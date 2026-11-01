@@ -9,6 +9,8 @@ web/.env
 web/.env.*
 !web/.env.example
 web/vite.config.ts.timestamp-*
+# Demo accounts from `make seed-demo`
+web/.demo.json
 
 # iOS
 ios/build/

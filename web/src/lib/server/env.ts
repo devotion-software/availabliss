@@ -15,6 +15,8 @@ function list(name: string): string[] {
 
 export const env = {
 	baseUrl: optional('BETTER_AUTH_URL') ?? 'http://localhost:5190',
+	/** Extra origins Better Auth accepts, e.g. the Android emulator's http://10.0.2.2:5190 in dev. */
+	trustedOrigins: list('TRUSTED_ORIGINS'),
 	authSecret: optional('BETTER_AUTH_SECRET'),
 	secretsKey: optional('SECRETS_KEY') ?? optional('BETTER_AUTH_SECRET'),
 

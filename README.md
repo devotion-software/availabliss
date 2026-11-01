@@ -33,12 +33,15 @@ Run `make help` for every task. The useful ones:
 | `make dev` | Web app + API with hot reload |
 | `make test` | Unit tests (availability engine, CalDAV parsing) |
 | `make smoke` | End-to-end API test against the running dev server |
+| `make seed-demo` / `make clean-demo` | Create / delete demo users, groups, busy time and chat to explore the apps |
 | `make check` | Type-check |
 | `make db-generate` / `make db-migrate` | Create / apply a migration after schema changes |
 | `make school-holidays FILE=…csv` | Import school holiday dates per local authority |
 | `make docker-build` / `make docker-run` | Build and run the production image |
-| `make ios-open` | Generate and open the Xcode project |
-| `make android-build` | Build the Android debug APK |
+| `make ios-open` / `make ios-build` | Generate and open the Xcode project / build for the simulator |
+| `make ios-uitest` | Sign in on the simulator as the demo user and tour every main screen (XCUITest) |
+| `make android-build` / `make android-test` | Build the Android debug APK / run its unit tests |
+| `make android-tour` | Sign in on the emulator as the demo user and tour every main screen |
 
 ## How it fits together
 

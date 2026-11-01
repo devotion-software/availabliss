@@ -1,34 +1,21 @@
 import SwiftUI
 
 /// Bricolage Grotesque for display, Instrument Sans for UI. Both are bundled
-/// (see Resources/Fonts/README.md). `Font.custom` falls back to the system font
-/// when a family isn't installed, and always scales with Dynamic Type.
+/// as variable fonts (see Resources/Fonts/README.md). `Font.custom` falls back to the
+/// system font when a family isn't installed, and always scales with Dynamic Type.
 enum AppFont {
-    /// PostScript prefixes of the bundled static TTFs.
-    static let displayFamily = "BricolageGrotesque"
-    static let bodyFamily = "InstrumentSans"
+    /// Family names of the bundled variable fonts. `.weight` drives their weight axis.
+    static let displayFamily = "Bricolage Grotesque"
+    static let bodyFamily = "Instrument Sans"
 
     /// Display: titles and numbers. Pass the size from the design concept.
     static func display(_ size: CGFloat, _ weight: Font.Weight = .bold, relativeTo style: Font.TextStyle = .title) -> Font {
-        .custom(postScriptName(displayFamily, weight), size: size, relativeTo: style).weight(weight)
+        .custom(displayFamily, size: size, relativeTo: style).weight(weight)
     }
 
     /// Body / UI text.
     static func body(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle = .body) -> Font {
-        .custom(postScriptName(bodyFamily, weight), size: size, relativeTo: style).weight(weight)
-    }
-
-    /// e.g. `BricolageGrotesque-SemiBold`. If the face isn't bundled, `Font.custom` falls back to the
-    /// system font at the same size (still Dynamic Type scaled) and `.weight` keeps the intended weight.
-    private static func postScriptName(_ family: String, _ weight: Font.Weight) -> String {
-        let suffix: String = switch weight {
-        case .medium: "Medium"
-        case .semibold: "SemiBold"
-        case .bold: "Bold"
-        case .heavy, .black: "ExtraBold"
-        default: "Regular"
-        }
-        return "\(family)-\(suffix)"
+        .custom(bodyFamily, size: size, relativeTo: style).weight(weight)
     }
 }
 

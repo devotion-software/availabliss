@@ -11,7 +11,7 @@ import dev.joeherbert.availabliss.core.network.onSuccess
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Countries, subdivisions, school authorities and holidays (`/regions/*`, `/holidays`). */
+/** Countries, subdivisions, school authorities and holidays (the `/regions` and `/holidays` endpoints). */
 @Singleton
 class RegionsRepository @Inject constructor(
     private val api: AvailablissApi,

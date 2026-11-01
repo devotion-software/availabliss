@@ -79,6 +79,7 @@ struct GroupAvailabilityView: View {
                 height: 32,
                 accessibilityLabel: "Calendar view"
             )
+            .fixedSize()
         }
     }
 
@@ -213,7 +214,7 @@ private struct MonthGrid: View {
                                 compact: model.columns.count > 4,
                                 isSelected: date == model.selectedDay
                             ) {
-                                withAnimation(.spring(response: 0.3)) { model.selectedDay = date }
+                                withAnimation(.spring(response: 0.3)) { model.pick(date) }
                             }
                         } else {
                             Color.clear.frame(height: 54).accessibilityHidden(true)

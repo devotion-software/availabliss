@@ -157,6 +157,7 @@ private struct SignInForm: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "shield").font(.system(size: 13, weight: .semibold)).padding(.top, 1)
             Text("Your group only ever sees when you're busy, never what you're doing.")
+                .fixedSize(horizontal: false, vertical: true)
         }
         .bodyFont(12, relativeTo: .caption)
         .foregroundStyle(theme.muted)

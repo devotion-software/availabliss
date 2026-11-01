@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -233,10 +232,12 @@ private fun HeadingRow(state: GroupCalendarUiState, onSelectView: (CalendarView)
         CalendarView.Day -> "day"
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        PlainIconButton(AvIcons.Back, "Previous $unit", onPrevious, size = 32.dp, iconSize = 16.dp)
-        Text(state.heading, style = AvailablissTheme.type.titleSmall, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-        PlainIconButton(AvIcons.Forward, "Next $unit", onNext, size = 32.dp, iconSize = 16.dp)
-        Spacer(Modifier.weight(1f))
+        // "‹ Nov 2026 ›" keeps together and takes whatever the view switcher leaves.
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            PlainIconButton(AvIcons.Back, "Previous $unit", onPrevious, size = 32.dp, iconSize = 16.dp)
+            Text(state.heading, style = AvailablissTheme.type.titleSmall, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            PlainIconButton(AvIcons.Forward, "Next $unit", onNext, size = 32.dp, iconSize = 16.dp)
+        }
         SegmentedControl(
             segments = CalendarView.entries.map { Segment(it, it.label) },
             selected = state.view,
@@ -289,7 +290,8 @@ private fun DetailCard(detail: DayDetailUi, onPropose: (Slot) -> Unit, onSeeWhos
                     height = 44.dp,
                     shape = Shapes.controlSmall,
                     textStyle = AvailablissTheme.type.bodySmallStrong,
-                    modifier = Modifier.weight(1f),
+                    // The primary action gets more room so "Propose this weekend" fits on one line.
+                    modifier = Modifier.weight(1.4f),
                 )
             }
             SecondaryButton(

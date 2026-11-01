@@ -90,6 +90,9 @@ object DateTimes {
     /** "November 2026" */
     fun monthYear(date: LocalDate): String = pattern("MMMM yyyy").format(date)
 
+    /** "Nov 2026", for tight headers. */
+    fun shortMonthYear(date: LocalDate): String = pattern("MMM yyyy").format(date)
+
     /** "NOV" */
     fun monthAbbrev(date: LocalDate): String = pattern("MMM").format(date).uppercase(locale)
 
@@ -104,24 +107,29 @@ object DateTimes {
         return if (allDay) shortDay(dt.toLocalDate()) else "${shortDay(dt.toLocalDate())} · ${time(dt)}"
     }
 
-    /** "2 – 8 November", "28 Oct – 3 Nov". */
+    /** "2 – 8 Nov", "28 Oct – 3 Nov". */
     fun weekRange(start: LocalDate, end: LocalDate): String = when {
-        start.month == end.month -> "${start.dayOfMonth} – ${pattern("d MMMM").format(end)}"
+        start.month == end.month -> "${start.dayOfMonth} – ${pattern("d MMM").format(end)}"
         else -> "${dayMonth(start)} – ${dayMonth(end)}"
     }
 
-    /** "Fri 13 – Sun 15 Nov", "Wed 11 Nov · 18:30 – 21:00", for proposals and events. */
+    /**
+     * "Fri 13 – Sun 15 Nov", "Wed 11 Nov · 18:30 – 21:00", "Mon 2 Nov · from 18:00", for
+     * proposals and events. The end is exclusive, so a range ending at midnight belongs to
+     * the day before (matching the server's labels).
+     */
     fun rangeLabel(startIso: String, endIso: String, allDay: Boolean): String {
         val start = localDateTime(startIso) ?: return ""
-        val endRaw = localDateTime(endIso) ?: return shortDay(start.toLocalDate())
-        // All-day ranges are end-exclusive at midnight.
-        val end = if (allDay && endRaw.toLocalTime() == LocalTime.MIDNIGHT) endRaw.minusDays(1) else endRaw
-        val sameDay = start.toLocalDate() == end.toLocalDate()
+        val end = localDateTime(endIso) ?: return shortDay(start.toLocalDate())
+        val endsAtMidnight = end.toLocalTime() == LocalTime.MIDNIGHT
+        val lastDay = if (endsAtMidnight) end.toLocalDate().minusDays(1) else end.toLocalDate()
+        val firstDay = start.toLocalDate()
         return when {
-            sameDay && allDay -> shortDay(start.toLocalDate())
-            sameDay -> "${shortDay(start.toLocalDate())} · ${time(start)} – ${time(end)}"
-            start.month == end.month -> "${weekdayAndDay(start.toLocalDate())} – ${shortDay(end.toLocalDate())}"
-            else -> "${shortDay(start.toLocalDate())} – ${shortDay(end.toLocalDate())}"
+            firstDay == lastDay && allDay -> shortDay(firstDay)
+            firstDay == lastDay && endsAtMidnight -> "${shortDay(firstDay)} · from ${time(start)}"
+            firstDay == lastDay -> "${shortDay(firstDay)} · ${time(start)} – ${time(end)}"
+            firstDay.month == lastDay.month -> "${weekdayAndDay(firstDay)} – ${shortDay(lastDay)}"
+            else -> "${shortDay(firstDay)} – ${shortDay(lastDay)}"
         }
     }
 

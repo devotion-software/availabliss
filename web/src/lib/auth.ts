@@ -33,8 +33,8 @@ export const auth = betterAuth({
 	// Passwordless only.
 	emailAndPassword: { enabled: false },
 	socialProviders: socialProviders(),
-	// Apple's web flow posts back from appleid.apple.com.
-	trustedOrigins: ['https://appleid.apple.com'],
+	// Apple's web flow posts back from appleid.apple.com; TRUSTED_ORIGINS adds dev hosts.
+	trustedOrigins: ['https://appleid.apple.com', ...env.trustedOrigins],
 	account: {
 		accountLinking: {
 			enabled: true,

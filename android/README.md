@@ -8,30 +8,32 @@ and Custom Tabs. It talks to the same `/api/v1` API as the web and iOS apps
 
 ## Requirements
 
-- **JDK 17** (Android Studio Ladybug or newer bundles one).
-- **Android SDK** with platform **35** and build-tools 35 (`compileSdk`/`targetSdk` 35, `minSdk` 26).
-- Gradle **8.11.1** (via the wrapper, see below). AGP 8.7.3, Kotlin 2.1.0.
-
-### Gradle wrapper
-
-The wrapper (`gradlew`, `gradle/wrapper/*`) is committed and pinned to Gradle **8.11.1**,
-the version AGP 8.7.3 supports. Do not regenerate it with Gradle 9.x unless you also move to
-an AGP release that supports Gradle 9. If the jar is ever missing:
+- **Android Studio** (its bundled JDK runs Gradle; `make android-build` picks it up
+  automatically when `JAVA_HOME` isn't set).
+- **Android SDK platform 37** (`compileSdk`/`targetSdk` 37, `minSdk` 26). Android Studio's
+  SDK Manager installs it.
+- Gradle **9.8.2** via the committed wrapper, AGP **9.5.0** (built-in Kotlin, so there is no
+  `kotlin-android` plugin), Kotlin **2.4**, KSP **2.3**.
 
 ```sh
-cd android
-gradle wrapper --gradle-version 8.11.1
+make android-build      # debug APK → app/build/outputs/apk/debug/app-debug.apk
+make android-test       # unit tests
 ```
 
-Run Gradle with **JDK 17 or 21** (`JAVA_HOME`). Gradle 8.11 can't run on newer JDKs such as
-Homebrew's current `openjdk`. Then:
+### Running against the local dev server
 
-```sh
-./gradlew assembleDebug
-```
+- The emulator reaches the host as `http://10.0.2.2:5190` (the default `apiBaseUrl`). The dev
+  server binds to `127.0.0.1` for this, and `TRUSTED_ORIGINS=http://10.0.2.2:5190` in
+  `web/.env` lets Better Auth accept the app's sign-in requests.
+- Android 17 blocks apps from reaching local-network addresses without
+  `ACCESS_LOCAL_NETWORK`. Only **debug** builds declare it (`src/debug/AndroidManifest.xml`) and
+  ask for it on launch; release builds talk to the public API and never ask.
+- End-to-end tour on a running emulator (signs in with a real email code from Mailpit and
+  screenshots every main screen into `android/build/tour-screens`):
 
-The SDK needs platform **35** installed (Android Studio → SDK Manager, or
-`sdkmanager "platforms;android-35" "build-tools;35.0.0"`).
+  ```sh
+  make seed-demo && make android-tour
+  ```
 
 ## Configuration
 

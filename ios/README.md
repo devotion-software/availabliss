@@ -91,16 +91,15 @@ Availabliss/
 - Live updates: the SSE stream runs while the app is active; screens subscribe in `.task` and
   refetch / patch state per event type. Push covers the background.
 
-## Checking without Xcode
-
-Xcode isn't required to type-check: the macOS SDK's Mac Catalyst slice has UIKit + SwiftUI.
-On SDK 27+ SwiftUI's `@State` is a macro whose plugin only ships with Xcode, so with the Command
-Line Tools alone point `SDK` at a 26.x SDK (e.g. `/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk`).
+## Building and testing
 
 ```sh
-SDK=$(xcrun --show-sdk-path)
-cd ios/Availabliss && swiftc -typecheck -swift-version 6 -module-name Availabliss \
-  -target arm64-apple-ios17.0-macabi -sdk $SDK \
-  -Fsystem $SDK/System/iOSSupport/System/Library/Frameworks \
-  $(find . -name '*.swift')
+make ios-build                              # simulator build (IOS_SIM="iPhone 18 Pro")
+make seed-demo && make ios-uitest          # sign in + tour, screenshots in ios/build/uitest-screens
 ```
+
+Both targets use Xcode even if `xcode-select` still points at the Command Line Tools
+(run `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer` to make it permanent).
+`ios-uitest` resets the simulator's Keychain first, so each run starts signed out.
+For the local dev server set `API_BASE_URL = http:/$()/localhost:5190` in
+`Config/Secrets.xcconfig`; `NSAllowsLocalNetworking` lets debug builds use plain http locally.

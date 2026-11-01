@@ -6,9 +6,10 @@
  *
  *   bun scripts/smoke.ts            # BASE_URL defaults to http://localhost:5190
  */
-const BASE = process.env.BASE_URL ?? 'http://localhost:5190';
-const MAILPIT = process.env.MAILPIT_URL ?? 'http://localhost:8027';
+import { addDays, BASE, call, otpFor, signIn as signInWithCode, todayUtc } from './lib/api';
+
 const run = Date.now().toString(36);
+const today = todayUtc();
 
 let failures = 0;
 function check(label: string, ok: boolean, detail?: unknown) {
@@ -16,48 +17,16 @@ function check(label: string, ok: boolean, detail?: unknown) {
 	if (!ok) failures++;
 }
 
-async function call<T = any>(token: string | null, method: string, path: string, body?: unknown): Promise<{ status: number; data: T; headers: Headers }> {
-	const res = await fetch(`${BASE}${path}`, {
-		method,
-		headers: {
-			...(token && { authorization: `Bearer ${token}` }),
-			...(body !== undefined && { 'content-type': 'application/json' }),
-			origin: BASE
-		},
-		body: body === undefined ? undefined : JSON.stringify(body)
-	});
-	const text = await res.text();
-	let data: any = text;
+async function signIn(email: string, name: string) {
 	try {
-		data = text ? JSON.parse(text) : null;
-	} catch {
-		/* not JSON */
+		const user = await signInWithCode(email, name);
+		check(`sign in ${email}`, true);
+		return user;
+	} catch (err) {
+		check(`sign in ${email}`, false, String(err));
+		process.exit(1);
 	}
-	return { status: res.status, data, headers: res.headers };
 }
-
-async function otpFor(email: string): Promise<string> {
-	for (let i = 0; i < 20; i++) {
-		const res = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`);
-		const { messages } = (await res.json()) as { messages: { Subject: string }[] };
-		const code = messages[0]?.Subject.match(/^(\d{6})/)?.[1];
-		if (code) return code;
-		await Bun.sleep(250);
-	}
-	throw new Error(`No code emailed to ${email}`);
-}
-
-async function signIn(email: string, name: string): Promise<{ token: string; id: string }> {
-	await call(null, 'POST', '/api/auth/email-otp/send-verification-otp', { email, type: 'sign-in' });
-	const res = await call(null, 'POST', '/api/auth/sign-in/email-otp', { email, otp: await otpFor(email) });
-	const token = res.headers.get('set-auth-token');
-	check(`sign in ${email}`, res.status === 200 && Boolean(token), res.data);
-	await call(token!, 'PATCH', '/api/v1/me', { name, timezone: 'Europe/London', country: 'GB', subdivision: 'GB-ENG', onboarded: true });
-	return { token: token!, id: res.data.user.id };
-}
-
-const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
-const today = new Date().toISOString().slice(0, 10);
 
 const sam = await signIn(`sam+${run}@example.com`, 'Sam');
 const priya = await signIn(`priya+${run}@example.com`, 'Priya');

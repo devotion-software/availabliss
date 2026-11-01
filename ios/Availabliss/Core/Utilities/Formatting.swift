@@ -25,6 +25,11 @@ enum Formatting {
         day.startDate().formatted(.dateTime.month(.wide).year())
     }
 
+    /// "Nov 2026", for tight headers.
+    static func shortMonthYear(_ day: CalendarDay) -> String {
+        day.startDate().formatted(.dateTime.month(.abbreviated).year())
+    }
+
     static func dayMonthYear(_ day: CalendarDay) -> String {
         day.startDate().formatted(.dateTime.day().month(.abbreviated).year())
     }
@@ -33,19 +38,23 @@ enum Formatting {
         day.startDate().formatted(.dateTime.day().month(.abbreviated))
     }
 
-    /// "2 – 8 November" / "28 Dec – 3 Jan".
+    /// "2 – 8 Nov" / "28 Dec – 3 Jan".
     static func dayRange(_ from: CalendarDay, _ to: CalendarDay) -> String {
         if from.month == to.month && from.year == to.year {
-            return "\(from.day) – \(to.day) \(to.startDate().formatted(.dateTime.month(.wide)))"
+            return "\(from.day) – \(to.day) \(to.startDate().formatted(.dateTime.month(.abbreviated)))"
         }
         return "\(dayMonth(from)) – \(dayMonth(to))"
     }
 
-    /// "Fri 13 – Sun 15 Nov" for a span of time, "Wed 11 Nov · 18:30 – 21:00" within a day.
+    /// "Fri 13 – Sun 15 Nov" for a span of time, "Wed 11 Nov · 18:30 – 21:00" within a day,
+    /// "Mon 2 Nov · from 18:00" for an evening that runs to midnight. The end is exclusive,
+    /// so a span ending at midnight belongs to the day before (matching the server's labels).
     static func span(start: Date, end: Date, allDay: Bool, calendar: Calendar = .current) -> String {
-        let lastInstant = allDay ? end.addingTimeInterval(-1) : end
+        let lastInstant = end.addingTimeInterval(-1)
         if calendar.isDate(start, inSameDayAs: lastInstant) {
-            return allDay ? shortDay(start) : "\(shortDay(start)) · \(time(start)) – \(time(end))"
+            if allDay { return shortDay(start) }
+            let endsAtMidnight = calendar.startOfDay(for: end) == end
+            return endsAtMidnight ? "\(shortDay(start)) · from \(time(start))" : "\(shortDay(start)) · \(time(start)) – \(time(end))"
         }
         let startText = start.formatted(.dateTime.weekday(.abbreviated).day())
         return "\(startText) – \(shortDay(lastInstant))"

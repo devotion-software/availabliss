@@ -18,6 +18,10 @@ export default defineConfig({
 		})
 	],
 	server: {
+		// IPv4 loopback: the Android emulator reaches the host only via 10.0.2.2 → 127.0.0.1,
+		// and Node would otherwise bind "localhost" to ::1 alone. Browsers and the iOS
+		// simulator still reach it as localhost. Use `bun run dev --host` for real devices.
+		host: '127.0.0.1',
 		// Fixed port keeps BETTER_AUTH_URL / OAuth callbacks stable across restarts.
 		port: 5190,
 		strictPort: true

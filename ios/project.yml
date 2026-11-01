@@ -26,6 +26,9 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
+    scheme:
+      testTargets:
+        - AvailablissUITests
     sources:
       - path: Availabliss
         excludes:
@@ -53,6 +56,9 @@ targets:
       path: Availabliss/Resources/Info.plist
       properties:
         CFBundleDisplayName: Availabliss
+        # Lets debug builds reach the local dev server over http (localhost / *.local only).
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
@@ -84,11 +90,29 @@ targets:
         NSCalendarsWriteOnlyAccessUsageDescription: Availabliss adds confirmed plans to your calendar.
         NSCalendarsUsageDescription: Availabliss reads when you're busy so your groups can find times that work.
         NSFaceIDUsageDescription: Use Face ID to sign in with your passkey.
+        # Google Fonts variable TTFs; AppFont picks the family and sets the weight axis.
         UIAppFonts:
-          - BricolageGrotesque-SemiBold.ttf
-          - BricolageGrotesque-Bold.ttf
-          - BricolageGrotesque-ExtraBold.ttf
-          - InstrumentSans-Regular.ttf
-          - InstrumentSans-Medium.ttf
-          - InstrumentSans-SemiBold.ttf
-          - InstrumentSans-Bold.ttf
+          - BricolageGrotesque-VariableFont_opsz,wdth,wght.ttf
+          - InstrumentSans-VariableFont_wdth,wght.ttf
+          - InstrumentSans-Italic-VariableFont_wdth,wght.ttf
+
+  # End-to-end UI tour against a running dev server (see AvailablissUITests/README.md).
+  AvailablissUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: AvailablissUITests
+        excludes:
+          - "**/README.md"
+    dependencies:
+      - target: Availabliss
+    info:
+      path: AvailablissUITests/Info.plist
+      properties:
+        # The test reads sign-in codes from Mailpit on localhost over http.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.joeherbert.availabliss.uitests

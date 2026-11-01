@@ -73,6 +73,8 @@ private data class RawState(
     val month: YearMonth = YearMonth.from(DateTimes.today()),
     val availability: Availability? = null,
     val selected: LocalDate = DateTimes.today(),
+    /** True once the user taps a day; reloads then keep their choice. */
+    val userPicked: Boolean = false,
     val week: List<DayAvailability> = emptyList(),
     val weekLoading: Boolean = false,
     val day: DayAvailability? = null,
@@ -124,7 +126,7 @@ class GroupCalendarViewModel @Inject constructor(
     }
 
     fun selectDate(date: LocalDate) {
-        raw.update { it.copy(selected = date) }
+        raw.update { it.copy(selected = date, userPicked = true) }
         if (raw.value.view != CalendarView.Month) loadForView()
     }
 
@@ -164,7 +166,7 @@ class GroupCalendarViewModel @Inject constructor(
             CalendarView.Month -> {
                 val month = r.month.plusMonths(delta)
                 val selected = if (YearMonth.from(DateTimes.today()) == month) DateTimes.today() else month.atDay(1)
-                raw.update { it.copy(month = month, selected = selected) }
+                raw.update { it.copy(month = month, selected = selected, userPicked = false) }
                 loadMonth()
             }
             CalendarView.Week -> {
@@ -213,12 +215,12 @@ class GroupCalendarViewModel @Inject constructor(
         }
     }
 
-    /** Keeps the user's selection, else picks today or the first match of the month. */
+    /** Keeps a day the user picked; otherwise the first day that works, then today, then the 1st. */
     private fun defaultSelection(s: RawState, availability: Availability): LocalDate {
-        if (YearMonth.from(s.selected) == s.month && s.selected != s.month.atDay(1)) return s.selected
+        if (s.userPicked && YearMonth.from(s.selected) == s.month) return s.selected
+        availability.days.firstOrNull { it.status == DayStatus.Match }?.date?.let(DateTimes::parseDate)?.let { return it }
         val today = DateTimes.today()
-        if (YearMonth.from(today) == s.month) return today
-        return availability.days.firstOrNull { it.status == DayStatus.Match }?.date?.let(DateTimes::parseDate) ?: s.month.atDay(1)
+        return if (YearMonth.from(today) == s.month) today else s.month.atDay(1)
     }
 
     private fun loadForView() {
@@ -250,7 +252,7 @@ class GroupCalendarViewModel @Inject constructor(
         val weekStart = DateTimes.startOfWeek(r.selected)
         val weekDates = columns.map { weekStart.plusDays(it.toLong()) }
         val heading = when (r.view) {
-            CalendarView.Month -> DateTimes.monthYear(r.month.atDay(1))
+            CalendarView.Month -> DateTimes.shortMonthYear(r.month.atDay(1))
             CalendarView.Week -> if (weekDates.isEmpty()) "" else DateTimes.weekRange(weekDates.first(), weekDates.last()).let { shortenMonth(it, weekDates) }
             CalendarView.Day -> DateTimes.shortDay(r.selected)
         }

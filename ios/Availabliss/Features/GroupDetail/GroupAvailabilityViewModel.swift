@@ -10,6 +10,8 @@ final class GroupAvailabilityViewModel {
     var mode: Mode = .month
     private(set) var month: CalendarDay = CalendarDay.today().firstOfMonth
     var selectedDay: CalendarDay = .today()
+    /// True once the user taps a day; reloads then keep their choice.
+    private var userPickedDay = false
     private(set) var availability: Availability?
     private(set) var dayDetails: [CalendarDay: DayAvailability] = [:]
     private(set) var isLoading = false
@@ -56,7 +58,7 @@ final class GroupAvailabilityViewModel {
 
     var heading: String {
         switch mode {
-        case .month: Formatting.monthYear(month)
+        case .month: Formatting.shortMonthYear(month)
         case .week:
             if let first = weekDays.first, let last = weekDays.last { Formatting.dayRange(first, last) } else { "" }
         case .day: Formatting.shortDay(selectedDay)
@@ -81,11 +83,18 @@ final class GroupAvailabilityViewModel {
         case .month:
             month = month.addingMonths(delta)
             selectedDay = month == CalendarDay.today().firstOfMonth ? .today() : month
+            userPickedDay = false
         case .week: selectedDay = selectedDay.adding(days: 7 * delta)
         case .day: selectedDay = selectedDay.adding(days: delta)
         }
         if mode != .month, selectedDay.firstOfMonth != month { month = selectedDay.firstOfMonth }
         await load()
+    }
+
+    /// A day tapped in the month grid.
+    func pick(_ date: CalendarDay) {
+        selectedDay = date
+        userPickedDay = true
     }
 
     func showDay(_ date: CalendarDay) async {
@@ -103,7 +112,12 @@ final class GroupAvailabilityViewModel {
         isLoading = availability == nil
         defer { isLoading = false }
         do {
-            availability = try await api.send(API.GroupAvailability.range(groupId: groupId, from: month, to: month.lastOfMonth()))
+            let loaded: Availability = try await api.send(API.GroupAvailability.range(groupId: groupId, from: month, to: month.lastOfMonth()))
+            availability = loaded
+            // Start on a day that works rather than one outside the group's timing.
+            if !userPickedDay, let firstMatch = loaded.days.first(where: { $0.status == .match }) {
+                selectedDay = firstMatch.date
+            }
         } catch where !error.isCancellation {
             self.error = error.userMessage
         } catch {}

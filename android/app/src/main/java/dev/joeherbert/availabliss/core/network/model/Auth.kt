@@ -3,7 +3,7 @@ package dev.joeherbert.availabliss.core.network.model
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
-/* Better Auth request / response bodies (`/api/auth/*`). */
+/* Better Auth request / response bodies (the `/api/auth` endpoints). */
 
 @Serializable
 data class SendOtpRequest(val email: String, val type: String) {

@@ -1,12 +1,14 @@
 package dev.joeherbert.availabliss
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -25,10 +27,13 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var deepLinks: DeepLinkBus
 
+    private val localNetworkPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (savedInstanceState == null) handleIntent(intent)
+        requestLocalNetworkForDevServer()
 
         setContent {
             val root: RootViewModel = hiltViewModel()
@@ -41,6 +46,20 @@ class MainActivity : ComponentActivity() {
                 }
                 AppRoot(root)
             }
+        }
+    }
+
+    /**
+     * Debug builds talk to a dev server on the local network (or the emulator host), which
+     * newer Android versions block without ACCESS_LOCAL_NETWORK. Only the debug manifest
+     * declares it, so release builds skip this.
+     */
+    private fun requestLocalNetworkForDevServer() {
+        if (!BuildConfig.DEBUG) return
+        val declared = packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+            .requestedPermissions.orEmpty().contains(LOCAL_NETWORK)
+        if (declared && checkSelfPermission(LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED) {
+            localNetworkPermission.launch(LOCAL_NETWORK)
         }
     }
 
@@ -57,5 +76,9 @@ class MainActivity : ComponentActivity() {
                 DeepLink.fromPushData(extras.keySet().associateWith { extras.getString(it).orEmpty() })
             }
         link?.let(deepLinks::post)
+    }
+
+    private companion object {
+        const val LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
     }
 }
