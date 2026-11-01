@@ -1,0 +1,29 @@
+.DS_Store
+*.log
+
+# Web
+web/node_modules
+web/build
+web/.svelte-kit
+web/.env
+web/.env.*
+!web/.env.example
+web/vite.config.ts.timestamp-*
+
+# iOS
+ios/build/
+ios/DerivedData/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+ios/Availabliss.xcodeproj/
+ios/Config/Secrets.xcconfig
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/app/google-services.json
+android/keystore.properties
+*.jks

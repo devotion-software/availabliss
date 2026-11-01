@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Availabliss · Groups</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Instrument+Sans:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+:root,.av{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC;--bg:#ECEEF7;--ink:#1A1B3A;--muted:#4D5072;--neutral-ink:#3A3D5C;--surface:rgba(255,255,255,.62);--glass:rgba(255,255,255,.5);--glass-border:rgba(255,255,255,.8);--glass-hi:rgba(255,255,255,.9);--shadow:rgba(43,38,120,.38);--line:rgba(26,27,58,.07);--line-2:rgba(26,27,58,.14);--line-3:rgba(26,27,58,.28);--solid:#1A1B3A;--on-solid:#FFFFFF;--on-accent:#FFFFFF;--busy-bg:#FFFFFF;--busy-line:#B9BCD6;--ok:#0FA37F;--ok-bg:#D3F5EA;--ok-ink:#0D6B52;--warn:#FF8A5E;--warn-bg:#FFE0CF;--warn-ink:#8A3410;--t1:#FFD3BF;--t2:#D6DAFF;--t3:#C8F1E4;--t4:#F5D6EE;--t5:#FFE7A3;--orb-op:.85}
+.av.dark{--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24);--bg:#0C0D1D;--ink:#F1F2FA;--muted:#A6A9C8;--neutral-ink:#C9CBE3;--surface:rgba(255,255,255,.07);--glass:rgba(26,28,56,.5);--glass-border:rgba(255,255,255,.12);--glass-hi:rgba(255,255,255,.1);--shadow:rgba(0,0,0,.6);--line:rgba(255,255,255,.08);--line-2:rgba(255,255,255,.16);--line-3:rgba(255,255,255,.3);--solid:#F1F2FA;--on-solid:#0C0D1D;--busy-bg:rgba(255,255,255,.14);--busy-line:#4A4D70;--ok:#34D3A0;--ok-bg:rgba(52,211,160,.16);--ok-ink:#7EE8C6;--warn:#FF9A73;--warn-bg:rgba(255,138,94,.18);--warn-ink:#FFBCA2;--t1:#5C3B2E;--t2:#363B78;--t3:#1E5045;--t4:#58304F;--t5:#5A4A1E;--orb-op:.42}
+.t-dawn{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC}
+.dark.t-dawn{--accent:#6A5CFF;--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24)}
+.t-lagoon{--accent:#0B7F8A;--accent-ink:#06646D;--accent-soft:rgba(11,127,138,.14);--orb1:#86E3E0;--orb2:#8EC5FF;--orb3:#B5EBA8}
+.dark.t-lagoon{--accent-ink:#7FDDE4;--accent-soft:rgba(19,156,168,.26)}
+.t-sunset{--accent:#C9401F;--accent-ink:#A8341A;--accent-soft:rgba(201,64,31,.13);--orb1:#FFA585;--orb2:#FF9CC0;--orb3:#FFD37E}
+.dark.t-sunset{--accent-ink:#FFB199;--accent-soft:rgba(224,83,47,.26)}
+.t-orchid{--accent:#9333C9;--accent-ink:#7A27AA;--accent-soft:rgba(147,51,201,.13);--orb1:#F4B0E0;--orb2:#C9A8FF;--orb3:#A9B8FF}
+.dark.t-orchid{--accent:#A646DB;--accent-ink:#DDB0F7;--accent-soft:rgba(166,70,219,.26)}
+.t-grove{--accent:#2D7A4A;--accent-ink:#22633B;--accent-soft:rgba(45,122,74,.14);--orb1:#C3E88F;--orb2:#8FD8B5;--orb3:#F3D78A}
+.dark.t-grove{--accent-ink:#9FE0B6;--accent-soft:rgba(58,148,96,.26)}
+.av{transition:background .3s ease,color .3s ease}
+.av .orb{opacity:var(--orb-op) !important}
+.dark .venn circle{mix-blend-mode:screen}
+a{color:var(--accent-ink)}a:hover{color:var(--ink)}
+.orb{position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(26px) saturate(170%);backdrop-filter:blur(26px) saturate(170%);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-hi),0 18px 40px -22px var(--shadow)}
+.disp{font-family:'Bricolage Grotesque',system-ui,sans-serif;letter-spacing:-.025em}
+button{font:inherit;color:inherit;cursor:pointer}
+.card{text-decoration:none;color:var(--ink);transition:transform .2s ease}
+.card:hover{color:var(--ink);transform:translateY(-1px)}
+</style>
+</helmet>
+<div class="{{themeClass}}" style="width:390px;height:844px;position:relative;overflow:hidden;background:var(--bg);font-family:'Instrument Sans',system-ui,sans-serif;color:var(--ink)">
+  <div class="orb" aria-hidden="true" style="width:340px;height:340px;left:-140px;top:-110px;background:var(--orb1);opacity:.85"></div>
+  <div class="orb" aria-hidden="true" style="width:300px;height:300px;right:-150px;top:230px;background:var(--orb2);opacity:.85"></div>
+  <div class="orb" aria-hidden="true" style="width:300px;height:300px;left:-90px;bottom:-40px;background:var(--orb3);opacity:.8"></div>
+
+  <div style="position:relative;height:100%;box-sizing:border-box;padding:28px 20px 0;display:flex;flex-direction:column;gap:18px">
+    <header style="display:flex;align-items:flex-end;justify-content:space-between">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:13px;font-weight:500;color:var(--muted)">Sunday 1 November</span>
+        <h1 class="disp" style="margin:0;font-size:32px;font-weight:700;line-height:1.05">Hi, Sam</h1>
+      </div>
+      <button class="glass" aria-label="Your profile" style="width:44px;height:44px;border-radius:50%;padding:0;font-weight:600;font-size:15px">S</button>
+    </header>
+
+    <section class="glass" aria-label="Up next" style="border-radius:28px;padding:18px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;background:var(--ok-bg);color:var(--ok-ink)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>
+          Everyone's in
+        </span>
+        <span style="font-size:12px;font-weight:500;color:var(--muted)">Book club</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <h2 class="disp" style="margin:0;font-size:22px;font-weight:650;line-height:1.15">Wed 11 Nov · 18:30</h2>
+        <span style="font-size:14px;color:var(--muted)">At Hana's · 8 going</span>
+      </div>
+      <button style="height:48px;border:0;border-radius:16px;background:var(--solid);color:var(--on-solid);font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5"></path></svg>
+        Add to calendar
+      </button>
+    </section>
+
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h2 class="disp" style="margin:0;font-size:20px;font-weight:650">Your groups</h2>
+      <button class="glass" style="height:36px;border-radius:999px;padding:0 14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+        New group
+      </button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+        <a href="GroupCalendar.dc.html" class="card glass" style="border-radius:24px;padding:14px;display:flex;gap:12px;align-items:center">
+          <div class="disp" aria-hidden="true" style="width:48px;height:48px;flex:none;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;background:{{g.tile}}">{{g.mono}}</div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <span style="font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{g.name}}</span>
+              <span style="flex:none;font-size:11px;font-weight:600;padding:4px 8px;border-radius:999px;{{g.badgeStyle}}">{{g.badge}}</span>
+            </div>
+            <span style="font-size:13px;color:var(--muted)">{{g.timing}}</span>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div style="display:flex;padding-right:8px">
+                <sc-for list="{{g.people}}" as="p" hint-placeholder-count="4">
+                  <span style="width:22px;height:22px;margin-right:-7px;border-radius:50%;border:1.5px solid var(--glass-border);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;background:{{p.c}}">{{p.i}}</span>
+                </sc-for>
+              </div>
+              <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--muted)">
+                <svg width="16" height="16" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="none" style="stroke:var(--line-2)" stroke-width="3"></circle><circle cx="11" cy="11" r="9" fill="none" style="stroke:var(--accent)" stroke-width="3" stroke-linecap="round" stroke-dasharray="{{g.ring}}" transform="rotate(-90 11 11)"></circle></svg>
+                {{g.sync}}
+              </span>
+            </div>
+          </div>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+
+  <nav class="glass" aria-label="Main" style="position:absolute;left:20px;right:20px;bottom:22px;height:66px;border-radius:24px;display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));padding:0 6px">
+    <a href="Main.dc.html" aria-current="page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;text-decoration:none;color:var(--accent-ink)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="10" r="5.5"></circle><circle cx="15" cy="10" r="5.5"></circle><circle cx="12" cy="15" r="5.5"></circle></svg>
+      Groups
+    </a>
+    <a href="BlockTime.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;text-decoration:none;color:var(--muted)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>
+      My time
+    </a>
+    <a href="Proposal.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;text-decoration:none;color:var(--muted);position:relative">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+      Activity
+      <span style="position:absolute;top:10px;left:calc(50% + 6px);width:8px;height:8px;border-radius:50%;background:var(--warn);border:1.5px solid var(--bg)"></span>
+    </a>
+    <a href="Appearance.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;text-decoration:none;color:var(--muted)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>
+      You
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["light","dark"],"default":"light"},"theme":{"editor":"enum","options":["dawn","lagoon","sunset","orchid","grove"],"default":"dawn"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var v = this.baseVals();
+    v.themeClass = 'av ' + (this.props.mode || 'light') + ' t-' + (this.props.theme || 'dawn');
+    return v;
+  }
+  baseVals() {
+    var C = 2 * Math.PI * 9;
+    var pal = ['var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)'];
+    var tone = {
+      indigo: 'background:var(--accent-soft);color:var(--accent-ink)',
+      apricot: 'background:var(--warn-bg);color:var(--warn-ink)',
+      mint: 'background:var(--ok-bg);color:var(--ok-ink)',
+      plain: 'background:var(--line);color:var(--neutral-ink)'
+    };
+    var groups = [
+      { name: 'Lake District crew', mono: 'LD', tile: 'var(--t1)', timing: 'A weekend · Fri 6pm → Sun · Nov–Jan', badge: '2 weekends work', tone: 'indigo', people: ['S', 'P', 'T', 'A', 'L'], synced: 4, total: 6 },
+      { name: 'Book club', mono: 'BC', tile: 'var(--t2)', timing: 'An evening from 6pm · Tue–Thu', badge: 'Wed 11 Nov', tone: 'mint', people: ['H', 'S', 'R', 'K', 'M'], synced: 8, total: 8 },
+      { name: "Mum's 60th", mono: '60', tile: 'var(--t4)', timing: 'One day · school holidays only', badge: 'Needs your reply', tone: 'apricot', people: ['S', 'D', 'E', 'N', 'G'], synced: 12, total: 12 },
+      { name: 'Five-a-side', mono: '5', tile: 'var(--t3)', timing: '2 hours · weekday evenings', badge: 'Finding times', tone: 'plain', people: ['J', 'S', 'O', 'B', 'C'], synced: 7, total: 10 }
+    ];
+    return {
+      groups: groups.map(function (g) {
+        var left = g.total - g.synced;
+        return {
+          name: g.name, mono: g.mono, tile: g.tile, timing: g.timing, badge: g.badge,
+          badgeStyle: tone[g.tone],
+          ring: (C * g.synced / g.total).toFixed(1) + ' ' + C.toFixed(1),
+          sync: left === 0 ? 'All synced' : left + ' of ' + g.total + ' to sync',
+          people: g.people.map(function (i, n) { return { i: i, c: pal[n % pal.length] }; })
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

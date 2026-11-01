@@ -1,0 +1,69 @@
+import { and, asc, eq, ne } from 'drizzle-orm';
+import type { ColorTheme, ThemeMode, User } from '#lib/types';
+import { COLOR_THEMES, THEME_MODES } from '#lib/types';
+import { db } from './db';
+import { groupMembers, groups, user } from './db/schema';
+import { notFound } from './http';
+
+type UserRow = typeof user.$inferSelect;
+
+const oneOf = <T extends string>(values: readonly T[], value: string, fallback: T): T =>
+	(values as readonly string[]).includes(value) ? (value as T) : fallback;
+
+export const toUser = (row: UserRow): User => ({
+	id: row.id,
+	name: row.name,
+	email: row.email,
+	image: row.image ?? null,
+	themeMode: oneOf<ThemeMode>(THEME_MODES, row.themeMode, 'system'),
+	colorTheme: oneOf<ColorTheme>(COLOR_THEMES, row.colorTheme, 'dawn'),
+	country: row.country,
+	subdivision: row.subdivision,
+	schoolAuthority: row.schoolAuthority,
+	timezone: row.timezone,
+	onboarded: row.onboarded
+});
+
+export async function getMe(userId: string): Promise<User> {
+	const row = await db.query.user.findFirst({ where: eq(user.id, userId) });
+	if (!row) throw notFound('Account not found');
+	return toUser(row);
+}
+
+export type UserPatch = Partial<Pick<User, 'name' | 'themeMode' | 'colorTheme' | 'country' | 'subdivision' | 'schoolAuthority' | 'timezone' | 'onboarded'>>;
+
+export async function updateMe(userId: string, patch: UserPatch): Promise<User> {
+	if (Object.keys(patch).length) await db.update(user).set(patch).where(eq(user.id, userId));
+	return getMe(userId);
+}
+
+/**
+ * Deletes the account and its data. Groups the user owns pass to the longest-
+ * standing remaining member (preferring admins), or are deleted if empty.
+ */
+export async function deleteAccount(userId: string): Promise<void> {
+	await db.transaction(async (tx) => {
+		const owned = await tx
+			.select({ groupId: groupMembers.groupId })
+			.from(groupMembers)
+			.where(and(eq(groupMembers.userId, userId), eq(groupMembers.role, 'owner')));
+
+		for (const { groupId } of owned) {
+			const [heir] = await tx
+				.select({ userId: groupMembers.userId, role: groupMembers.role })
+				.from(groupMembers)
+				.where(and(eq(groupMembers.groupId, groupId), ne(groupMembers.userId, userId)))
+				.orderBy(asc(groupMembers.role), asc(groupMembers.joinedAt))
+				.limit(1);
+			if (heir) {
+				await tx
+					.update(groupMembers)
+					.set({ role: 'owner' })
+					.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, heir.userId)));
+			} else {
+				await tx.delete(groups).where(eq(groups.id, groupId));
+			}
+		}
+		await tx.delete(user).where(eq(user.id, userId));
+	});
+}

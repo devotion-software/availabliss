@@ -1,0 +1,12 @@
+**/node_modules
+web/build
+web/.svelte-kit
+**/.env
+**/.env.*
+!web/.env.example
+.git
+ios
+android
+docs
+*.log
+.DS_Store

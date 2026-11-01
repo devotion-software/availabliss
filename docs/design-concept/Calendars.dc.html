@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Availabliss · Busy calendars</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Instrument+Sans:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+:root,.av{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC;--bg:#ECEEF7;--ink:#1A1B3A;--muted:#4D5072;--neutral-ink:#3A3D5C;--surface:rgba(255,255,255,.62);--glass:rgba(255,255,255,.5);--glass-border:rgba(255,255,255,.8);--glass-hi:rgba(255,255,255,.9);--shadow:rgba(43,38,120,.38);--line:rgba(26,27,58,.07);--line-2:rgba(26,27,58,.14);--line-3:rgba(26,27,58,.28);--solid:#1A1B3A;--on-solid:#FFFFFF;--on-accent:#FFFFFF;--busy-bg:#FFFFFF;--busy-line:#B9BCD6;--ok:#0FA37F;--ok-bg:#D3F5EA;--ok-ink:#0D6B52;--warn:#FF8A5E;--warn-bg:#FFE0CF;--warn-ink:#8A3410;--t1:#FFD3BF;--t2:#D6DAFF;--t3:#C8F1E4;--t4:#F5D6EE;--t5:#FFE7A3;--orb-op:.85}
+.av.dark{--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24);--bg:#0C0D1D;--ink:#F1F2FA;--muted:#A6A9C8;--neutral-ink:#C9CBE3;--surface:rgba(255,255,255,.07);--glass:rgba(26,28,56,.5);--glass-border:rgba(255,255,255,.12);--glass-hi:rgba(255,255,255,.1);--shadow:rgba(0,0,0,.6);--line:rgba(255,255,255,.08);--line-2:rgba(255,255,255,.16);--line-3:rgba(255,255,255,.3);--solid:#F1F2FA;--on-solid:#0C0D1D;--busy-bg:rgba(255,255,255,.14);--busy-line:#4A4D70;--ok:#34D3A0;--ok-bg:rgba(52,211,160,.16);--ok-ink:#7EE8C6;--warn:#FF9A73;--warn-bg:rgba(255,138,94,.18);--warn-ink:#FFBCA2;--t1:#5C3B2E;--t2:#363B78;--t3:#1E5045;--t4:#58304F;--t5:#5A4A1E;--orb-op:.42}
+.t-dawn{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC}
+.dark.t-dawn{--accent:#6A5CFF;--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24)}
+.t-lagoon{--accent:#0B7F8A;--accent-ink:#06646D;--accent-soft:rgba(11,127,138,.14);--orb1:#86E3E0;--orb2:#8EC5FF;--orb3:#B5EBA8}
+.dark.t-lagoon{--accent-ink:#7FDDE4;--accent-soft:rgba(19,156,168,.26)}
+.t-sunset{--accent:#C9401F;--accent-ink:#A8341A;--accent-soft:rgba(201,64,31,.13);--orb1:#FFA585;--orb2:#FF9CC0;--orb3:#FFD37E}
+.dark.t-sunset{--accent-ink:#FFB199;--accent-soft:rgba(224,83,47,.26)}
+.t-orchid{--accent:#9333C9;--accent-ink:#7A27AA;--accent-soft:rgba(147,51,201,.13);--orb1:#F4B0E0;--orb2:#C9A8FF;--orb3:#A9B8FF}
+.dark.t-orchid{--accent:#A646DB;--accent-ink:#DDB0F7;--accent-soft:rgba(166,70,219,.26)}
+.t-grove{--accent:#2D7A4A;--accent-ink:#22633B;--accent-soft:rgba(45,122,74,.14);--orb1:#C3E88F;--orb2:#8FD8B5;--orb3:#F3D78A}
+.dark.t-grove{--accent-ink:#9FE0B6;--accent-soft:rgba(58,148,96,.26)}
+.av{transition:background .3s ease,color .3s ease}
+.av .orb{opacity:var(--orb-op) !important}
+.dark .venn circle{mix-blend-mode:screen}
+a{color:var(--accent-ink)}a:hover{color:var(--ink)}
+.orb{position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(26px) saturate(170%);backdrop-filter:blur(26px) saturate(170%);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-hi),0 18px 40px -22px var(--shadow)}
+.disp{font-family:'Bricolage Grotesque',system-ui,sans-serif;letter-spacing:-.025em}
+button{font:inherit;color:inherit;cursor:pointer}
+.knob{transition:transform .2s cubic-bezier(.3,1.4,.5,1)}
+</style>
+</helmet>
+<div class="{{themeClass}}" style="width:390px;height:844px;position:relative;overflow:hidden;background:var(--bg);font-family:'Instrument Sans',system-ui,sans-serif;color:var(--ink)">
+  <div class="orb" aria-hidden="true" style="width:320px;height:320px;right:-120px;top:-90px;background:var(--orb3);opacity:.85"></div>
+  <div class="orb" aria-hidden="true" style="width:320px;height:320px;left:-170px;top:280px;background:var(--orb2);opacity:.8"></div>
+  <div class="orb" aria-hidden="true" style="width:300px;height:300px;right:-110px;bottom:-60px;background:var(--orb1);opacity:.85"></div>
+
+  <div style="position:relative;height:100%;box-sizing:border-box;padding:28px 20px 24px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <a href="SignIn.dc.html" class="glass" aria-label="Back" style="width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+      </a>
+      <div aria-label="Step 2 of 2" style="display:flex;gap:6px">
+        <span style="width:18px;height:6px;border-radius:3px;background:var(--line-3)"></span>
+        <span style="width:30px;height:6px;border-radius:3px;background:var(--ink)"></span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 class="disp" style="margin:0;font-size:30px;line-height:1.05;font-weight:700">Which calendars mean you're busy?</h1>
+      <p style="margin:0;font-size:14px;line-height:1.45;color:var(--muted)">Events in these calendars block out your time. Only "busy" is shared, never the details.</p>
+    </div>
+
+    <sc-for list="{{sources}}" as="src" hint-placeholder-count="2">
+      <section class="glass" style="border-radius:24px;padding:6px 14px">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 0 6px;font-size:12px;font-weight:600;color:var(--muted)">
+          <span>{{src.title}}</span>
+          <span style="flex:1"></span>
+          <span>{{src.account}}</span>
+        </div>
+        <sc-for list="{{src.items}}" as="cal" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;gap:12px;min-height:50px;border-top:1px solid var(--line)">
+            <span aria-hidden="true" style="width:12px;height:12px;border-radius:4px;flex:none;background:{{cal.color}}"></span>
+            <span style="flex:1;font-size:15px;font-weight:500">{{cal.name}}</span>
+            <button role="switch" aria-checked="{{cal.on}}" aria-label="{{cal.aria}}" onClick="{{cal.toggle}}" style="width:52px;height:32px;border-radius:16px;border:0;padding:3px;display:flex;{{cal.track}}">
+              <span class="knob" style="width:26px;height:26px;border-radius:50%;background:#FFFFFF;box-shadow:0 2px 6px rgba(20,20,60,.25);{{cal.knob}}"></span>
+            </button>
+          </div>
+        </sc-for>
+      </section>
+    </sc-for>
+
+    <button class="glass" style="min-height:52px;border-radius:20px;padding:0 14px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;text-align:left">
+      <span style="width:30px;height:30px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      </span>
+      <span style="flex:1">Connect another calendar</span>
+      <span style="font-size:12px;font-weight:500;color:var(--muted)">Google · Outlook · iCloud</span>
+    </button>
+
+    <div class="glass" style="border-radius:20px;padding:12px 14px;display:flex;align-items:center;gap:12px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="stroke:var(--ok-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>
+      <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+        <span style="font-size:14px;font-weight:600">United Kingdom · England</span>
+        <span style="font-size:12px;color:var(--muted)">School holidays: Bristol City Council</span>
+      </div>
+      <button style="height:36px;border:0;background:transparent;font-size:13px;font-weight:600;color:var(--accent-ink)">Change</button>
+    </div>
+
+    <div style="flex:1"></div>
+    <a href="Main.dc.html" style="height:54px;border-radius:18px;background:var(--solid);color:var(--on-solid);text-decoration:none;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center">Continue</a>
+    <a href="BlockTime.dc.html" style="margin-top:-6px;min-height:44px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;text-decoration:none">No calendar? Mark busy times yourself</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["light","dark"],"default":"light"},"theme":{"editor":"enum","options":["dawn","lagoon","sunset","orchid","grove"],"default":"dawn"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { on: { personal: true, family: true, birthdays: false, work: true, team: false } };
+  }
+  renderVals() {
+    var v = this.baseVals();
+    v.themeClass = 'av ' + (this.props.mode || 'light') + ' t-' + (this.props.theme || 'dawn');
+    return v;
+  }
+  baseVals() {
+    var self = this;
+    var on = this.state.on;
+    var row = function (id, name, color) {
+      var v = !!on[id];
+      return {
+        name: name, color: color, on: v, aria: name + ' counts as busy',
+        track: v ? 'background:var(--accent);justify-content:flex-end' : 'background:var(--line-2);justify-content:flex-start',
+        knob: '',
+        toggle: function () {
+          var next = Object.assign({}, self.state.on);
+          next[id] = !v;
+          self.setState({ on: next });
+        }
+      };
+    };
+    return {
+      sources: [
+        { title: 'On this iPhone', account: 'iCloud', items: [row('personal', 'Personal', 'var(--warn)'), row('family', 'Family', '#6FD8BB'), row('birthdays', 'Birthdays', '#C9A6F5')] },
+        { title: 'Outlook', account: 'Work', items: [row('work', 'Calendar', '#5B8DEF'), row('team', 'Team holidays', '#F2C14E')] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

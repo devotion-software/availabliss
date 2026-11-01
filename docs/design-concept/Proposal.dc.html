@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Availabliss · Proposal</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Instrument+Sans:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+:root,.av{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC;--bg:#ECEEF7;--ink:#1A1B3A;--muted:#4D5072;--neutral-ink:#3A3D5C;--surface:rgba(255,255,255,.62);--glass:rgba(255,255,255,.5);--glass-border:rgba(255,255,255,.8);--glass-hi:rgba(255,255,255,.9);--shadow:rgba(43,38,120,.38);--line:rgba(26,27,58,.07);--line-2:rgba(26,27,58,.14);--line-3:rgba(26,27,58,.28);--solid:#1A1B3A;--on-solid:#FFFFFF;--on-accent:#FFFFFF;--busy-bg:#FFFFFF;--busy-line:#B9BCD6;--ok:#0FA37F;--ok-bg:#D3F5EA;--ok-ink:#0D6B52;--warn:#FF8A5E;--warn-bg:#FFE0CF;--warn-ink:#8A3410;--t1:#FFD3BF;--t2:#D6DAFF;--t3:#C8F1E4;--t4:#F5D6EE;--t5:#FFE7A3;--orb-op:.85}
+.av.dark{--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24);--bg:#0C0D1D;--ink:#F1F2FA;--muted:#A6A9C8;--neutral-ink:#C9CBE3;--surface:rgba(255,255,255,.07);--glass:rgba(26,28,56,.5);--glass-border:rgba(255,255,255,.12);--glass-hi:rgba(255,255,255,.1);--shadow:rgba(0,0,0,.6);--line:rgba(255,255,255,.08);--line-2:rgba(255,255,255,.16);--line-3:rgba(255,255,255,.3);--solid:#F1F2FA;--on-solid:#0C0D1D;--busy-bg:rgba(255,255,255,.14);--busy-line:#4A4D70;--ok:#34D3A0;--ok-bg:rgba(52,211,160,.16);--ok-ink:#7EE8C6;--warn:#FF9A73;--warn-bg:rgba(255,138,94,.18);--warn-ink:#FFBCA2;--t1:#5C3B2E;--t2:#363B78;--t3:#1E5045;--t4:#58304F;--t5:#5A4A1E;--orb-op:.42}
+.t-dawn{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC}
+.dark.t-dawn{--accent:#6A5CFF;--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24)}
+.t-lagoon{--accent:#0B7F8A;--accent-ink:#06646D;--accent-soft:rgba(11,127,138,.14);--orb1:#86E3E0;--orb2:#8EC5FF;--orb3:#B5EBA8}
+.dark.t-lagoon{--accent-ink:#7FDDE4;--accent-soft:rgba(19,156,168,.26)}
+.t-sunset{--accent:#C9401F;--accent-ink:#A8341A;--accent-soft:rgba(201,64,31,.13);--orb1:#FFA585;--orb2:#FF9CC0;--orb3:#FFD37E}
+.dark.t-sunset{--accent-ink:#FFB199;--accent-soft:rgba(224,83,47,.26)}
+.t-orchid{--accent:#9333C9;--accent-ink:#7A27AA;--accent-soft:rgba(147,51,201,.13);--orb1:#F4B0E0;--orb2:#C9A8FF;--orb3:#A9B8FF}
+.dark.t-orchid{--accent:#A646DB;--accent-ink:#DDB0F7;--accent-soft:rgba(166,70,219,.26)}
+.t-grove{--accent:#2D7A4A;--accent-ink:#22633B;--accent-soft:rgba(45,122,74,.14);--orb1:#C3E88F;--orb2:#8FD8B5;--orb3:#F3D78A}
+.dark.t-grove{--accent-ink:#9FE0B6;--accent-soft:rgba(58,148,96,.26)}
+.av{transition:background .3s ease,color .3s ease}
+.av .orb{opacity:var(--orb-op) !important}
+.dark .venn circle{mix-blend-mode:screen}
+a{color:var(--accent-ink)}a:hover{color:var(--ink)}
+.orb{position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(26px) saturate(170%);backdrop-filter:blur(26px) saturate(170%);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-hi),0 18px 40px -22px var(--shadow)}
+.disp{font-family:'Bricolage Grotesque',system-ui,sans-serif;letter-spacing:-.025em}
+button{font:inherit;color:inherit;cursor:pointer}
+.venn circle{mix-blend-mode:multiply}
+@keyframes drop{from{transform:translateY(-24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes bloom{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+.drop{animation:drop .5s cubic-bezier(.2,1.2,.4,1) both}
+.bloom{animation:bloom .7s cubic-bezier(.2,1.2,.4,1) both}
+</style>
+</helmet>
+<div class="{{themeClass}}" style="width:390px;height:844px;position:relative;overflow:hidden;background:var(--bg);font-family:'Instrument Sans',system-ui,sans-serif;color:var(--ink)">
+  <div class="orb" aria-hidden="true" style="width:340px;height:340px;left:-120px;top:-60px;background:var(--orb3);opacity:.85"></div>
+  <div class="orb" aria-hidden="true" style="width:300px;height:300px;right:-150px;top:200px;background:var(--orb1);opacity:.85"></div>
+  <div class="orb" aria-hidden="true" style="width:320px;height:320px;left:-40px;bottom:-110px;background:var(--orb2);opacity:.85"></div>
+
+  <sc-if value="{{pending}}" hint-placeholder-val="{{true}}">
+    <div style="position:relative;height:100%;box-sizing:border-box;padding:20px 20px 0;display:flex;flex-direction:column;gap:14px">
+      <header style="display:flex;align-items:center;gap:10px">
+        <a href="GroupCalendar.dc.html" class="glass" aria-label="Back to calendar" style="width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+        </a>
+        <div style="flex:1;display:flex;flex-direction:column">
+          <h1 class="disp" style="margin:0;font-size:22px;font-weight:700;line-height:1.1">Proposal</h1>
+          <span style="font-size:12px;color:var(--muted)">Lake District crew</span>
+        </div>
+      </header>
+
+      <section class="glass" style="border-radius:28px;padding:18px;display:flex;gap:14px;align-items:center">
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:600;color:var(--muted)">Ana proposed · 2h ago</span>
+          <h2 class="disp" style="margin:0;font-size:26px;font-weight:700;line-height:1.05">Fri 13 – Sun 15 Nov</h2>
+          <span style="font-size:13px;color:var(--muted)">From Fri 18:00 · Keswick</span>
+        </div>
+        <div style="position:relative;width:76px;height:76px;flex:none">
+          <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="31" fill="none" style="stroke:var(--line-2)" stroke-width="7"></circle><circle cx="38" cy="38" r="31" fill="none" style="stroke:var(--ok)" stroke-width="7" stroke-linecap="round" stroke-dasharray="{{ring}}" transform="rotate(-90 38 38)"></circle></svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <span class="disp" style="font-size:20px;font-weight:700;line-height:1">{{yes}}/6</span>
+            <span style="font-size:10px;color:var(--muted)">accepted</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass" style="border-radius:24px;padding:4px 14px">
+        <sc-for list="{{members}}" as="m" hint-placeholder-count="6">
+          <div style="display:flex;align-items:center;gap:12px;min-height:56px;{{m.border}}">
+            <span style="width:34px;height:34px;flex:none;border-radius:50%;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;background:{{m.c}}">{{m.i}}</span>
+            <div style="flex:1;display:flex;flex-direction:column">
+              <span style="font-size:15px;font-weight:600">{{m.n}}</span>
+              <span style="font-size:12px;color:var(--muted)">{{m.note}}</span>
+            </div>
+            <sc-if value="{{m.canOverride}}" hint-placeholder-val="{{false}}">
+              <button onClick="{{m.override}}" style="height:34px;padding:0 10px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);font-size:12px;font-weight:600">Override</button>
+            </sc-if>
+            <span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;{{m.pill}}">{{m.status}}</span>
+          </div>
+        </sc-for>
+      </section>
+
+      <p style="margin:0;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.3 8.3-8 9-4.7-.7-8-4.5-8-9V6l8-3z"></path></svg>
+        As an admin you can set anyone's reply.
+      </p>
+
+      <div class="glass" style="position:absolute;left:12px;right:12px;bottom:16px;border-radius:26px;padding:12px;display:flex;flex-direction:column;gap:10px">
+        <span style="font-size:13px;font-weight:600;padding-left:4px">Can you make it?</span>
+        <div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:8px">
+          <button style="height:50px;border-radius:16px;border:1px solid var(--line-2);background:var(--surface);font-size:15px;font-weight:600">Can't make it</button>
+          <button onClick="{{accept}}" style="height:50px;border-radius:16px;border:0;background:var(--solid);color:var(--on-solid);font-size:15px;font-weight:600">Accept</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{allIn}}" hint-placeholder-val="{{false}}">
+    <div style="position:relative;height:100%;box-sizing:border-box;padding:16px 14px 24px;display:flex;flex-direction:column;align-items:stretch">
+      <div class="glass drop" role="status" style="border-radius:22px;padding:12px 14px;display:flex;gap:12px;align-items:center">
+        <svg class="venn" width="34" height="34" viewBox="0 0 40 40" aria-hidden="true"><circle cx="14" cy="15" r="10" fill="#FF9E78"></circle><circle cx="26" cy="15" r="10" fill="#8F9BFF"></circle><circle cx="20" cy="25" r="10" fill="#6FD8BB"></circle></svg>
+        <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+          <span style="font-size:13px;font-weight:700">Availabliss <span style="font-weight:500;color:var(--muted)">· now</span></span>
+          <span style="font-size:13px">Everyone accepted Fri 13 – Sun 15 Nov for Lake District crew</span>
+        </div>
+      </div>
+
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:0 10px">
+        <svg class="venn bloom" width="132" height="132" viewBox="0 0 40 40" aria-hidden="true"><circle cx="14" cy="15" r="10" fill="#FF9E78"></circle><circle cx="26" cy="15" r="10" fill="#8F9BFF"></circle><circle cx="20" cy="25" r="10" fill="#6FD8BB"></circle></svg>
+        <h1 class="disp" style="margin:0;font-size:40px;font-weight:750;line-height:1">Everyone's in.</h1>
+        <p style="margin:0;font-size:16px;color:var(--muted);line-height:1.4">All 6 of you can make<br>Fri 13 – Sun 15 Nov in Keswick.</p>
+      </div>
+
+      <div class="glass" style="border-radius:28px;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <button style="min-height:52px;border-radius:16px;border:1px solid var(--glass-border);background:var(--surface);padding:0 14px;display:flex;align-items:center;gap:10px;text-align:left">
+          <span style="width:12px;height:12px;border-radius:4px;background:var(--warn)"></span>
+          <span style="flex:1;font-size:14px;font-weight:600">Personal <span style="font-weight:500;color:var(--muted)">· iCloud</span></span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+        </button>
+        <button onClick="{{add}}" style="height:54px;border-radius:18px;border:0;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;{{addStyle}}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{addIcon}}"></path></svg>
+          {{addLabel}}
+        </button>
+        <button onClick="{{reset}}" style="height:40px;border:0;background:transparent;font-size:13px;font-weight:600;color:var(--accent-ink)">Replay demo</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["light","dark"],"default":"light"},"theme":{"editor":"enum","options":["dawn","lagoon","sunset","orchid","grove"],"default":"dawn"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { me: false, tom: false, added: false };
+  }
+  renderVals() {
+    var v = this.baseVals();
+    v.themeClass = 'av ' + (this.props.mode || 'light') + ' t-' + (this.props.theme || 'dawn');
+    return v;
+  }
+  baseVals() {
+    var self = this;
+    var s = this.state;
+    var yesPill = 'background:var(--ok-bg);color:var(--ok-ink)';
+    var waitPill = 'background:var(--warn-bg);color:var(--warn-ink)';
+    var people = [
+      { i: 'A', n: 'Ana', c: 'var(--t3)', note: 'Proposed this', ok: true },
+      { i: 'P', n: 'Priya', c: 'var(--t2)', note: 'Synced', ok: true },
+      { i: 'S', n: 'Sam (you)', c: 'var(--t1)', note: 'Admin', ok: s.me },
+      { i: 'T', n: 'Tom', c: 'var(--t4)', note: s.tom ? 'Set by you (admin)' : 'Hasn’t replied', ok: s.tom, tom: true },
+      { i: 'L', n: 'Leo', c: 'var(--t5)', note: 'Not synced yet', ok: true },
+      { i: 'J', n: 'Jade', c: 'var(--t3)', note: 'Not synced yet', ok: true }
+    ];
+    var yes = people.filter(function (p) { return p.ok; }).length;
+    var C = 2 * Math.PI * 31;
+    var allIn = yes === 6;
+    return {
+      pending: !allIn, allIn: allIn, yes: yes,
+      ring: (C * yes / 6).toFixed(1) + ' ' + C.toFixed(1),
+      members: people.map(function (p, n) {
+        return {
+          i: p.i, n: p.n, c: p.c, note: p.note,
+          status: p.ok ? 'Accepted' : 'Waiting',
+          pill: p.ok ? yesPill : waitPill,
+          border: n ? 'border-top:1px solid var(--line)' : '',
+          canOverride: !!p.tom && !p.ok,
+          override: function () { self.setState({ tom: true }); }
+        };
+      }),
+      accept: function () { self.setState({ me: true }); },
+      add: function () { self.setState({ added: true }); },
+      reset: function () { self.setState({ me: false, tom: false, added: false }); },
+      addLabel: s.added ? 'Added to your calendar' : 'Add to calendar',
+      addIcon: s.added ? 'M5 12l5 5L20 7' : 'M12 5v14M5 12h14',
+      addStyle: s.added ? 'background:var(--ok-bg);color:var(--ok-ink)' : 'background:var(--solid);color:var(--on-solid)'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Availabliss · Group chat</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Instrument+Sans:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+:root,.av{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC;--bg:#ECEEF7;--ink:#1A1B3A;--muted:#4D5072;--neutral-ink:#3A3D5C;--surface:rgba(255,255,255,.62);--glass:rgba(255,255,255,.5);--glass-border:rgba(255,255,255,.8);--glass-hi:rgba(255,255,255,.9);--shadow:rgba(43,38,120,.38);--line:rgba(26,27,58,.07);--line-2:rgba(26,27,58,.14);--line-3:rgba(26,27,58,.28);--solid:#1A1B3A;--on-solid:#FFFFFF;--on-accent:#FFFFFF;--busy-bg:#FFFFFF;--busy-line:#B9BCD6;--ok:#0FA37F;--ok-bg:#D3F5EA;--ok-ink:#0D6B52;--warn:#FF8A5E;--warn-bg:#FFE0CF;--warn-ink:#8A3410;--t1:#FFD3BF;--t2:#D6DAFF;--t3:#C8F1E4;--t4:#F5D6EE;--t5:#FFE7A3;--orb-op:.85}
+.av.dark{--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24);--bg:#0C0D1D;--ink:#F1F2FA;--muted:#A6A9C8;--neutral-ink:#C9CBE3;--surface:rgba(255,255,255,.07);--glass:rgba(26,28,56,.5);--glass-border:rgba(255,255,255,.12);--glass-hi:rgba(255,255,255,.1);--shadow:rgba(0,0,0,.6);--line:rgba(255,255,255,.08);--line-2:rgba(255,255,255,.16);--line-3:rgba(255,255,255,.3);--solid:#F1F2FA;--on-solid:#0C0D1D;--busy-bg:rgba(255,255,255,.14);--busy-line:#4A4D70;--ok:#34D3A0;--ok-bg:rgba(52,211,160,.16);--ok-ink:#7EE8C6;--warn:#FF9A73;--warn-bg:rgba(255,138,94,.18);--warn-ink:#FFBCA2;--t1:#5C3B2E;--t2:#363B78;--t3:#1E5045;--t4:#58304F;--t5:#5A4A1E;--orb-op:.42}
+.t-dawn{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC}
+.dark.t-dawn{--accent:#6A5CFF;--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24)}
+.t-lagoon{--accent:#0B7F8A;--accent-ink:#06646D;--accent-soft:rgba(11,127,138,.14);--orb1:#86E3E0;--orb2:#8EC5FF;--orb3:#B5EBA8}
+.dark.t-lagoon{--accent-ink:#7FDDE4;--accent-soft:rgba(19,156,168,.26)}
+.t-sunset{--accent:#C9401F;--accent-ink:#A8341A;--accent-soft:rgba(201,64,31,.13);--orb1:#FFA585;--orb2:#FF9CC0;--orb3:#FFD37E}
+.dark.t-sunset{--accent-ink:#FFB199;--accent-soft:rgba(224,83,47,.26)}
+.t-orchid{--accent:#9333C9;--accent-ink:#7A27AA;--accent-soft:rgba(147,51,201,.13);--orb1:#F4B0E0;--orb2:#C9A8FF;--orb3:#A9B8FF}
+.dark.t-orchid{--accent:#A646DB;--accent-ink:#DDB0F7;--accent-soft:rgba(166,70,219,.26)}
+.t-grove{--accent:#2D7A4A;--accent-ink:#22633B;--accent-soft:rgba(45,122,74,.14);--orb1:#C3E88F;--orb2:#8FD8B5;--orb3:#F3D78A}
+.dark.t-grove{--accent-ink:#9FE0B6;--accent-soft:rgba(58,148,96,.26)}
+.av{transition:background .3s ease,color .3s ease}
+.av .orb{opacity:var(--orb-op) !important}
+.dark .venn circle{mix-blend-mode:screen}
+a{color:var(--accent-ink)}a:hover{color:var(--ink)}
+.orb{position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(26px) saturate(170%);backdrop-filter:blur(26px) saturate(170%);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-hi),0 18px 40px -22px var(--shadow)}
+.disp{font-family:'Bricolage Grotesque',system-ui,sans-serif;letter-spacing:-.025em}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+input::placeholder{color:var(--muted)}
+.bar{transition:width .45s cubic-bezier(.3,1.2,.5,1)}
+@keyframes pop{from{transform:translateY(10px) scale(.96);opacity:0}to{transform:none;opacity:1}}
+.pop{animation:pop .25s ease both}
+</style>
+</helmet>
+<div class="{{themeClass}}" style="width:390px;height:844px;position:relative;overflow:hidden;background:var(--bg);font-family:'Instrument Sans',system-ui,sans-serif;color:var(--ink)">
+  <div class="orb" aria-hidden="true" style="width:320px;height:320px;right:-130px;top:-80px;background:var(--orb1);opacity:.85"></div>
+  <div class="orb" aria-hidden="true" style="width:320px;height:320px;left:-170px;top:320px;background:var(--orb3);opacity:.8"></div>
+  <div class="orb" aria-hidden="true" style="width:300px;height:300px;right:-120px;bottom:-40px;background:var(--orb2);opacity:.85"></div>
+
+  <div style="position:relative;height:100%;display:flex;flex-direction:column">
+    <header class="glass" style="margin:14px 12px 0;border-radius:24px;padding:8px 10px;display:flex;align-items:center;gap:10px">
+      <a href="GroupCalendar.dc.html" aria-label="Back to calendar" style="width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+      </a>
+      <div class="disp" aria-hidden="true" style="width:40px;height:40px;flex:none;border-radius:14px;background:var(--t1);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">LD</div>
+      <div style="flex:1;display:flex;flex-direction:column">
+        <span style="font-size:16px;font-weight:650">Lake District crew</span>
+        <span style="font-size:12px;color:var(--muted)">Ana, Priya, Tom and 3 others</span>
+      </div>
+      <a href="GroupCalendar.dc.html" aria-label="Group calendar" style="width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>
+      </a>
+    </header>
+
+    <div style="flex:1;overflow:hidden;padding:14px 16px 0;display:flex;flex-direction:column;gap:10px;justify-content:flex-end">
+      <span style="align-self:center;font-size:11px;font-weight:600;color:var(--muted)">Today</span>
+
+      <div style="display:flex;gap:8px;align-items:flex-end;max-width:290px">
+        <span style="width:28px;height:28px;flex:none;border-radius:50%;background:var(--t2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">P</span>
+        <div class="glass" style="border-radius:18px 18px 18px 6px;padding:9px 12px;font-size:14px;line-height:1.4">Has everyone put their calendar in yet? Leo, Jade…</div>
+      </div>
+
+      <a href="Proposal.dc.html" class="glass" style="align-self:stretch;border-radius:20px;padding:12px;display:flex;gap:12px;align-items:center;text-decoration:none;color:var(--ink)">
+        <div style="width:46px;height:50px;flex:none;border-radius:12px;background:var(--accent);color:var(--on-accent);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1">
+          <span style="font-size:10px;font-weight:600">NOV</span>
+          <span class="disp" style="font-size:19px;font-weight:700">13</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:12px;color:var(--muted)">Ana proposed a time</span>
+          <span style="font-size:15px;font-weight:600">Fri 13 – Sun 15 Nov</span>
+          <span style="font-size:12px;font-weight:600;color:var(--ok-ink)">4 of 6 accepted</span>
+        </div>
+        <span style="font-size:13px;font-weight:600;color:var(--accent-ink)">Reply</span>
+      </a>
+
+      <div style="display:flex;gap:8px;align-items:flex-end;max-width:290px">
+        <span style="width:28px;height:28px;flex:none;border-radius:50%;background:var(--t4);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">T</span>
+        <div class="glass" style="border-radius:18px 18px 18px 6px;padding:9px 12px;font-size:14px;line-height:1.4">Saturday's fine. Just checking I can get off early on the Friday</div>
+      </div>
+
+      <button onClick="{{openInfo}}" aria-label="Your message: I'll book somewhere to stay. Vote below. Tap for message info" style="align-self:flex-end;max-width:270px;border:0;border-radius:18px 18px 6px 18px;padding:9px 12px;font-size:14px;line-height:1.4;text-align:left;background:var(--solid);color:var(--on-solid)">I'll book somewhere to stay. Vote below</button>
+      <button onClick="{{openInfo}}" style="align-self:flex-end;margin-top:-6px;min-height:24px;border:0;background:transparent;padding:0 2px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:var(--muted)">
+        <span style="display:flex;padding-right:4px">
+          <span style="width:16px;height:16px;margin-right:-4px;border-radius:50%;border:1.5px solid var(--bg);background:var(--t3);font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--ink)">A</span>
+          <span style="width:16px;height:16px;margin-right:-4px;border-radius:50%;border:1.5px solid var(--bg);background:var(--t2);font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--ink)">P</span>
+          <span style="width:16px;height:16px;margin-right:-4px;border-radius:50%;border:1.5px solid var(--bg);background:var(--t4);font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--ink)">T</span>
+        </span>
+        Seen by 3 of 5
+        <svg width="16" height="12" viewBox="0 0 28 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-ink)" aria-hidden="true"><path d="M2 10l5 5L17 4"></path><path d="M12 14l1 1L24 4"></path></svg>
+      </button>
+
+      <section class="glass" aria-label="Poll" style="align-self:flex-end;width:300px;border-radius:22px;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--accent-ink)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"></path></svg>
+          <span style="font-size:12px;font-weight:600;color:var(--accent-ink)">Poll · {{total}} votes</span>
+        </div>
+        <span class="disp" style="font-size:17px;font-weight:650">Where should we stay?</span>
+        <sc-for list="{{options}}" as="o" hint-placeholder-count="3">
+          <button onClick="{{o.vote}}" aria-pressed="{{o.mine}}" style="position:relative;min-height:46px;border-radius:14px;overflow:hidden;padding:0 12px;text-align:left;display:flex;align-items:center;gap:8px;{{o.box}}">
+            <span class="bar" aria-hidden="true" style="position:absolute;left:0;top:0;bottom:0;width:{{o.w}};{{o.fill}}"></span>
+            <span style="position:relative;width:18px;height:18px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;{{o.radio}}">
+              <sc-if value="{{o.mine}}" hint-placeholder-val="{{false}}">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>
+              </sc-if>
+            </span>
+            <span style="position:relative;flex:1;font-size:14px;font-weight:600">{{o.label}}</span>
+            <span style="position:relative;font-size:13px;font-weight:600;color:var(--neutral-ink)">{{o.n}}</span>
+          </button>
+        </sc-for>
+      </section>
+
+      <div style="display:flex;gap:8px;align-items:flex-end;max-width:290px">
+        <span style="width:28px;height:28px;flex:none;border-radius:50%;background:var(--t3);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">A</span>
+        <div class="glass" style="border-radius:18px 18px 18px 6px;padding:9px 12px;font-size:14px;line-height:1.4">Cottage. It has a wood burner, case closed</div>
+      </div>
+    </div>
+
+    <sc-if value="{{menu}}" hint-placeholder-val="{{false}}">
+      <div class="glass pop" style="margin:10px 12px 0;border-radius:22px;padding:8px;display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:6px">
+        <button style="min-height:72px;border:0;border-radius:16px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:600">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="stroke:var(--accent-ink)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"></path></svg>
+          Poll
+        </button>
+        <a href="GroupCalendar.dc.html" style="min-height:72px;border-radius:16px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink);text-decoration:none">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="stroke:var(--accent-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l3 3 5-6"></path></svg>
+          Propose a time
+        </a>
+        <button style="min-height:72px;border:0;border-radius:16px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:600">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="stroke:var(--accent-ink)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5"></path></svg>
+          Add event
+        </button>
+      </div>
+    </sc-if>
+
+    <form class="glass" style="margin:10px 12px 18px;border-radius:24px;padding:6px;display:flex;align-items:center;gap:6px">
+      <button type="button" onClick="{{toggleMenu}}" aria-expanded="{{menu}}" aria-label="Add poll, proposal or event" style="width:44px;height:44px;flex:none;border-radius:50%;border:0;display:flex;align-items:center;justify-content:center;{{plusStyle}}">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" style="{{plusRot}}"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+      <label for="msg" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Message</label>
+      <input id="msg" placeholder="Message the group" style="flex:1;min-width:0;height:44px;border:0;background:transparent;font-size:15px;outline:none">
+      <button type="button" aria-label="Send" style="width:44px;height:44px;flex:none;border-radius:50%;border:0;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+      </button>
+    </form>
+  </div>
+
+  <sc-if value="{{info}}" hint-placeholder-val="{{false}}">
+    <div style="position:absolute;inset:0;background:rgba(12,13,29,.3)">
+      <div class="glass pop" role="dialog" aria-label="Message info" style="position:absolute;left:8px;right:8px;bottom:8px;border-radius:32px;padding:18px;display:flex;flex-direction:column;gap:14px;background:var(--bg)">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <h2 class="disp" style="margin:0;font-size:22px;font-weight:700">Message info</h2>
+          <button onClick="{{closeInfo}}" aria-label="Close" style="width:40px;height:40px;border-radius:50%;border:0;background:var(--line);display:flex;align-items:center;justify-content:center;padding:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+        <div style="align-self:flex-end;max-width:270px;border-radius:18px 18px 6px 18px;padding:9px 12px;font-size:14px;line-height:1.4;background:var(--solid);color:var(--on-solid)">I'll book somewhere to stay. Vote below</div>
+        <span style="align-self:flex-end;font-size:11px;color:var(--muted);margin-top:-8px">Sent today at 14:20</span>
+        <sc-for list="{{receipts}}" as="grp" hint-placeholder-count="2">
+          <section style="border-radius:22px;padding:4px 14px;background:var(--surface);border:1px solid var(--glass-border)">
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 0 6px;font-size:12px;font-weight:600;color:var(--muted)">
+              <svg width="16" height="12" viewBox="0 0 28 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="{{grp.tick}}" aria-hidden="true"><path d="M2 10l5 5L17 4"></path><path d="{{grp.second}}"></path></svg>
+              <span style="flex:1">{{grp.title}}</span>
+              <span>{{grp.count}}</span>
+            </div>
+            <sc-for list="{{grp.people}}" as="p" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:12px;min-height:50px;border-top:1px solid var(--line)">
+                <span style="width:32px;height:32px;flex:none;border-radius:50%;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;background:{{p.c}}">{{p.i}}</span>
+                <span style="flex:1;font-size:15px;font-weight:600">{{p.n}}</span>
+                <span style="font-size:12px;color:var(--muted)">{{p.t}}</span>
+              </div>
+            </sc-for>
+          </section>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["light","dark"],"default":"light"},"theme":{"editor":"enum","options":["dawn","lagoon","sunset","orchid","grove"],"default":"dawn"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { vote: null, menu: false, info: false };
+  }
+  renderVals() {
+    var v = this.baseVals();
+    v.themeClass = 'av ' + (this.props.mode || 'light') + ' t-' + (this.props.theme || 'dawn');
+    return v;
+  }
+  baseVals() {
+    var self = this;
+    var s = this.state;
+    var base = [['cottage', 'Keswick cottage', 3], ['yha', 'Ambleside YHA', 1], ['camp', 'Camping at Wasdale', 1]];
+    var counts = base.map(function (o) { return o[2] + (s.vote === o[0] ? 1 : 0); });
+    var total = counts.reduce(function (a, b) { return a + b; }, 0);
+    var max = Math.max.apply(null, counts);
+    return {
+      total: total,
+      info: s.info,
+      openInfo: function () { self.setState({ info: true, menu: false }); },
+      closeInfo: function () { self.setState({ info: false }); },
+      receipts: [
+        { title: 'Seen by', count: '3', tick: 'color:var(--accent-ink)', second: 'M12 14l1 1L24 4', people: [
+          { i: 'A', n: 'Ana', c: 'var(--t3)', t: '14:22' },
+          { i: 'P', n: 'Priya', c: 'var(--t2)', t: '14:31' },
+          { i: 'T', n: 'Tom', c: 'var(--t4)', t: '15:05' }
+        ] },
+        { title: 'Delivered to, not seen yet', count: '2', tick: 'color:var(--muted)', second: 'M12 14l1 1L24 4', people: [
+          { i: 'L', n: 'Leo', c: 'var(--t5)', t: 'Delivered 14:20' },
+          { i: 'J', n: 'Jade', c: 'var(--t3)', t: 'Delivered 14:21' }
+        ] }
+      ],
+      menu: s.menu,
+      toggleMenu: function () { self.setState({ menu: !s.menu }); },
+      plusStyle: s.menu ? 'background:var(--solid);color:var(--on-solid)' : 'background:var(--surface);color:var(--ink)',
+      plusRot: s.menu ? 'transform:rotate(45deg);transition:transform .2s' : 'transition:transform .2s',
+      options: base.map(function (o, i) {
+        var mine = s.vote === o[0];
+        var lead = counts[i] === max;
+        return {
+          label: o[1], n: counts[i], mine: mine,
+          w: Math.round(counts[i] / total * 100) + '%',
+          fill: lead ? 'background:var(--accent-soft)' : 'background:var(--line)',
+          box: 'border:1px solid ' + (mine ? 'var(--accent)' : 'rgba(255,255,255,.9)') + ';background:var(--surface)',
+          radio: mine ? 'background:var(--accent)' : 'border:2px solid var(--line-3);box-sizing:border-box',
+          vote: function () { self.setState({ vote: mine ? null : o[0] }); }
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

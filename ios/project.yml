@@ -1,0 +1,94 @@
+name: Availabliss
+options:
+  bundleIdPrefix: dev.joeherbert
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+  developmentLanguage: en-GB
+
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+    TARGETED_DEVICE_FAMILY: "1"
+    SUPPORTS_MACCATALYST: NO
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+
+targets:
+  Availabliss:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Availabliss
+        excludes:
+          - "**/README.md"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER)
+        PRODUCT_NAME: Availabliss
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: NO
+    entitlements:
+      path: Availabliss/Resources/Availabliss.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
+        com.apple.developer.associated-domains:
+          - webcredentials:$(ASSOCIATED_DOMAIN_HOST)
+          - applinks:$(ASSOCIATED_DOMAIN_HOST)
+        aps-environment: $(APS_ENVIRONMENT)
+    info:
+      path: Availabliss/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Availabliss
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        # App configuration read by AppConfig.swift
+        AVAPIBaseURL: $(API_BASE_URL)
+        AVAssociatedDomainHost: $(ASSOCIATED_DOMAIN_HOST)
+        AVGoogleClientID: $(GOOGLE_IOS_CLIENT_ID)
+        AVGoogleRedirectScheme: $(GOOGLE_REVERSED_CLIENT_ID)
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.joeherbert.availabliss
+            CFBundleURLSchemes:
+              - availabliss
+          - CFBundleURLName: google-sign-in
+            CFBundleURLSchemes:
+              - $(GOOGLE_REVERSED_CLIENT_ID)
+        UIBackgroundModes:
+          - fetch
+          - remote-notification
+        BGTaskSchedulerPermittedIdentifiers:
+          - dev.joeherbert.availabliss.calendar-refresh
+        NSCalendarsFullAccessUsageDescription: Availabliss reads when you're busy (never what you're doing) so your groups can find times that work. Only start and end times leave your phone.
+        NSCalendarsWriteOnlyAccessUsageDescription: Availabliss adds confirmed plans to your calendar.
+        NSCalendarsUsageDescription: Availabliss reads when you're busy so your groups can find times that work.
+        NSFaceIDUsageDescription: Use Face ID to sign in with your passkey.
+        UIAppFonts:
+          - BricolageGrotesque-SemiBold.ttf
+          - BricolageGrotesque-Bold.ttf
+          - BricolageGrotesque-ExtraBold.ttf
+          - InstrumentSans-Regular.ttf
+          - InstrumentSans-Medium.ttf
+          - InstrumentSans-SemiBold.ttf
+          - InstrumentSans-Bold.ttf

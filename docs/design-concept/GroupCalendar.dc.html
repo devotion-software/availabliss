@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Availabliss · Group availability</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Instrument+Sans:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+:root,.av{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC;--bg:#ECEEF7;--ink:#1A1B3A;--muted:#4D5072;--neutral-ink:#3A3D5C;--surface:rgba(255,255,255,.62);--glass:rgba(255,255,255,.5);--glass-border:rgba(255,255,255,.8);--glass-hi:rgba(255,255,255,.9);--shadow:rgba(43,38,120,.38);--line:rgba(26,27,58,.07);--line-2:rgba(26,27,58,.14);--line-3:rgba(26,27,58,.28);--solid:#1A1B3A;--on-solid:#FFFFFF;--on-accent:#FFFFFF;--busy-bg:#FFFFFF;--busy-line:#B9BCD6;--ok:#0FA37F;--ok-bg:#D3F5EA;--ok-ink:#0D6B52;--warn:#FF8A5E;--warn-bg:#FFE0CF;--warn-ink:#8A3410;--t1:#FFD3BF;--t2:#D6DAFF;--t3:#C8F1E4;--t4:#F5D6EE;--t5:#FFE7A3;--orb-op:.85}
+.av.dark{--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24);--bg:#0C0D1D;--ink:#F1F2FA;--muted:#A6A9C8;--neutral-ink:#C9CBE3;--surface:rgba(255,255,255,.07);--glass:rgba(26,28,56,.5);--glass-border:rgba(255,255,255,.12);--glass-hi:rgba(255,255,255,.1);--shadow:rgba(0,0,0,.6);--line:rgba(255,255,255,.08);--line-2:rgba(255,255,255,.16);--line-3:rgba(255,255,255,.3);--solid:#F1F2FA;--on-solid:#0C0D1D;--busy-bg:rgba(255,255,255,.14);--busy-line:#4A4D70;--ok:#34D3A0;--ok-bg:rgba(52,211,160,.16);--ok-ink:#7EE8C6;--warn:#FF9A73;--warn-bg:rgba(255,138,94,.18);--warn-ink:#FFBCA2;--t1:#5C3B2E;--t2:#363B78;--t3:#1E5045;--t4:#58304F;--t5:#5A4A1E;--orb-op:.42}
+.t-dawn{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC}
+.dark.t-dawn{--accent:#6A5CFF;--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24)}
+.t-lagoon{--accent:#0B7F8A;--accent-ink:#06646D;--accent-soft:rgba(11,127,138,.14);--orb1:#86E3E0;--orb2:#8EC5FF;--orb3:#B5EBA8}
+.dark.t-lagoon{--accent-ink:#7FDDE4;--accent-soft:rgba(19,156,168,.26)}
+.t-sunset{--accent:#C9401F;--accent-ink:#A8341A;--accent-soft:rgba(201,64,31,.13);--orb1:#FFA585;--orb2:#FF9CC0;--orb3:#FFD37E}
+.dark.t-sunset{--accent-ink:#FFB199;--accent-soft:rgba(224,83,47,.26)}
+.t-orchid{--accent:#9333C9;--accent-ink:#7A27AA;--accent-soft:rgba(147,51,201,.13);--orb1:#F4B0E0;--orb2:#C9A8FF;--orb3:#A9B8FF}
+.dark.t-orchid{--accent:#A646DB;--accent-ink:#DDB0F7;--accent-soft:rgba(166,70,219,.26)}
+.t-grove{--accent:#2D7A4A;--accent-ink:#22633B;--accent-soft:rgba(45,122,74,.14);--orb1:#C3E88F;--orb2:#8FD8B5;--orb3:#F3D78A}
+.dark.t-grove{--accent-ink:#9FE0B6;--accent-soft:rgba(58,148,96,.26)}
+.av{transition:background .3s ease,color .3s ease}
+.av .orb{opacity:var(--orb-op) !important}
+a{color:var(--accent-ink)}a:hover{color:var(--ink)}
+.orb{position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(26px) saturate(170%);backdrop-filter:blur(26px) saturate(170%);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-hi),0 18px 40px -22px var(--shadow)}
+.disp{font-family:'Bricolage Grotesque',system-ui,sans-serif;letter-spacing:-.025em}
+button{font:inherit;color:inherit;cursor:pointer}
+.day{transition:transform .15s ease, box-shadow .2s ease}
+.day:hover{transform:scale(1.03)}
+</style>
+</helmet>
+<div class="{{themeClass}}" style="width:390px;height:844px;position:relative;overflow:hidden;background:var(--bg);font-family:'Instrument Sans',system-ui,sans-serif;color:var(--ink)">
+  <div class="orb" aria-hidden="true" style="width:320px;height:320px;right:-130px;top:-100px;background:var(--orb2)"></div>
+  <div class="orb" aria-hidden="true" style="width:300px;height:300px;left:-150px;top:300px;background:var(--orb1)"></div>
+  <div class="orb" aria-hidden="true" style="width:280px;height:280px;right:-80px;bottom:40px;background:var(--orb3)"></div>
+
+  <div style="position:relative;height:100%;box-sizing:border-box;padding:20px 20px 0;display:flex;flex-direction:column;gap:12px">
+    <header style="display:flex;align-items:center;gap:10px">
+      <a href="Main.dc.html" class="glass" aria-label="Back to groups" style="width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+      </a>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+        <h1 class="disp" style="margin:0;font-size:22px;font-weight:700;line-height:1.1">Lake District crew</h1>
+        <span style="font-size:12px;color:var(--muted)">6 members · you're an admin</span>
+      </div>
+      <button class="glass" aria-label="Invite people" style="width:44px;height:44px;flex:none;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="8" r="4"></circle><path d="M3 20c1.2-3.5 3.8-5 7-5s5.8 1.5 7 5M19 8v6M16 11h6"></path></svg>
+      </button>
+    </header>
+
+    <div class="glass" style="border-radius:20px;padding:10px 10px 10px 12px;display:flex;align-items:center;gap:10px">
+      <div style="position:relative;width:38px;height:38px;flex:none">
+        <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle cx="19" cy="19" r="15" fill="none" style="stroke:var(--line-2)" stroke-width="4"></circle><circle cx="19" cy="19" r="15" fill="none" style="stroke:var(--warn)" stroke-width="4" stroke-linecap="round" stroke-dasharray="62.8 94.2" transform="rotate(-90 19 19)"></circle></svg>
+        <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">4/6</span>
+      </div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+        <span style="font-size:14px;font-weight:600">2 people still to sync</span>
+        <span style="font-size:12px;color:var(--muted)">Leo and Jade haven't added busy times</span>
+      </div>
+      <button style="height:36px;border:0;border-radius:12px;padding:0 12px;background:var(--warn-bg);color:var(--warn-ink);font-size:13px;font-weight:600">Nudge</button>
+    </div>
+
+    <a href="Requirements.dc.html" class="glass" style="height:40px;border-radius:14px;padding:0 12px;display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);font-size:13px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+      <span style="flex:1"><strong style="font-weight:600">A weekend</strong> · Fri from 18:00 → Sun · Nov – Jan</span>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"></path></svg>
+    </a>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <h2 class="disp" style="margin:0;font-size:19px;font-weight:650">{{heading}}</h2>
+      <div class="glass" role="group" aria-label="Calendar view" style="display:flex;padding:3px;border-radius:13px;gap:2px">
+        <sc-for list="{{segs}}" as="s" hint-placeholder-count="3">
+          <button onClick="{{s.pick}}" aria-pressed="{{s.on}}" style="height:32px;min-width:52px;border:0;border-radius:10px;font-size:13px;font-weight:600;{{s.style}}">{{s.label}}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <sc-if value="{{isMonth}}" hint-placeholder-val="{{true}}">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:4px;font-size:11px;font-weight:600;color:var(--muted)">
+          <sc-for list="{{colNames}}" as="n" hint-placeholder-count="3">
+            <span style="padding-left:10px">{{n}}</span>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:4px">
+          <sc-for list="{{cells}}" as="c" hint-placeholder-count="15">
+            <sc-if value="{{c.show}}" hint-placeholder-val="{{true}}">
+              <button class="day" onClick="{{c.pick}}" aria-label="{{c.label}}" style="{{c.style}}">
+                <span style="font-size:17px;font-weight:650;line-height:1">{{c.d}}</span>
+                <span style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">{{c.note}}</span>
+              </button>
+            </sc-if>
+            <sc-if value="{{c.hide}}" hint-placeholder-val="{{false}}">
+              <div aria-hidden="true" style="height:54px"></div>
+            </sc-if>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;font-size:11px;color:var(--muted);padding:4px 2px 0">
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:3px;background:var(--accent)"></span>Works for everyone</span>
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:3px;background:var(--busy-bg);opacity:.5;border:1px solid var(--busy-line)"></span>Someone's busy</span>
+          <span>Fri–Sun only</span>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isWeek}}" hint-placeholder-val="{{false}}">
+      <div class="glass" style="border-radius:22px;padding:12px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:grid;grid-template-columns:34px repeat(3, minmax(0, 1fr));gap:6px;font-size:11px;font-weight:600;color:var(--muted);text-align:center">
+          <span></span><span>Fri 13</span><span>Sat 14</span><span>Sun 15</span>
+        </div>
+        <div style="display:grid;grid-template-columns:34px repeat(3, minmax(0, 1fr));gap:6px;height:320px">
+          <div style="position:relative;font-size:10px;color:var(--muted)">
+            <sc-for list="{{hours}}" as="h" hint-placeholder-count="5">
+              <span style="position:absolute;left:0;top:{{h.top}};transform:translateY(-50%)">{{h.t}}</span>
+            </sc-for>
+          </div>
+          <sc-for list="{{weekCols}}" as="col" hint-placeholder-count="3">
+            <div style="position:relative;border-radius:12px;background:var(--line)">
+              <sc-for list="{{col.blocks}}" as="b" hint-placeholder-count="1">
+                <div style="position:absolute;left:3px;right:3px;border-radius:10px;padding:6px;box-sizing:border-box;font-size:10px;font-weight:600;line-height:1.25;{{b.style}}">{{b.label}}</div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isDay}}" hint-placeholder-val="{{false}}">
+      <div class="glass" style="border-radius:22px;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span style="font-size:14px;font-weight:600">Fri 13 Nov</span>
+          <span style="font-size:12px;color:var(--muted)">Timing starts 18:00</span>
+        </div>
+        <div style="display:grid;grid-template-columns:64px minmax(0, 1fr);gap:8px;align-items:center">
+          <span style="font-size:12px;font-weight:700;color:var(--accent-ink)">Everyone</span>
+          <div style="position:relative;height:30px;border-radius:9px;background:var(--line)">
+            <div style="position:absolute;top:0;bottom:0;left:62.5%;right:0;border-radius:9px;background:var(--accent);color:var(--on-accent);font-size:11px;font-weight:600;display:flex;align-items:center;padding-left:8px">18:00 – late</div>
+          </div>
+          <sc-for list="{{people}}" as="p" hint-placeholder-count="6">
+            <span style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.n}}</span>
+            <div style="position:relative;height:22px;border-radius:7px;{{p.track}}">
+              <sc-for list="{{p.busy}}" as="b" hint-placeholder-count="1">
+                <div style="position:absolute;top:0;bottom:0;border-radius:7px;opacity:.5;box-sizing:border-box;left:{{b.l}};width:{{b.w}};{{b.look}}"></div>
+              </sc-for>
+              <sc-if value="{{p.pending}}" hint-placeholder-val="{{false}}">
+                <span style="position:absolute;inset:0;display:flex;align-items:center;padding-left:8px;font-size:10px;color:var(--muted)">Not synced yet</span>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:64px minmax(0, 1fr);gap:8px">
+          <span></span>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span>08</span><span>12</span><span>16</span><span>20</span><span>24</span></div>
+        </div>
+        <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px"><span style="width:14px;height:10px;border-radius:3px;background:repeating-linear-gradient(135deg,var(--line-3) 0 2px,transparent 2px 5px)"></span>Striped = blocked by hand</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isMonth}}" hint-placeholder-val="{{true}}">
+      <div class="glass" style="border-radius:22px;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+            <span style="font-size:16px;font-weight:650" class="disp">{{info.title}}</span>
+            <span style="font-size:12px;color:var(--muted)">{{info.sub}}</span>
+          </div>
+          <span style="flex:none;font-size:11px;font-weight:600;padding:4px 8px;border-radius:999px;{{info.pill}}">{{info.tag}}</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <sc-if value="{{info.ok}}" hint-placeholder-val="{{true}}">
+            <a href="Proposal.dc.html" style="flex:1;height:44px;border-radius:14px;background:var(--accent);color:var(--on-accent);text-decoration:none;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px">Propose this weekend</a>
+          </sc-if>
+          <button onClick="{{toDay}}" style="flex:1;height:44px;border-radius:14px;border:1px solid var(--line-2);background:var(--surface);font-size:14px;font-weight:600">See who's free</button>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <nav class="glass" aria-label="Group" style="position:absolute;left:20px;right:20px;bottom:22px;height:66px;border-radius:24px;display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));padding:0 6px">
+    <a href="GroupCalendar.dc.html" aria-current="page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;text-decoration:none;color:var(--accent-ink)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>
+      Calendar
+    </a>
+    <a href="Chat.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;text-decoration:none;color:var(--muted);position:relative">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5z"></path></svg>
+      Chat
+      <span style="position:absolute;top:8px;left:calc(50% + 5px);min-width:16px;height:16px;border-radius:8px;background:var(--warn);color:#1A1B3A;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">3</span>
+    </a>
+    <a href="Proposal.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;text-decoration:none;color:var(--muted)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l3 3 5-6"></path></svg>
+      Proposals
+    </a>
+    <a href="Requirements.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;text-decoration:none;color:var(--muted)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>
+      Timing
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["light","dark"],"default":"light"},"theme":{"editor":"enum","options":["dawn","lagoon","sunset","orchid","grove"],"default":"dawn"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { view: 'month', sel: 13 };
+  }
+  renderVals() {
+    var self = this;
+    var view = this.state.view;
+    var sel = this.state.sel;
+    var busy = { 7: 'Priya busy', 20: 'Tom busy' };
+    var match = { 13: 's', 14: 'm', 15: 'e', 27: 's', 28: 'm', 29: 'e' };
+    var names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // Weekday columns that can never match the group's timing are dropped entirely.
+    var cols = [4, 5, 6];
+    var cells = [];
+    for (var i = 0; i < 5 * cols.length; i++) {
+      var col = cols[i % cols.length];
+      var d = Math.floor(i / cols.length) * 7 + col - 5;
+      var show = d >= 1 && d <= 30;
+      var radius = '16px';
+      var look = 'background:var(--surface);color:var(--ink);border:1px solid var(--glass-border);';
+      var note = d === 1 ? 'Today' : '';
+      if (match[d]) {
+        radius = match[d] === 's' ? '16px 5px 5px 16px' : match[d] === 'e' ? '5px 16px 16px 5px' : '5px';
+        look = 'background:var(--accent);color:var(--on-accent);border:1px solid transparent;box-shadow:0 12px 24px -14px var(--accent);';
+        note = match[d] === 's' ? 'from 18:00' : 'all free';
+      } else if (busy[d]) {
+        look = 'background:var(--busy-bg);color:var(--ink);border:1px solid var(--glass-border);opacity:.5;';
+        note = busy[d];
+      }
+      if (d === sel) look += 'outline:2px solid var(--ink);outline-offset:2px;';
+      cells.push({
+        d: d, show: show, hide: !show, note: note,
+        label: show ? names[col] + ' ' + d + ' November' + (match[d] ? ', works for everyone' : busy[d] ? ', ' + busy[d] : '') : '',
+        style: 'height:54px;padding:0 10px;border-radius:' + radius + ';display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;' + look,
+        pick: (function (day) { return function () { self.setState({ sel: day }); }; })(d)
+      });
+    }
+    var goodSub = 'Everyone synced is free from Fri 18:00';
+    var info;
+    if (sel >= 13 && sel <= 15) info = { title: 'Fri 13 – Sun 15 Nov', sub: goodSub, ok: true };
+    else if (sel >= 27 && sel <= 29) info = { title: 'Fri 27 – Sun 29 Nov', sub: goodSub, ok: true };
+    else if (sel === 7) info = { title: 'Sat 7 Nov', sub: 'Priya blocked this day by hand', ok: false };
+    else if (sel === 6 || sel === 8) info = { title: 'Fri 6 – Sun 8 Nov', sub: 'Priya is busy on Sat 7', ok: false };
+    else if (sel === 20) info = { title: 'Fri 20 Nov', sub: 'Tom is busy from 17:00', ok: false };
+    else if (sel === 21 || sel === 22) info = { title: 'Fri 20 – Sun 22 Nov', sub: 'Free Sat & Sun, but Tom is busy Fri evening', ok: false };
+    else info = { title: 'Today · Sun 1 Nov', sub: 'This weekend has already started', ok: false };
+    info.tag = info.ok ? 'Works' : 'Doesn’t fit';
+    info.pill = info.ok ? 'background:var(--ok-bg);color:var(--ok-ink)' : 'background:var(--line);color:var(--neutral-ink)';
+
+    var segs = [['month', 'Month'], ['week', 'Week'], ['day', 'Day']].map(function (s) {
+      var on = view === s[0];
+      return {
+        label: s[1], on: on,
+        style: on ? 'background:var(--solid);color:var(--on-solid)' : 'background:transparent;color:var(--ink)',
+        pick: function () { self.setState({ view: s[0] }); }
+      };
+    });
+
+    var pct = function (h) { return ((h - 8) / 16 * 100) + '%'; };
+    var span = function (a, b) { return 'top:' + pct(a) + ';height:' + ((b - a) / 16 * 100) + '%;'; };
+    var free = 'background:var(--accent);color:var(--on-accent);';
+    var faded = 'background:var(--busy-bg);opacity:.5;border:1px solid var(--busy-line);color:var(--ink);';
+    var weekCols = [
+      { blocks: [{ label: 'Free from 18:00', style: span(18, 24) + free }] },
+      { blocks: [{ label: 'Everyone free all day', style: span(8, 24) + free }] },
+      { blocks: [{ label: 'Everyone free', style: span(8, 22) + free }, { label: 'Tom', style: span(22, 24) + faded }] }
+    ];
+    var hours = [8, 12, 16, 20, 24].map(function (h) { return { t: (h < 10 ? '0' : '') + h, top: pct(h) }; });
+
+    var calLook = 'background:var(--busy-bg);border:1px solid var(--busy-line)';
+    var manualLook = 'background:repeating-linear-gradient(135deg,var(--line-3) 0 2px,var(--busy-bg) 2px 5px);border:1px solid var(--busy-line)';
+    var bar = function (a, b, manual) { return { l: pct(a), w: ((b - a) / 16 * 100) + '%', look: manual ? manualLook : calLook }; };
+    var people = [
+      { n: 'Sam (you)', busy: [bar(9, 17.5)] },
+      { n: 'Priya', busy: [bar(8.5, 17), bar(17, 18, true)] },
+      { n: 'Tom', busy: [bar(10, 13), bar(14, 16.5)] },
+      { n: 'Ana', busy: [bar(9, 12, true), bar(13, 17.5)] },
+      { n: 'Leo', busy: [], pending: true },
+      { n: 'Jade', busy: [], pending: true }
+    ].map(function (p) {
+      p.track = p.pending ? 'border:1px dashed var(--line-3);box-sizing:border-box' : 'background:var(--accent-soft)';
+      p.pending = !!p.pending;
+      return p;
+    });
+
+    return {
+      themeClass: 'av ' + (this.props.mode || 'light') + ' t-' + (this.props.theme || 'dawn'),
+      cells: cells, info: info, segs: segs, weekCols: weekCols, hours: hours, people: people,
+      colNames: cols.map(function (c) { return names[c]; }),
+      isMonth: view === 'month', isWeek: view === 'week', isDay: view === 'day',
+      heading: view === 'month' ? 'November 2026' : view === 'week' ? '13 – 15 Nov' : 'Fri 13 Nov',
+      toDay: function () { self.setState({ view: 'day' }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

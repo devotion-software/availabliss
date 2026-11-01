@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Availabliss · Appearance</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Instrument+Sans:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+:root,.av{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC;--bg:#ECEEF7;--ink:#1A1B3A;--muted:#4D5072;--neutral-ink:#3A3D5C;--surface:rgba(255,255,255,.62);--glass:rgba(255,255,255,.5);--glass-border:rgba(255,255,255,.8);--glass-hi:rgba(255,255,255,.9);--shadow:rgba(43,38,120,.38);--line:rgba(26,27,58,.07);--line-2:rgba(26,27,58,.14);--line-3:rgba(26,27,58,.28);--solid:#1A1B3A;--on-solid:#FFFFFF;--on-accent:#FFFFFF;--busy-bg:#FFFFFF;--busy-line:#B9BCD6;--ok:#0FA37F;--ok-bg:#D3F5EA;--ok-ink:#0D6B52;--warn:#FF8A5E;--warn-bg:#FFE0CF;--warn-ink:#8A3410;--t1:#FFD3BF;--t2:#D6DAFF;--t3:#C8F1E4;--t4:#F5D6EE;--t5:#FFE7A3;--orb-op:.85}
+.av.dark{--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24);--bg:#0C0D1D;--ink:#F1F2FA;--muted:#A6A9C8;--neutral-ink:#C9CBE3;--surface:rgba(255,255,255,.07);--glass:rgba(26,28,56,.5);--glass-border:rgba(255,255,255,.12);--glass-hi:rgba(255,255,255,.1);--shadow:rgba(0,0,0,.6);--line:rgba(255,255,255,.08);--line-2:rgba(255,255,255,.16);--line-3:rgba(255,255,255,.3);--solid:#F1F2FA;--on-solid:#0C0D1D;--busy-bg:rgba(255,255,255,.14);--busy-line:#4A4D70;--ok:#34D3A0;--ok-bg:rgba(52,211,160,.16);--ok-ink:#7EE8C6;--warn:#FF9A73;--warn-bg:rgba(255,138,94,.18);--warn-ink:#FFBCA2;--t1:#5C3B2E;--t2:#363B78;--t3:#1E5045;--t4:#58304F;--t5:#5A4A1E;--orb-op:.42}
+.t-dawn{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC}
+.dark.t-dawn{--accent:#6A5CFF;--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24)}
+.t-lagoon{--accent:#0B7F8A;--accent-ink:#06646D;--accent-soft:rgba(11,127,138,.14);--orb1:#86E3E0;--orb2:#8EC5FF;--orb3:#B5EBA8}
+.dark.t-lagoon{--accent-ink:#7FDDE4;--accent-soft:rgba(19,156,168,.26)}
+.t-sunset{--accent:#C9401F;--accent-ink:#A8341A;--accent-soft:rgba(201,64,31,.13);--orb1:#FFA585;--orb2:#FF9CC0;--orb3:#FFD37E}
+.dark.t-sunset{--accent-ink:#FFB199;--accent-soft:rgba(224,83,47,.26)}
+.t-orchid{--accent:#9333C9;--accent-ink:#7A27AA;--accent-soft:rgba(147,51,201,.13);--orb1:#F4B0E0;--orb2:#C9A8FF;--orb3:#A9B8FF}
+.dark.t-orchid{--accent:#A646DB;--accent-ink:#DDB0F7;--accent-soft:rgba(166,70,219,.26)}
+.t-grove{--accent:#2D7A4A;--accent-ink:#22633B;--accent-soft:rgba(45,122,74,.14);--orb1:#C3E88F;--orb2:#8FD8B5;--orb3:#F3D78A}
+.dark.t-grove{--accent-ink:#9FE0B6;--accent-soft:rgba(58,148,96,.26)}
+.av{transition:background .4s ease,color .4s ease}
+.av .orb{opacity:var(--orb-op) !important;transition:background .6s ease}
+a{color:var(--accent-ink)}a:hover{color:var(--ink)}
+.orb{position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(26px) saturate(170%);backdrop-filter:blur(26px) saturate(170%);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-hi),0 18px 40px -22px var(--shadow)}
+.disp{font-family:'Bricolage Grotesque',system-ui,sans-serif;letter-spacing:-.025em}
+button{font:inherit;color:inherit;cursor:pointer}
+.sw{transition:transform .15s ease}
+.sw:hover{transform:translateY(-2px)}
+</style>
+</helmet>
+<div class="{{themeClass}}" style="width:390px;height:844px;position:relative;overflow:hidden;background:var(--bg);font-family:'Instrument Sans',system-ui,sans-serif;color:var(--ink)">
+  <div class="orb" aria-hidden="true" style="width:340px;height:340px;left:-130px;top:-100px;background:var(--orb1)"></div>
+  <div class="orb" aria-hidden="true" style="width:320px;height:320px;right:-150px;top:250px;background:var(--orb2)"></div>
+  <div class="orb" aria-hidden="true" style="width:300px;height:300px;left:-70px;bottom:-70px;background:var(--orb3)"></div>
+
+  <div style="position:relative;height:100%;box-sizing:border-box;padding:20px 20px 24px;display:flex;flex-direction:column;gap:16px">
+    <header style="display:flex;align-items:center;gap:10px">
+      <a href="Main.dc.html" class="glass" aria-label="Back" style="width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+      </a>
+      <h1 class="disp" style="margin:0;font-size:24px;font-weight:700;flex:1">Appearance</h1>
+    </header>
+
+    <section class="glass" style="border-radius:24px;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <h2 style="margin:0;font-size:13px;font-weight:600;color:var(--muted)">Mode</h2>
+      <div role="radiogroup" aria-label="Mode" style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:6px;padding:4px;border-radius:16px;background:var(--line)">
+        <sc-for list="{{modes}}" as="m" hint-placeholder-count="3">
+          <button role="radio" aria-checked="{{m.on}}" onClick="{{m.pick}}" style="height:44px;border:0;border-radius:12px;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;{{m.style}}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
+            {{m.label}}
+          </button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section class="glass" style="border-radius:24px;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <h2 style="margin:0;font-size:13px;font-weight:600;color:var(--muted)">Colour theme</h2>
+      <div role="radiogroup" aria-label="Colour theme" style="display:grid;grid-template-columns:repeat(5, minmax(0, 1fr));gap:8px">
+        <sc-for list="{{themes}}" as="t" hint-placeholder-count="5">
+          <button class="sw {{t.cls}}" role="radio" aria-checked="{{t.on}}" aria-label="{{t.label}}" onClick="{{t.pick}}" style="border:0;background:transparent;padding:0;display:flex;flex-direction:column;align-items:center;gap:6px">
+            <span style="position:relative;width:56px;height:56px;border-radius:18px;overflow:hidden;background:var(--bg);{{t.ring}}">
+              <span style="position:absolute;width:40px;height:40px;border-radius:50%;left:-8px;top:-8px;background:var(--orb1);filter:blur(6px)"></span>
+              <span style="position:absolute;width:40px;height:40px;border-radius:50%;right:-10px;top:4px;background:var(--orb2);filter:blur(6px)"></span>
+              <span style="position:absolute;width:36px;height:36px;border-radius:50%;left:4px;bottom:-12px;background:var(--orb3);filter:blur(6px)"></span>
+              <span style="position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:var(--accent);border:2px solid rgba(255,255,255,.85);box-sizing:border-box"></span>
+            </span>
+            <span style="font-size:12px;font-weight:600;color:var(--ink)">{{t.label}}</span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section class="glass" aria-label="Preview" style="border-radius:24px;padding:14px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h2 style="margin:0;font-size:13px;font-weight:600;color:var(--muted)">Preview</h2>
+        <span style="font-size:11px;font-weight:600;padding:4px 8px;border-radius:999px;background:var(--ok-bg);color:var(--ok-ink)">Works</span>
+      </div>
+      <span class="disp" style="font-size:18px;font-weight:650">Lake District crew</span>
+      <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:4px">
+        <span style="height:48px;border-radius:14px 5px 5px 14px;background:var(--accent);color:var(--on-accent);display:flex;flex-direction:column;justify-content:center;padding:0 10px;font-size:15px;font-weight:650">13<span style="font-size:10px;font-weight:600">from 18:00</span></span>
+        <span style="height:48px;border-radius:5px;background:var(--accent);color:var(--on-accent);display:flex;flex-direction:column;justify-content:center;padding:0 10px;font-size:15px;font-weight:650">14<span style="font-size:10px;font-weight:600">all free</span></span>
+        <span style="height:48px;border-radius:5px 14px 14px 5px;background:var(--accent);color:var(--on-accent);display:flex;flex-direction:column;justify-content:center;padding:0 10px;font-size:15px;font-weight:650">15<span style="font-size:10px;font-weight:600">all free</span></span>
+        <span style="height:48px;border-radius:14px;background:var(--surface);border:1px solid var(--glass-border);display:flex;flex-direction:column;justify-content:center;padding:0 10px;font-size:15px;font-weight:650;box-sizing:border-box">20<span style="font-size:10px;font-weight:600;color:var(--muted)">&#160;</span></span>
+        <span style="height:48px;border-radius:14px;background:var(--busy-bg);border:1px solid var(--glass-border);opacity:.5;display:flex;flex-direction:column;justify-content:center;padding:0 10px;font-size:15px;font-weight:650;box-sizing:border-box">21<span style="font-size:10px;font-weight:600">Tom busy</span></span>
+        <span style="height:48px;border-radius:14px;background:var(--surface);border:1px solid var(--glass-border);display:flex;flex-direction:column;justify-content:center;padding:0 10px;font-size:15px;font-weight:650;box-sizing:border-box">22<span style="font-size:10px;font-weight:600;color:var(--muted)">&#160;</span></span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <span style="flex:1;height:42px;border-radius:13px;background:var(--accent);color:var(--on-accent);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">Propose</span>
+        <span style="flex:1;height:42px;border-radius:13px;background:var(--solid);color:var(--on-solid);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">Add to calendar</span>
+      </div>
+    </section>
+
+    <div style="flex:1"></div>
+    <p style="margin:0;display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;color:var(--muted)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ok-ink)" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4.5 12a3.5 3.5 0 0 0 1 6.9z"></path><path d="M9 14l2 2 4-4"></path></svg>
+      Saved to your account · syncs to every device
+    </p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["light","dark"],"default":"light"},"theme":{"editor":"enum","options":["dawn","lagoon","sunset","orchid","grove"],"default":"dawn"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { mode: null, theme: null };
+  }
+  renderVals() {
+    var self = this;
+    var mode = this.state.mode || this.props.mode || 'light';
+    var theme = this.state.theme || this.props.theme || 'dawn';
+    // "System" follows the device; the preview renders it light.
+    var applied = mode === 'dark' ? 'dark' : 'light';
+    var icons = {
+      light: 'M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6L4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+      dark: 'M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z',
+      system: 'M3 5h18v11H3zM8 20h8M12 16v4'
+    };
+    return {
+      themeClass: 'av ' + applied + ' t-' + theme,
+      modes: [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']].map(function (m) {
+        var on = mode === m[0];
+        return {
+          label: m[1], on: on, icon: icons[m[0]],
+          style: on ? 'background:var(--surface);color:var(--ink);box-shadow:0 4px 12px -4px var(--shadow)' : 'background:transparent;color:var(--muted)',
+          pick: function () { self.setState({ mode: m[0] }); }
+        };
+      }),
+      themes: [['dawn', 'Dawn'], ['lagoon', 'Lagoon'], ['sunset', 'Sunset'], ['orchid', 'Orchid'], ['grove', 'Grove']].map(function (t) {
+        var on = theme === t[0];
+        return {
+          label: t[1], on: on,
+          cls: 'av ' + applied + ' t-' + t[0],
+          ring: on ? 'outline:2.5px solid var(--ink);outline-offset:3px' : 'outline:1px solid var(--line-2);outline-offset:0',
+          pick: function () { self.setState({ theme: t[0] }); }
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

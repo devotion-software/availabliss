@@ -1,0 +1,142 @@
+/*
+ * Design tokens (docs/DESIGN.md). <html> carries:
+ *   data-scheme = light | dark   (resolved from the user's mode in app.html)
+ *   data-theme  = dawn | lagoon | sunset | orchid | grove
+ */
+:root {
+	--bg: #eceef7;
+	--ink: #1a1b3a;
+	--muted: #4d5072;
+	--neutral-ink: #3a3d5c;
+	--surface: rgba(255, 255, 255, 0.62);
+	--glass: rgba(255, 255, 255, 0.5);
+	--glass-border: rgba(255, 255, 255, 0.8);
+	--glass-hi: rgba(255, 255, 255, 0.9);
+	--shadow: rgba(43, 38, 120, 0.38);
+	--line: rgba(26, 27, 58, 0.07);
+	--line-2: rgba(26, 27, 58, 0.14);
+	--line-3: rgba(26, 27, 58, 0.28);
+	--solid: #1a1b3a;
+	--on-solid: #ffffff;
+	--on-accent: #ffffff;
+	/* Busy cells recede: translucent enough that, faded to 50%, they read clearly against free (surface) cells. */
+	--busy-bg: rgba(255, 255, 255, 0.4);
+	--busy-line: #b9bcd6;
+	--ok: #0fa37f;
+	--ok-bg: #d3f5ea;
+	--ok-ink: #0d6b52;
+	--warn: #ff8a5e;
+	--warn-bg: #ffe0cf;
+	--warn-ink: #8a3410;
+	--t1: #ffd3bf;
+	--t2: #d6daff;
+	--t3: #c8f1e4;
+	--t4: #f5d6ee;
+	--t5: #ffe7a3;
+	--orb-opacity: 0.85;
+
+	--accent: #5546ff;
+	--accent-ink: #3b2fd0;
+	--accent-soft: rgba(85, 70, 255, 0.14);
+	--orb1: #ffb894;
+	--orb2: #9da6ff;
+	--orb3: #8ee3cc;
+
+	--font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+	--font-body: 'Instrument Sans', system-ui, sans-serif;
+
+	--radius-sheet: 32px;
+	--radius-card: 24px;
+	--radius-control: 14px;
+	--radius-pill: 999px;
+	--blur: blur(26px) saturate(170%);
+	--glass-shadow: inset 0 1px 0 var(--glass-hi), 0 18px 40px -22px var(--shadow);
+}
+
+:root[data-scheme='dark'] {
+	--bg: #0c0d1d;
+	--ink: #f1f2fa;
+	--muted: #a6a9c8;
+	--neutral-ink: #c9cbe3;
+	--surface: rgba(255, 255, 255, 0.07);
+	--glass: rgba(26, 28, 56, 0.5);
+	--glass-border: rgba(255, 255, 255, 0.12);
+	--glass-hi: rgba(255, 255, 255, 0.1);
+	--shadow: rgba(0, 0, 0, 0.6);
+	--line: rgba(255, 255, 255, 0.08);
+	--line-2: rgba(255, 255, 255, 0.16);
+	--line-3: rgba(255, 255, 255, 0.3);
+	--solid: #f1f2fa;
+	--on-solid: #0c0d1d;
+	/* Busy cells sink below the page in dark mode so they read differently from free (surface) cells. */
+	--busy-bg: rgba(0, 0, 0, 0.28);
+	--busy-line: #4a4d70;
+	--ok: #34d3a0;
+	--ok-bg: rgba(52, 211, 160, 0.16);
+	--ok-ink: #7ee8c6;
+	--warn: #ff9a73;
+	--warn-bg: rgba(255, 138, 94, 0.18);
+	--warn-ink: #ffbca2;
+	--t1: #5c3b2e;
+	--t2: #363b78;
+	--t3: #1e5045;
+	--t4: #58304f;
+	--t5: #5a4a1e;
+	--orb-opacity: 0.42;
+	--accent: #6a5cff;
+	--accent-ink: #b4acff;
+	--accent-soft: rgba(130, 118, 255, 0.24);
+}
+
+:root[data-theme='lagoon'] {
+	--accent: #0b7f8a;
+	--accent-ink: #06646d;
+	--accent-soft: rgba(11, 127, 138, 0.14);
+	--orb1: #86e3e0;
+	--orb2: #8ec5ff;
+	--orb3: #b5eba8;
+}
+:root[data-theme='lagoon'][data-scheme='dark'] {
+	--accent-ink: #7fdde4;
+	--accent-soft: rgba(19, 156, 168, 0.26);
+}
+
+:root[data-theme='sunset'] {
+	--accent: #c9401f;
+	--accent-ink: #a8341a;
+	--accent-soft: rgba(201, 64, 31, 0.13);
+	--orb1: #ffa585;
+	--orb2: #ff9cc0;
+	--orb3: #ffd37e;
+}
+:root[data-theme='sunset'][data-scheme='dark'] {
+	--accent-ink: #ffb199;
+	--accent-soft: rgba(224, 83, 47, 0.26);
+}
+
+:root[data-theme='orchid'] {
+	--accent: #9333c9;
+	--accent-ink: #7a27aa;
+	--accent-soft: rgba(147, 51, 201, 0.13);
+	--orb1: #f4b0e0;
+	--orb2: #c9a8ff;
+	--orb3: #a9b8ff;
+}
+:root[data-theme='orchid'][data-scheme='dark'] {
+	--accent: #a646db;
+	--accent-ink: #ddb0f7;
+	--accent-soft: rgba(166, 70, 219, 0.26);
+}
+
+:root[data-theme='grove'] {
+	--accent: #2d7a4a;
+	--accent-ink: #22633b;
+	--accent-soft: rgba(45, 122, 74, 0.14);
+	--orb1: #c3e88f;
+	--orb2: #8fd8b5;
+	--orb3: #f3d78a;
+}
+:root[data-theme='grove'][data-scheme='dark'] {
+	--accent-ink: #9fe0b6;
+	--accent-soft: rgba(58, 148, 96, 0.26);
+}

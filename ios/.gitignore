@@ -1,0 +1,5 @@
+Config/Secrets.xcconfig
+Availabliss.xcodeproj/
+build/
+DerivedData/
+*.xcuserstate

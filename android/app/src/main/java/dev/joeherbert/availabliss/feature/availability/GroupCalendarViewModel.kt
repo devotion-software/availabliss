@@ -1,0 +1,294 @@
+package dev.joeherbert.availabliss.feature.availability
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.common.UserMessage
+import dev.joeherbert.availabliss.core.data.GroupsRepository
+import dev.joeherbert.availabliss.core.data.UserRepository
+import dev.joeherbert.availabliss.core.live.LiveEvents
+import dev.joeherbert.availabliss.core.live.LivePayload
+import dev.joeherbert.availabliss.core.network.ApiError
+import dev.joeherbert.availabliss.core.network.ApiResult
+import dev.joeherbert.availabliss.core.network.getOrNull
+import dev.joeherbert.availabliss.core.network.model.Availability
+import dev.joeherbert.availabliss.core.network.model.DayAvailability
+import dev.joeherbert.availabliss.core.network.model.DayStatus
+import dev.joeherbert.availabliss.core.network.model.Group
+import dev.joeherbert.availabliss.core.network.model.Role
+import dev.joeherbert.availabliss.core.network.model.Slot
+import dev.joeherbert.availabliss.designsystem.component.availability.EveryoneBandUi
+import dev.joeherbert.availabliss.designsystem.component.availability.MonthCellUi
+import dev.joeherbert.availabliss.designsystem.component.availability.TimelineRowUi
+import dev.joeherbert.availabliss.designsystem.component.availability.WeekColumnUi
+import dev.joeherbert.availabliss.navigation.GroupRoute
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.YearMonth
+import javax.inject.Inject
+
+enum class CalendarView(val label: String) { Month("Month"), Week("Week"), Day("Day") }
+
+/** Everything the group calendar renders. Built from raw state by [AvailabilityUiMapper]. */
+data class GroupCalendarUiState(
+    val loading: Boolean = true,
+    val groupName: String = "",
+    val membersLine: String = "",
+    val requirementSummary: String = "",
+    val isAdmin: Boolean = false,
+    val view: CalendarView = CalendarView.Month,
+    val heading: String = "",
+    val columnLabels: List<String> = emptyList(),
+    val monthRows: List<List<MonthCellUi?>> = emptyList(),
+    val daysNote: String? = null,
+    val detail: DayDetailUi? = null,
+    val syncBanner: SyncBannerUi? = null,
+    val nudging: Boolean = false,
+    val weekColumns: List<WeekColumnUi> = emptyList(),
+    val weekLoading: Boolean = false,
+    val dayTitle: String = "",
+    val dayNote: String? = null,
+    val everyone: List<EveryoneBandUi> = emptyList(),
+    val timelineRows: List<TimelineRowUi> = emptyList(),
+    val dayLoading: Boolean = false,
+    val error: String? = null,
+    val message: UserMessage? = null,
+)
+
+private data class RawState(
+    val loading: Boolean = true,
+    val view: CalendarView = CalendarView.Month,
+    val month: YearMonth = YearMonth.from(DateTimes.today()),
+    val availability: Availability? = null,
+    val selected: LocalDate = DateTimes.today(),
+    val week: List<DayAvailability> = emptyList(),
+    val weekLoading: Boolean = false,
+    val day: DayAvailability? = null,
+    val dayLoading: Boolean = false,
+    val nudging: Boolean = false,
+    val error: String? = null,
+    val message: UserMessage? = null,
+)
+
+@HiltViewModel
+class GroupCalendarViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
+    private val groups: GroupsRepository,
+    users: UserRepository,
+    liveEvents: LiveEvents,
+) : ViewModel() {
+
+    private val groupId = savedStateHandle.toRoute<GroupRoute>().groupId
+    private val raw = MutableStateFlow(RawState())
+    private var monthJob: Job? = null
+    private var detailJob: Job? = null
+
+    val uiState: StateFlow<GroupCalendarUiState> = combine(raw, groups.group(groupId), users.user) { r, group, user ->
+        toUi(r, group, user?.id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GroupCalendarUiState())
+
+    init {
+        viewModelScope.launch { groups.refreshGroup(groupId) }
+        loadMonth()
+        viewModelScope.launch {
+            liveEvents.payloadsFor(groupId).collect { payload ->
+                when (payload) {
+                    is LivePayload.AvailabilityChanged, is LivePayload.MemberChanged, is LivePayload.MemberRemoved,
+                    is LivePayload.ProposalConfirmed, is LivePayload.EventChanged, is LivePayload.EventDeleted -> refresh()
+                    is LivePayload.GroupUpdated -> {
+                        groups.refreshGroup(groupId)
+                        refresh()
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
+
+    // region Intents
+    fun selectView(view: CalendarView) {
+        raw.update { it.copy(view = view) }
+        loadForView()
+    }
+
+    fun selectDate(date: LocalDate) {
+        raw.update { it.copy(selected = date) }
+        if (raw.value.view != CalendarView.Month) loadForView()
+    }
+
+    /** "See who's free": jump to the day view for the selected date. */
+    fun showDay() = selectView(CalendarView.Day)
+
+    fun previous() = step(-1)
+
+    fun next() = step(1)
+
+    fun refresh() {
+        loadMonth(silent = true)
+        if (raw.value.view != CalendarView.Month) loadForView()
+    }
+
+    fun nudge() {
+        if (raw.value.nudging) return
+        raw.update { it.copy(nudging = true) }
+        viewModelScope.launch {
+            val message = when (val result = groups.nudge(groupId)) {
+                is ApiResult.Success -> if (result.value == 0) "Everyone's already been nudged" else "Nudged ${result.value} ${if (result.value == 1) "person" else "people"}"
+                is ApiResult.Failure -> if (result.error is ApiError.RateLimited) "You can nudge again later. Nudges are limited to once every 12 hours." else result.error.message
+            }
+            raw.update { it.copy(nudging = false, message = UserMessage(message)) }
+        }
+    }
+
+    fun messageShown(message: UserMessage) = raw.update { if (it.message?.id == message.id) it.copy(message = null) else it }
+
+    /** The slot the detail card proposes, with the all-day guess. */
+    fun proposalFor(slot: Slot): Triple<String, String, Boolean> = Triple(slot.start, slot.end, AvailabilityUiMapper.isAllDay(slot))
+    // endregion
+
+    private fun step(delta: Long) {
+        val r = raw.value
+        when (r.view) {
+            CalendarView.Month -> {
+                val month = r.month.plusMonths(delta)
+                val selected = if (YearMonth.from(DateTimes.today()) == month) DateTimes.today() else month.atDay(1)
+                raw.update { it.copy(month = month, selected = selected) }
+                loadMonth()
+            }
+            CalendarView.Week -> {
+                raw.update { it.copy(selected = it.selected.plusWeeks(delta)) }
+                syncMonthToSelection()
+                loadForView()
+            }
+            CalendarView.Day -> {
+                raw.update { it.copy(selected = nextVisibleDay(it.selected, delta.toInt())) }
+                syncMonthToSelection()
+                loadForView()
+            }
+        }
+    }
+
+    /** Skips weekdays that can never match. */
+    private fun nextVisibleDay(from: LocalDate, direction: Int): LocalDate {
+        val columns = AvailabilityUiMapper.columns(raw.value.availability).toSet()
+        var d = from.plusDays(direction.toLong())
+        repeat(7) {
+            if (DateTimes.apiWeekday(d) in columns) return d
+            d = d.plusDays(direction.toLong())
+        }
+        return d
+    }
+
+    private fun syncMonthToSelection() {
+        val month = YearMonth.from(raw.value.selected)
+        if (month != raw.value.month) {
+            raw.update { it.copy(month = month) }
+            loadMonth()
+        }
+    }
+
+    private fun loadMonth(silent: Boolean = false) {
+        monthJob?.cancel()
+        monthJob = viewModelScope.launch {
+            val month = raw.value.month
+            if (!silent) raw.update { it.copy(loading = it.availability == null, error = null) }
+            when (val result = groups.availability(groupId, month.atDay(1).toString(), month.atEndOfMonth().toString())) {
+                is ApiResult.Success -> raw.update { s ->
+                    s.copy(loading = false, availability = result.value, error = null, selected = defaultSelection(s, result.value))
+                }
+                is ApiResult.Failure -> raw.update { it.copy(loading = false, error = result.error.message) }
+            }
+        }
+    }
+
+    /** Keeps the user's selection, else picks today or the first match of the month. */
+    private fun defaultSelection(s: RawState, availability: Availability): LocalDate {
+        if (YearMonth.from(s.selected) == s.month && s.selected != s.month.atDay(1)) return s.selected
+        val today = DateTimes.today()
+        if (YearMonth.from(today) == s.month) return today
+        return availability.days.firstOrNull { it.status == DayStatus.Match }?.date?.let(DateTimes::parseDate) ?: s.month.atDay(1)
+    }
+
+    private fun loadForView() {
+        detailJob?.cancel()
+        val r = raw.value
+        detailJob = when (r.view) {
+            CalendarView.Month -> null
+            CalendarView.Day -> viewModelScope.launch {
+                raw.update { it.copy(dayLoading = true) }
+                val day = groups.dayAvailability(groupId, r.selected.toString())
+                raw.update { it.copy(dayLoading = false, day = day.getOrNull() ?: it.day.takeIf { d -> d?.date == r.selected.toString() }, error = (day as? ApiResult.Failure)?.error?.message) }
+            }
+            CalendarView.Week -> viewModelScope.launch {
+                raw.update { it.copy(weekLoading = true) }
+                val columns = AvailabilityUiMapper.columns(r.availability)
+                val weekStart = DateTimes.startOfWeek(r.selected)
+                val dates = columns.map { weekStart.plusDays(it.toLong()) }
+                val results = dates.map { date -> async { groups.dayAvailability(groupId, date.toString()) } }.awaitAll()
+                val failure = results.firstOrNull { it is ApiResult.Failure } as? ApiResult.Failure
+                raw.update { it.copy(weekLoading = false, week = results.mapNotNull { res -> res.getOrNull() }, error = failure?.error?.message) }
+            }
+        }
+    }
+
+    private fun toUi(r: RawState, group: Group?, meId: String?): GroupCalendarUiState {
+        val today = DateTimes.today()
+        val isAdmin = group?.role?.isAdmin == true
+        val columns = AvailabilityUiMapper.columns(r.availability)
+        val weekStart = DateTimes.startOfWeek(r.selected)
+        val weekDates = columns.map { weekStart.plusDays(it.toLong()) }
+        val heading = when (r.view) {
+            CalendarView.Month -> DateTimes.monthYear(r.month.atDay(1))
+            CalendarView.Week -> if (weekDates.isEmpty()) "" else DateTimes.weekRange(weekDates.first(), weekDates.last()).let { shortenMonth(it, weekDates) }
+            CalendarView.Day -> DateTimes.shortDay(r.selected)
+        }
+        val day = r.day?.takeIf { it.date == r.selected.toString() }
+        return GroupCalendarUiState(
+            loading = r.loading,
+            groupName = group?.name.orEmpty(),
+            membersLine = group?.let {
+                val count = "${it.memberCount} ${if (it.memberCount == 1) "member" else "members"}"
+                when (it.role) {
+                    Role.Owner -> "$count · you're the owner"
+                    Role.Admin -> "$count · you're an admin"
+                    else -> count
+                }
+            }.orEmpty(),
+            requirementSummary = group?.requirementSummary.orEmpty(),
+            isAdmin = isAdmin,
+            view = r.view,
+            heading = heading,
+            columnLabels = AvailabilityUiMapper.columnLabels(columns),
+            monthRows = AvailabilityUiMapper.monthRows(r.month, r.availability, group, meId, r.selected, today),
+            daysNote = AvailabilityUiMapper.daysNote(columns),
+            detail = if (YearMonth.from(r.selected) == r.month) AvailabilityUiMapper.detail(r.selected, r.availability, group, meId, today) else null,
+            syncBanner = AvailabilityUiMapper.syncBanner(r.availability, group, isAdmin),
+            nudging = r.nudging,
+            weekColumns = AvailabilityUiMapper.weekColumns(r.week, group, meId),
+            weekLoading = r.weekLoading,
+            dayTitle = DateTimes.shortDay(r.selected),
+            dayNote = day?.let(AvailabilityUiMapper::dayNote),
+            everyone = day?.let(AvailabilityUiMapper::everyoneBands).orEmpty(),
+            timelineRows = day?.let { AvailabilityUiMapper.timelineRows(it, group, meId) }.orEmpty(),
+            dayLoading = r.dayLoading,
+            error = r.error,
+            message = r.message,
+        )
+    }
+
+    /** "13 – 15 November" → "13 – 15 Nov" to fit beside the segmented control. */
+    private fun shortenMonth(label: String, dates: List<LocalDate>): String =
+        if (dates.first().month == dates.last().month) "${dates.first().dayOfMonth} – ${DateTimes.dayMonth(dates.last())}" else label
+}

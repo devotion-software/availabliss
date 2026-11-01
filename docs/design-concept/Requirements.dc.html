@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Availabliss · Group timing</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Instrument+Sans:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+:root,.av{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC;--bg:#ECEEF7;--ink:#1A1B3A;--muted:#4D5072;--neutral-ink:#3A3D5C;--surface:rgba(255,255,255,.62);--glass:rgba(255,255,255,.5);--glass-border:rgba(255,255,255,.8);--glass-hi:rgba(255,255,255,.9);--shadow:rgba(43,38,120,.38);--line:rgba(26,27,58,.07);--line-2:rgba(26,27,58,.14);--line-3:rgba(26,27,58,.28);--solid:#1A1B3A;--on-solid:#FFFFFF;--on-accent:#FFFFFF;--busy-bg:#FFFFFF;--busy-line:#B9BCD6;--ok:#0FA37F;--ok-bg:#D3F5EA;--ok-ink:#0D6B52;--warn:#FF8A5E;--warn-bg:#FFE0CF;--warn-ink:#8A3410;--t1:#FFD3BF;--t2:#D6DAFF;--t3:#C8F1E4;--t4:#F5D6EE;--t5:#FFE7A3;--orb-op:.85}
+.av.dark{--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24);--bg:#0C0D1D;--ink:#F1F2FA;--muted:#A6A9C8;--neutral-ink:#C9CBE3;--surface:rgba(255,255,255,.07);--glass:rgba(26,28,56,.5);--glass-border:rgba(255,255,255,.12);--glass-hi:rgba(255,255,255,.1);--shadow:rgba(0,0,0,.6);--line:rgba(255,255,255,.08);--line-2:rgba(255,255,255,.16);--line-3:rgba(255,255,255,.3);--solid:#F1F2FA;--on-solid:#0C0D1D;--busy-bg:rgba(255,255,255,.14);--busy-line:#4A4D70;--ok:#34D3A0;--ok-bg:rgba(52,211,160,.16);--ok-ink:#7EE8C6;--warn:#FF9A73;--warn-bg:rgba(255,138,94,.18);--warn-ink:#FFBCA2;--t1:#5C3B2E;--t2:#363B78;--t3:#1E5045;--t4:#58304F;--t5:#5A4A1E;--orb-op:.42}
+.t-dawn{--accent:#5546FF;--accent-ink:#3B2FD0;--accent-soft:rgba(85,70,255,.14);--orb1:#FFB894;--orb2:#9DA6FF;--orb3:#8EE3CC}
+.dark.t-dawn{--accent:#6A5CFF;--accent-ink:#B4ACFF;--accent-soft:rgba(130,118,255,.24)}
+.t-lagoon{--accent:#0B7F8A;--accent-ink:#06646D;--accent-soft:rgba(11,127,138,.14);--orb1:#86E3E0;--orb2:#8EC5FF;--orb3:#B5EBA8}
+.dark.t-lagoon{--accent-ink:#7FDDE4;--accent-soft:rgba(19,156,168,.26)}
+.t-sunset{--accent:#C9401F;--accent-ink:#A8341A;--accent-soft:rgba(201,64,31,.13);--orb1:#FFA585;--orb2:#FF9CC0;--orb3:#FFD37E}
+.dark.t-sunset{--accent-ink:#FFB199;--accent-soft:rgba(224,83,47,.26)}
+.t-orchid{--accent:#9333C9;--accent-ink:#7A27AA;--accent-soft:rgba(147,51,201,.13);--orb1:#F4B0E0;--orb2:#C9A8FF;--orb3:#A9B8FF}
+.dark.t-orchid{--accent:#A646DB;--accent-ink:#DDB0F7;--accent-soft:rgba(166,70,219,.26)}
+.t-grove{--accent:#2D7A4A;--accent-ink:#22633B;--accent-soft:rgba(45,122,74,.14);--orb1:#C3E88F;--orb2:#8FD8B5;--orb3:#F3D78A}
+.dark.t-grove{--accent-ink:#9FE0B6;--accent-soft:rgba(58,148,96,.26)}
+.av{transition:background .3s ease,color .3s ease}
+.av .orb{opacity:var(--orb-op) !important}
+.dark .venn circle{mix-blend-mode:screen}
+a{color:var(--accent-ink)}a:hover{color:var(--ink)}
+.orb{position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(26px) saturate(170%);backdrop-filter:blur(26px) saturate(170%);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-hi),0 18px 40px -22px var(--shadow)}
+.disp{font-family:'Bricolage Grotesque',system-ui,sans-serif;letter-spacing:-.025em}
+button{font:inherit;color:inherit;cursor:pointer}
+.scroll{overflow-y:auto;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.chip{transition:background .2s ease,color .2s ease}
+</style>
+</helmet>
+<div class="{{themeClass}}" style="width:390px;height:844px;position:relative;overflow:hidden;background:var(--bg);font-family:'Instrument Sans',system-ui,sans-serif;color:var(--ink)">
+  <div class="orb" aria-hidden="true" style="width:320px;height:320px;left:-130px;top:-100px;background:var(--orb2);opacity:.85"></div>
+  <div class="orb" aria-hidden="true" style="width:300px;height:300px;right:-140px;top:330px;background:var(--orb1);opacity:.85"></div>
+  <div class="orb" aria-hidden="true" style="width:300px;height:300px;left:-60px;bottom:-80px;background:var(--orb3);opacity:.8"></div>
+
+  <div style="position:relative;height:100%;display:flex;flex-direction:column">
+    <header style="padding:20px 20px 8px;display:flex;align-items:center;gap:10px">
+      <a href="GroupCalendar.dc.html" class="glass" aria-label="Back to calendar" style="width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+      </a>
+      <div style="flex:1;display:flex;flex-direction:column">
+        <h1 class="disp" style="margin:0;font-size:24px;font-weight:700;line-height:1.1">Timing</h1>
+        <span style="font-size:12px;color:var(--muted)">Lake District crew</span>
+      </div>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:5px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.3 8.3-8 9-4.7-.7-8-4.5-8-9V6l8-3z"></path></svg>
+        Admins only
+      </span>
+    </header>
+
+    <div class="scroll" style="flex:1;padding:8px 20px 120px;display:flex;flex-direction:column;gap:12px">
+      <section class="glass" style="border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <h2 style="margin:0;font-size:13px;font-weight:600;color:var(--muted)">How long?</h2>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{lengths}}" as="l" hint-placeholder-count="6">
+            <button class="chip" onClick="{{l.pick}}" aria-pressed="{{l.on}}" style="height:40px;padding:0 14px;border-radius:999px;font-size:14px;font-weight:600;{{l.style}}">{{l.label}}</button>
+          </sc-for>
+        </div>
+      </section>
+
+      <section class="glass" style="border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <h2 style="margin:0;font-size:13px;font-weight:600;color:var(--muted)">Starts and ends</h2>
+        <div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:8px">
+          <button style="min-height:60px;border-radius:16px;border:1px solid var(--glass-border);background:var(--surface);padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:11px;font-weight:600;color:var(--muted)">Starts</span>
+            <span style="font-size:15px;font-weight:600">Fri from 18:00</span>
+          </button>
+          <button style="min-height:60px;border-radius:16px;border:1px solid var(--glass-border);background:var(--surface);padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:11px;font-weight:600;color:var(--muted)">Ends</span>
+            <span style="font-size:15px;font-weight:600">Sun, any time</span>
+          </button>
+        </div>
+        <div role="group" aria-label="Days it can fall on" style="display:grid;grid-template-columns:repeat(7, minmax(0, 1fr));gap:6px">
+          <sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+            <button onClick="{{d.toggle}}" aria-pressed="{{d.on}}" aria-label="{{d.name}}" style="height:44px;border-radius:14px;font-size:14px;font-weight:700;{{d.style}}">{{d.short}}</button>
+          </sc-for>
+        </div>
+      </section>
+
+      <section class="glass" style="border-radius:24px;padding:4px 16px">
+        <sc-for list="{{extras}}" as="x" hint-placeholder-count="2">
+          <div style="display:flex;align-items:center;gap:12px;min-height:60px;{{x.border}}">
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:15px;font-weight:600">{{x.name}}</span>
+              <span style="font-size:12px;color:var(--muted)">{{x.sub}}</span>
+            </div>
+            <button role="switch" aria-checked="{{x.on}}" aria-label="{{x.name}}" onClick="{{x.toggle}}" style="width:52px;height:32px;border-radius:16px;border:0;padding:3px;display:flex;{{x.track}}">
+              <span style="width:26px;height:26px;border-radius:50%;background:#FFFFFF;box-shadow:0 2px 6px rgba(20,20,60,.25)"></span>
+            </button>
+          </div>
+        </sc-for>
+      </section>
+
+      <section class="glass" style="border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <h2 style="margin:0;font-size:13px;font-weight:600;color:var(--muted)">Search between</h2>
+        <div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600">
+          <span style="flex:1;height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center">1 Nov 2026</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+          <span style="flex:1;height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center">31 Jan 2027</span>
+        </div>
+        <h2 style="margin:4px 0 0;font-size:13px;font-weight:600;color:var(--muted)">Or only these dates</h2>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <span style="height:36px;padding:0 6px 0 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:4px">
+            27 Dec – 2 Jan
+            <button aria-label="Remove 27 Dec to 2 Jan" style="width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:inherit;display:flex;align-items:center;justify-content:center;padding:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+          </span>
+          <button style="height:36px;padding:0 12px;border-radius:999px;border:1px dashed var(--line-3);background:transparent;font-size:13px;font-weight:600">+ Add date range</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="glass" style="position:absolute;left:12px;right:12px;bottom:16px;border-radius:26px;padding:12px 12px 12px 16px;display:flex;align-items:center;gap:12px">
+      <div style="flex:1;display:flex;flex-direction:column">
+        <span class="disp" style="font-size:20px;font-weight:700">{{fitCount}}</span>
+        <span style="font-size:12px;color:var(--muted)">{{fitLabel}}</span>
+      </div>
+      <a href="GroupCalendar.dc.html" style="height:48px;padding:0 22px;border-radius:16px;background:var(--solid);color:var(--on-solid);text-decoration:none;font-size:15px;font-weight:600;display:flex;align-items:center">Save timing</a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["light","dark"],"default":"light"},"theme":{"editor":"enum","options":["dawn","lagoon","sunset","orchid","grove"],"default":"dawn"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { len: 'weekend', days: [false, false, false, false, true, true, true], bank: true, school: false };
+  }
+  renderVals() {
+    var v = this.baseVals();
+    v.themeClass = 'av ' + (this.props.mode || 'light') + ' t-' + (this.props.theme || 'dawn');
+    return v;
+  }
+  baseVals() {
+    var self = this;
+    var s = this.state;
+    var lens = [['2h', '2 hours'], ['evening', 'An evening'], ['day', 'One day'], ['weekend', 'A weekend'], ['week', 'A week'], ['custom', 'Custom']];
+    var counts = { '2h': ['Fri–Sun', '2-hour slots'], evening: ['40 evenings', 'fit this timing'], day: ['40 days', 'fit this timing'], weekend: ['13 weekends', 'fit this timing'], week: ['A week', 'starting on a chosen day'], custom: ['Custom', 'set your own length'] };
+    var on = 'background:var(--solid);color:var(--on-solid);border:1px solid var(--solid)';
+    var off = 'background:var(--surface);color:var(--ink);border:1px solid var(--glass-border)';
+    var names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    var sw = function (v) { return v ? 'background:var(--accent);justify-content:flex-end' : 'background:var(--line-2);justify-content:flex-start'; };
+    return {
+      lengths: lens.map(function (l) {
+        return { label: l[1], on: s.len === l[0], style: s.len === l[0] ? on : off, pick: function () { self.setState({ len: l[0] }); } };
+      }),
+      days: names.map(function (n, i) {
+        var v = s.days[i];
+        return {
+          name: n, short: n.charAt(0), on: v,
+          style: v ? 'background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)' : off,
+          toggle: function () { var d = s.days.slice(); d[i] = !v; self.setState({ days: d }); }
+        };
+      }),
+      extras: [
+        { name: 'Bank holidays', sub: 'England · treat like a weekend day', on: s.bank, track: sw(s.bank), border: '', toggle: function () { self.setState({ bank: !s.bank }); } },
+        { name: 'School holidays only', sub: 'Bristol City Council term dates', on: s.school, track: sw(s.school), border: 'border-top:1px solid var(--line)', toggle: function () { self.setState({ school: !s.school }); } }
+      ],
+      fitCount: counts[s.len][0],
+      fitLabel: counts[s.len][1] + ' between 1 Nov and 31 Jan'
+    };
+  }
+}
+</script>
+</body>
+</html>

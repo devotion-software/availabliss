@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Availabliss</string>
+
+    <!-- Notification channels; ids equal the push `kind` (see core/push/NotificationChannels.kt). -->
+    <string name="channel_general_id" translatable="false">general</string>
+    <string name="channel_general_name">General</string>
+    <string name="channel_general_description">Other updates from your groups</string>
+    <string name="channel_messages_name">Group chat</string>
+    <string name="channel_messages_description">New messages and polls in your groups</string>
+    <string name="channel_proposal_created_name">Proposed times</string>
+    <string name="channel_proposal_created_description">When someone proposes a time for a group</string>
+    <string name="channel_proposal_confirmed_name">Confirmed plans</string>
+    <string name="channel_proposal_confirmed_description">When everyone has accepted a time</string>
+    <string name="channel_events_name">Events</string>
+    <string name="channel_events_description">Events added to your groups</string>
+    <string name="channel_nudges_name">Reminders</string>
+    <string name="channel_nudges_description">Reminders to add your busy times</string>
+    <string name="channel_invites_name">Group joins</string>
+    <string name="channel_invites_description">When someone accepts your invite</string>
+</resources>

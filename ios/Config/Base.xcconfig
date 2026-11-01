@@ -1,0 +1,25 @@
+// Availabliss build configuration.
+// Values here are safe to commit. Put per-developer / secret values in
+// Config/Secrets.xcconfig (git-ignored) — copy Secrets.example.xcconfig to start.
+//
+// NOTE: "//" starts a comment in xcconfig files, so URLs use the $() trick:
+//   https:/$()/example.com
+
+// API host serving /api/v1 and /api/auth (no trailing slash).
+API_BASE_URL = https:/$()/availabliss.app
+
+// Host used for universal links + passkeys (webcredentials) — no scheme.
+ASSOCIATED_DOMAIN_HOST = availabliss.app
+
+// Google Sign-In (iOS OAuth client). Leave empty to hide the Google button.
+GOOGLE_IOS_CLIENT_ID =
+// Reversed client id, e.g. com.googleusercontent.apps.1234-abcd
+GOOGLE_REVERSED_CLIENT_ID = dev.joeherbert.availabliss.google-unset
+
+// Push environment: development | production
+APS_ENVIRONMENT = development
+
+DEVELOPMENT_TEAM =
+PRODUCT_BUNDLE_IDENTIFIER = dev.joeherbert.availabliss
+
+#include? "Secrets.xcconfig"
