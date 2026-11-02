@@ -2,23 +2,20 @@ package dev.joeherbert.availabliss.feature.mytime
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -29,20 +26,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.network.model.BusyInterval
+import dev.joeherbert.availabliss.core.network.model.BusySource
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
@@ -61,7 +59,6 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
-import dev.joeherbert.availabliss.feature.common.parseHex
 import java.time.LocalDate
 
 /** "My time" tab: the week grid of busy times, recurring blocks and "Block a specific time". */
@@ -78,7 +75,7 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
             onOpenCalendars = onOpenCalendars,
             onPreviousWeek = viewModel::previousWeek,
             onNextWeek = viewModel::nextWeek,
-            onSlotTapped = viewModel::onSlotTapped,
+            onEmptyTapped = viewModel::onEmptyTapped,
             onOpenRecurring = viewModel::openEditor,
             onDeleteRecurring = viewModel::deleteBlock,
             onBlockSpecificTime = viewModel::openBlockSheet,
@@ -93,8 +90,8 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
             onDismiss = viewModel::closeBlockSheet,
             onDate = viewModel::onDraftDate,
             onWhen = viewModel::onDraftWhen,
-            onCustomStart = viewModel::onDraftCustomStart,
-            onCustomEnd = viewModel::onDraftCustomEnd,
+            onStart = viewModel::onDraftStart,
+            onEnd = viewModel::onDraftEnd,
             onRepeat = viewModel::onDraftRepeat,
             onUntil = viewModel::onDraftUntil,
             onNote = viewModel::onDraftNote,
@@ -109,7 +106,8 @@ data class MyTimeActions(
     val onOpenCalendars: () -> Unit = {},
     val onPreviousWeek: () -> Unit = {},
     val onNextWeek: () -> Unit = {},
-    val onSlotTapped: (SlotUi) -> Unit = {},
+    /** A tap on empty time in the week grid: that day and the hour tapped. */
+    val onEmptyTapped: (LocalDate, MinuteRange) -> Unit = { _, _ -> },
     val onOpenRecurring: (String) -> Unit = {},
     val onDeleteRecurring: (String) -> Unit = {},
     val onBlockSpecificTime: () -> Unit = {},
@@ -133,7 +131,7 @@ fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: My
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
                 Column(Modifier.weight(1f)) {
                     Text("My time", style = type.headlineMedium, color = colors.ink)
-                    Text("Tap to block time you're busy", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                    Text("Tap a time to block it", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
                 }
                 GlassIconButton(AvIcons.CalendarSync, "Connected calendars", actions.onOpenCalendars)
             }
@@ -145,14 +143,20 @@ fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: My
                 GlassIconButton(AvIcons.Forward, "Next week", actions.onNextWeek, size = 40.dp, iconSize = 16.dp, shape = Shapes.inner)
             }
 
-            Column(
-                Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xl),
-            ) {
-                state.error?.let { ErrorBanner(it, onRetry = actions.onRetry) }
-                WeekGridCard(state, actions.onSlotTapped)
-                state.recurring.forEach { block ->
-                    RecurringBlockRow(block, onClick = { actions.onOpenRecurring(block.id) }, onDelete = { actions.onDeleteRecurring(block.id) })
+            BoxWithConstraints(Modifier.weight(1f)) {
+                // The grid card takes just over half the screen (never more than the viewport), so the hours
+                // scroll inside it with the day header in view and the page still reaches the blocks below.
+                val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+                val gridHeight = (minOf(screenHeight * 0.52f, maxHeight) - GridCardChrome).coerceIn(200.dp, 640.dp)
+                Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+                ) {
+                    state.error?.let { ErrorBanner(it, onRetry = actions.onRetry) }
+                    WeekGridCard(state, gridHeight, actions.onEmptyTapped)
+                    state.recurring.forEach { block ->
+                        RecurringBlockRow(block, onClick = { actions.onOpenRecurring(block.id) }, onDelete = { actions.onDeleteRecurring(block.id) })
+                    }
                 }
             }
 
@@ -167,43 +171,36 @@ fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: My
     }
 }
 
+/** Header, legend and padding around the grid's scroller (plus the all-day row when shown). */
+private val GridCardChrome = 112.dp
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WeekGridCard(state: MyTimeUiState, onSlotTapped: (SlotUi) -> Unit) {
+private fun WeekGridCard(state: MyTimeUiState, scrollHeight: Dp, onEmptyTapped: (LocalDate, MinuteRange) -> Unit) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
     GlassPanel(
         modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Busy times this week" },
-        contentPadding = PaddingValues(Spacing.l),
+        contentPadding = PaddingValues(Spacing.m),
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Spacer(Modifier.width(50.dp))
-            DayPart.entries.forEach { part ->
-                Text(part.label, style = type.micro, color = colors.muted, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-            }
-        }
-        state.days.forEach { day ->
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.width(50.dp)) {
-                    Text(day.dayLabel, style = type.captionStrong, color = colors.ink)
-                    Text(day.dateLabel, style = type.micro.copy(fontWeight = FontWeight.Normal), color = colors.muted)
-                }
-                day.slots.forEach { slot ->
-                    SlotButton(slot, onClick = { onSlotTapped(slot) }, modifier = Modifier.weight(1f))
-                }
-            }
-        }
+        WeekTimeGrid(
+            layout = state.layout,
+            today = state.today,
+            scrollHeight = if (state.layout.hasAllDay) scrollHeight - 32.dp else scrollHeight,
+            onEmptyTap = onEmptyTapped,
+            ready = !state.loading,
+        )
         FlowRow(
             modifier = Modifier.padding(top = Spacing.xs),
             horizontalArrangement = Arrangement.spacedBy(Spacing.l),
             verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
         ) {
             LegendItem("Blocked by you") {
-                Box(Modifier.size(12.dp, 10.dp).clip(RoundedCornerShape(3.dp)).background(colors.accentSoft).stripes(colors.accent, 2.dp, 5.dp))
+                Box(Modifier.size(12.dp, 10.dp).clip(RoundedCornerShape(3.dp)).background(colors.surface).stripes(colors.accentSoft, 2.dp, 4.dp).border(1.dp, colors.accent, RoundedCornerShape(3.dp)))
             }
             LegendItem("From a calendar") {
-                Box(Modifier.size(12.dp, 10.dp).alpha(0.5f).clip(RoundedCornerShape(3.dp)).background(colors.busyBg).border(1.dp, colors.busyLine, RoundedCornerShape(3.dp)))
+                Box(Modifier.size(12.dp, 10.dp).clip(RoundedCornerShape(3.dp)).background(colors.busyBg).border(1.dp, colors.busyLine, RoundedCornerShape(3.dp)))
             }
             Text("${state.blockedCount} blocked this week", style = type.micro.copy(fontWeight = FontWeight.Normal), color = colors.muted)
         }
@@ -215,53 +212,6 @@ private fun LegendItem(label: String, swatch: @Composable () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         swatch()
         Text(label, style = AvailablissTheme.type.micro.copy(fontWeight = FontWeight.Normal), color = AvailablissTheme.colors.muted)
-    }
-}
-
-/** One 46dp grid cell in its free / calendar-busy / blocked-by-hand look. */
-@Composable
-private fun SlotButton(slot: SlotUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = AvailablissTheme.colors
-    val shape = Shapes.inner
-    val labelStyle = AvailablissTheme.type.micro
-    val base = modifier.height(46.dp)
-    when (val s = slot.state) {
-        SlotState.Free -> Box(
-            base
-                .clip(shape)
-                .background(colors.surface)
-                .border(1.dp, colors.glassBorder, shape)
-                .clickable(role = Role.Button, onClickLabel = "Block", onClick = onClick)
-                .clearAndSetSemantics { contentDescription = slot.accessibilityLabel },
-        )
-        is SlotState.Calendar -> Row(
-            base
-                .alpha(0.5f)
-                .clip(shape)
-                .background(colors.busyBg)
-                .border(1.dp, colors.busyLine, shape)
-                .padding(horizontal = 6.dp)
-                .clearAndSetSemantics { contentDescription = slot.accessibilityLabel },
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(6.dp).clip(Shapes.pill).background(s.dotColor?.let(::parseHex) ?: colors.warn))
-            Text(s.label, style = labelStyle, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        is SlotState.Manual -> Box(
-            base
-                .alpha(if (s.pending) 0.7f else 1f)
-                .clip(shape)
-                .background(colors.surface)
-                .stripes(colors.accentSoft, 6.dp, 12.dp)
-                .border(1.5.dp, colors.accent, shape)
-                .clickable(role = Role.Button, onClickLabel = "Unblock or edit", onClick = onClick)
-                .padding(horizontal = 6.dp)
-                .clearAndSetSemantics { contentDescription = slot.accessibilityLabel },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(s.label, style = labelStyle, color = colors.accentInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
     }
 }
 
@@ -297,31 +247,24 @@ private fun RecurringBlockRow(block: RecurringBlockUi, onClick: () -> Unit, onDe
 @Composable
 private fun MyTimePreview() {
     val start = LocalDate.of(2026, 11, 2)
-    val days = (0L until 7L).map { i ->
-        val date = start.plusDays(i)
-        DayRowUi(
-            date = date,
-            dayLabel = DateTimes.shortWeekday(i.toInt()),
-            dateLabel = date.dayOfMonth.toString(),
-            slots = DayPart.entries.mapIndexed { p, part ->
-                val state = when {
-                    i < 5 && p < 2 -> SlotState.Calendar("Work", "#5B8DEF")
-                    i == 1L && p == 2 -> SlotState.Manual("b1", "Choir")
-                    i == 6L && p == 0 -> SlotState.Calendar("Parkrun", null)
-                    else -> SlotState.Free
-                }
-                SlotUi(date, part, state)
-            },
-        )
-    }
+    val zone = DateTimes.zone
+    fun at(day: Long, h: Int, m: Int = 0) = DateTimes.toIso(start.plusDays(day).atTime(h, m), zone)
+    val intervals = listOf(
+        BusyInterval(at(0, 9), at(0, 17, 30), BusySource.Manual, "Work", blockId = "b0"),
+        BusyInterval(at(1, 19), at(1, 21, 30), BusySource.Manual, "Choir", blockId = "b1"),
+        BusyInterval(at(2, 10), at(2, 11), BusySource.Calendar, "Dentist"),
+        BusyInterval(at(2, 10, 30), at(2, 12), BusySource.Calendar, "Standup"),
+        BusyInterval(at(4, 22), at(5, 2), BusySource.Calendar, "Night out"),
+    )
     AvailablissPreviewTheme {
         MyTimeContent(
             state = MyTimeUiState(
                 weekStart = start,
                 weekLabel = "2 – 8 November",
-                days = days,
+                today = start.plusDays(1),
+                layout = layoutWeek(start, intervals, zone),
                 recurring = listOf(RecurringBlockUi("b1", "Choir", "Every Tuesday · 19:00 – 21:30")),
-                blockedCount = 1,
+                blockedCount = 2,
                 loading = false,
             ),
             snackbar = SnackbarHostState(),

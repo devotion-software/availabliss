@@ -6,14 +6,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.BlocksRepository
-import dev.joeherbert.availabliss.core.data.CalendarsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.live.LiveEvents
 import dev.joeherbert.availabliss.core.live.LivePayload
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.BusyInterval
-import dev.joeherbert.availabliss.core.network.model.BusySource
-import dev.joeherbert.availabliss.core.network.model.CreateBlockRequest
 import dev.joeherbert.availabliss.core.network.model.ManualBlock
 import dev.joeherbert.availabliss.core.network.model.Repeat
 import dev.joeherbert.availabliss.core.network.model.wireName
@@ -27,13 +24,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
-import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class MyTimeViewModel @Inject constructor(
     private val blocksRepository: BlocksRepository,
-    private val calendars: CalendarsRepository,
     private val users: UserRepository,
     liveEvents: LiveEvents,
 ) : ViewModel() {
@@ -41,7 +36,6 @@ class MyTimeViewModel @Inject constructor(
     /** Raw data the grid is derived from. */
     private var intervals: List<BusyInterval> = emptyList()
     private var blocks: List<ManualBlock> = emptyList()
-    private var calendarColors: Map<String, String> = emptyMap()
 
     private val _state = MutableStateFlow(initialState(DateTimes.startOfWeek(DateTimes.today())))
     val state: StateFlow<MyTimeUiState> = _state.asStateFlow()
@@ -50,15 +44,6 @@ class MyTimeViewModel @Inject constructor(
 
     init {
         load()
-        viewModelScope.launch {
-            if (calendars.refresh() is ApiResult.Success) {
-                calendarColors = calendars.connections.value
-                    .flatMap { it.calendars }
-                    .mapNotNull { cal -> cal.color?.let { cal.id to it } }
-                    .toMap()
-                publish()
-            }
-        }
         viewModelScope.launch {
             liveEvents.payloads.filterIsInstance<LivePayload.AvailabilityChanged>().collect { event ->
                 if (event.userId == users.user.value?.id) load(silent = true)
@@ -102,49 +87,9 @@ class MyTimeViewModel @Inject constructor(
     }
 
     // region Grid taps
-    fun onSlotTapped(slot: SlotUi) {
-        when (val s = slot.state) {
-            SlotState.Free -> blockSlot(slot)
-            is SlotState.Calendar -> Unit
-            is SlotState.Manual -> {
-                if (s.pending) return
-                val block = blocks.firstOrNull { it.id == s.blockId }
-                when {
-                    block == null -> showMessage("That block is still syncing. Try again in a moment.")
-                    block.repeat == Repeat.None && block.coversExactly(slot.date, slot.part) -> deleteBlock(block)
-                    else -> openEditor(block)
-                }
-            }
-        }
-    }
-
-    /** Optimistically blocks one slot, rolling back if the request fails. */
-    private fun blockSlot(slot: SlotUi) {
-        val tempId = LOCAL_BLOCK_PREFIX + UUID.randomUUID()
-        val request = CreateBlockRequest(
-            start = DateTimes.toIso(slot.part.startOn(slot.date)),
-            end = DateTimes.toIso(slot.part.endOn(slot.date)),
-            allDay = false,
-            repeat = Repeat.None,
-            until = null,
-            note = null,
-        )
-        intervals = intervals + BusyInterval(request.start, request.end, BusySource.Manual, null, null, tempId)
-        publish()
-        viewModelScope.launch {
-            when (val result = blocksRepository.create(request)) {
-                is ApiResult.Success -> {
-                    val block = result.value
-                    blocks = blocks + block
-                    intervals = intervals.map { if (it.blockId == tempId) it.copy(blockId = block.id) else it }
-                }
-                is ApiResult.Failure -> {
-                    intervals = intervals.filterNot { it.blockId == tempId }
-                    showMessage(result.error.message)
-                }
-            }
-            publish()
-        }
+    /** A tap on empty time opens the sheet on that day and range. */
+    fun onEmptyTapped(date: LocalDate, range: MinuteRange) {
+        _state.update { it.copy(draft = BlockDraft.forRange(date, range), savingDraft = false) }
     }
 
     /** Optimistically removes [block] (every occurrence), restoring it on failure. */
@@ -202,13 +147,11 @@ class MyTimeViewModel @Inject constructor(
 
     fun onDraftDate(date: LocalDate) = updateDraft { it.copy(date = date, until = it.until?.takeIf { u -> !u.isBefore(date) }) }
 
-    fun onDraftWhen(option: WhenOption) = updateDraft { it.copy(whenOption = option) }
+    fun onDraftWhen(option: BlockWhen) = updateDraft { it.copy(whenOption = option) }
 
-    fun onDraftCustomStart(time: LocalTime) = updateDraft {
-        it.copy(whenOption = WhenOption.Custom, customStart = time, customEnd = if (it.customEnd.isAfter(time)) it.customEnd else time.plusHours(1).coerceBeforeMidnight())
-    }
+    fun onDraftStart(time: LocalTime) = updateDraft { it.withStart(time) }
 
-    fun onDraftCustomEnd(time: LocalTime) = updateDraft { it.copy(whenOption = WhenOption.Custom, customEnd = time) }
+    fun onDraftEnd(time: LocalTime) = updateDraft { it.copy(whenOption = BlockWhen.Times, end = time) }
 
     fun onDraftRepeat(repeat: Repeat) = updateDraft { it.copy(repeat = repeat, until = if (repeat == Repeat.None) null else it.until) }
 
@@ -237,7 +180,7 @@ class MyTimeViewModel @Inject constructor(
                     blocks = blocks.filterNot { it.id == result.value.id } + result.value
                     _state.update { it.copy(draft = null, savingDraft = false) }
                     val verb = if (draft.isEditing) "Updated" else "Blocked"
-                    showMessage("$verb ${DateTimes.shortDay(draft.date)} · ${draft.timeLabel.lowercase()}")
+                    showMessage("$verb ${DateTimes.shortDay(draft.date)} · ${draft.timeLabel}")
                     load(silent = true)
                 }
                 is ApiResult.Failure -> {
@@ -256,10 +199,10 @@ class MyTimeViewModel @Inject constructor(
     /** Recomputes everything derived from the raw data. */
     private fun publish() {
         _state.update { s ->
-            val days = buildWeek(s.weekStart, intervals, blocks, calendarColors)
             s.copy(
-                days = days,
-                blockedCount = days.sumOf { day -> day.slots.count { it.state is SlotState.Manual } },
+                today = DateTimes.today(),
+                layout = layoutWeek(s.weekStart, intervals),
+                blockedCount = blockedOccurrences(intervals),
                 recurring = blocks
                     .filter { it.repeat != Repeat.None }
                     .sortedBy { it.start }
@@ -271,8 +214,5 @@ class MyTimeViewModel @Inject constructor(
     private fun initialState(weekStart: LocalDate) = MyTimeUiState(
         weekStart = weekStart,
         weekLabel = DateTimes.weekRange(weekStart, weekStart.plusDays(6)),
-        days = buildWeek(weekStart, emptyList(), emptyList(), emptyMap()),
     )
-
-    private fun LocalTime.coerceBeforeMidnight(): LocalTime = if (this.isBefore(LocalTime.of(1, 0))) LocalTime.of(23, 59) else this
 }

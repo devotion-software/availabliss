@@ -2,8 +2,6 @@ package dev.joeherbert.availabliss.feature.mytime
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
@@ -24,7 +22,6 @@ import dev.joeherbert.availabliss.designsystem.component.AvDatePickerDialog
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvTimePickerDialog
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
-import dev.joeherbert.availabliss.designsystem.component.Chip
 import dev.joeherbert.availabliss.designsystem.component.FieldTile
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.Segment
@@ -38,23 +35,24 @@ import java.time.LocalTime
 
 private enum class PickerTarget { Date, Start, End, Until }
 
+private val whenSegments = BlockWhen.entries.map { Segment(it, it.label) }
+
 private val repeatSegments = listOf(
     Segment(Repeat.None, "Once"),
     Segment(Repeat.Weekly, "Weekly"),
     Segment(Repeat.Fortnightly, "Fortnightly"),
 )
 
-/** "Block a time" sheet: date, time option, repeat, private note. */
-@OptIn(ExperimentalLayoutApi::class)
+/** "Block a time" sheet: date, all day or exact times, repeat, private note. */
 @Composable
 fun BlockTimeSheet(
     draft: BlockDraft,
     saving: Boolean,
     onDismiss: () -> Unit,
     onDate: (LocalDate) -> Unit,
-    onWhen: (WhenOption) -> Unit,
-    onCustomStart: (LocalTime) -> Unit,
-    onCustomEnd: (LocalTime) -> Unit,
+    onWhen: (BlockWhen) -> Unit,
+    onStart: (LocalTime) -> Unit,
+    onEnd: (LocalTime) -> Unit,
     onRepeat: (Repeat) -> Unit,
     onUntil: (LocalDate?) -> Unit,
     onNote: (String) -> Unit,
@@ -69,24 +67,21 @@ fun BlockTimeSheet(
     AvBottomSheet(title = if (draft.isEditing) "Edit busy time" else "Block a time", onDismissRequest = onDismiss) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FieldTile("Date", DateTimes.shortDay(draft.date), onClick = { picker = PickerTarget.Date }, modifier = Modifier.weight(1f))
-            FieldTile("Time", draft.timeLabel, onClick = { picker = PickerTarget.Start }, modifier = Modifier.weight(1f))
+            FieldTile(
+                "Time",
+                draft.timeLabel,
+                onClick = { if (draft.whenOption == BlockWhen.Times) picker = PickerTarget.Start },
+                modifier = Modifier.weight(1f),
+            )
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            WhenOption.entries.forEach { option ->
-                Chip(
-                    label = option.label,
-                    selected = draft.whenOption == option,
-                    onClick = { if (option == WhenOption.Custom) picker = PickerTarget.Start else onWhen(option) },
-                )
-            }
-        }
-        if (draft.whenOption == WhenOption.Custom) {
+        SegmentedControl(whenSegments, draft.whenOption, onWhen, style = SegmentedStyle.Inset, modifier = Modifier.fillMaxWidth())
+        if (draft.whenOption == BlockWhen.Times) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FieldTile("From", DateTimes.time(draft.customStart), onClick = { picker = PickerTarget.Start }, modifier = Modifier.weight(1f))
-                FieldTile("Until", DateTimes.time(draft.customEnd), onClick = { picker = PickerTarget.End }, modifier = Modifier.weight(1f))
+                FieldTile("From", DateTimes.time(draft.start), onClick = { picker = PickerTarget.Start }, modifier = Modifier.weight(1f))
+                FieldTile("To", DateTimes.time(draft.end), onClick = { picker = PickerTarget.End }, modifier = Modifier.weight(1f))
             }
-            if (!draft.customEnd.isAfter(draft.customStart)) {
-                Text("The end time needs to be after the start.", style = type.caption, color = colors.warnInk)
+            if (draft.endsNextDay) {
+                Text("Runs past midnight, ending the next day.", style = type.caption, color = colors.muted)
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -148,9 +143,9 @@ fun BlockTimeSheet(
         )
         PickerTarget.Start -> AvTimePickerDialog(
             title = "Starts",
-            initial = draft.customStart,
+            initial = draft.start,
             onPick = { time ->
-                onCustomStart(time)
+                onStart(time)
                 // Chain straight into the end time, like a range picker.
                 picker = PickerTarget.End
             },
@@ -158,8 +153,8 @@ fun BlockTimeSheet(
         )
         PickerTarget.End -> AvTimePickerDialog(
             title = "Ends",
-            initial = draft.customEnd,
-            onPick = onCustomEnd,
+            initial = draft.end,
+            onPick = onEnd,
             onDismiss = { if (picker == PickerTarget.End) picker = null },
         )
         null -> Unit
