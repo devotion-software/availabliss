@@ -61,7 +61,7 @@
 {#if mainTabs}
 	<TabBar label="Main" {tabs} />
 {/if}
-<NewGroupSheet bind:open={newGroupSheet.open} timeZone={data.user.timezone} />
+<NewGroupSheet bind:open={newGroupSheet.open} user={data.user} />
 <UpgradeSheet bind:open={upgradeSheet.open} user={data.user} reason={upgradeSheet.reason} />
 
 <style>

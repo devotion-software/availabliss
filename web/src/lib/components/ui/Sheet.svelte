@@ -157,9 +157,25 @@
 		flex-direction: column;
 		gap: 14px;
 	}
+	/* Stays at the bottom of a long sheet so its actions are always reachable. */
 	footer {
 		display: flex;
 		gap: 8px;
+		position: sticky;
+		bottom: -18px;
+		margin: 0 -18px -18px;
+		padding: 12px 18px 18px;
+		background: color-mix(in srgb, var(--bg) 94%, transparent);
+		border-top: 1px solid var(--line);
+		z-index: 1;
+	}
+	.sheet footer {
+		bottom: calc(-1 * max(18px, env(safe-area-inset-bottom)));
+		margin-bottom: calc(-1 * max(18px, env(safe-area-inset-bottom)));
+		padding-bottom: max(18px, env(safe-area-inset-bottom));
+	}
+	footer:empty {
+		display: none;
 	}
 	footer > :global(*) {
 		flex: 1;

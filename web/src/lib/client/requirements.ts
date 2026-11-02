@@ -78,8 +78,12 @@ export function applyPreset(req: Requirement, id: PresetId): Requirement {
 	if (!preset?.length) return req;
 	const window =
 		preset.length.type === 'duration' && req.length.type === 'duration' && req.window ? req.window : (preset.window ?? null);
-	return { ...req, length: structuredClone(preset.length), window };
+	// "A week" (7 days in a row) can never fit in Fri–Sun: open up every day when the run is longer than the days allowed.
+	const days = preset.length.type === 'days' && preset.length.count > req.days.length ? ALL_DAYS : req.days;
+	return { ...req, length: structuredClone(preset.length), window, days: [...days] };
 }
+
+const ALL_DAYS: Weekday[] = [0, 1, 2, 3, 4, 5, 6];
 
 /** A fresh requirement: a weekend within the next three months. */
 export function defaultRequirement(timeZone: string, today: string, preset: PresetId = 'weekend'): Requirement {

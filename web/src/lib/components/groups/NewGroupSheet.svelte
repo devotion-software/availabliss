@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
-	import { TILE_COLORS, type TileColor } from '#lib/types';
-	import { createGroupSchema } from '#lib/schemas';
+	import { TILE_COLORS, type Requirement, type TileColor, type User } from '#lib/types';
+	import { createGroupSchema, requirementSchema } from '#lib/schemas';
 	import { createGroup } from '#lib/client/groups';
 	import { ApiError } from '#lib/client/api';
 	import { getPlan } from '#lib/client/plan';
 	import { upgradeSheet } from '#lib/client/ui-state.svelte';
 	import { FREE_GROUP_LIMIT } from '#lib/plans';
-	import Icon from '#lib/components/ui/Icon.svelte';
 	import { toasts } from '#lib/client/toast.svelte';
 	import { useFormat } from '#lib/client/format';
 	import { defaultRequirement, summarize, PRESETS, type PresetId } from '#lib/client/requirements';
@@ -16,23 +15,45 @@
 	import Chip from '#lib/components/ui/Chip.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import GroupTile from '#lib/components/ui/GroupTile.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
+	import StepDots from '#lib/components/onboarding/StepDots.svelte';
+	import RequirementsEditor from '#lib/components/timing/RequirementsEditor.svelte';
+	import FitPreview from '#lib/components/timing/FitPreview.svelte';
 
+	/**
+	 * New group in two steps: 1) name, colour and roughly what you're planning;
+	 * 2) the full timing editor (days, times, holidays, date range) with a live
+	 * count of how many times fit, before the group is created.
+	 */
 	interface Props {
 		open: boolean;
-		timeZone: string;
+		user: Pick<User, 'timezone' | 'country'>;
 	}
-	let { open = $bindable(), timeZone }: Props = $props();
+	let { open = $bindable(), user }: Props = $props();
 
 	const fmt = useFormat();
 	const QUICK: PresetId[] = ['2h', 'evening', 'day', 'weekend', 'week'];
 
+	let step = $state<1 | 2>(1);
 	let name = $state('');
 	let color = $state<TileColor>('t1');
 	let preset = $state<PresetId>('weekend');
+	let requirement = $state<Requirement>(defaultRequirement('UTC', '2000-01-01'));
 	let error = $state<string | null>(null);
 	let busy = $state(false);
 	/** Free accounts at their group limit see an upgrade prompt instead of the form. */
 	let atLimit = $state(false);
+
+	// Fresh form each time the sheet opens.
+	$effect.pre(() => {
+		if (!open) return;
+		step = 1;
+		name = '';
+		color = TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)];
+		preset = 'weekend';
+		requirement = defaultRequirement(user.timezone, fmt.current.today(), 'weekend');
+		error = null;
+	});
 
 	$effect(() => {
 		if (!open) return;
@@ -45,12 +66,6 @@
 		};
 	});
 
-	function upgrade() {
-		open = false;
-		upgradeSheet.showFor(`You've used your ${FREE_GROUP_LIMIT} free groups. Pro gives you as many as you like.`);
-	}
-
-	const requirement = $derived(defaultRequirement(timeZone, fmt.current.today(), preset));
 	const monogram = $derived(
 		name
 			.trim()
@@ -61,80 +76,121 @@
 			.join('') || '?'
 	);
 
-	function reset() {
-		name = '';
-		color = TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)];
-		preset = 'weekend';
-		error = null;
+	// A fresh timing per preset: "A week" needs every day, "A weekend" Fri–Sun, and so on.
+	function pickPreset(id: PresetId) {
+		preset = id;
+		requirement = defaultRequirement(user.timezone, fmt.current.today(), id);
 	}
 
-	async function submit(e: SubmitEvent) {
+	function next(e: SubmitEvent) {
 		e.preventDefault();
-		const parsed = createGroupSchema.safeParse({ name, color, requirement });
+		const parsed = createGroupSchema.pick({ name: true }).safeParse({ name });
 		if (!parsed.success) {
 			error = parsed.error.issues[0]?.message ?? 'Give your group a name';
 			return;
 		}
-		busy = true;
 		error = null;
+		step = 2;
+	}
+
+	function upgrade() {
+		open = false;
+		upgradeSheet.showFor(`You've used your ${FREE_GROUP_LIMIT} free groups. Pro gives you as many as you like.`);
+	}
+
+	async function create() {
+		const req = { ...($state.snapshot(requirement) as Requirement), timezone: requirement.timezone || user.timezone };
+		const timing = requirementSchema.safeParse(req);
+		if (!timing.success) {
+			toasts.error(timing.error.issues[0]?.message ?? 'Check the timing');
+			return;
+		}
+		busy = true;
 		try {
-			const group = await createGroup({ name: parsed.data.name, color, requirement });
+			const group = await createGroup({ name: name.trim(), color, requirement: req });
 			open = false;
-			reset();
 			await invalidate('app:groups');
 			await goto(`/app/groups/${group.id}`);
 		} catch (err) {
 			if (err instanceof ApiError && err.code === 'upgrade_required') atLimit = true;
-			else if (err instanceof ApiError && err.issue('name')) error = err.issue('name')!;
-			else toasts.error(err);
+			else if (err instanceof ApiError && err.issue('name')) {
+				error = err.issue('name')!;
+				step = 1;
+			} else toasts.error(err);
 		} finally {
 			busy = false;
 		}
 	}
 </script>
 
-<Sheet bind:open title="New group" description="Name it, pick what you're planning. You can fine-tune timing later.">
+<Sheet
+	bind:open
+	title={atLimit ? 'New group' : step === 1 ? 'New group' : 'When are you looking for?'}
+	description={atLimit ? undefined : step === 1 ? 'Name it and pick roughly what you’re planning.' : `Fine-tune the timing for ${name.trim()}. You can change it later.`}
+	width={step === 2 && !atLimit ? 640 : 480}
+>
 	{#if atLimit}
 		<div class="limit">
 			<span class="limit-icon"><Icon name="groups" size={22} /></span>
 			<h3>You've made {FREE_GROUP_LIMIT} groups</h3>
-			<p>Free accounts can create {FREE_GROUP_LIMIT}. Upgrade to Pro for unlimited groups, or delete one you no longer need. You can still join groups other people make.</p>
+			<p>
+				Free accounts can create {FREE_GROUP_LIMIT}. Upgrade to Pro for unlimited groups, or delete one you no longer need. You can still join groups other
+				people make.
+			</p>
 			<Button variant="accent" size="lg" block icon="sparkle" onclick={upgrade}>See Pro</Button>
 		</div>
-	{:else}
-	<form class="form" onsubmit={submit} novalidate>
-		<div class="name-row">
-			<GroupTile {monogram} {color} size={50} />
-			<TextField label="Group name" bind:value={name} placeholder="e.g. Lake District crew" maxlength={80} {error} autofocus />
-		</div>
+	{:else if step === 1}
+		<form class="form" onsubmit={next} novalidate>
+			<StepDots total={2} step={1} />
+			<div class="name-row">
+				<GroupTile {monogram} {color} size={50} />
+				<TextField label="Group name" bind:value={name} placeholder="e.g. Lake District crew" maxlength={80} {error} autofocus />
+			</div>
 
-		<div class="colors" role="radiogroup" aria-label="Tile colour">
-			{#each TILE_COLORS as c (c)}
-				<button
-					type="button"
-					role="radio"
-					aria-checked={color === c}
-					aria-label="Colour {c.slice(1)}"
-					class:on={color === c}
-					style:background="var(--{c})"
-					onclick={() => (color = c)}
-				></button>
-			{/each}
-		</div>
-
-		<fieldset>
-			<legend class="eyebrow">How long?</legend>
-			<div class="chips">
-				{#each PRESETS.filter((p) => QUICK.includes(p.id)) as p (p.id)}
-					<Chip selected={preset === p.id} onclick={() => (preset = p.id)}>{p.label}</Chip>
+			<div class="colors" role="radiogroup" aria-label="Tile colour">
+				{#each TILE_COLORS as c (c)}
+					<button
+						type="button"
+						role="radio"
+						aria-checked={color === c}
+						aria-label="Colour {c.slice(1)}"
+						class:on={color === c}
+						style:background="var(--{c})"
+						onclick={() => (color = c)}
+					></button>
 				{/each}
 			</div>
-			<p class="summary">{summarize(requirement)}</p>
-		</fieldset>
 
-		<Button type="submit" variant="accent" size="lg" block loading={busy}>Create group</Button>
-	</form>
+			<fieldset>
+				<legend class="eyebrow">What are you planning?</legend>
+				<div class="chips">
+					{#each PRESETS.filter((p) => QUICK.includes(p.id)) as p (p.id)}
+						<Chip selected={preset === p.id} onclick={() => pickPreset(p.id)}>{p.label}</Chip>
+					{/each}
+				</div>
+				<p class="summary">{summarize(requirement)}</p>
+			</fieldset>
+
+			<Button type="submit" variant="accent" size="lg" block icon="arrow-right">Next: timing</Button>
+		</form>
+	{:else}
+		<div class="form">
+			<StepDots total={2} step={2} />
+			<RequirementsEditor bind:requirement country={user.country} />
+		</div>
 	{/if}
+
+	{#snippet footer()}
+		{#if !atLimit && step === 2}
+			<div class="bar">
+				<FitPreview {requirement} timeZone={user.timezone} />
+				<div class="bar-actions">
+					<Button variant="secondary" icon="chevron-left" onclick={() => (step = 1)}>Back</Button>
+					<Button variant="accent" loading={busy} onclick={create}>Create group</Button>
+				</div>
+			</div>
+		{/if}
+	{/snippet}
 </Sheet>
 
 <style>
@@ -185,6 +241,19 @@
 	.summary {
 		font-size: 13px;
 		color: var(--muted);
+	}
+	.bar {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+	.bar-actions {
+		display: flex;
+		gap: 8px;
+		margin-left: auto;
 	}
 	.limit {
 		display: flex;
