@@ -4,7 +4,7 @@
  */
 import { afterAll, describe, expect, test } from 'bun:test';
 import { Redis } from 'ioredis';
-import { MemoryBus, MemoryStore, RedisBus, RedisStore, type Bus, type KeyValueStore } from './redis';
+import { FallbackBus, FallbackStore, MemoryBus, MemoryStore, RedisBus, RedisStore, type Bus, type KeyValueStore } from './redis';
 import { createHub } from './realtime';
 import type { LiveEvent } from '#lib/types';
 
@@ -111,3 +111,55 @@ hubContract('memory', () => {
 	return [bus, bus];
 });
 if (redisUrl) hubContract('redis', () => [new RedisBus(redisClient()), new RedisBus(redisClient())]);
+
+/** A store whose every call fails, like Redis timing out. */
+const broken: KeyValueStore = new Proxy({} as KeyValueStore, {
+	get: () => () => Promise.reject(new Error('Command timed out'))
+});
+
+describe('fallback store', () => {
+	test('uses the in-memory store while Redis is not connected', async () => {
+		const primary = new MemoryStore();
+		const kv = new FallbackStore(primary, new MemoryStore(), () => false);
+		await kv.set('k', 'v', 60);
+		expect(await kv.get('k')).toBe('v');
+		expect(await primary.get('k')).toBeNull();
+	});
+
+	test('falls back when a command fails instead of throwing', async () => {
+		const kv = new FallbackStore(broken, new MemoryStore(), () => true);
+		expect(await kv.hit('rl:x', 60)).toEqual({ count: 1, resetSeconds: 60 });
+		expect(await kv.setIfAbsent('lock', '1', 60)).toBe(true);
+		expect(await kv.setIfAbsent('lock', '1', 60)).toBe(false);
+	});
+
+	test('uses Redis when it is connected', async () => {
+		const primary = new MemoryStore();
+		const kv = new FallbackStore(primary, new MemoryStore(), () => true);
+		await kv.set('k', 'v', 60);
+		expect(await primary.get('k')).toBe('v');
+	});
+});
+
+describe('fallback bus', () => {
+	test('delivers locally, exactly once, while Redis is down', async () => {
+		const primary = new MemoryBus();
+		let up = false;
+		const bus = new FallbackBus(primary, new MemoryBus(), () => up);
+		const got: string[] = [];
+		await bus.subscribe('c', (m) => got.push(m));
+		await bus.publish('c', 'offline');
+		up = true;
+		await bus.publish('c', 'online');
+		expect(got).toEqual(['offline', 'online']);
+	});
+
+	test('falls back to local delivery when a publish fails', async () => {
+		const failing: Bus = { publish: () => Promise.reject(new Error('down')), subscribe: async () => {} };
+		const bus = new FallbackBus(failing, new MemoryBus(), () => true);
+		const got: string[] = [];
+		await bus.subscribe('c', (m) => got.push(m));
+		await bus.publish('c', 'hello');
+		expect(got).toEqual(['hello']);
+	});
+});

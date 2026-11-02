@@ -95,4 +95,7 @@ live updates fan out over pub/sub, native sign-in hand-off codes and rate-limit
 counters are expiring keys, and a lock stops every instance running the
 background calendar sync at once. Instances are stateless, so you can run more
 than one. Without `REDIS_URL` the app falls back to in-memory state, which only
-works with a single instance.
+works with a single instance. If Redis is configured but unreachable, commands fail
+fast and the same in-memory fallback stands in until it reconnects (the health
+check reports `redis: down`), so an outage degrades multi-instance features
+instead of stalling every request.

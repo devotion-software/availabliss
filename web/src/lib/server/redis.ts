@@ -6,6 +6,10 @@
  * With REDIS_URL set everything goes through Redis. Without it (unit tests, a
  * quick local run) an in-process implementation is used, which only works for a
  * single instance, so production should always set REDIS_URL.
+ *
+ * Redis being down must never hang requests (every request records a rate-limit
+ * hit): commands fail fast instead of queueing, and while Redis is unreachable
+ * the in-process implementation stands in until it reconnects.
  */
 import { Redis } from 'ioredis';
 import { env } from './env';
@@ -147,7 +151,10 @@ export class RedisBus implements Bus {
 
 	constructor(private client: Redis) {
 		// A connection in subscriber mode can't run other commands, so it gets its own.
-		this.subscriber = client.duplicate();
+		// It queues SUBSCRIBE while offline, so subscriptions made during an outage
+		// take effect once Redis is back (ioredis re-subscribes after reconnects).
+		this.subscriber = client.duplicate({ enableOfflineQueue: true, maxRetriesPerRequest: null });
+		this.subscriber.on('error', () => {});
 		this.subscriber.on('message', (channel: string, message: string) => {
 			for (const handler of this.handlers.get(channel) ?? []) {
 				try {
@@ -172,6 +179,111 @@ export class RedisBus implements Bus {
 		}
 		set.add(handler);
 	}
+
+	/** Both connections are up, so a publish reaches every instance, this one included. */
+	get ready() {
+		return this.client.status === 'ready' && this.subscriber.status === 'ready';
+	}
+}
+
+// ── Fallback while Redis is down ─────────────────────────────────────────────
+
+/** Logs once when Redis drops out and once when it's back, not on every call. */
+function outageLog() {
+	let down = false;
+	return {
+		failed(err?: unknown) {
+			if (down) return;
+			down = true;
+			console.warn('[redis] unavailable, using in-memory state until it reconnects', err instanceof Error ? err.message : '');
+		},
+		ok() {
+			if (!down) return;
+			down = false;
+			console.warn('[redis] reconnected');
+		}
+	};
+}
+
+/**
+ * Uses Redis when it's connected and the in-memory store otherwise (or when a
+ * command fails). State written during an outage stays local to this instance.
+ */
+export class FallbackStore implements KeyValueStore {
+	private log = outageLog();
+
+	constructor(
+		private primary: KeyValueStore,
+		private fallback: KeyValueStore,
+		private isReady: () => boolean
+	) {}
+
+	private async run<T>(op: (store: KeyValueStore) => Promise<T>): Promise<T> {
+		if (!this.isReady()) {
+			this.log.failed();
+			return op(this.fallback);
+		}
+		try {
+			const result = await op(this.primary);
+			this.log.ok();
+			return result;
+		} catch (err) {
+			this.log.failed(err);
+			return op(this.fallback);
+		}
+	}
+
+	get(key: string) {
+		return this.run((s) => s.get(key));
+	}
+	set(key: string, value: string, ttlSeconds?: number) {
+		return this.run((s) => s.set(key, value, ttlSeconds));
+	}
+	setIfAbsent(key: string, value: string, ttlSeconds: number) {
+		return this.run((s) => s.setIfAbsent(key, value, ttlSeconds));
+	}
+	take(key: string) {
+		return this.run((s) => s.take(key));
+	}
+	delete(key: string) {
+		return this.run((s) => s.delete(key));
+	}
+	hit(key: string, windowSeconds: number) {
+		return this.run((s) => s.hit(key, windowSeconds));
+	}
+}
+
+/**
+ * Publishes through Redis when it's up; otherwise delivers on this instance only.
+ * Handlers are registered on both, and only one of them carries each message.
+ */
+export class FallbackBus implements Bus {
+	private log = outageLog();
+
+	constructor(
+		private primary: Bus,
+		private fallback: Bus,
+		private isReady: () => boolean
+	) {}
+
+	async publish(channel: string, message: string) {
+		if (this.isReady()) {
+			try {
+				await this.primary.publish(channel, message);
+				this.log.ok();
+				return;
+			} catch (err) {
+				this.log.failed(err);
+			}
+		} else this.log.failed();
+		await this.fallback.publish(channel, message);
+	}
+
+	async subscribe(channel: string, handler: (message: string) => void) {
+		await this.fallback.subscribe(channel, handler);
+		// Don't wait on Redis: the subscription completes whenever it connects.
+		void this.primary.subscribe(channel, handler).catch((err) => this.log.failed(err));
+	}
 }
 
 // ── Process-wide instances ───────────────────────────────────────────────────
@@ -189,9 +301,23 @@ function connect(): Shared {
 		}
 		return { client: null, store: new MemoryStore(), bus: new MemoryBus() };
 	}
-	const client = new Redis(env.redisUrl, { maxRetriesPerRequest: 3, lazyConnect: false });
-	client.on('error', (err) => console.warn('[redis]', err.message));
-	return { client, store: new RedisStore(client), bus: new RedisBus(client) };
+	const client = new Redis(env.redisUrl, {
+		// Fail fast rather than queue commands while disconnected; FallbackStore takes over.
+		enableOfflineQueue: false,
+		maxRetriesPerRequest: 1,
+		connectTimeout: 5_000,
+		commandTimeout: 1_000,
+		// Keep trying to reconnect in the background, at most every 5 s.
+		retryStrategy: (times) => Math.min(times * 200, 5_000)
+	});
+	// Connection errors repeat on every retry; FallbackStore/FallbackBus log the outage once.
+	client.on('error', () => {});
+	const redisBus = new RedisBus(client);
+	return {
+		client,
+		store: new FallbackStore(new RedisStore(client), new MemoryStore(), () => client.status === 'ready'),
+		bus: new FallbackBus(redisBus, new MemoryBus(), () => redisBus.ready)
+	};
 }
 
 // Reuse connections across HMR reloads in dev.
@@ -204,6 +330,7 @@ export const bus: Bus = shared.bus;
 /** 'ok' / 'down' when Redis is configured, 'off' when running in-memory. */
 export async function redisHealth(): Promise<'ok' | 'down' | 'off'> {
 	if (!shared.client) return 'off';
+	if (shared.client.status !== 'ready') return 'down';
 	try {
 		return (await shared.client.ping()) === 'PONG' ? 'ok' : 'down';
 	} catch {
