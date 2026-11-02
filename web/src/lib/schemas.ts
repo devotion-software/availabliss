@@ -156,3 +156,6 @@ export const deviceSchema = z.object({
 });
 
 export const rangeQuerySchema = z.object({ from: dateString, to: dateString });
+
+export const createTemplateSchema = z.object({ name: trimmed(60), requirement: requirementSchema });
+export const updateTemplateSchema = z.object({ name: trimmed(60).optional(), requirement: requirementSchema.optional() });

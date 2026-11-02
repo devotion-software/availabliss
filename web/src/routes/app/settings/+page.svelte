@@ -15,6 +15,7 @@
 	import AppearanceSection from '#lib/components/settings/AppearanceSection.svelte';
 	import PasskeysSection from '#lib/components/settings/PasskeysSection.svelte';
 	import PlanSection from '#lib/components/settings/PlanSection.svelte';
+	import TemplatesSection from '#lib/components/settings/TemplatesSection.svelte';
 
 	let { data } = $props();
 
@@ -111,6 +112,8 @@
 				<RegionFields bind:value={region} />
 				<Button type="submit" size="sm" variant="secondary" loading={savingRegion}>Save region</Button>
 			</GlassPanel>
+
+			<TemplatesSection />
 
 			<a class="glass link-row" href="/app/calendars">
 				<span class="tile"><Icon name="calendar-sync" size={18} /></span>

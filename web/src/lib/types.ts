@@ -327,3 +327,11 @@ export interface Plan {
 	/** RevenueCat public SDK keys, null when billing isn't set up (hide purchase UI). */
 	purchase: { ios: string | null; android: string | null; web: string | null; entitlement: string };
 }
+
+/** A saved timing to reuse when creating groups. */
+export interface RequirementTemplate {
+	id: string;
+	name: string;
+	requirement: Requirement;
+	createdAt: string;
+}

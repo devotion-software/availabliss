@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
-	import { TILE_COLORS, type Requirement, type TileColor, type User } from '#lib/types';
+	import { TILE_COLORS, type Requirement, type RequirementTemplate, type TileColor, type User } from '#lib/types';
 	import { createGroupSchema, requirementSchema } from '#lib/schemas';
 	import { createGroup } from '#lib/client/groups';
 	import { ApiError } from '#lib/client/api';
@@ -19,6 +19,8 @@
 	import StepDots from '#lib/components/onboarding/StepDots.svelte';
 	import RequirementsEditor from '#lib/components/timing/RequirementsEditor.svelte';
 	import FitPreview from '#lib/components/timing/FitPreview.svelte';
+	import SaveTemplate from '#lib/components/timing/SaveTemplate.svelte';
+	import { listTemplates, requirementFromTemplate } from '#lib/client/templates';
 
 	/**
 	 * New group in two steps: 1) name, colour and roughly what you're planning;
@@ -38,6 +40,9 @@
 	let name = $state('');
 	let color = $state<TileColor>('t1');
 	let preset = $state<PresetId>('weekend');
+	/** Your saved timings; picking one replaces the preset. */
+	let templates = $state<RequirementTemplate[]>([]);
+	let templateId = $state<string | null>(null);
 	let requirement = $state<Requirement>(defaultRequirement('UTC', '2000-01-01'));
 	let error = $state<string | null>(null);
 	let busy = $state(false);
@@ -51,9 +56,26 @@
 		name = '';
 		color = TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)];
 		preset = 'weekend';
+		templateId = null;
 		requirement = defaultRequirement(user.timezone, fmt.current.today(), 'weekend');
 		error = null;
 	});
+
+	$effect(() => {
+		if (!open) return;
+		let stale = false;
+		listTemplates()
+			.then((list) => !stale && (templates = list))
+			.catch(() => {});
+		return () => {
+			stale = true;
+		};
+	});
+
+	function pickTemplate(t: RequirementTemplate) {
+		templateId = t.id;
+		requirement = requirementFromTemplate(t, fmt.current.today(), user.timezone);
+	}
 
 	$effect(() => {
 		if (!open) return;
@@ -79,6 +101,7 @@
 	// A fresh timing per preset: "A week" needs every day, "A weekend" Fri–Sun, and so on.
 	function pickPreset(id: PresetId) {
 		preset = id;
+		templateId = null;
 		requirement = defaultRequirement(user.timezone, fmt.current.today(), id);
 	}
 
@@ -161,11 +184,22 @@
 				{/each}
 			</div>
 
+			{#if templates.length}
+				<fieldset>
+					<legend class="eyebrow">Your templates</legend>
+					<div class="chips">
+						{#each templates as t (t.id)}
+							<Chip selected={templateId === t.id} onclick={() => pickTemplate(t)}>{t.name}</Chip>
+						{/each}
+					</div>
+				</fieldset>
+			{/if}
+
 			<fieldset>
-				<legend class="eyebrow">What are you planning?</legend>
+				<legend class="eyebrow">{templates.length ? 'Or start from' : 'What are you planning?'}</legend>
 				<div class="chips">
 					{#each PRESETS.filter((p) => QUICK.includes(p.id)) as p (p.id)}
-						<Chip selected={preset === p.id} onclick={() => pickPreset(p.id)}>{p.label}</Chip>
+						<Chip selected={!templateId && preset === p.id} onclick={() => pickPreset(p.id)}>{p.label}</Chip>
 					{/each}
 				</div>
 				<p class="summary">{summarize(requirement)}</p>
@@ -177,6 +211,7 @@
 		<div class="form">
 			<StepDots total={2} step={2} />
 			<RequirementsEditor bind:requirement country={user.country} />
+			<SaveTemplate {requirement} onsaved={(t) => (templates = [...templates, t])} />
 		</div>
 	{/if}
 

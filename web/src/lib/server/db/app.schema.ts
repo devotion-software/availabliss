@@ -356,6 +356,22 @@ export const calendarRelations = relations(calendars, ({ one }) => ({
 	connection: one(calendarConnections, { fields: [calendars.connectionId], references: [calendarConnections.id] })
 }));
 
+// ─── Timing templates ─────────────────────────────────────────────────────
+
+/** A user's saved group timings ("Weekends in school holidays") to reuse for new groups. */
+export const requirementTemplates = mysqlTable(
+	'requirement_templates',
+	{
+		id: id(),
+		userId: userRef(),
+		name: varchar('name', { length: 60 }).notNull(),
+		requirement: json('requirement').$type<Requirement>().notNull(),
+		createdAt: createdAt(),
+		updatedAt: updatedAt()
+	},
+	(t) => [index('requirement_templates_user_idx').on(t.userId)]
+);
+
 // ─── Plans ────────────────────────────────────────────────────────────────
 
 /**

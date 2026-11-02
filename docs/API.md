@@ -223,6 +223,23 @@ interface Plan {
 
 `POST /groups` returns `402 upgrade_required` when a free account already owns 3.
 
+### Timing templates
+
+A user's saved group timings, reused when creating groups. When applying one,
+clients restart its search range from today (same length) and drop specific
+dates that are already over.
+
+| Method | Path | Body | Response |
+| ------ | ---- | ---- | -------- |
+| GET 🔒 | `/me/templates` | | `{ templates: RequirementTemplate[] }` (sorted by name) |
+| POST 🔒 | `/me/templates` | `{ name, requirement }` | `RequirementTemplate` (max 50 per user) |
+| PATCH 🔒 | `/me/templates/:id` | `{ name?, requirement? }` | `RequirementTemplate` |
+| DELETE 🔒 | `/me/templates/:id` | | `204` |
+
+```ts
+interface RequirementTemplate { id: string; name: string; requirement: Requirement; createdAt: string }
+```
+
 ### Regions & holidays
 
 | Method | Path | Response |
