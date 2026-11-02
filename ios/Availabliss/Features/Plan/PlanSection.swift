@@ -27,7 +27,7 @@ struct PlanSection: View {
         }
         .padding(16)
         .glass(cornerRadius: 24)
-        .task { await load() }
+        .task(id: app.accountVersion) { await load() }
         .sheet(isPresented: $showsUpgrade, onDismiss: { Task { await load() } }) {
             UpgradeSheet { _ in toast = "Welcome to Pro" }
         }

@@ -15,6 +15,10 @@ enum API {
         static func delete() -> Endpoint<EmptyResponse> { .init(.delete, "/me") }
         static func upcoming() -> Endpoint<EventsResponse> { .init(.get, "/me/upcoming") }
         static func plan() -> Endpoint<Plan> { .init(.get, "/me/plan") }
+        /// Apple / Google sign-ins on the account, and which ones the server can link.
+        static func accounts() -> Endpoint<LinkedAccounts> { .init(.get, "/me/accounts") }
+        /// Links a sign-in; a 409 `.mergeCandidate` means it has its own account (send again with `merge`).
+        static func linkAccount(_ body: LinkAccountBody) -> Endpoint<LinkAccountResponse> { .init(.post, "/me/accounts/link", body: body) }
         /// Re-reads RevenueCat after a purchase or restore.
         static func refreshPlan() -> Endpoint<Plan> { .init(.post, "/me/plan/refresh") }
         static func templates() -> Endpoint<TemplatesResponse> { .init(.get, "/me/templates") }

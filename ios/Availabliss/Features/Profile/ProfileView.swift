@@ -16,6 +16,7 @@ struct ProfileView: View {
                 account
                 settingsList
                 PlanSection(toast: $toast)
+                SignInMethodsSection(toast: $toast, error: $error)
                 TemplatesSection(api: app.api, toast: $toast, error: $error)
                 VStack(spacing: 4) {
                     Button("Sign out") { confirmsSignOut = true }.buttonStyle(.textAction)

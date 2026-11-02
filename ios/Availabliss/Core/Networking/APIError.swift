@@ -9,6 +9,8 @@ struct APIErrorBody: Decodable, Sendable, Equatable {
     let message: String
     let code: String?
     let issues: [Issue]?
+    /// POST /me/accounts/link: the account the sign-in already belongs to.
+    var account: MergeCandidate? = nil
 }
 
 enum APIError: LocalizedError, Sendable, Equatable {
@@ -17,6 +19,8 @@ enum APIError: LocalizedError, Sendable, Equatable {
     case notFound(String)
     case validation(String, issues: [APIErrorBody.Issue])
     case conflict(String)
+    /// The Apple / Google sign-in being linked has its own account, which could be merged into this one.
+    case mergeCandidate(MergeCandidate, message: String)
     case rateLimited(String)
     case server(String)
     case http(status: Int, message: String)
@@ -31,7 +35,8 @@ enum APIError: LocalizedError, Sendable, Equatable {
         case ("forbidden", _), (_, 403): self = .forbidden(message)
         case ("not_found", _), (_, 404): self = .notFound(message)
         case ("validation_error", _), (_, 400): self = .validation(message, issues: body?.issues ?? [])
-        case ("conflict", _), (_, 409): self = .conflict(message)
+        case ("conflict", _), (_, 409):
+            if let account = body?.account { self = .mergeCandidate(account, message: message) } else { self = .conflict(message) }
         case ("rate_limited", _), (_, 429): self = .rateLimited(message)
         case ("server_error", _), (_, 500...): self = .server(message)
         default: self = .http(status: status, message: message)
@@ -41,7 +46,7 @@ enum APIError: LocalizedError, Sendable, Equatable {
     var errorDescription: String? {
         switch self {
         case .unauthorized(let m), .forbidden(let m), .notFound(let m), .conflict(let m),
-             .rateLimited(let m), .server(let m), .http(_, let m):
+             .rateLimited(let m), .server(let m), .http(_, let m), .mergeCandidate(_, let m):
             m
         case .validation(let m, let issues):
             issues.isEmpty ? m : issues.map(\.message).joined(separator: "\n")

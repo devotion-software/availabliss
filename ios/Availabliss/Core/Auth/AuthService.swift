@@ -27,6 +27,22 @@ struct AuthService {
         return try await token(from: API.Auth.signInSocial(provider: "google", idToken: idToken, nonce: nil))
     }
 
+    /// Links Sign in with Apple / Google to the signed-in account. Throws `APIError.mergeCandidate`
+    /// when it has its own account; call again with the same token and `merge: true` to merge it.
+    func linkToken(_ provider: LinkProvider) async throws -> (idToken: String, nonce: String?) {
+        switch provider {
+        case .apple:
+            let result = try await AppleSignIn().signIn()
+            return (result.identityToken, result.rawNonce)
+        case .google:
+            return (try await google.signIn(), nil)
+        }
+    }
+
+    func link(_ provider: LinkProvider, idToken: String, nonce: String?, merge: Bool) async throws -> LinkAccountResponse {
+        try await api.send(API.Me.linkAccount(LinkAccountBody(provider: provider, idToken: idToken, nonce: nonce, merge: merge ? true : nil)))
+    }
+
     func signInWithPasskey() async throws -> String {
         let options = try await api.send(API.Auth.passkeyAuthenticateOptions())
         let request = try PasskeyCoordinator.assertion(options: options, fallbackRelyingParty: config.associatedDomainHost)

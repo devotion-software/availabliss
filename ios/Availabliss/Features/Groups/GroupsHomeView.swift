@@ -28,7 +28,7 @@ struct GroupsHomeView: View {
         .screenBackground(OrbLayout.groups)
         .foregroundStyle(theme.ink)
         .chromeless()
-        .task { await model.load() }
+        .task(id: app.accountVersion) { await model.load() }
         .refreshable { await model.load() }
         .task {
             for await event in app.live.events() {
