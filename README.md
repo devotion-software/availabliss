@@ -8,7 +8,7 @@ it lands in your calendar with one tap.
 
 | Part | Stack | Folder |
 | ---- | ----- | ------ |
-| Web app + JSON API | SvelteKit 3 (Svelte 5), Better Auth, Drizzle ORM, MariaDB, Bun | [`web/`](web/) |
+| Web app + JSON API | SvelteKit 3 (Svelte 5), Better Auth, Drizzle ORM, MariaDB, Redis, Bun | [`web/`](web/) |
 | iOS app | SwiftUI, EventKit, APNs (XcodeGen project) | [`ios/`](ios/) |
 | Android app | Kotlin, Jetpack Compose, CalendarContract, FCM | [`android/`](android/) |
 | Docs | API contract, design system, signed-off design concept | [`docs/`](docs/) |
@@ -18,7 +18,7 @@ it lands in your calendar with one tap.
 Prerequisites: [Bun](https://bun.sh) ≥ 1.3 and Docker.
 
 ```bash
-make setup     # web/.env from the example, bun install, MariaDB + Mailpit, migrations
+make setup     # web/.env from the example, bun install, MariaDB + Redis + Mailpit, migrations
 make dev       # http://localhost:5190
 ```
 
@@ -69,8 +69,8 @@ and every pull request, and only builds the platforms a change touches:
   tested: it expands a group's requirement into candidate slots, checks every
   synced member is free, and returns per-day states (hidden / busy / free /
   match) plus which weekday columns are worth drawing.
-- **Live updates** stream over Server-Sent Events (`/api/v1/live`); native apps
-  also get APNs / FCM pushes.
+- **Live updates** stream over Server-Sent Events (`/api/v1/live`), fanned out
+  across instances by Redis pub/sub; native apps also get APNs / FCM pushes.
 - **Holidays.** Bank holidays come from [Nager.Date](https://date.nager.at)
   (cached in the database). School holidays come from the `school_holidays`
   table (import a CSV per local authority) or ranges a group enters itself.
@@ -83,11 +83,15 @@ builds, a slim Node image runs `scripts/migrate.js` and then the server on port
 
 1. New resource → this repository → **Dockerfile** build pack (base directory `/`).
 2. Add a MariaDB database and set `DATABASE_URL`.
-3. Set the environment variables from `web/.env.example`, at minimum
+3. Add a Redis database and set `REDIS_URL`.
+4. Set the environment variables from `web/.env.example`, at minimum
    `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (the public URL), `SECRETS_KEY`,
    `RESEND_API_KEY` and `EMAIL_FROM`.
-4. Health check: `GET /api/v1/health`.
+5. Health check: `GET /api/v1/health` (it also reports `redis: ok | down | off`).
 
-The in-process live-update hub and background calendar sync assume a single
-instance; scale out by swapping `web/src/lib/server/realtime.ts` for Redis
-pub/sub.
+Shared state lives in Redis ([`web/src/lib/server/redis.ts`](web/src/lib/server/redis.ts)):
+live updates fan out over pub/sub, native sign-in hand-off codes and rate-limit
+counters are expiring keys, and a lock stops every instance running the
+background calendar sync at once. Instances are stateless, so you can run more
+than one. Without `REDIS_URL` the app falls back to in-memory state, which only
+works with a single instance.

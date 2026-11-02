@@ -1,35 +1,77 @@
 /**
- * In-process pub/sub behind GET /api/v1/live. Each signed-in user has a channel;
- * mutations publish to the users who should see them. Single-node only (swap for
- * Redis pub/sub to scale horizontally).
+ * Pub/sub behind GET /api/v1/live. Each signed-in user has listeners on the
+ * instance holding their SSE connection; mutations publish to the users who
+ * should see them. Events travel over the shared bus (Redis pub/sub when
+ * configured), so a change made on one instance reaches connections on all of them.
  */
 import type { LiveEvent } from '#lib/types';
+import { bus as sharedBus, type Bus } from './redis';
 import { groupIdsFor, memberIds } from './groups';
 
 type Listener = (event: LiveEvent) => void;
 
-const channels = new Map<string, Set<Listener>>();
+const CHANNEL = 'live';
 
-export function subscribe(userId: string, listener: Listener): () => void {
-	let set = channels.get(userId);
-	if (!set) channels.set(userId, (set = new Set()));
-	set.add(listener);
-	return () => {
-		set.delete(listener);
-		if (set.size === 0) channels.delete(userId);
-	};
+interface Envelope {
+	userIds: string[];
+	event: LiveEvent;
 }
 
-export function publishToUsers(userIds: Iterable<string>, event: LiveEvent): void {
-	for (const userId of userIds) {
-		for (const listener of channels.get(userId) ?? []) {
-			try {
-				listener(event);
-			} catch {
-				// A broken connection shouldn't affect the others.
+/** Local listeners plus the bus that fans events out across instances. Exported for tests. */
+export function createHub(bus: Bus) {
+	const channels = new Map<string, Set<Listener>>();
+	let ready: Promise<void> | null = null;
+
+	function deliver(raw: string) {
+		let envelope: Envelope;
+		try {
+			envelope = JSON.parse(raw);
+		} catch {
+			return;
+		}
+		for (const userId of envelope.userIds) {
+			for (const listener of channels.get(userId) ?? []) {
+				try {
+					listener(envelope.event);
+				} catch {
+					// A broken connection shouldn't affect the others.
+				}
 			}
 		}
 	}
+
+	return {
+		subscribe(userId: string, listener: Listener): () => void {
+			ready ??= bus.subscribe(CHANNEL, deliver).catch((err) => {
+				ready = null;
+				console.warn('[live] could not subscribe to the bus', err);
+			});
+			let set = channels.get(userId);
+			if (!set) channels.set(userId, (set = new Set()));
+			set.add(listener);
+			return () => {
+				set.delete(listener);
+				if (set.size === 0) channels.delete(userId);
+			};
+		},
+
+		publishToUsers(userIds: Iterable<string>, event: LiveEvent): Promise<void> {
+			const envelope: Envelope = { userIds: [...new Set(userIds)], event };
+			if (!envelope.userIds.length) return Promise.resolve();
+			return bus.publish(CHANNEL, JSON.stringify(envelope)).catch((err) => {
+				// Live updates are best effort; clients also refresh on focus.
+				console.warn('[live] publish failed', err);
+			});
+		}
+	};
+}
+
+const hub = createHub(sharedBus);
+
+export const subscribe = hub.subscribe;
+
+export function publishToUsers(userIds: Iterable<string>, event: LiveEvent): void {
+	void hub.publishToUsers(userIds, event);
 }
 
 /** Sends an event to every member of a group. */

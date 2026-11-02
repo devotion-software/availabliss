@@ -19,6 +19,8 @@ export const env = {
 	trustedOrigins: list('TRUSTED_ORIGINS'),
 	authSecret: optional('BETTER_AUTH_SECRET'),
 	secretsKey: optional('SECRETS_KEY') ?? optional('BETTER_AUTH_SECRET'),
+	/** Shared state for multiple instances (live updates, sign-in codes, rate limits, locks). */
+	redisUrl: optional('REDIS_URL'),
 
 	google: {
 		/** Web client first; iOS / Android client ids are accepted for native ID-token sign-in. */

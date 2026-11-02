@@ -19,6 +19,19 @@ services:
       timeout: 5s
       retries: 20
 
+  # Shared state: live updates (pub/sub), sign-in hand-off codes, rate limits, locks
+  redis:
+    image: redis:7.4-alpine
+    container_name: availabliss-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6382}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   # Catches all outgoing dev email — view it at http://localhost:8027
   mailpit:
     image: axllent/mailpit:latest

@@ -6,16 +6,27 @@ import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
 import { syncStaleConnections } from '#lib/server/calendars';
 import { isForbiddenCrossSite, selfOrigins } from '#lib/server/csrf';
 import { env } from '#lib/server/env';
+import { kv } from '#lib/server/redis';
 
 const ALLOWED_ORIGINS = selfOrigins(env.baseUrl, env.trustedOrigins);
 
 const CALENDAR_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
-/** Keeps Google / Microsoft / CalDAV busy time fresh in the background. */
+/**
+ * Keeps Google / Microsoft / CalDAV busy time fresh in the background. Every
+ * instance runs the timer, but a lock in the shared store lets only one of them
+ * sync per interval.
+ */
 export const init: ServerInit = () => {
 	if (process.env.NODE_ENV === 'test') return;
-	setInterval(() => {
-		syncStaleConnections().catch((err) => console.warn('[calendars] background sync failed', err));
+	setInterval(async () => {
+		try {
+			const lockSeconds = CALENDAR_SYNC_INTERVAL_MS / 1000 - 10;
+			if (!(await kv.setIfAbsent('lock:calendar-sync', String(process.pid), lockSeconds))) return;
+			await syncStaleConnections();
+		} catch (err) {
+			console.warn('[calendars] background sync failed', err);
+		}
 	}, CALENDAR_SYNC_INTERVAL_MS).unref();
 };
 

@@ -79,6 +79,15 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
       mailpit:
         image: axllent/mailpit:latest
         ports:
@@ -86,6 +95,8 @@ jobs:
           - 8025:8025
     env:
       DATABASE_URL: mysql://availabliss:availablisspass@127.0.0.1:3306/availabliss
+      REDIS_URL: redis://127.0.0.1:6379
+      TEST_REDIS_URL: redis://127.0.0.1:6379
       BETTER_AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
       BETTER_AUTH_URL: http://localhost:3000
       ORIGIN: http://localhost:3000
@@ -116,6 +127,8 @@ jobs:
           node build > server.log 2>&1 &
           for i in $(seq 1 60); do curl -sf http://localhost:3000/api/v1/health && exit 0; sleep 1; done
           cat server.log; exit 1
+      - name: Redis integration tests
+        run: bun test src/lib/server/redis
       - name: Smoke test
         run: bun scripts/smoke.ts
       - name: Server log

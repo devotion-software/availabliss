@@ -21,7 +21,7 @@ env: ## Create web/.env from the example (won't overwrite)
 	@test -f $(WEB)/.env || (cp $(WEB)/.env.example $(WEB)/.env && echo "Created $(WEB)/.env")
 
 # ── Database & services ──────────────────────────────────────────────────────
-db-up: ## Start MariaDB (:3312) and Mailpit (UI :8027)
+db-up: ## Start MariaDB (:3312), Redis (:6382) and Mailpit (UI :8027)
 	docker compose up -d --wait
 
 db-down: ## Stop local services

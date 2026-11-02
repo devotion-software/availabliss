@@ -6,6 +6,7 @@ import { db } from './server/db';
 import * as schema from './server/db/schema';
 import { androidPasskeyOrigins, env } from './server/env';
 import { sendOtpEmail } from './server/email';
+import { kv } from './server/redis';
 
 const rpID = new URL(env.baseUrl).hostname;
 
@@ -35,6 +36,15 @@ export const auth = betterAuth({
 	socialProviders: socialProviders(),
 	// Apple's web flow posts back from appleid.apple.com; TRUSTED_ORIGINS adds dev hosts.
 	trustedOrigins: ['https://appleid.apple.com', ...env.trustedOrigins],
+	rateLimit: {
+		// Counters live in the shared store (Redis) so limits hold across instances.
+		customStorage: {
+			async consume(key, rule) {
+				const { count, resetSeconds } = await kv.hit(`rl:auth:${key}`, rule.window);
+				return count <= rule.max ? { allowed: true, retryAfter: null } : { allowed: false, retryAfter: resetSeconds };
+			}
+		}
+	},
 	account: {
 		accountLinking: {
 			enabled: true,
