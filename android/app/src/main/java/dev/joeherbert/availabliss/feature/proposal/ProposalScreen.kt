@@ -163,6 +163,8 @@ private fun PendingContent(state: ProposalUiState, actions: ProposalActions) {
                 }
             }
 
+            state.clash?.let { ClashPanel(it, state.clashDetail) }
+
             if (state.members.isNotEmpty()) {
                 GlassPanel(
                     Modifier.fillMaxWidth(),
@@ -282,7 +284,7 @@ private fun ReplyBar(state: ProposalUiState, onRespond: (ResponseKind) -> Unit, 
         val prompt = when (state.myResponse) {
             ResponseKind.Accepted -> "You're in. Changed your mind?"
             ResponseKind.Declined -> "You said you can't make it."
-            else -> "Can you make it?"
+            else -> if (state.iAmBusy) "You're busy then. Can you still make it?" else "Can you make it?"
         }
         Text(prompt, style = AvailablissTheme.type.label, color = colors.ink, modifier = Modifier.padding(start = 4.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

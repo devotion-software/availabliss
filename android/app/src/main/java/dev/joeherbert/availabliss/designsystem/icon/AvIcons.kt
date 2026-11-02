@@ -54,6 +54,8 @@ object AvIcons {
     val Trash = line("Trash", "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6")
     val SignOut = line("SignOut", "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9")
     val Info = line("Info", circle(12f, 12f, 9f), "M12 11v5M12 8h.01")
+    /** Warning: "!" in a circle (clashes, problems). */
+    val Alert = line("Alert", circle(12f, 12f, 9f), "M12 7.5v5M12 16.2v.1")
     val Mail = line("Mail", rect(3f, 5f, 18f, 14f, 3f), "M3 7l9 6 9-6")
     val Palette = line("Palette", "M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.4-4-7.8-9-7.8z", circle(7.5f, 11f, .5f), circle(10.5f, 7.5f, .5f), circle(15f, 8f, .5f))
     val Refresh = line("Refresh", "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5")

@@ -32,7 +32,12 @@ data class Proposal(
     val createdAt: String,
     val eventId: String? = null,
     val responses: List<ProposalResponse> = emptyList(),
+    /** Open proposals: members whose calendars or blocked time clash with it (ids only). */
+    val busyMemberIds: List<String> = emptyList(),
 )
+
+@Serializable
+data class ConflictsResponse(val busyMemberIds: List<String> = emptyList())
 
 @Serializable
 data class ProposalResponse(

@@ -43,6 +43,8 @@ data class DayDetailUi(
     /** "Propose this weekend"; null when the day isn't part of a slot. */
     val proposeLabel: String?,
     val slot: Slot?,
+    /** The day doesn't work for everyone but can still be proposed (the proposal warns who's busy). */
+    val canProposeAnyway: Boolean = false,
 )
 
 /**
@@ -188,7 +190,8 @@ object AvailabilityUiMapper {
             date.isBefore(today) -> "This day has already passed"
             else -> "Everyone's free, but not for a whole ${group?.requirement?.slotNoun() ?: "slot"}"
         }
-        return DayDetailUi(date, dayTitle, subtitle + holiday, works = false, proposeLabel = null, slot = null)
+        val anyway = (day?.status == DayStatus.Busy || day?.status == DayStatus.Free) && !date.isBefore(today)
+        return DayDetailUi(date, dayTitle, subtitle + holiday, works = false, proposeLabel = null, slot = null, canProposeAnyway = anyway)
     }
 
     fun syncBanner(availability: Availability?, group: Group?, isAdmin: Boolean): SyncBannerUi? {

@@ -89,7 +89,11 @@ private fun CreateProposalContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.cardLarge, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Everyone synced is free", style = AvailablissTheme.type.captionStrong, color = colors.okInk)
+                    if (state.clash == null) {
+                        Text("Everyone synced is free", style = AvailablissTheme.type.captionStrong, color = colors.okInk)
+                    } else {
+                        Text("Not everyone is free", style = AvailablissTheme.type.captionStrong, color = colors.warnInk)
+                    }
                     Text(
                         if (state.range.isValid) state.range.label else "Pick a start and end",
                         style = AvailablissTheme.type.headlineLarge,
@@ -106,6 +110,7 @@ private fun CreateProposalContent(
                     SectionLabel("When")
                     TimeRangeFields(state.range, onRangeChange)
                 }
+                state.clash?.let { ClashPanel(it, "You can still propose it; everyone will see the clash before they reply.") }
                 GlassPanel(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     AvTextField(state.title, onTitleChange, label = "What's the plan? (optional)", placeholder = "e.g. Lakes weekend", imeAction = ImeAction.Next)
                     AvTextField(state.location, onLocationChange, label = "Where (optional)", placeholder = "e.g. Keswick", imeAction = ImeAction.Next)
@@ -113,7 +118,7 @@ private fun CreateProposalContent(
                 }
             }
             PrimaryButton(
-                text = "Propose this time",
+                text = if (state.clash != null) "Propose anyway" else "Propose this time",
                 onClick = onSubmit,
                 style = ButtonStyle.Accent,
                 enabled = state.canSubmit,

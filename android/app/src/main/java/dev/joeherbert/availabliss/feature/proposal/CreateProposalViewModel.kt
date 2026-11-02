@@ -8,11 +8,17 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.ProposalsRepository
+import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.CreateProposalRequest
 import dev.joeherbert.availabliss.feature.events.TimeRangeDraft
 import dev.joeherbert.availabliss.navigation.CreateProposalRoute
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -28,6 +34,8 @@ data class CreateProposalUiState(
     val saving: Boolean = false,
     val createdId: String? = null,
     val message: UserMessage? = null,
+    /** "Priya is busy then" when the chosen time clashes with someone's busy time. */
+    val clash: String? = null,
 ) {
     val canSubmit: Boolean get() = range.isValid && !saving
 }
@@ -37,6 +45,7 @@ class CreateProposalViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val proposals: ProposalsRepository,
     private val groups: GroupsRepository,
+    private val users: UserRepository,
 ) : ViewModel() {
 
     private val route = savedStateHandle.toRoute<CreateProposalRoute>()
@@ -45,10 +54,29 @@ class CreateProposalViewModel @Inject constructor(
     )
     val state: StateFlow<CreateProposalUiState> = _state.asStateFlow()
 
+    private var members: Map<String, String> = emptyMap()
+
     init {
         viewModelScope.launch {
             val group = groups.cachedGroup(route.groupId) ?: (groups.refreshGroup(route.groupId) as? ApiResult.Success)?.value
+            members = group?.members.orEmpty().associate { it.userId to it.name }
             _state.update { it.copy(groupName = group?.name.orEmpty()) }
+        }
+        watchConflicts()
+    }
+
+    /** Asks who's busy whenever the times change (debounced; a newer change cancels an older check). */
+    @OptIn(FlowPreview::class)
+    private fun watchConflicts() {
+        viewModelScope.launch {
+            _state.map { it.range }.distinctUntilChanged().debounce(CONFLICT_DEBOUNCE_MS).collectLatest { range ->
+                val busy = if (!range.isValid) {
+                    emptyList()
+                } else {
+                    (proposals.conflicts(route.groupId, range.startIso(), range.endIso()) as? ApiResult.Success)?.value.orEmpty()
+                }
+                _state.update { it.copy(clash = Clash.text(busy, members::get, users.user.value?.id)) }
+            }
         }
     }
 
@@ -75,6 +103,10 @@ class CreateProposalViewModel @Inject constructor(
                 is ApiResult.Failure -> _state.update { it.copy(saving = false, message = UserMessage(result.error.message)) }
             }
         }
+    }
+
+    private companion object {
+        const val CONFLICT_DEBOUNCE_MS = 250L
     }
 
     fun onMessageShown(message: UserMessage) = _state.update { if (it.message?.id == message.id) it.copy(message = null) else it }

@@ -55,6 +55,12 @@ data class ProposalUiState(
     val accepted: Int = 0,
     val total: Int = 0,
     val members: List<ProposalMemberUi> = emptyList(),
+    /** Open proposals that clash with someone's busy time: "Priya is busy then". */
+    val clash: String? = null,
+    /** "Their calendars or blocked time overlap. …" */
+    val clashDetail: String = "",
+    /** You're among the busy members. */
+    val iAmBusy: Boolean = false,
     val isAdmin: Boolean = false,
     val myResponse: ResponseKind? = null,
     val responding: Boolean = false,
@@ -180,6 +186,7 @@ class ProposalViewModel @Inject constructor(
         val directory = MemberDirectory(g?.members.orEmpty(), meId)
         val isAdmin = g?.role?.isAdmin == true
         val responses = p.responses.associateBy { it.userId }
+        val busyIds = ProposalFormatting.busyIds(p)
         // Proposer first, then the group's member order.
         val memberIds = (listOf(p.createdBy) + (g?.members?.map { it.userId } ?: p.responses.map { it.userId })).distinct()
             .filter { it in responses || g?.members?.any { m -> m.userId == it } == true }
@@ -191,6 +198,8 @@ class ProposalViewModel @Inject constructor(
                 id == p.createdBy -> "Proposed this"
                 r?.setBy != null && r.setBy != id -> if (r.setBy == meId) "Set by you (admin)" else "Set by ${directory.displayName(r.setBy, youSuffix = false)}"
                 member != null && !member.synced -> "Not synced yet"
+                id in busyIds && response == ResponseKind.Pending -> "Busy then · hasn't replied"
+                id in busyIds && response == ResponseKind.Accepted -> "Busy then, but in"
                 response == ResponseKind.Pending -> "Hasn't replied"
                 response == ResponseKind.Declined -> "Can't make it"
                 member?.role?.isAdmin == true -> "Admin"
@@ -218,6 +227,9 @@ class ProposalViewModel @Inject constructor(
             accepted = ProposalFormatting.acceptedCount(p),
             total = ProposalFormatting.totalCount(p, g?.memberCount ?: 0),
             members = members,
+            clash = Clash.text(busyIds, { directory[it]?.name }, meId),
+            clashDetail = Clash.detail(busyIds, meId),
+            iAmBusy = meId != null && meId in busyIds,
             isAdmin = isAdmin,
             myResponse = meId?.let { responses[it]?.response },
             responding = responding,

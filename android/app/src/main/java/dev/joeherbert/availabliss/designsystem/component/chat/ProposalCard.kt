@@ -16,7 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
@@ -40,6 +43,8 @@ data class ProposalCardUi(
     /** "4 of 6 accepted" */
     val status: String,
     val tone: ProposalCardTone = ProposalCardTone.Open,
+    /** Appended to [status] in warn ink: "Priya busy then". */
+    val clash: String? = null,
 )
 
 /** Accent date tile (46×50, radius 12): "NOV" over "13". */
@@ -83,13 +88,17 @@ fun ProposalCard(
                 Text(ui.caption, style = AvailablissTheme.type.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal), color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(ui.title, style = AvailablissTheme.type.bodyMedium, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    ui.status,
+                    buildAnnotatedString {
+                        append(ui.status)
+                        ui.clash?.let { withStyle(SpanStyle(color = colors.warnInk)) { append(" · $it") } }
+                    },
                     style = AvailablissTheme.type.captionStrong,
                     color = when (ui.tone) {
                         ProposalCardTone.Muted -> colors.muted
                         else -> colors.okInk
                     },
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             actionLabel?.let {
@@ -106,7 +115,7 @@ fun ProposalCard(
 private fun ProposalCardPreview() {
     AvailablissPreviewTheme {
         Box(Modifier.background(AvailablissTheme.colors.bg).padding(16.dp)) {
-            ProposalCard(ProposalCardUi("NOV", "13", "Ana proposed a time", "Fri 13 – Sun 15 Nov", "4 of 6 accepted"), onClick = {})
+            ProposalCard(ProposalCardUi("NOV", "13", "Ana proposed a time", "Fri 13 – Sun 15 Nov", "4 of 6 accepted", clash = "Priya busy then"), onClick = {})
         }
     }
 }

@@ -30,6 +30,10 @@ class ProposalsRepository @Inject constructor(
 
     suspend fun get(id: String): ApiResult<Proposal> = call { api.getProposal(id) }
 
+    /** Members busy between [start] and [end] (ISO instants), to warn before proposing that time. */
+    suspend fun conflicts(groupId: String, start: String, end: String): ApiResult<List<String>> =
+        call { api.getConflicts(groupId, start, end) }.map { it.busyMemberIds }
+
     /** [response] must be accepted or declined. */
     suspend fun respond(id: String, response: ResponseKind): ApiResult<Proposal> =
         call { api.respond(id, RespondRequest(response)) }

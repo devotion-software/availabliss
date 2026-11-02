@@ -29,6 +29,14 @@ object ProposalFormatting {
         return listOfNotNull(from, proposal.location?.takeIf { it.isNotBlank() }).joinToString(" · ")
     }
 
+    /** Members busy at an open proposal's time (none once it's settled). */
+    fun busyIds(proposal: Proposal): List<String> =
+        if (proposal.status == ProposalStatus.Open) proposal.busyMemberIds else emptyList()
+
+    /** "Priya busy then" for compact rows, or null. */
+    fun clashShort(proposal: Proposal, directory: MemberDirectory?): String? =
+        Clash.short(busyIds(proposal)) { directory?.get(it)?.name }
+
     fun card(proposal: Proposal, directory: MemberDirectory?, memberCount: Int, caption: String? = null): ProposalCardUi {
         val date = DateTimes.localDate(proposal.start)
         val accepted = acceptedCount(proposal)
@@ -46,6 +54,7 @@ object ProposalFormatting {
             title = rangeLabel(proposal),
             status = status,
             tone = tone,
+            clash = clashShort(proposal, directory),
         )
     }
 }

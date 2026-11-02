@@ -12,6 +12,7 @@ import dev.joeherbert.availabliss.core.network.model.CreateBlockRequest
 import dev.joeherbert.availabliss.core.network.model.CreateEventRequest
 import dev.joeherbert.availabliss.core.network.model.CreateGroupRequest
 import dev.joeherbert.availabliss.core.network.model.CreateInviteRequest
+import dev.joeherbert.availabliss.core.network.model.ConflictsResponse
 import dev.joeherbert.availabliss.core.network.model.CreateProposalRequest
 import dev.joeherbert.availabliss.core.network.model.DayAvailability
 import dev.joeherbert.availabliss.core.network.model.DetectedRegion
@@ -212,6 +213,9 @@ interface AvailablissApi {
 
     @POST("api/v1/groups/{id}/proposals")
     suspend fun createProposal(@Path("id") groupId: String, @Body body: CreateProposalRequest): Proposal
+
+    @GET("api/v1/groups/{id}/conflicts")
+    suspend fun getConflicts(@Path("id") groupId: String, @Query("start") start: String, @Query("end") end: String): ConflictsResponse
 
     @GET("api/v1/proposals/{id}")
     suspend fun getProposal(@Path("id") id: String): Proposal

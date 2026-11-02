@@ -158,6 +158,10 @@ class GroupCalendarViewModel @Inject constructor(
 
     /** The slot the detail card proposes, with the all-day guess. */
     fun proposalFor(slot: Slot): Triple<String, String, Boolean> = Triple(slot.start, slot.end, AvailabilityUiMapper.isAllDay(slot))
+
+    /** "Propose anyway" on a day that doesn't work: an evening, 18:00–21:00 (web's blank default). */
+    fun eveningOn(date: LocalDate): Pair<String, String> =
+        DateTimes.toIso(date.atTime(18, 0)) to DateTimes.toIso(date.atTime(21, 0))
     // endregion
 
     private fun step(delta: Long) {

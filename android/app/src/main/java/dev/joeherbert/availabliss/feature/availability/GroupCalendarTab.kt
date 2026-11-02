@@ -92,6 +92,10 @@ fun GroupCalendarTab(
             val (start, end, allDay) = viewModel.proposalFor(slot)
             onCreateProposal(start, end, allDay)
         },
+        onProposeDay = { date ->
+            val (start, end) = viewModel.eveningOn(date)
+            onCreateProposal(start, end, false)
+        },
         onSeeWhosFree = viewModel::showDay,
         snackbar = { AvSnackbarHost(snackbar) },
     )
@@ -112,6 +116,8 @@ fun GroupCalendarContent(
     onPropose: (Slot) -> Unit,
     onSeeWhosFree: () -> Unit,
     snackbar: @Composable () -> Unit = {},
+    /** "Propose anyway" on a day that doesn't work for everyone. */
+    onProposeDay: (LocalDate) -> Unit = {},
 ) {
     AvailablissBackground(OrbLayout.GroupCalendar) {
         Box(Modifier.fillMaxSize()) {
@@ -130,7 +136,7 @@ fun GroupCalendarContent(
                 state.error?.let { ErrorBanner(it, onRetry = onRetry) }
                 AnimatedContent(targetState = state.view, label = "calendar-view") { view ->
                     when (view) {
-                        CalendarView.Month -> MonthSection(state, onSelectDate, onPropose, onSeeWhosFree)
+                        CalendarView.Month -> MonthSection(state, onSelectDate, onPropose, onProposeDay, onSeeWhosFree)
                         CalendarView.Week -> if (state.weekLoading && state.weekColumns.isEmpty()) LoadingIndicator() else WeekGrid(state.weekColumns)
                         CalendarView.Day -> if (state.dayLoading && state.timelineRows.isEmpty()) LoadingIndicator()
                         else DayTimeline(state.dayTitle, state.dayNote, state.everyone, state.timelineRows)
@@ -251,6 +257,7 @@ private fun MonthSection(
     state: GroupCalendarUiState,
     onSelectDate: (LocalDate) -> Unit,
     onPropose: (Slot) -> Unit,
+    onProposeDay: (LocalDate) -> Unit,
     onSeeWhosFree: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
@@ -262,12 +269,12 @@ private fun MonthSection(
                 MonthLegend(state.daysNote)
             }
         }
-        state.detail?.let { DetailCard(it, onPropose, onSeeWhosFree) }
+        state.detail?.let { DetailCard(it, onPropose, onProposeDay, onSeeWhosFree) }
     }
 }
 
 @Composable
-private fun DetailCard(detail: DayDetailUi, onPropose: (Slot) -> Unit, onSeeWhosFree: () -> Unit) {
+private fun DetailCard(detail: DayDetailUi, onPropose: (Slot) -> Unit, onProposeDay: (LocalDate) -> Unit, onSeeWhosFree: () -> Unit) {
     val colors = AvailablissTheme.colors
     Column(
         Modifier.fillMaxWidth().glass(Shapes.panel).padding(14.dp),
@@ -292,6 +299,15 @@ private fun DetailCard(detail: DayDetailUi, onPropose: (Slot) -> Unit, onSeeWhos
                     textStyle = AvailablissTheme.type.bodySmallStrong,
                     // The primary action gets more room so "Propose this weekend" fits on one line.
                     modifier = Modifier.weight(1.4f),
+                )
+            } else if (detail.canProposeAnyway) {
+                SecondaryButton(
+                    text = "Propose anyway",
+                    onClick = { onProposeDay(detail.date) },
+                    height = 44.dp,
+                    shape = Shapes.controlSmall,
+                    textStyle = AvailablissTheme.type.bodySmallStrong,
+                    modifier = Modifier.weight(1f),
                 )
             }
             SecondaryButton(
