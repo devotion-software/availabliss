@@ -82,7 +82,13 @@
 <svelte:head><title>Members · {group.name} · Availabliss</title></svelte:head>
 
 <div class="page">
-	<PageHeader title="Members" subtitle={groupSubtitle(group)} backHref="/app/groups/{group.id}" backLabel="Back to calendar" />
+	<PageHeader
+	title="Members"
+	subtitle={groupSubtitle(group)}
+	backHref="/app/groups/{group.id}"
+	backLabel="Back to calendar"
+	crumbs={[{ label: 'Groups', href: '/app' }, { label: group.name, href: `/app/groups/${group.id}` }, { label: 'Members' }]}
+/>
 
 	<div class="columns">
 		<section class="people glass" aria-label="Members">

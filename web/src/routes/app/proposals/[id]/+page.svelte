@@ -114,7 +114,18 @@
 	<EveryoneIn {proposal} {group} />
 {:else}
 	<div class="page">
-		<PageHeader title="Proposal" subtitle={group.name} backHref="/app/groups/{group.id}" backLabel="Back to calendar" />
+		<PageHeader
+			title="Proposal"
+			subtitle={group.name}
+			backHref="/app/groups/{group.id}/proposals"
+			backLabel="Back to proposals"
+			crumbs={[
+				{ label: 'Groups', href: '/app' },
+				{ label: group.name, href: `/app/groups/${group.id}` },
+				{ label: 'Proposals', href: `/app/groups/${group.id}/proposals` },
+				{ label: proposal.title ?? fmt.current.when(proposal.start, proposal.end, proposal.allDay) }
+			]}
+		/>
 
 		{#if proposal.status === 'cancelled'}
 			<div class="glass panel">

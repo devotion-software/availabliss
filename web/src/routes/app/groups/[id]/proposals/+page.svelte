@@ -27,7 +27,13 @@
 <svelte:head><title>Proposals · {data.group.name} · Availabliss</title></svelte:head>
 
 <div class="page">
-	<PageHeader title="Proposals" subtitle={data.group.name} backHref="/app/groups/{data.group.id}" backLabel="Back to calendar">
+	<PageHeader
+	title="Proposals"
+	subtitle={data.group.name}
+	backHref="/app/groups/{data.group.id}"
+	backLabel="Back to calendar"
+	crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Proposals' }]}
+>
 		{#snippet actions()}
 			<Button variant="accent" size="sm" icon="plus" onclick={() => (proposing = true)}>Propose</Button>
 		{/snippet}

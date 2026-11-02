@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import IconButton from './IconButton.svelte';
 	import type { IconName } from './Icon.svelte';
+	import Breadcrumbs, { type Crumb } from './Breadcrumbs.svelte';
 
 	/** Phone-style screen header: round back button, title + subtitle, trailing actions. */
 	interface Props {
@@ -14,12 +15,17 @@
 		/** Hide the back button from wide layouts where navigation is always visible. */
 		backOnPhoneOnly?: boolean;
 		size?: 'md' | 'lg';
+		/** Where this page sits ("Groups › Lake District crew › Timing"); shown from tablet width up. */
+		crumbs?: Crumb[];
 		actions?: Snippet;
 		after?: Snippet;
 	}
-	let { title, subtitle, backHref, backLabel = 'Back', backIcon = 'chevron-left', backOnPhoneOnly = false, size = 'md', actions, after }: Props = $props();
+	let { title, subtitle, backHref, backLabel = 'Back', backIcon = 'chevron-left', backOnPhoneOnly = false, size = 'md', crumbs = [], actions, after }: Props = $props();
 </script>
 
+{#if crumbs.length}
+	<div class="crumbs-row"><Breadcrumbs items={crumbs} /></div>
+{/if}
 <header class="page-header {size}">
 	{#if backHref}
 		<span class:phone-only={backOnPhoneOnly}>
@@ -35,6 +41,15 @@
 </header>
 
 <style>
+	.crumbs-row {
+		display: none;
+		margin-bottom: -6px;
+	}
+	@media (min-width: 640px) {
+		.crumbs-row {
+			display: block;
+		}
+	}
 	.page-header {
 		display: flex;
 		align-items: center;

@@ -19,6 +19,7 @@
 	import SyncBanner from '#lib/components/group/SyncBanner.svelte';
 	import BestOptions from '#lib/components/group/BestOptions.svelte';
 	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
+	import Breadcrumbs from '#lib/components/ui/Breadcrumbs.svelte';
 	import ChatPanel from '#lib/components/chat/ChatPanel.svelte';
 
 	let { data } = $props();
@@ -171,6 +172,7 @@
 		<!-- Desktop header (Web.dc) -->
 		<header class="desk-head">
 			<div class="titles">
+				<Breadcrumbs items={[{ label: 'Groups', href: '/app' }, { label: group.name }]} />
 				<h1>{group.name}</h1>
 				<span class="sub">
 					{lengthLabel(group.requirement)} · {detailLabel(group.requirement)} ·

@@ -30,7 +30,13 @@
 <svelte:head><title>Calendars · Availabliss</title></svelte:head>
 
 <div class="page">
-	<PageHeader title="Calendars" subtitle="Choose which calendars mean you're busy" backHref="/app/settings" backOnPhoneOnly />
+	<PageHeader
+	title="Calendars"
+	subtitle="Choose which calendars mean you're busy"
+	backHref="/app/settings"
+	backLabel="Back to your settings"
+	crumbs={[{ label: 'You', href: '/app/settings' }, { label: 'Calendars' }]}
+/>
 
 	<div class="layout">
 		<div class="list">

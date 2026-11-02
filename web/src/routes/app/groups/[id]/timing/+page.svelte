@@ -95,7 +95,14 @@
 <svelte:head><title>Timing · {data.group.name} · Availabliss</title></svelte:head>
 
 <div class="page">
-	<PageHeader title="Timing" subtitle={data.group.name} backHref="/app/groups/{data.group.id}" backLabel="Back to calendar" size="lg">
+	<PageHeader
+	title="Timing"
+	subtitle={data.group.name}
+	backHref="/app/groups/{data.group.id}"
+	backLabel="Back to calendar"
+	size="lg"
+	crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Timing' }]}
+>
 		{#snippet actions()}
 			<StatusPill tone="indigo" icon="shield" size="md">Admins only</StatusPill>
 		{/snippet}
