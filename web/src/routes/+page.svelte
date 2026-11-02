@@ -4,12 +4,10 @@
 	import Button from '#lib/components/ui/Button.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import Toggle from '#lib/components/ui/Toggle.svelte';
-	import AvatarStack from '#lib/components/ui/AvatarStack.svelte';
 	import SyncRing from '#lib/components/ui/SyncRing.svelte';
-	import CalendarMock from '#lib/components/landing/CalendarMock.svelte';
+	import HeroDemo from '#lib/components/landing/HeroDemo.svelte';
 	import StepCard from '#lib/components/landing/StepCard.svelte';
 
-	const crew = ['Sam', 'Priya', 'Tom', 'Ana', 'Leo', 'Jade'].map((name) => ({ id: name, name }));
 	const year = new Date().getFullYear();
 </script>
 
@@ -43,19 +41,8 @@
 				<p class="trust"><Icon name="shield" size={16} />Your group only ever sees when you're busy, never what you're doing.</p>
 			</div>
 
-			<div class="stage" aria-label="Example: a group calendar showing two weekends that work for everyone" role="img">
-				<div class="tilt"><CalendarMock /></div>
-				<div class="float notif glass" aria-hidden="true">
-					<Logo size={30} />
-					<div>
-						<b>Availabliss <span>· now</span></b>
-						<span>Everyone accepted Fri 13 – Sun 15 Nov for Lake District crew</span>
-					</div>
-				</div>
-				<div class="float crew glass" aria-hidden="true">
-					<AvatarStack people={crew} max={5} size={26} />
-					<span><SyncRing value={4} total={6} size={18} />4 of 6 synced</span>
-				</div>
+			<div class="stage" role="region" aria-label="Try it: an example group calendar">
+				<div class="tilt"><HeroDemo /></div>
 			</div>
 		</section>
 
@@ -255,56 +242,13 @@
 
 	.stage {
 		position: relative;
-		padding: 34px 0 40px;
+		padding: 64px 0 40px;
 	}
 	.tilt {
 		transform: perspective(1600px) rotateX(4deg) rotateY(-6deg) rotateZ(0.6deg);
 		transform-origin: center;
 		animation: settle 1s var(--ease-out) both;
 	}
-	.float {
-		position: absolute;
-		border-radius: 20px;
-		padding: 10px 14px;
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		font-size: 12px;
-		background: color-mix(in srgb, var(--bg) 88%, transparent);
-		z-index: 2;
-	}
-	.notif {
-		top: -30px;
-		right: 0;
-		max-width: 290px;
-		animation: drop 0.7s 0.9s var(--ease-spring) both;
-	}
-	.notif div {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-	}
-	.notif b {
-		font-size: 12px;
-		font-weight: 700;
-	}
-	.notif b span {
-		font-weight: 500;
-		color: var(--muted);
-	}
-	.crew {
-		left: -4px;
-		bottom: 0;
-		animation: rise 0.7s 1.2s var(--ease-spring) both;
-	}
-	.crew > span {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-weight: 600;
-		color: var(--muted);
-	}
-
 	/* How it works */
 	.how {
 		display: flex;
@@ -521,12 +465,6 @@
 		.stage {
 			flex: 1;
 			min-width: 0;
-		}
-		.notif {
-			right: -8px;
-		}
-		.crew {
-			left: -32px;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
