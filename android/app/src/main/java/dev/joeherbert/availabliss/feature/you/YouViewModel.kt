@@ -7,11 +7,17 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.auth.AuthRepository
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.billing.PlanRepository
+import dev.joeherbert.availabliss.core.data.AccountsRepository
 import dev.joeherbert.availabliss.core.data.AppPreferences
+import dev.joeherbert.availabliss.core.data.GroupsRepository
+import dev.joeherbert.availabliss.core.data.LinkResult
 import dev.joeherbert.availabliss.core.data.TemplatesRepository
 import dev.joeherbert.availabliss.core.data.Appearance
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiResult
+import dev.joeherbert.availabliss.core.network.model.LinkProviders
+import dev.joeherbert.availabliss.core.network.model.LinkedAccounts
+import dev.joeherbert.availabliss.core.network.model.MergeCandidate
 import dev.joeherbert.availabliss.core.network.model.Plan
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.feature.timing.Templates
@@ -31,6 +37,14 @@ data class YouUiState(
     val nameDraft: String? = null,
     val savingName: Boolean = false,
     val addingPasskey: Boolean = false,
+    /** Linked Apple / Google sign-ins; null until loaded. */
+    val accounts: LinkedAccounts? = null,
+    /** Providers this app can link itself (Google via Credential Manager; not Apple on Android). */
+    val linkableProviders: Set<String> = emptySet(),
+    /** The provider being linked (or merged) right now. */
+    val linkingProvider: String? = null,
+    /** Non-null while asking whether to merge the account that sign-in already belongs to. */
+    val pendingMerge: LinkResult.NeedsMerge? = null,
     val confirmingDelete: Boolean = false,
     val deleting: Boolean = false,
     /** Set after the account is deleted; the UI then runs sign-out cleanup. */
@@ -56,16 +70,31 @@ data class YouUiState(
     val appearanceSummary: String get() = "${appearance.mode.name} · ${appearance.theme.name}"
 }
 
+/** Body of the "merge accounts?" dialog. */
+internal fun mergePrompt(account: MergeCandidate): String {
+    val groups = when (account.groups) {
+        0 -> "in no groups"
+        1 -> "in 1 group"
+        else -> "in ${account.groups} groups"
+    }
+    return "Merge ${account.name} (${account.email}, $groups) into this account? Its groups, busy times, calendars, " +
+        "chats and Pro move here, then the other account is deleted. This can't be undone."
+}
+
 @HiltViewModel
 class YouViewModel @Inject constructor(
     private val users: UserRepository,
     private val auth: AuthRepository,
     private val templatesRepo: TemplatesRepository,
     private val plans: PlanRepository,
+    private val accounts: AccountsRepository,
+    private val groups: GroupsRepository,
     prefs: AppPreferences,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(YouUiState())
+    private val _state = MutableStateFlow(
+        YouUiState(linkableProviders = setOf(LinkProviders.APPLE, LinkProviders.GOOGLE).filter(accounts::canLink).toSet()),
+    )
     val state: StateFlow<YouUiState> = _state.asStateFlow()
 
     init {
@@ -171,6 +200,62 @@ class YouViewModel @Inject constructor(
             }
         }
     }
+
+    // region Sign-in methods (Apple / Google)
+    fun refreshAccounts() {
+        viewModelScope.launch {
+            when (val result = accounts.list()) {
+                is ApiResult.Success -> _state.update { it.copy(accounts = result.value) }
+                // Keep whatever we had; the panel still shows the email row.
+                is ApiResult.Failure -> Unit
+            }
+        }
+    }
+
+    /** [activity] anchors the Credential Manager sheet; it is not retained. */
+    fun link(provider: String, activity: Context) {
+        val s = _state.value
+        if (s.linkingProvider != null || provider !in s.linkableProviders) return
+        runLink(provider) { accounts.linkGoogle(activity) }
+    }
+
+    fun confirmMerge() {
+        val pending = _state.value.pendingMerge ?: return
+        if (_state.value.linkingProvider != null) return
+        _state.update { it.copy(pendingMerge = null) }
+        runLink(pending.request.provider) { accounts.link(pending.request.copy(merge = true)) }
+    }
+
+    fun cancelMerge() = _state.update { it.copy(pendingMerge = null) }
+
+    private fun runLink(provider: String, block: suspend () -> LinkResult) {
+        viewModelScope.launch {
+            _state.update { it.copy(linkingProvider = provider) }
+            val result = block()
+            _state.update {
+                when (result) {
+                    is LinkResult.Linked -> it.copy(
+                        linkingProvider = null,
+                        message = UserMessage(if (result.merged) "Accounts merged." else "${LinkProviders.label(provider)} linked."),
+                    )
+                    is LinkResult.NeedsMerge -> it.copy(linkingProvider = null, pendingMerge = result)
+                    LinkResult.Cancelled -> it.copy(linkingProvider = null)
+                    is LinkResult.Failed -> it.copy(linkingProvider = null, message = UserMessage(result.message))
+                }
+            }
+            if (result is LinkResult.Linked) {
+                refreshAccounts()
+                if (result.merged) {
+                    // The other account's groups, Pro, templates and profile now live here.
+                    launch { groups.refreshGroups() }
+                    launch { plans.refresh() }
+                    launch { users.refresh() }
+                    refreshTemplates()
+                }
+            }
+        }
+    }
+    // endregion
 
     fun requestDelete() = _state.update { it.copy(confirmingDelete = true) }
 

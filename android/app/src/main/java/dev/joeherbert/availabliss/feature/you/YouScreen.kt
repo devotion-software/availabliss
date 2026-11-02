@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.BuildConfig
+import dev.joeherbert.availabliss.core.network.model.LinkProviders
+import dev.joeherbert.availabliss.core.network.model.LinkedAccount
+import dev.joeherbert.availabliss.core.network.model.LinkedAccounts
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
@@ -52,8 +55,11 @@ import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
+import dev.joeherbert.availabliss.designsystem.component.PillTone
+import dev.joeherbert.availabliss.designsystem.component.StatusPill
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.RowDivider
+import dev.joeherbert.availabliss.designsystem.component.SectionLabel
 import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
@@ -81,6 +87,7 @@ fun YouScreen(
     LaunchedEffect(Unit) {
         viewModel.refreshTemplates()
         viewModel.refreshPlan()
+        viewModel.refreshAccounts()
     }
     var upgrading by rememberSaveable { mutableStateOf(false) }
     if (upgrading) UpgradeSheet(onDismiss = { upgrading = false }, onUpgraded = viewModel::upgraded)
@@ -94,6 +101,7 @@ fun YouScreen(
             onOpenAppearance = onOpenAppearance,
             onOpenRegion = onOpenRegion,
             onAddPasskey = { viewModel.addPasskey(context) },
+            onLink = { provider -> viewModel.link(provider, context) },
             onSignOut = onSignOut,
             onDelete = viewModel::requestDelete,
             onOpenPro = { upgrading = true },
@@ -122,6 +130,20 @@ fun YouScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+
+    state.pendingMerge?.let { pending ->
+        val colors = AvailablissTheme.colors
+        AlertDialog(
+            onDismissRequest = viewModel::cancelMerge,
+            containerColor = colors.bg,
+            shape = Shapes.cardLarge,
+            tonalElevation = 0.dp,
+            title = { Text("Merge accounts?", style = AvailablissTheme.type.headlineSmall, color = colors.ink) },
+            text = { Text(mergePrompt(pending.account), style = AvailablissTheme.type.body, color = colors.muted) },
+            confirmButton = { TextAction("Merge", viewModel::confirmMerge, color = colors.warnInk) },
+            dismissButton = { TextAction("Cancel", viewModel::cancelMerge, color = colors.muted) },
+        )
     }
 
     if (state.confirmingDelete) {
@@ -161,6 +183,7 @@ fun YouContent(
     onAddPasskey: () -> Unit,
     onSignOut: () -> Unit,
     onDelete: () -> Unit,
+    onLink: (provider: String) -> Unit = {},
     onOpenPro: () -> Unit = {},
     templateActions: TemplateActions = TemplateActions(),
 ) {
@@ -195,6 +218,8 @@ fun YouContent(
                 loading = state.addingPasskey,
             )
         }
+
+        SignInMethodsPanel(state, onLink)
 
         PlanSection(state.plan, onOpenPro)
 
@@ -240,22 +265,67 @@ private fun ProfileCard(user: User, onEditName: () -> Unit) {
     }
 }
 
+/** "Sign-in methods": the email code row, then one row per provider the server can link. */
+@Composable
+private fun SignInMethodsPanel(state: YouUiState, onLink: (String) -> Unit) {
+    val user = state.user ?: return
+    val colors = AvailablissTheme.colors
+    GlassPanel(
+        Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 4.dp),
+        verticalArrangement = Arrangement.Top,
+    ) {
+        SectionLabel("Sign-in methods")
+        SettingsRow(AvIcons.Mail, "Email code", user.email, onClick = null, showChevron = false)
+        state.accounts?.available.orEmpty().forEach { provider ->
+            val linked = state.accounts?.isLinked(provider) == true
+            val linkable = provider in state.linkableProviders
+            val label = LinkProviders.label(provider)
+            RowDivider()
+            SettingsRow(
+                icon = when (provider) {
+                    LinkProviders.APPLE -> AvIcons.Apple
+                    LinkProviders.GOOGLE -> AvIcons.Google
+                    else -> AvIcons.Link
+                },
+                title = label,
+                subtitle = when {
+                    linked -> null
+                    // No Apple SDK on Android (sign-in is a web flow with no id token), so link it elsewhere.
+                    !linkable && provider == LinkProviders.APPLE -> "Link on the web or iPhone app"
+                    !linkable -> "Link on the web"
+                    else -> "Sign in with $label too"
+                },
+                onClick = if (!linked && linkable) ({ onLink(provider) }) else null,
+                showChevron = false,
+                loading = state.linkingProvider == provider,
+                trailing = when {
+                    linked -> ({ StatusPill("Linked", PillTone.Mint, icon = AvIcons.Check) })
+                    linkable -> ({ Text("Link", style = AvailablissTheme.type.bodySmallStrong, color = colors.accentInk) })
+                    else -> ({ Text("Not linked", style = AvailablissTheme.type.caption, color = colors.muted) })
+                },
+            )
+        }
+    }
+}
+
 @Composable
 private fun SettingsRow(
     icon: ImageVector,
     title: String,
     subtitle: String?,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     showChevron: Boolean = true,
     loading: Boolean = false,
     tint: Color = AvailablissTheme.colors.ink,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = AvailablissTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = if (subtitle != null) 62.dp else 52.dp)
-            .clickable(enabled = !loading, role = Role.Button, onClick = onClick),
+            .then(if (onClick != null) Modifier.clickable(enabled = !loading, role = Role.Button, onClick = onClick) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -266,6 +336,7 @@ private fun SettingsRow(
         }
         when {
             loading -> CircularProgressIndicator(color = colors.accent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+            trailing != null -> trailing()
             showChevron -> Icon(AvIcons.Forward, null, tint = colors.muted, modifier = Modifier.size(16.dp))
         }
     }
@@ -277,7 +348,14 @@ private fun YouPreview() {
     AvailablissPreviewTheme {
         AvailablissBackground(OrbLayout.Main) {
             YouContent(
-                state = YouUiState(user = User(id = "u1", name = "Sam Taylor", email = "sam@example.com", country = "GB", subdivision = "GB-ENG")),
+                state = YouUiState(
+                    user = User(id = "u1", name = "Sam Taylor", email = "sam@example.com", country = "GB", subdivision = "GB-ENG"),
+                    accounts = LinkedAccounts(
+                        linked = listOf(LinkedAccount(LinkProviders.APPLE, "2026-10-01T09:00:00Z")),
+                        available = listOf(LinkProviders.APPLE, LinkProviders.GOOGLE),
+                    ),
+                    linkableProviders = setOf(LinkProviders.GOOGLE),
+                ),
                 onEditName = {}, onOpenCalendars = {}, onOpenAppearance = {}, onOpenRegion = {}, onAddPasskey = {}, onSignOut = {}, onDelete = {},
             )
         }

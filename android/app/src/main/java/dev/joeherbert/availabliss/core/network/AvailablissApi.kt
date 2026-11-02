@@ -1,6 +1,9 @@
 package dev.joeherbert.availabliss.core.network
 
 import dev.joeherbert.availabliss.core.network.model.Availability
+import dev.joeherbert.availabliss.core.network.model.LinkAccountRequest
+import dev.joeherbert.availabliss.core.network.model.LinkAccountResponse
+import dev.joeherbert.availabliss.core.network.model.LinkedAccounts
 import dev.joeherbert.availabliss.core.network.model.Plan
 import dev.joeherbert.availabliss.core.network.model.PlannerRequest
 import dev.joeherbert.availabliss.core.network.model.PlannerResult
@@ -59,6 +62,7 @@ import dev.joeherbert.availabliss.core.network.model.UpdateGroupRequest
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.core.network.model.VoteRequest
 import kotlinx.serialization.json.JsonObject
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -229,6 +233,18 @@ interface AvailablissApi {
     /** Re-reads RevenueCat right after a purchase or restore (the webhook may lag). */
     @POST("api/v1/me/plan/refresh")
     suspend fun refreshPlan(): Plan
+    // endregion
+
+    // region Linked sign-ins (Apple / Google)
+    @GET("api/v1/me/accounts")
+    suspend fun getLinkedAccounts(): LinkedAccounts
+
+    /**
+     * Raw [Response] because a 409 carries the other account (`account`) that the
+     * normal error parsing would drop; see AccountsRepository.
+     */
+    @POST("api/v1/me/accounts/link")
+    suspend fun linkAccount(@Body body: LinkAccountRequest): Response<LinkAccountResponse>
     // endregion
 
     // region Timing templates
