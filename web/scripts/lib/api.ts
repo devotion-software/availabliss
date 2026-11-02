@@ -35,8 +35,8 @@ export async function call<T = any>(token: string | null, method: string, path: 
 export async function otpFor(email: string): Promise<string> {
 	for (let i = 0; i < 40; i++) {
 		const res = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`);
-		const { messages } = (await res.json()) as { messages: { Subject: string }[] };
-		const code = messages[0]?.Subject.match(/^(\d{6})/)?.[1];
+		const { messages } = (await res.json()) as { messages: { Snippet: string }[] };
+		const code = messages[0]?.Snippet.match(/\b(\d{6})\b/)?.[1];
 		if (code) return code;
 		await Bun.sleep(250);
 	}

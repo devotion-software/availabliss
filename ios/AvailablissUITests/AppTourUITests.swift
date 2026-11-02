@@ -109,14 +109,15 @@ final class AppTourUITests: XCTestCase {
     /// Polls Mailpit for the newest sign-in code sent to `email`.
     nonisolated private static func latestCode(for email: String, mailpit: URL) async throws -> String {
         struct Search: Decodable { let messages: [Message] }
-        struct Message: Decodable { let Subject: String }
+        struct Message: Decodable { let Snippet: String }
         var components = URLComponents(url: mailpit.appending(path: "api/v1/search"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "query", value: "to:\(email)")]
         for _ in 0..<30 {
             let (data, _) = try await URLSession.shared.data(from: components.url!)
-            if let subject = try JSONDecoder().decode(Search.self, from: data).messages.first?.Subject,
-               let code = subject.split(separator: " ").first, code.count == 6, code.allSatisfy(\.isNumber) {
-                return String(code)
+            // The code is in the body, not the subject; Mailpit's snippet is the text body.
+            if let snippet = try JSONDecoder().decode(Search.self, from: data).messages.first?.Snippet,
+               let match = snippet.firstMatch(of: /\b\d{6}\b/) {
+                return String(match.output)
             }
             try await Task.sleep(for: .milliseconds(500))
         }

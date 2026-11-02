@@ -77,8 +77,10 @@ def latest_code() -> str:
     for _ in range(30):
         with urllib.request.urlopen(f"{MAILPIT}/api/v1/search?{query}") as res:
             messages = json.load(res)["messages"]
-        if messages and re.match(r"^\d{6}", messages[0]["Subject"]):
-            return messages[0]["Subject"][:6]
+        # The code is in the body, not the subject; Mailpit's snippet is the text body.
+        found = messages and re.search(r"\b(\d{6})\b", messages[0]["Snippet"])
+        if found:
+            return found.group(1)
         time.sleep(0.5)
     raise SystemExit(f"No sign-in code arrived for {email}")
 
