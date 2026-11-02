@@ -24,6 +24,8 @@ struct TimingEditorView: View {
                 header
                 TimingForm(model: model)
                     .disabled(!canEdit)
+                // Anyone can keep a copy of a group's timing to reuse, admin or not.
+                SaveTemplateRow(requirement: model.draft, suggestion: group.name, api: detail.api, toast: $model.toast)
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)

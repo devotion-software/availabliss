@@ -14,6 +14,14 @@ enum API {
         }
         static func delete() -> Endpoint<EmptyResponse> { .init(.delete, "/me") }
         static func upcoming() -> Endpoint<EventsResponse> { .init(.get, "/me/upcoming") }
+        static func templates() -> Endpoint<TemplatesResponse> { .init(.get, "/me/templates") }
+        static func createTemplate(name: String, requirement: Requirement) -> Endpoint<RequirementTemplate> {
+            .init(.post, "/me/templates", body: CreateTemplateBody(name: name, requirement: requirement))
+        }
+        static func renameTemplate(id: String, name: String) -> Endpoint<RequirementTemplate> {
+            .init(.patch, "/me/templates/\(id.pathEncoded)", body: RenameTemplateBody(name: name))
+        }
+        static func deleteTemplate(id: String) -> Endpoint<EmptyResponse> { .init(.delete, "/me/templates/\(id.pathEncoded)") }
     }
 
     // MARK: Regions & holidays

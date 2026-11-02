@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// "You": account, appearance, calendars, region, passkeys, sign out.
+/// "You": account, appearance, calendars, region, passkeys, timing templates, sign out.
 struct ProfileView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
@@ -15,6 +15,7 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 14) {
                 account
                 settingsList
+                TemplatesSection(api: app.api, toast: $toast, error: $error)
                 VStack(spacing: 4) {
                     Button("Sign out") { confirmsSignOut = true }.buttonStyle(.textAction)
                     Button("Delete account") { confirmsDelete = true }.buttonStyle(.textAction).foregroundStyle(theme.warnInk)

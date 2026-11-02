@@ -12,6 +12,10 @@ struct NewGroupSheet: View {
     @State private var name = ""
     @State private var color = NewGroupSheet.colors.randomElement() ?? "t1"
     @State private var preset: TimingPreset = .weekend
+    /// Your saved timings; picking one replaces the preset.
+    @State private var templates: [RequirementTemplate] = []
+    @State private var templateId: String?
+    @State private var toast: String?
     @State private var timing: TimingEditorViewModel
     @State private var isSaving = false
     @State private var error: String?
@@ -36,9 +40,11 @@ struct NewGroupSheet: View {
             if step == 2 { createBar }
         }
         .task { await timing.loadAuthorities(country: app.session.user?.country) }
+        .task { templates = (try? await api.send(API.Me.templates()).templates) ?? [] }
         .task(id: timing.draft) { await timing.refreshPreview() }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: step)
         .errorAlert($error)
+        .toast($toast)
     }
 
     // MARK: Step 1
@@ -74,11 +80,21 @@ struct NewGroupSheet: View {
                 }
             }
         }
+        if !templates.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Your templates").sectionLabelStyle()
+                FlowLayout(spacing: 8) {
+                    ForEach(templates) { template in
+                        Chip(label: template.name, isOn: templateId == template.id, height: 40, fontSize: 14) { pick(template) }
+                    }
+                }
+            }
+        }
         VStack(alignment: .leading, spacing: 10) {
-            Text("What are you planning?").sectionLabelStyle()
+            Text(templates.isEmpty ? "What are you planning?" : "Or start from").sectionLabelStyle()
             FlowLayout(spacing: 8) {
                 ForEach(Self.quickPresets) { option in
-                    Chip(label: option.label, isOn: preset == option, height: 40, fontSize: 14) { pick(option) }
+                    Chip(label: option.label, isOn: templateId == nil && preset == option, height: 40, fontSize: 14) { pick(option) }
                 }
             }
             Text(timing.preview?.summary ?? timing.draft.draftSummary)
@@ -95,7 +111,13 @@ struct NewGroupSheet: View {
     /// A fresh timing per preset: "A week" needs every day, "A weekend" Fri–Sun, and so on.
     private func pick(_ option: TimingPreset) {
         preset = option
+        templateId = nil
         timing.reset(to: TimingEditorViewModel.fresh(option, timezone: timezone))
+    }
+
+    private func pick(_ template: RequirementTemplate) {
+        templateId = template.id
+        timing.reset(to: template.requirementForNewGroup(timezone: timezone))
     }
 
     private func next() {
@@ -112,6 +134,7 @@ struct NewGroupSheet: View {
             .foregroundStyle(theme.muted)
         StepDots(current: 1, total: 2)
         TimingForm(model: timing)
+        SaveTemplateRow(requirement: timing.draft, api: api, toast: $toast) { templates.append($0) }
     }
 
     private var createBar: some View {
