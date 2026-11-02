@@ -31,7 +31,8 @@ Run `make help` for every task. The useful ones:
 | Command | What it does |
 | ------- | ------------ |
 | `make dev` | Web app + API with hot reload |
-| `make test` | Unit tests (availability engine, CalDAV parsing) |
+| `make test` | Unit tests (no database needed) |
+| `make test-integration` | Service tests against the dev database (`DATABASE_URL`); they create and delete their own users and groups |
 | `make smoke` | End-to-end API test against the running dev server |
 | `make seed-demo` / `make clean-demo` | Create / delete demo users, groups, busy time and chat to explore the apps |
 | `make check` | Type-check |

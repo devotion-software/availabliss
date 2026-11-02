@@ -125,6 +125,8 @@ jobs:
         run: bun run build
       - name: Migrate
         run: node scripts/migrate.js
+      - name: DB integration tests
+        run: bun run test:integration
       - name: Start server
         env:
           # Production mode, so rate limits are on as they are when deployed.

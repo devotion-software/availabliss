@@ -4,7 +4,7 @@ WEB := web
 IMAGE ?= availabliss-web
 
 .DEFAULT_GOAL := help
-.PHONY: help setup env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test smoke \
+.PHONY: help setup env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test test-integration smoke \
 	seed-demo clean-demo set-plan school-holidays \
 	docker-build docker-run ios-project ios-open ios-build ios-uitest android-build android-test android-tour clean
 
@@ -56,6 +56,9 @@ check: ## Type-check the web app
 
 test: ## Run unit tests
 	cd $(WEB) && bun run test
+
+test-integration: ## Run DB integration tests against DATABASE_URL (needs `make db-up` and migrations)
+	cd $(WEB) && bun run test:integration
 
 smoke: ## End-to-end API smoke test against the running dev server (needs `make dev`)
 	cd $(WEB) && bun scripts/smoke.ts
