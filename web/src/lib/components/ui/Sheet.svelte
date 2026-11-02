@@ -4,6 +4,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import IconButton from './IconButton.svelte';
 	import { focusTrap } from './focus-trap';
+	import { portal } from './portal';
 
 	interface Props {
 		open: boolean;
@@ -60,7 +61,7 @@
 </script>
 
 {#if open}
-	<div class="overlay" class:sheet={asSheet} transition:fade={{ duration: 160 }}>
+	<div class="overlay" class:sheet={asSheet} use:portal transition:fade={{ duration: 160 }}>
 		<button class="scrim" tabindex="-1" aria-label="Close" onclick={close}></button>
 		<div
 			class="panel glass"

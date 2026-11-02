@@ -8,7 +8,7 @@
 	/**
 	 * Week view of your busy time: days across the top, hours down the side,
 	 * every interval at its exact times. Tap an empty slot (or drag with a mouse)
-	 * to block that time.
+	 * to block that time; tap busy time to edit or inspect it.
 	 */
 	interface Props {
 		layout: WeekLayout;
@@ -16,8 +16,10 @@
 		timeZone: string;
 		/** A tap (an hour) or a drag (exact range) on empty time. */
 		onselect: (day: string, from: number, to: number, dragged: boolean) => void;
+		/** A tap on busy time: your own block, or an interval from a calendar. */
+		onopen: (interval: BusyInterval) => void;
 	}
-	let { layout, today, timeZone, onselect }: Props = $props();
+	let { layout, today, timeZone, onselect, onopen }: Props = $props();
 
 	const HOURS = Array.from({ length: 24 }, (_, h) => h);
 	const hasAllDay = $derived([...layout.allDay.values()].some((list) => list.length > 0));
@@ -117,7 +119,13 @@
 			{#each layout.days as day (day)}
 				<div class="allday-cell">
 					{#each layout.allDay.get(day) ?? [] as interval, i (i)}
-						<span class="chip {interval.source}" title={labelOf(interval)}>{labelOf(interval)}</span>
+						<button
+							type="button"
+							class="chip {interval.source}"
+							title={labelOf(interval)}
+							aria-label="{interval.source === 'manual' ? 'Edit' : 'About'} {labelOf(interval)}, all day {weekdayName(day, 'long')}"
+							onclick={() => onopen(interval)}>{labelOf(interval)}</button
+						>
 					{/each}
 				</div>
 			{/each}
@@ -144,16 +152,19 @@
 				>
 					{#each layout.timed.get(day) ?? [] as p, i (i)}
 						{@const minutes = p.to - p.from}
-						<div
+						<button
+							type="button"
 							class="event {p.interval.source}"
 							class:cont-before={p.continuesBefore}
 							class:cont-after={p.continuesAfter}
 							style={boxStyle(p)}
 							title={describe(p)}
+							aria-label="{p.interval.source === 'manual' ? 'Edit: ' : ''}{describe(p)}"
+							onclick={() => onopen(p.interval)}
 						>
 							<span class="elabel">{labelOf(p.interval)}</span>
 							{#if minutes >= 45}<span class="etime">{clock(p.from)} – {clock(p.to)}</span>{/if}
-						</div>
+						</button>
 					{/each}
 
 					{#if selection && selection.day === day}
@@ -298,7 +309,24 @@
 		font-size: 11px;
 		line-height: 1.2;
 		min-height: 14px;
-		cursor: default;
+		text-align: left;
+		align-items: stretch;
+		justify-content: flex-start;
+		cursor: pointer;
+		transition:
+			transform 0.12s ease,
+			box-shadow 0.15s ease;
+	}
+	.event:hover,
+	.chip:hover {
+		box-shadow: 0 6px 16px -10px var(--shadow);
+	}
+	.event:active {
+		transform: scale(0.98);
+	}
+	.chip {
+		cursor: pointer;
+		text-align: left;
 	}
 	.manual {
 		background: var(--stripe-manual), var(--surface);

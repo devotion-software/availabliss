@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
-	import type { ManualBlock } from '#lib/types';
+	import type { BusyInterval, ManualBlock } from '#lib/types';
 	import { createBlock, deleteBlock } from '#lib/client/blocks';
 	import { addDays, startOfWeek } from '#lib/client/dates';
 	import { dayNumber, monthTitle, formatDayRange } from '#lib/client/format';
@@ -13,6 +13,7 @@
 	import WeekTimeGrid from '#lib/components/mytime/WeekTimeGrid.svelte';
 	import BlockRow from '#lib/components/mytime/BlockRow.svelte';
 	import BlockTimeSheet from '#lib/components/mytime/BlockTimeSheet.svelte';
+	import CalendarBusySheet from '#lib/components/mytime/CalendarBusySheet.svelte';
 	import { clock, layoutWeek, rangeToIso } from '#lib/components/mytime/parts';
 	import { weekdayName } from '#lib/client/format';
 
@@ -64,6 +65,20 @@
 		}
 	}
 
+	/** Tap on busy time: edit your own block, or explain calendar time. */
+	let calendarOpen = $state(false);
+	let calendarInterval = $state<BusyInterval | null>(null);
+	function open(interval: BusyInterval) {
+		if (interval.source === 'calendar') {
+			calendarInterval = interval;
+			calendarOpen = true;
+			return;
+		}
+		const block = data.blocks.find((b) => b.id === interval.blockId);
+		if (block) openEdit(block);
+		else toasts.info('That block was just removed.');
+	}
+
 	function openNew() {
 		editing = null;
 		sheetDay = isThisWeek ? data.today : data.weekStart;
@@ -87,7 +102,7 @@
 <svelte:head><title>My time · Availabliss</title></svelte:head>
 
 <div class="page">
-	<PageHeader title="My time" subtitle="Tap or drag to block time you're busy" backHref="/app" backLabel="Home" backIcon="home">
+	<PageHeader title="My time" subtitle="Tap to block time or edit a block" backHref="/app" backLabel="Home" backIcon="home">
 		{#snippet actions()}
 			<IconButton href="/app/calendars" icon="calendar-sync" label="Connected calendars" />
 		{/snippet}
@@ -119,7 +134,7 @@
 			</div>
 
 			<GlassPanel as="section" padding="12px" aria-label="Busy times this week">
-				<WeekTimeGrid {layout} today={data.today} timeZone={tz} onselect={select} />
+				<WeekTimeGrid {layout} today={data.today} timeZone={tz} onselect={select} onopen={open} />
 				<div class="legend">
 					<span><i class="sw manual"></i>Blocked by you</span>
 					<span><i class="sw cal"></i>From a calendar</span>
@@ -143,6 +158,7 @@
 </div>
 
 <BlockTimeSheet bind:open={sheetOpen} timeZone={tz} block={editing} defaultDay={sheetDay} defaultRange={sheetRange} onsaved={refresh} />
+<CalendarBusySheet bind:open={calendarOpen} interval={calendarInterval} />
 <ConfirmSheet
 	bind:open={confirmOpen}
 	title="Delete this block?"
