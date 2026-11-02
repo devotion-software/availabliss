@@ -156,7 +156,7 @@ fun YouContent(
         state.user?.let { user -> ProfileCard(user, onEditName) }
 
         GlassPanel(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp), verticalArrangement = Arrangement.Top) {
-            SettingsRow(AvIcons.Link, "Calendars", "Connected calendars and what counts as busy", onOpenCalendars)
+            SettingsRow(AvIcons.CalendarSync, "Calendars", "Connected calendars and what counts as busy", onOpenCalendars)
             RowDivider()
             SettingsRow(AvIcons.Palette, "Appearance", state.appearanceSummary, onOpenAppearance)
             RowDivider()

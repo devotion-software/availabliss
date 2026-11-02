@@ -16,7 +16,7 @@ struct MyTimeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 ScreenHeader(title: "My time", subtitle: "Tap to block time you're busy") {
-                    IconButton(systemImage: "link", label: "Connected calendars") { app.router.push(.calendars) }
+                    IconButton(icon: .asset("CalendarSync"), label: "Connected calendars") { app.router.push(.calendars) }
                 }
                 weekSwitcher
                 WeekSlotGrid(model: model)

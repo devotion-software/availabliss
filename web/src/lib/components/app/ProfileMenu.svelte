@@ -17,7 +17,7 @@
 
 	const links: { href: string; label: string; icon: IconName }[] = [
 		{ href: '/app/my-time', label: 'My time', icon: 'calendar' },
-		{ href: '/app/calendars', label: 'Calendars', icon: 'link' },
+		{ href: '/app/calendars', label: 'Calendars', icon: 'calendar-sync' },
 		{ href: '/app/settings', label: 'Settings', icon: 'settings' }
 	];
 

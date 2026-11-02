@@ -88,7 +88,7 @@
 <div class="page">
 	<PageHeader title="My time" subtitle="Tap to block time you're busy" backHref="/app" backLabel="Back to groups" backOnPhoneOnly>
 		{#snippet actions()}
-			<IconButton href="/app/calendars" icon="link" label="Connected calendars" />
+			<IconButton href="/app/calendars" icon="calendar-sync" label="Connected calendars" />
 		{/snippet}
 	</PageHeader>
 

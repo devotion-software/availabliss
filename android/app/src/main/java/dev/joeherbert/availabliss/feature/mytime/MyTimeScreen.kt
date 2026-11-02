@@ -135,7 +135,7 @@ fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: My
                     Text("My time", style = type.headlineMedium, color = colors.ink)
                     Text("Tap to block time you're busy", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
                 }
-                GlassIconButton(AvIcons.Link, "Connected calendars", actions.onOpenCalendars)
+                GlassIconButton(AvIcons.CalendarSync, "Connected calendars", actions.onOpenCalendars)
             }
 
             // Week switcher

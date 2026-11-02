@@ -20,6 +20,14 @@ object AvIcons {
     val Close = line("Close", "M6 6l12 12M18 6L6 18", stroke = 2.6f)
     val Check = line("Check", "M5 12l5 5L20 7", stroke = 3f)
     val Calendar = line("Calendar", rect(3f, 5f, 18f, 16f, 3f), "M3 10h18M8 3v4M16 3v4")
+    /** Connected calendars: a calendar with a sync arrow in the corner. */
+    val CalendarSync = line(
+        "CalendarSync",
+        "M3 10h18M8 3v4M16 3v4",
+        "M21 11V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h5",
+        "M21.5 17.5a4 4 0 1 1-1.17-2.83",
+        "M20.6 12.2v2.7h-2.7",
+    )
     val CalendarAdd = line("CalendarAdd", rect(3f, 5f, 18f, 16f, 3f), "M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5")
     val Groups = line("Groups", circle(9f, 10f, 5.5f), circle(15f, 10f, 5.5f), circle(12f, 15f, 5.5f))
     val Bell = line("Bell", "M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0")

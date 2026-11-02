@@ -10,6 +10,8 @@
 		check: '<path d="M5 12l5 5L20 7"/>',
 		x: '<path d="M6 6l12 12M18 6L6 18"/>',
 		calendar: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+		'calendar-sync':
+			'<path d="M3 10h18M8 3v4M16 3v4"/><path d="M21 11V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h5"/><path d="M21.5 17.5a4 4 0 1 1-1.17-2.83"/><path d="M20.6 12.2v2.7h-2.7"/>',
 		'calendar-plus': '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/>',
 		clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
 		pencil: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',

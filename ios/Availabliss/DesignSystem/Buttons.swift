@@ -142,17 +142,34 @@ struct LoadingLabel: View {
 
 /// 44pt circular glass icon button. Always pass an accessibility label.
 struct IconButton: View {
-    let systemImage: String
+    /// An SF Symbol, or a template image from the asset catalog for icons SF Symbols lacks.
+    enum Icon {
+        case system(String)
+        case asset(String)
+    }
+
+    let icon: Icon
     let label: String
     var size: CGFloat = 44
     var glass = true
     let action: () -> Void
     @Environment(\.theme) private var theme
 
+    init(systemImage: String, label: String, size: CGFloat = 44, glass: Bool = true, action: @escaping () -> Void) {
+        self.init(icon: .system(systemImage), label: label, size: size, glass: glass, action: action)
+    }
+
+    init(icon: Icon, label: String, size: CGFloat = 44, glass: Bool = true, action: @escaping () -> Void) {
+        self.icon = icon
+        self.label = label
+        self.size = size
+        self.glass = glass
+        self.action = action
+    }
+
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: size * 0.4, weight: .semibold))
+            image
                 .foregroundStyle(theme.ink)
                 .frame(width: size, height: size)
                 .modifier(OptionalGlassCircle(enabled: glass))
@@ -161,6 +178,16 @@ struct IconButton: View {
         }
         .buttonStyle(.pressable)
         .accessibilityLabel(label)
+    }
+
+    @ViewBuilder private var image: some View {
+        switch icon {
+        case .system(let name):
+            Image(systemName: name).font(.system(size: size * 0.4, weight: .semibold))
+        case .asset(let name):
+            // Line icons drawn on the shared 24pt grid (docs/DESIGN.md), sized like the symbols.
+            Image(name).resizable().scaledToFit().frame(width: size * 0.48, height: size * 0.48)
+        }
     }
 }
 
