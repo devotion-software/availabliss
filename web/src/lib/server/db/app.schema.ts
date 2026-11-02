@@ -356,6 +356,27 @@ export const calendarRelations = relations(calendars, ({ one }) => ({
 	connection: one(calendarConnections, { fields: [calendars.connectionId], references: [calendarConnections.id] })
 }));
 
+// ─── Plans ────────────────────────────────────────────────────────────────
+
+/**
+ * Pro entitlement, mirrored from RevenueCat (App Store, Play Store and web
+ * purchases through Stripe). No row, or `proUntil` in the past, means free.
+ */
+export const userPlans = mysqlTable('user_plans', {
+	userId: varchar('user_id', { length: 36 })
+		.primaryKey()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	/** When Pro runs out; null with `lifetime` for one-off purchases. */
+	proUntil: instant('pro_until'),
+	lifetime: boolean('lifetime').default(false).notNull(),
+	/** app_store, play_store, stripe, rc_billing, promotional … as RevenueCat reports it. */
+	store: varchar('store', { length: 32 }),
+	productId: varchar('product_id', { length: 128 }),
+	/** The subscription won't renew (cancelled), but stays active until proUntil. */
+	willRenew: boolean('will_renew').default(true).notNull(),
+	updatedAt: updatedAt()
+});
+
 export const groupRelations = relations(groups, ({ many }) => ({
 	members: many(groupMembers)
 }));

@@ -14,6 +14,7 @@
 	import { regionFromUser, regionPatch, type RegionValue } from '#lib/components/region/region';
 	import AppearanceSection from '#lib/components/settings/AppearanceSection.svelte';
 	import PasskeysSection from '#lib/components/settings/PasskeysSection.svelte';
+	import PlanSection from '#lib/components/settings/PlanSection.svelte';
 
 	let { data } = $props();
 
@@ -102,6 +103,8 @@
 		</div>
 
 		<div class="col">
+			<PlanSection />
+
 			<GlassPanel as="form" padding="16px" gap={12} onsubmit={saveRegion} aria-labelledby="region-title">
 				<h2 class="eyebrow" id="region-title">Region & school holidays</h2>
 				<p class="small muted">Bank holidays and school term dates come from here.</p>

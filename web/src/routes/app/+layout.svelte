@@ -3,11 +3,12 @@
 	import { invalidate } from '$app/navigation';
 	import { live } from '#lib/client/live.svelte';
 	import { activity } from '#lib/client/activity.svelte';
-	import { newGroupSheet } from '#lib/client/ui-state.svelte';
+	import { newGroupSheet, upgradeSheet } from '#lib/client/ui-state.svelte';
 	import Orbs from '#lib/components/ui/Orbs.svelte';
 	import TabBar from '#lib/components/ui/TabBar.svelte';
 	import AppHeader from '#lib/components/app/AppHeader.svelte';
 	import NewGroupSheet from '#lib/components/groups/NewGroupSheet.svelte';
+	import UpgradeSheet from '#lib/components/plan/UpgradeSheet.svelte';
 
 	let { data, children } = $props();
 
@@ -61,6 +62,7 @@
 	<TabBar label="Main" {tabs} />
 {/if}
 <NewGroupSheet bind:open={newGroupSheet.open} timeZone={data.user.timezone} />
+<UpgradeSheet bind:open={upgradeSheet.open} user={data.user} reason={upgradeSheet.reason} />
 
 <style>
 	.shell {

@@ -5,7 +5,7 @@ IMAGE ?= availabliss-web
 
 .DEFAULT_GOAL := help
 .PHONY: help setup env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test smoke \
-	seed-demo clean-demo school-holidays \
+	seed-demo clean-demo set-plan school-holidays \
 	docker-build docker-run ios-project ios-open ios-build ios-uitest android-build android-test android-tour clean
 
 help: ## Show this help
@@ -65,6 +65,9 @@ seed-demo: ## Create demo users, groups, busy time and chat (prints the email to
 
 clean-demo: ## Delete the demo data created by seed-demo
 	cd $(WEB) && bun scripts/clean-demo.ts
+
+set-plan: ## Give an account Pro or free without a purchase: make set-plan EMAIL=… PLAN=pro|free [DAYS=30|lifetime]
+	cd $(WEB) && bun scripts/set-plan.ts $(EMAIL) $(PLAN) $(DAYS)
 
 school-holidays: ## Import school holidays from a CSV: make school-holidays FILE=path.csv
 	cd $(WEB) && bun scripts/import-school-holidays.ts $(abspath $(FILE))

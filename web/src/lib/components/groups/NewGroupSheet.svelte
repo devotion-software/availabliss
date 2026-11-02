@@ -4,6 +4,10 @@
 	import { createGroupSchema } from '#lib/schemas';
 	import { createGroup } from '#lib/client/groups';
 	import { ApiError } from '#lib/client/api';
+	import { getPlan } from '#lib/client/plan';
+	import { upgradeSheet } from '#lib/client/ui-state.svelte';
+	import { FREE_GROUP_LIMIT } from '#lib/plans';
+	import Icon from '#lib/components/ui/Icon.svelte';
 	import { toasts } from '#lib/client/toast.svelte';
 	import { useFormat } from '#lib/client/format';
 	import { defaultRequirement, summarize, PRESETS, type PresetId } from '#lib/client/requirements';
@@ -27,6 +31,24 @@
 	let preset = $state<PresetId>('weekend');
 	let error = $state<string | null>(null);
 	let busy = $state(false);
+	/** Free accounts at their group limit see an upgrade prompt instead of the form. */
+	let atLimit = $state(false);
+
+	$effect(() => {
+		if (!open) return;
+		let stale = false;
+		getPlan()
+			.then((plan) => !stale && (atLimit = !plan.canCreateGroup))
+			.catch(() => {});
+		return () => {
+			stale = true;
+		};
+	});
+
+	function upgrade() {
+		open = false;
+		upgradeSheet.showFor(`You've used your ${FREE_GROUP_LIMIT} free groups. Pro gives you as many as you like.`);
+	}
 
 	const requirement = $derived(defaultRequirement(timeZone, fmt.current.today(), preset));
 	const monogram = $derived(
@@ -62,7 +84,8 @@
 			await invalidate('app:groups');
 			await goto(`/app/groups/${group.id}`);
 		} catch (err) {
-			if (err instanceof ApiError && err.issue('name')) error = err.issue('name')!;
+			if (err instanceof ApiError && err.code === 'upgrade_required') atLimit = true;
+			else if (err instanceof ApiError && err.issue('name')) error = err.issue('name')!;
 			else toasts.error(err);
 		} finally {
 			busy = false;
@@ -71,6 +94,14 @@
 </script>
 
 <Sheet bind:open title="New group" description="Name it, pick what you're planning. You can fine-tune timing later.">
+	{#if atLimit}
+		<div class="limit">
+			<span class="limit-icon"><Icon name="groups" size={22} /></span>
+			<h3>You've made {FREE_GROUP_LIMIT} groups</h3>
+			<p>Free accounts can create {FREE_GROUP_LIMIT}. Upgrade to Pro for unlimited groups, or delete one you no longer need. You can still join groups other people make.</p>
+			<Button variant="accent" size="lg" block icon="sparkle" onclick={upgrade}>See Pro</Button>
+		</div>
+	{:else}
 	<form class="form" onsubmit={submit} novalidate>
 		<div class="name-row">
 			<GroupTile {monogram} {color} size={50} />
@@ -103,6 +134,7 @@
 
 		<Button type="submit" variant="accent" size="lg" block loading={busy}>Create group</Button>
 	</form>
+	{/if}
 </Sheet>
 
 <style>
@@ -153,5 +185,32 @@
 	.summary {
 		font-size: 13px;
 		color: var(--muted);
+	}
+	.limit {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 10px;
+		padding: 8px 4px 4px;
+	}
+	.limit-icon {
+		width: 52px;
+		height: 52px;
+		border-radius: 18px;
+		display: grid;
+		place-items: center;
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+	}
+	.limit h3 {
+		font-size: 18px;
+		font-weight: 700;
+	}
+	.limit p {
+		font-size: 14px;
+		color: var(--muted);
+		line-height: 1.45;
+		margin-bottom: 6px;
 	}
 </style>

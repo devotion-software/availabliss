@@ -15,6 +15,7 @@ const STATUS: Record<Code, number> = {
 	not_found: 404,
 	validation_error: 400,
 	conflict: 409,
+	upgrade_required: 402,
 	rate_limited: 429,
 	server_error: 500
 };

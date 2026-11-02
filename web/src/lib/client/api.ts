@@ -21,6 +21,7 @@ export interface RequestOptions {
 const CODE_BY_STATUS: Record<number, ApiErrorBody['code']> = {
 	400: 'validation_error',
 	401: 'unauthorized',
+	402: 'upgrade_required',
 	403: 'forbidden',
 	404: 'not_found',
 	409: 'conflict',

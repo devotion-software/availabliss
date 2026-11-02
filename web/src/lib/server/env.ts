@@ -53,6 +53,18 @@ export const env = {
 	/** Base64-encoded Firebase service account JSON. */
 	fcmServiceAccount: optional('FCM_SERVICE_ACCOUNT'),
 
+	revenuecat: {
+		/** Secret (v1 REST) key: the server re-reads a subscriber after every webhook. */
+		secretKey: optional('REVENUECAT_SECRET_KEY'),
+		/** The Authorization header value set on the RevenueCat webhook. */
+		webhookAuth: optional('REVENUECAT_WEBHOOK_AUTH'),
+		/** Public SDK keys handed to the apps / web page (not secret). */
+		iosKey: optional('REVENUECAT_IOS_KEY'),
+		androidKey: optional('REVENUECAT_ANDROID_KEY'),
+		webKey: optional('REVENUECAT_WEB_KEY'),
+		entitlement: optional('REVENUECAT_ENTITLEMENT') ?? 'pro'
+	},
+
 	email: {
 		from: optional('EMAIL_FROM') ?? 'Availabliss <no-reply@availabliss.local>',
 		resendApiKey: optional('RESEND_API_KEY'),

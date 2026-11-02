@@ -37,6 +37,9 @@ check('unauthenticated request is 401 JSON', (await call(null, 'GET', '/api/v1/m
 check('validation errors are 400 with issues', (await call(sam.token, 'POST', '/api/v1/groups', {})).data.issues?.length > 0);
 
 // Group + invite
+const plan0 = await call(sam.token, 'GET', '/api/v1/me/plan');
+check('new accounts are on the free plan', plan0.data.tier === 'free' && plan0.data.groupLimit === 3 && plan0.data.canCreateGroup, plan0.data);
+check('webhook rejects requests without the shared secret', (await call(null, 'POST', '/api/v1/billing/revenuecat', { event: { type: 'RENEWAL' } })).status === 401);
 const group = await call(sam.token, 'POST', '/api/v1/groups', { name: 'Lake District crew' });
 check('create group (default weekend requirement)', group.status === 201 && group.data.requirement.length.type === 'span', group.data);
 const groupId = group.data.id;
@@ -48,6 +51,14 @@ check('preview invite', (await call(null, 'GET', `/api/v1/invites/${invite.data.
 const joined = await call(priya.token, 'POST', `/api/v1/invites/${invite.data.token}/accept`);
 check('accept invite', joined.status === 200 && joined.data.memberCount === 2, joined.data);
 check('member cannot edit requirement', (await call(priya.token, 'PATCH', `/api/v1/groups/${groupId}`, { name: 'x' })).status === 403);
+
+// Free accounts can own three groups; joining others' groups doesn't count.
+const extra = [];
+for (const name of ['Spare one', 'Spare two']) extra.push((await call(sam.token, 'POST', '/api/v1/groups', { name })).data.id);
+const fourth = await call(sam.token, 'POST', '/api/v1/groups', { name: 'One too many' });
+check('a fourth group needs Pro (402 upgrade_required)', fourth.status === 402 && fourth.data.code === 'upgrade_required', fourth.data);
+check('plan reports the allowance used', (await call(sam.token, 'GET', '/api/v1/me/plan')).data.canCreateGroup === false);
+for (const id of extra) await call(sam.token, 'DELETE', `/api/v1/groups/${id}`);
 
 // Live stream for Priya
 const events: any[] = [];

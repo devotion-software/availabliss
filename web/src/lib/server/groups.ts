@@ -2,6 +2,7 @@ import { and, asc, eq, gt, inArray } from 'drizzle-orm';
 import type { Group, Member, Requirement, Role, TileColor } from '#lib/types';
 import { TILE_COLORS } from '#lib/types';
 import { db } from './db';
+import { requireCanCreateGroup } from './billing';
 import { groupInvites, groupMembers, groups, user } from './db/schema';
 import { forbidden, notFound } from './http';
 import { newId, newToken } from './ids';
@@ -128,6 +129,7 @@ export async function createGroup(
 	input: { name: string; color?: TileColor; requirement?: Requirement },
 	timeZone: string
 ): Promise<Group> {
+	await requireCanCreateGroup(userId);
 	const id = newId();
 	const color = input.color ?? TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)];
 	await db.transaction(async (tx) => {

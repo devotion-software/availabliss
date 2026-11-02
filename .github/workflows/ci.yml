@@ -53,6 +53,9 @@ jobs:
         run: bun run check
       - name: Unit tests
         run: bun test src --coverage
+        env:
+          # Some tested modules import the DB pool; it connects lazily, so nothing is reached.
+          DATABASE_URL: mysql://test:test@127.0.0.1:3306/test
       - name: Build
         run: bun run build
         env:

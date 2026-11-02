@@ -305,6 +305,25 @@ export interface LiveEvent {
 
 export interface ApiErrorBody {
 	message: string;
-	code: 'unauthorized' | 'forbidden' | 'not_found' | 'validation_error' | 'conflict' | 'rate_limited' | 'server_error';
+	code: 'unauthorized' | 'forbidden' | 'not_found' | 'validation_error' | 'conflict' | 'upgrade_required' | 'rate_limited' | 'server_error';
 	issues?: { path: string; message: string }[];
+}
+
+export type PlanTier = 'free' | 'pro';
+
+/** GET /me/plan */
+export interface Plan {
+	tier: PlanTier;
+	/** When Pro ends (or renews); null on free or lifetime. */
+	proUntil: string | null;
+	lifetime: boolean;
+	willRenew: boolean;
+	/** Where it was bought: app_store, play_store, stripe, rc_billing, promotional. */
+	store: string | null;
+	/** Groups you can own on this plan; null is unlimited. */
+	groupLimit: number | null;
+	groupsOwned: number;
+	canCreateGroup: boolean;
+	/** RevenueCat public SDK keys, null when billing isn't set up (hide purchase UI). */
+	purchase: { ios: string | null; android: string | null; web: string | null; entitlement: string };
 }

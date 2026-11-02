@@ -46,8 +46,10 @@ Non-2xx responses have the body:
 { "message": "Human readable message", "code": "validation_error", "issues": [ { "path": "name", "message": "Required" } ] }
 ```
 
-`code` is one of `unauthorized` (401), `forbidden` (403), `not_found` (404),
-`validation_error` (400), `conflict` (409), `rate_limited` (429), `server_error` (500).
+`code` is one of `unauthorized` (401), `upgrade_required` (402), `forbidden` (403),
+`not_found` (404), `validation_error` (400), `conflict` (409), `rate_limited` (429),
+`server_error` (500). `upgrade_required` means the action needs Pro (see Plans): show
+the upgrade screen rather than a plain error.
 `issues` is only present for `validation_error`.
 
 ### Rate limits
@@ -192,6 +194,35 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 interface BusyInterval { start: string; end: string; source: 'calendar' | 'manual'; label: string | null; calendarId: string | null; blockId: string | null }
 ```
 
+### Plans (Pro)
+
+Free accounts can own 3 groups (joining other people's is unlimited); Pro is
+unlimited. Pro is bought through RevenueCat in the App Store, Play Store or on
+the web (RevenueCat Web Billing / Stripe), always with **the user's id as the
+RevenueCat app user id**, so it follows the account to every platform. See
+[BILLING.md](BILLING.md) for the RevenueCat setup.
+
+| Method | Path | Body | Response |
+| ------ | ---- | ---- | -------- |
+| GET 🔒 | `/me/plan` | | `Plan` |
+| POST 🔒 | `/me/plan/refresh` | | `Plan` (re-reads RevenueCat; call after a purchase or restore) |
+| POST | `/billing/revenuecat` | RevenueCat webhook | `{ ok: true }` (`Authorization` must equal `REVENUECAT_WEBHOOK_AUTH`) |
+
+```ts
+interface Plan {
+  tier: 'free' | 'pro';
+  proUntil: string | null;      // renews / ends; null on free or lifetime
+  lifetime: boolean; willRenew: boolean;
+  store: string | null;         // app_store, play_store, stripe, rc_billing, promotional
+  groupLimit: number | null;    // null = unlimited
+  groupsOwned: number; canCreateGroup: boolean;
+  // RevenueCat public SDK keys; null hides purchase UI on that platform.
+  purchase: { ios: string | null; android: string | null; web: string | null; entitlement: string };
+}
+```
+
+`POST /groups` returns `402 upgrade_required` when a free account already owns 3.
+
 ### Regions & holidays
 
 | Method | Path | Response |
@@ -265,7 +296,7 @@ interface ManualBlock {
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/groups` | | `{ groups: GroupSummary[] }` |
-| POST 🔒 | `/groups` | `{ name, color?, requirement? }` | `Group` (creator is owner) |
+| POST 🔒 | `/groups` | `{ name, color?, requirement? }` | `Group` (creator is owner; `402 upgrade_required` past the free limit) |
 | GET 🔒 | `/groups/:id` | | `Group` |
 | PATCH 👑 | `/groups/:id` | `{ name?, color?, requirement? }` | `Group` |
 | DELETE ⭐ | `/groups/:id` | | `204` |
