@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import IconButton from './IconButton.svelte';
+	import type { IconName } from './Icon.svelte';
 
 	/** Phone-style screen header: round back button, title + subtitle, trailing actions. */
 	interface Props {
@@ -8,19 +9,21 @@
 		subtitle?: string;
 		backHref?: string;
 		backLabel?: string;
+		/** `home` for top-level screens whose way out is the groups home rather than "back". */
+		backIcon?: Extract<IconName, 'chevron-left' | 'home'>;
 		/** Hide the back button from wide layouts where navigation is always visible. */
 		backOnPhoneOnly?: boolean;
 		size?: 'md' | 'lg';
 		actions?: Snippet;
 		after?: Snippet;
 	}
-	let { title, subtitle, backHref, backLabel = 'Back', backOnPhoneOnly = false, size = 'md', actions, after }: Props = $props();
+	let { title, subtitle, backHref, backLabel = 'Back', backIcon = 'chevron-left', backOnPhoneOnly = false, size = 'md', actions, after }: Props = $props();
 </script>
 
 <header class="page-header {size}">
 	{#if backHref}
 		<span class:phone-only={backOnPhoneOnly}>
-			<IconButton href={backHref} icon="chevron-left" label={backLabel} />
+			<IconButton href={backHref} icon={backIcon} label={backLabel} />
 		</span>
 	{/if}
 	<div class="titles">
