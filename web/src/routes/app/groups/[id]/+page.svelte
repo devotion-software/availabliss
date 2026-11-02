@@ -18,6 +18,9 @@
 	import { dayMap, slotOn, visibleColumns, weekDates } from '#lib/components/calendar/grid';
 	import SyncBanner from '#lib/components/group/SyncBanner.svelte';
 	import BestOptions from '#lib/components/group/BestOptions.svelte';
+	import PlannerSheet from '#lib/components/group/PlannerSheet.svelte';
+	import { getPlan } from '#lib/client/plan';
+	import { upgradeSheet } from '#lib/client/ui-state.svelte';
 	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
 	import Breadcrumbs from '#lib/components/ui/Breadcrumbs.svelte';
 	import ChatPanel from '#lib/components/chat/ChatPanel.svelte';
@@ -143,10 +146,23 @@
 	}
 
 	let proposeOpen = $state(false);
-	let proposeInitial = $state<Slot | { day: string } | null>(null);
-	function propose(slot: Slot | { day: string } | null) {
+	let proposeInitial = $state<(Slot & { title?: string; note?: string }) | { day: string } | null>(null);
+	function propose(slot: (Slot & { title?: string; note?: string }) | { day: string } | null) {
 		proposeInitial = slot;
 		proposeOpen = true;
+	}
+
+	// The optional AI planner: only offered when the server has it set up; Pro to use.
+	let aiPlanner = $state<{ available: boolean; included: boolean } | null>(null);
+	$effect(() => {
+		getPlan()
+			.then((p) => (aiPlanner = p.aiPlanner))
+			.catch(() => {});
+	});
+	let plannerOpen = $state(false);
+	function openPlanner() {
+		if (aiPlanner?.included) plannerOpen = true;
+		else upgradeSheet.showFor('AI planning is part of Pro: it picks the best time, suggests things to do and drafts the plan.');
 	}
 
 	function selectSlot(slot: Slot) {
@@ -251,7 +267,13 @@
 	</div>
 
 	<aside class="aside">
-		<BestOptions slots={availability.slots} pendingCount={availability.pendingMemberIds.length} onpropose={propose} onselect={selectSlot} />
+		<BestOptions
+			slots={availability.slots}
+			pendingCount={availability.pendingMemberIds.length}
+			onpropose={propose}
+			onselect={selectSlot}
+			onplan={aiPlanner?.available ? openPlanner : undefined}
+		/>
 		<div class="desk-only">
 			<ChatPanel {group} me={data.user} onpropose={() => propose(null)} />
 		</div>
@@ -259,6 +281,7 @@
 </div>
 
 <ProposeSheet bind:open={proposeOpen} {group} meId={data.user.id} initial={proposeInitial} />
+<PlannerSheet bind:open={plannerOpen} groupId={group.id} onpropose={({ slot, title, note }) => propose({ ...slot, title, note })} />
 
 <style>
 	.page {

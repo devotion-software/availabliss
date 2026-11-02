@@ -218,10 +218,33 @@ interface Plan {
   groupsOwned: number; canCreateGroup: boolean;
   // RevenueCat public SDK keys; null hides purchase UI on that platform.
   purchase: { ios: string | null; android: string | null; web: string | null; entitlement: string };
+  aiPlanner: { available: boolean; included: boolean }; // set up on the server / usable on this plan
 }
 ```
 
 `POST /groups` returns `402 upgrade_required` when a free account already owns 3.
+
+### AI planner (optional, Pro)
+
+Offered only when the server has `ANTHROPIC_API_KEY` set (`Plan.aiPlanner.available`)
+and usable on Pro (`Plan.aiPlanner.included`). Nothing runs unless someone asks.
+Claude sees the group's name and timing, the slots that already work for
+everyone, named holidays, member counts and the asker's notes, never names,
+calendars or busy time.
+
+| Method | Path | Body | Response |
+| ------ | ---- | ---- | -------- |
+| POST 🔒 | `/groups/:id/planner` | `{ notes?: string (≤500) }` | `PlannerResult` (`402 upgrade_required` without Pro, `409` when no time works yet; 20 an hour) |
+
+```ts
+interface PlannerResult {
+  best: { slot: Slot; why: string };
+  alternatives: { slot: Slot; why: string }[];   // up to 3
+  ideas: { title: string; description: string }[];
+  checklist: string[];
+  proposalTitle: string; proposalNote: string;   // prefill for "Propose this"
+}
+```
 
 ### Timing templates
 

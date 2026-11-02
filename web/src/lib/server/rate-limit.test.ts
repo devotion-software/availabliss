@@ -35,6 +35,7 @@ describe('matchRule', () => {
 			message: ['POST', '/api/v1/groups/g/messages'],
 			availability: ['GET', '/api/v1/groups/g/availability'],
 			preview: ['POST', '/api/v1/requirements/preview'],
+			'ai-planner': ['POST', '/api/v1/groups/g/planner'],
 			'region-detect': ['GET', '/api/v1/regions/detect']
 		};
 		for (const rule of RULES) {

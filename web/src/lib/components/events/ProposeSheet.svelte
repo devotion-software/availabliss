@@ -22,7 +22,7 @@
 		group: Pick<Group, 'id' | 'members'>;
 		meId: string;
 		/** What to prefill: a slot that works, or just a day. */
-		initial?: { start: string; end: string; allDay?: boolean; label?: string } | { day: string } | null;
+		initial?: { start: string; end: string; allDay?: boolean; label?: string; title?: string; note?: string } | { day: string } | null;
 	}
 	let { open = $bindable(), group, meId, initial = null }: Props = $props();
 	const groupId = $derived(group.id);
@@ -40,7 +40,7 @@
 			? blankDraft(fmt.current.today())
 			: 'day' in initial
 				? blankDraft(initial.day)
-				: draftFromRange(initial.start, initial.end, !!initial.allDay, tz);
+				: { ...draftFromRange(initial.start, initial.end, !!initial.allDay, tz, initial.title ?? ''), note: initial.note ?? '' };
 		error = null;
 	});
 

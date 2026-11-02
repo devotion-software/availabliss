@@ -326,6 +326,8 @@ export interface Plan {
 	canCreateGroup: boolean;
 	/** RevenueCat public SDK keys, null when billing isn't set up (hide purchase UI). */
 	purchase: { ios: string | null; android: string | null; web: string | null; entitlement: string };
+	/** The optional AI planner is set up on this server (it still needs Pro to use). */
+	aiPlanner: { available: boolean; included: boolean };
 }
 
 /** A saved timing to reuse when creating groups. */
@@ -334,4 +336,14 @@ export interface RequirementTemplate {
 	name: string;
 	requirement: Requirement;
 	createdAt: string;
+}
+
+/** POST /groups/:id/planner (Pro): a suggested time, ideas and a plan. */
+export interface PlannerResult {
+	best: { slot: Slot; why: string };
+	alternatives: { slot: Slot; why: string }[];
+	ideas: { title: string; description: string }[];
+	checklist: string[];
+	proposalTitle: string;
+	proposalNote: string;
 }

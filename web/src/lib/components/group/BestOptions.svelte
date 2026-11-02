@@ -10,9 +10,11 @@
 		pendingCount: number;
 		onpropose: (slot: Slot) => void;
 		onselect?: (slot: Slot) => void;
+		/** Shown when the optional AI planner is set up on this server. */
+		onplan?: () => void;
 		max?: number;
 	}
-	let { slots, pendingCount, onpropose, onselect, max = 4 }: Props = $props();
+	let { slots, pendingCount, onpropose, onselect, onplan, max = 4 }: Props = $props();
 
 	const fmt = useFormat();
 	const upcoming = $derived(slots.filter((s) => new Date(s.end) > new Date()).slice(0, max));
@@ -20,7 +22,12 @@
 </script>
 
 <section class="options glass" aria-labelledby="best-options">
-	<h2 id="best-options">Best options</h2>
+	<div class="head">
+		<h2 id="best-options">Best options</h2>
+		{#if onplan && upcoming.length}
+			<Button variant="ghost" size="sm" icon="sparkle" onclick={onplan}>Plan with AI</Button>
+		{/if}
+	</div>
 	{#each upcoming as slot (slot.start)}
 		<div class="option">
 			<button type="button" class="when" onclick={() => onselect?.(slot)}>
@@ -35,6 +42,12 @@
 </section>
 
 <style>
+	.head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
 	.options {
 		border-radius: 28px;
 		padding: 16px;

@@ -60,6 +60,7 @@ export async function getPlan(userId: string): Promise<Plan> {
 		groupLimit: limit,
 		groupsOwned: owned,
 		canCreateGroup: limit === null || owned < limit,
+		aiPlanner: { available: !!env.ai.apiKey, included: pro },
 		purchase: {
 			ios: env.revenuecat.iosKey,
 			android: env.revenuecat.androidKey,

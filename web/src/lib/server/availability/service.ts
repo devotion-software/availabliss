@@ -102,3 +102,23 @@ export async function previewRequirement(userId: string, requirement: Requiremen
 	});
 	return { count: result.slots.length, from, to };
 }
+
+/**
+ * What the AI planner may see about a group's coming weeks: the slots that work
+ * for everyone and named holidays. No member names or busy time.
+ */
+export async function planningContext(group: GroupRow, maxSlots = 25) {
+	const from = [today(group.requirement.timezone), group.requirement.range.from].sort()[1];
+	const to = [group.requirement.range.to, addDays(from, MAX_RANGE_DAYS)].sort()[0];
+	if (to < from) return { from, to, slots: [], holidays: [], members: 0, synced: 0 };
+	const input = await engineInput(group, from, to);
+	const result = computeAvailability(input);
+	return {
+		from,
+		to,
+		slots: result.slots.slice(0, maxSlots),
+		holidays: result.days.filter((d) => d.holiday).map((d) => ({ date: d.date, name: d.holiday! })),
+		members: input.members.length,
+		synced: input.members.filter((m) => m.synced).length
+	};
+}

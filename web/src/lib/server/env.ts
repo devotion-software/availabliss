@@ -53,6 +53,11 @@ export const env = {
 	/** Base64-encoded Firebase service account JSON. */
 	fcmServiceAccount: optional('FCM_SERVICE_ACCOUNT'),
 
+	/** Optional AI planner (Pro). Off unless a key is set. */
+	ai: {
+		apiKey: optional('ANTHROPIC_API_KEY'),
+		model: optional('AI_PLANNER_MODEL') ?? 'claude-opus-5-5'
+	},
 	revenuecat: {
 		/** Secret (v1 REST) key: the server re-reads a subscriber after every webhook. */
 		secretKey: optional('REVENUECAT_SECRET_KEY'),
