@@ -38,14 +38,33 @@
 
 	async function add() {
 		adding = true;
-		const res = await authClient.passkey.addPasskey({ name: deviceName() });
-		adding = false;
-		if (res?.error) {
-			toasts.error(res.error.message ?? 'No passkey was added');
-			return;
+		try {
+			// No name here: Better Auth would use it as the credential's user name, so password
+			// managers would list "Mac · Firefox" instead of your email. The device name goes on
+			// the saved passkey instead, to tell your passkeys apart in the list below.
+			const res = await authClient.passkey.addPasskey();
+			if (res?.error) {
+				const message = addError(res.error);
+				if (message) toasts.error(message);
+				return;
+			}
+			const id = (res?.data as { id?: string } | null)?.id;
+			if (id) await authClient.passkey.updatePasskey({ id, name: deviceName() });
+			toasts.success('Passkey added');
+			await load();
+		} catch (err) {
+			toasts.error(err instanceof Error ? err.message : 'No passkey was added');
+		} finally {
+			adding = false;
 		}
-		toasts.success('Passkey added');
-		await load();
+	}
+
+	/** What to tell the user when a passkey wasn't added; null when they cancelled. */
+	function addError(error: { code?: string; message?: string; status?: number }): string | null {
+		if (error.code === 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED') return 'This device already has a passkey for your account.';
+		if (error.code === 'ERROR_CEREMONY_ABORTED') return null;
+		if (error.status && error.status >= 500) return "Couldn't reach Availabliss to set up the passkey. Try again in a moment.";
+		return error.message || 'No passkey was added';
 	}
 
 	async function remove() {
