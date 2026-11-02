@@ -1,15 +1,15 @@
 import SwiftUI
 
 /// Week view of your busy time: days across the top, hours down the side, every
-/// interval at its exact times. Tap empty time to block that hour.
+/// interval at its exact times. Tap empty time to block that hour; tap busy time to open it.
 struct WeekTimeGrid: View {
     let layout: WeekLayout
     /// Bumped when a new week's intervals land, to re-run the initial scroll.
     let scrollKey: CalendarDay?
     /// A tap on empty time: the day and the hour it fell in (minutes since midnight).
     let onSelect: (CalendarDay, Int, Int) -> Void
-    /// A tap on a busy box. Nil = boxes are display-only (taps on them do nothing).
-    var onSelectInterval: ((WeekLayout.Placed) -> Void)?
+    /// A tap on busy time (a box or an all-day chip): your own block, or an interval from a calendar.
+    let onOpen: (BusyInterval) -> Void
 
     static let hourHeight: CGFloat = 44
     static let gutterWidth: CGFloat = 38
@@ -80,7 +80,7 @@ struct WeekTimeGrid: View {
             ForEach(layout.days, id: \.self) { day in
                 VStack(spacing: 3) {
                     ForEach(Array((layout.allDay[day] ?? []).enumerated()), id: \.offset) { _, interval in
-                        AllDayChip(interval: interval)
+                        AllDayChip(interval: interval) { onOpen(interval) }
                     }
                 }
                 .padding(.horizontal, 2)
@@ -103,7 +103,7 @@ struct WeekTimeGrid: View {
                         let range = WeekLayout.tapRange(at: minutes)
                         onSelect(day, range.from, range.to)
                     },
-                    onSelectInterval: onSelectInterval
+                    onOpen: onOpen
                 )
             }
         }
@@ -143,7 +143,7 @@ private struct DayColumn: View {
     let pieces: [WeekLayout.Placed]
     let height: CGFloat
     let onTapEmpty: (Double) -> Void
-    let onSelectInterval: ((WeekLayout.Placed) -> Void)?
+    let onOpen: (BusyInterval) -> Void
     @Environment(\.theme) private var theme
 
     private var isToday: Bool { day == .today() }
@@ -164,7 +164,7 @@ private struct DayColumn: View {
                         .frame(width: max(0, laneWidth - 4))
                         .contentShape(Rectangle())
                         // Boxes take their own taps so they never fall through to "block this hour".
-                        .onTapGesture { onSelectInterval?(piece) }
+                        .onTapGesture { onOpen(piece.interval) }
                         .offset(x: CGFloat(piece.lane) * laneWidth + 2, y: y(piece.from))
                 }
                 if isToday { nowLine }
@@ -258,18 +258,21 @@ private struct BusyBox: View {
         .clipShape(shape)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
+        .accessibilityAddTraits(.isButton)
     }
 
     private var accessibilityText: String {
         let label = piece.interval.label
         let what = isManual ? "Blocked by you\(label.map { ": \($0)" } ?? "")" : "Busy from \(label ?? "a calendar")"
-        return "\(what), \(WeekLayout.clock(piece.from)) to \(WeekLayout.clock(piece.to))"
+        let edit = isManual ? "Edit: " : ""
+        return "\(edit)\(what), \(Formatting.longDay(piece.day.startDate())) \(WeekLayout.clock(piece.from)) to \(WeekLayout.clock(piece.to))"
     }
 }
 
 /// An all-day interval in the row under the header.
 private struct AllDayChip: View {
     let interval: BusyInterval
+    let onTap: () -> Void
     @Environment(\.theme) private var theme
 
     private var isManual: Bool { interval.source == .manual }
@@ -286,7 +289,10 @@ private struct AllDayChip: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background { BusyFill(isManual: isManual, shape: shape) }
             .clipShape(shape)
-            .accessibilityLabel(isManual ? "Blocked by you all day: \(interval.label ?? "Busy")" : "Busy all day from \(interval.label ?? "a calendar")")
+            .contentShape(shape)
+            .onTapGesture(perform: onTap)
+            .accessibilityLabel(isManual ? "Edit: blocked by you all day, \(interval.label ?? "Busy")" : "Busy all day from \(interval.label ?? "a calendar")")
+            .accessibilityAddTraits(.isButton)
     }
 }
 

@@ -1,12 +1,14 @@
 import SwiftUI
 
 /// My time: a week calendar of your busy time at exact times. Calendar busy is faded,
-/// blocks you made are striped; tap empty time to block it.
+/// blocks you made are striped; tap empty time to block it, tap busy time to open it.
 struct MyTimeView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var model: MyTimeViewModel
     @State private var draft: BlockDraft?
+    @State private var calendarBusy: CalendarBusy?
+    @State private var toast: String?
 
     /// What the block sheet opens on.
     private struct BlockDraft: Identifiable {
@@ -16,6 +18,12 @@ struct MyTimeView: View {
         var editing: ManualBlock?
     }
 
+    /// Calendar busy time the user tapped.
+    private struct CalendarBusy: Identifiable {
+        let id = UUID()
+        let interval: BusyInterval
+    }
+
     init(api: APIClient) {
         _model = State(initialValue: MyTimeViewModel(api: api))
     }
@@ -23,12 +31,14 @@ struct MyTimeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeader(title: "My time", subtitle: "Tap to block time you're busy") {
+                ScreenHeader(title: "My time", subtitle: "Tap to block time, tap a block to edit it") {
                     IconButton(icon: .asset("CalendarSync"), label: "Connected calendars") { app.router.push(.calendars) }
                 }
                 weekSwitcher
                 WeekPanel(model: model) { day, from, to in
                     draft = BlockDraft(day: day, range: (from, to))
+                } onOpen: { interval in
+                    open(interval)
                 }
                 ForEach(model.recurringBlocks) { block in
                     RecurringBlockRow(block: block) {
@@ -64,6 +74,10 @@ struct MyTimeView: View {
                 if let editing = draft.editing { await model.update(editing.id, block) } else { await model.create(block) }
             }
         }
+        .sheet(item: $calendarBusy) { busy in
+            CalendarBusySheet(interval: busy.interval) { app.router.push(.calendars) }
+        }
+        .toast($toast)
         .confirmationDialog(
             "Remove this block?",
             isPresented: Binding(get: { model.pendingRemoval != nil }, set: { if !$0 { model.pendingRemoval = nil } }),
@@ -77,6 +91,20 @@ struct MyTimeView: View {
             Text("\(block.note ?? "Busy") · \(block.scheduleDescription)")
         }
         .errorAlert($model.error)
+    }
+
+    /// A tap on busy time: edit your own block (the whole series if it repeats), or explain calendar busy.
+    private func open(_ interval: BusyInterval) {
+        switch interval.source {
+        case .calendar:
+            calendarBusy = CalendarBusy(interval: interval)
+        case .manual:
+            if let block = model.blocks.first(where: { $0.id == interval.blockId }) {
+                draft = BlockDraft(day: CalendarDay(block.start), editing: block)
+            } else {
+                toast = "That block was just removed."
+            }
+        }
     }
 
     private var weekSwitcher: some View {
@@ -116,11 +144,12 @@ private struct WeekArrow: View {
 private struct WeekPanel: View {
     let model: MyTimeViewModel
     let onSelect: (CalendarDay, Int, Int) -> Void
+    let onOpen: (BusyInterval) -> Void
     @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(spacing: 0) {
-            WeekTimeGrid(layout: model.layout, scrollKey: model.loadedWeek, onSelect: onSelect)
+            WeekTimeGrid(layout: model.layout, scrollKey: model.loadedWeek, onSelect: onSelect, onOpen: onOpen)
             legend
         }
         .padding(12)
