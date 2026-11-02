@@ -9,7 +9,7 @@
 	import { FREE_GROUP_LIMIT } from '#lib/plans';
 	import { toasts } from '#lib/client/toast.svelte';
 	import { useFormat } from '#lib/client/format';
-	import { defaultRequirement, summarize, PRESETS, type PresetId } from '#lib/client/requirements';
+	import { defaultRequirement } from '#lib/client/requirements';
 	import Sheet from '#lib/components/ui/Sheet.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';
 	import Chip from '#lib/components/ui/Chip.svelte';
@@ -23,7 +23,7 @@
 	import { listTemplates, requirementFromTemplate } from '#lib/client/templates';
 
 	/**
-	 * New group in two steps: 1) name, colour and roughly what you're planning;
+	 * New group in two steps: 1) name, colour and optionally a saved template;
 	 * 2) the full timing editor (days, times, holidays, date range) with a live
 	 * count of how many times fit, before the group is created.
 	 */
@@ -34,13 +34,11 @@
 	let { open = $bindable(), user }: Props = $props();
 
 	const fmt = useFormat();
-	const QUICK: PresetId[] = ['2h', 'evening', 'day', 'weekend', 'week'];
 
 	let step = $state<1 | 2>(1);
 	let name = $state('');
 	let color = $state<TileColor>('t1');
-	let preset = $state<PresetId>('weekend');
-	/** Your saved timings; picking one replaces the preset. */
+	/** Your saved timings; picking one starts step 2 from it instead of the default. */
 	let templates = $state<RequirementTemplate[]>([]);
 	let templateId = $state<string | null>(null);
 	let requirement = $state<Requirement>(defaultRequirement('UTC', '2000-01-01'));
@@ -55,7 +53,6 @@
 		step = 1;
 		name = '';
 		color = TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)];
-		preset = 'weekend';
 		templateId = null;
 		requirement = defaultRequirement(user.timezone, fmt.current.today(), 'weekend');
 		error = null;
@@ -72,7 +69,13 @@
 		};
 	});
 
+	// Tapping the selected template again goes back to the default timing.
 	function pickTemplate(t: RequirementTemplate) {
+		if (templateId === t.id) {
+			templateId = null;
+			requirement = defaultRequirement(user.timezone, fmt.current.today(), 'weekend');
+			return;
+		}
 		templateId = t.id;
 		requirement = requirementFromTemplate(t, fmt.current.today(), user.timezone);
 	}
@@ -97,13 +100,6 @@
 			.map((w) => w[0]?.toUpperCase())
 			.join('') || '?'
 	);
-
-	// A fresh timing per preset: "A week" needs every day, "A weekend" Fri–Sun, and so on.
-	function pickPreset(id: PresetId) {
-		preset = id;
-		templateId = null;
-		requirement = defaultRequirement(user.timezone, fmt.current.today(), id);
-	}
 
 	function next(e: SubmitEvent) {
 		e.preventDefault();
@@ -149,7 +145,7 @@
 <Sheet
 	bind:open
 	title={atLimit ? 'New group' : step === 1 ? 'New group' : 'When are you looking for?'}
-	description={atLimit ? undefined : step === 1 ? 'Name it and pick roughly what you’re planning.' : `Fine-tune the timing for ${name.trim()}. You can change it later.`}
+	description={atLimit ? undefined : step === 1 ? 'Name it and pick a colour. Timing comes next.' : `Fine-tune the timing for ${name.trim()}. You can change it later.`}
 	width={step === 2 && !atLimit ? 640 : 480}
 >
 	{#if atLimit}
@@ -186,7 +182,7 @@
 
 			{#if templates.length}
 				<fieldset>
-					<legend class="eyebrow">Your templates</legend>
+					<legend class="eyebrow">Start from a template</legend>
 					<div class="chips">
 						{#each templates as t (t.id)}
 							<Chip selected={templateId === t.id} onclick={() => pickTemplate(t)}>{t.name}</Chip>
@@ -194,16 +190,6 @@
 					</div>
 				</fieldset>
 			{/if}
-
-			<fieldset>
-				<legend class="eyebrow">{templates.length ? 'Or start from' : 'What are you planning?'}</legend>
-				<div class="chips">
-					{#each PRESETS.filter((p) => QUICK.includes(p.id)) as p (p.id)}
-						<Chip selected={!templateId && preset === p.id} onclick={() => pickPreset(p.id)}>{p.label}</Chip>
-					{/each}
-				</div>
-				<p class="summary">{summarize(requirement)}</p>
-			</fieldset>
 
 			<Button type="submit" variant="accent" size="lg" block icon="arrow-right">Next: timing</Button>
 		</form>
@@ -272,10 +258,6 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
-	}
-	.summary {
-		font-size: 13px;
-		color: var(--muted);
 	}
 	.bar {
 		width: 100%;

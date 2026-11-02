@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.text.font.FontWeight
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
 import dev.joeherbert.availabliss.designsystem.component.Chip
@@ -24,7 +23,6 @@ import dev.joeherbert.availabliss.feature.timing.SaveTemplateRow
 import dev.joeherbert.availabliss.feature.timing.TimingActions
 import dev.joeherbert.availabliss.feature.timing.TimingEditorSections
 import dev.joeherbert.availabliss.feature.timing.TimingEditorUiState
-import dev.joeherbert.availabliss.feature.timing.TimingPreset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.mutableStateOf
@@ -96,7 +94,7 @@ fun NewGroupScreen(
     BackHandler(enabled = state.step == NewGroupStep.Timing && !state.atLimit, onBack = viewModel::back)
     when {
         state.atLimit -> GroupLimitContent(state.groupLimit, onBack, onSeePro = { upgrading = true })
-        state.step == NewGroupStep.Details -> NewGroupContent(state, onBack, viewModel::setName, viewModel::setColor, viewModel::selectPreset, viewModel::next, viewModel::selectTemplate)
+        state.step == NewGroupStep.Details -> NewGroupContent(state, onBack, viewModel::setName, viewModel::setColor, viewModel::next, viewModel::selectTemplate)
         else -> {
             val editor = state.editor
             if (editor != null) {
@@ -158,7 +156,7 @@ fun GroupLimitContent(limit: Int, onBack: () -> Unit, onSeePro: () -> Unit) {
     }
 }
 
-/** Step 1: name, colour and "What are you planning?". */
+/** Step 1: name, colour and (if you have any) a saved template to start from. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NewGroupContent(
@@ -166,7 +164,6 @@ fun NewGroupContent(
     onBack: () -> Unit,
     onNameChange: (String) -> Unit,
     onColorChange: (TileColor) -> Unit,
-    onPreset: (TimingPreset) -> Unit,
     onNext: () -> Unit,
     onTemplate: (RequirementTemplate) -> Unit = {},
 ) {
@@ -184,7 +181,7 @@ fun NewGroupContent(
                 .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            ScreenHeader(title = "New group", subtitle = "Name it and pick roughly what you're planning", onBack = onBack)
+            ScreenHeader(title = "New group", subtitle = "Name it and pick a colour. Timing comes next.", onBack = onBack)
             StepDots(total = 2, step = 1)
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()),
@@ -233,23 +230,14 @@ fun NewGroupContent(
                         }
                     }
                 }
-                GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (state.templates.isNotEmpty()) {
-                        SectionLabel("Your templates")
+                if (state.templates.isNotEmpty()) {
+                    GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SectionLabel("Start from a template")
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             state.templates.forEach { t ->
                                 Chip(t.name, selected = state.templateId == t.id, onClick = { onTemplate(t) })
                             }
                         }
-                    }
-                    SectionLabel(if (state.templates.isNotEmpty()) "Or start from" else "What are you planning?")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NewGroupUiState.QUICK_PRESETS.forEach { preset ->
-                            Chip(preset.label, selected = state.preset == preset, onClick = { onPreset(preset) })
-                        }
-                    }
-                    if (state.summary.isNotEmpty()) {
-                        Text(state.summary, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
                     }
                 }
             }
@@ -345,6 +333,6 @@ private fun StepDots(total: Int, step: Int) {
 @Composable
 private fun NewGroupPreview() {
     AvailablissPreviewTheme {
-        NewGroupContent(NewGroupUiState(name = "Lake District crew", color = TileColor.T2), {}, {}, {}, {}, {})
+        NewGroupContent(NewGroupUiState(name = "Lake District crew", color = TileColor.T2), {}, {}, {}, {})
     }
 }

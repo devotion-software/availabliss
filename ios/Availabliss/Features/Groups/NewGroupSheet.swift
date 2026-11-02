@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// New group in two steps: 1) name, colour and roughly what you're planning; 2) the full timing
+/// New group in two steps: 1) name, colour and optionally a saved template; 2) the full timing
 /// editor (days, times, holidays, date range) with a live count of how many times fit.
 struct NewGroupSheet: View {
     let api: APIClient
@@ -11,8 +11,7 @@ struct NewGroupSheet: View {
     @State private var step = 1
     @State private var name = ""
     @State private var color = NewGroupSheet.colors.randomElement() ?? "t1"
-    @State private var preset: TimingPreset = .weekend
-    /// Your saved timings; picking one replaces the preset.
+    /// Your saved timings; picking one starts step 2 from it instead of the default.
     @State private var templates: [RequirementTemplate] = []
     @State private var templateId: String?
     @State private var toast: String?
@@ -24,7 +23,6 @@ struct NewGroupSheet: View {
     @State private var error: String?
 
     private static let colors = ["t1", "t2", "t3", "t4", "t5"]
-    private static let quickPresets: [TimingPreset] = [.twoHours, .evening, .oneDay, .weekend, .week]
 
     init(api: APIClient, timezone: String, onCreated: @escaping (Group) -> Void) {
         self.api = api
@@ -69,7 +67,7 @@ struct NewGroupSheet: View {
 
     @ViewBuilder
     private var details: some View {
-        Text("Name it and pick roughly what you\u{2019}re planning.")
+        Text("Name it and pick a colour. Timing comes next.")
             .bodyFont(14)
             .foregroundStyle(theme.muted)
         StepDots(current: 0, total: 2)
@@ -100,24 +98,13 @@ struct NewGroupSheet: View {
         }
         if !templates.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Your templates").sectionLabelStyle()
+                Text("Start from a template").sectionLabelStyle()
                 FlowLayout(spacing: 8) {
                     ForEach(templates) { template in
                         Chip(label: template.name, isOn: templateId == template.id, height: 40, fontSize: 14) { pick(template) }
                     }
                 }
             }
-        }
-        VStack(alignment: .leading, spacing: 10) {
-            Text(templates.isEmpty ? "What are you planning?" : "Or start from").sectionLabelStyle()
-            FlowLayout(spacing: 8) {
-                ForEach(Self.quickPresets) { option in
-                    Chip(label: option.label, isOn: templateId == nil && preset == option, height: 40, fontSize: 14) { pick(option) }
-                }
-            }
-            Text(timing.preview?.summary ?? timing.draft.draftSummary)
-                .bodyFont(13, relativeTo: .subheadline)
-                .foregroundStyle(theme.muted)
         }
         Button(action: next) {
             LoadingLabel(title: "Next: timing", systemImage: "arrow.right")
@@ -126,14 +113,13 @@ struct NewGroupSheet: View {
         .disabled(trimmedName.isEmpty)
     }
 
-    /// A fresh timing per preset: "A week" needs every day, "A weekend" Fri–Sun, and so on.
-    private func pick(_ option: TimingPreset) {
-        preset = option
-        templateId = nil
-        timing.reset(to: TimingEditorViewModel.fresh(option, timezone: timezone))
-    }
-
+    /// Tapping the selected template again goes back to the default timing.
     private func pick(_ template: RequirementTemplate) {
+        guard templateId != template.id else {
+            templateId = nil
+            timing.reset(to: TimingEditorViewModel.fresh(.weekend, timezone: timezone))
+            return
+        }
         templateId = template.id
         timing.reset(to: template.requirementForNewGroup(timezone: timezone))
     }

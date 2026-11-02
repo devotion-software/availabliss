@@ -22,7 +22,6 @@ import dev.joeherbert.availabliss.feature.timing.TemplateSaver
 import dev.joeherbert.availabliss.feature.timing.Templates
 import dev.joeherbert.availabliss.feature.timing.TimingEditor
 import dev.joeherbert.availabliss.feature.timing.TimingEditorUiState
-import dev.joeherbert.availabliss.feature.timing.TimingLabels
 import dev.joeherbert.availabliss.feature.timing.TimingPreset
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,9 +38,9 @@ data class NewGroupUiState(
     val color: TileColor = TileColor.T1,
     /** The timing being built (step 2 edits it in full). */
     val editor: TimingEditorUiState? = null,
-    /** Your saved timings, offered above the presets. */
+    /** Your saved timings, offered on step 1. */
     val templates: List<RequirementTemplate> = emptyList(),
-    /** The template the timing came from; null when it came from a preset. */
+    /** The template the timing came from; null for the default timing. */
     val templateId: String? = null,
     val templateSave: TemplateSaveState = TemplateSaveState(),
     val creating: Boolean = false,
@@ -56,24 +55,13 @@ data class NewGroupUiState(
     val canContinue: Boolean get() = name.isNotBlank()
     val canCreate: Boolean get() = name.isNotBlank() && editor != null && !creating
 
-    /** "A weekend · Fri from 18:00 → Sun · Nov – Feb" */
-    val summary: String get() = editor?.draft?.let(TimingLabels::summary).orEmpty()
-
-    /** The highlighted "What are you planning?" chip (none for a template or a customised timing). */
-    val preset: TimingPreset? get() = if (templateId != null) null else editor?.draft?.preset
-
     /** Preview monogram, e.g. "Lake District crew" → "LD" (the server assigns the real one). */
     val monogramPreview: String
         get() = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.take(2)
             .joinToString("") { it.first().uppercase() }.ifEmpty { "?" }
-
-    companion object {
-        /** The "What are you planning?" chips. */
-        val QUICK_PRESETS = listOf(TimingPreset.TwoHours, TimingPreset.Evening, TimingPreset.OneDay, TimingPreset.Weekend, TimingPreset.Week)
-    }
 }
 
-/** New group in two steps: name, colour and a rough preset; then the full timing editor and Create. */
+/** New group in two steps: name, colour and optionally a saved template; then the full timing editor and Create. */
 @HiltViewModel
 class NewGroupViewModel @Inject constructor(
     private val groups: GroupsRepository,
@@ -97,7 +85,7 @@ class NewGroupViewModel @Inject constructor(
     init {
         viewModelScope.launch { editor.state.collect { e -> _uiState.update { it.copy(editor = e) } } }
         viewModelScope.launch { templateSaver.state.collect { t -> _uiState.update { it.copy(templateSave = t) } } }
-        selectPreset(TimingPreset.Weekend)
+        resetTiming()
         viewModelScope.launch {
             templates.list().getOrNull()?.let { list -> _uiState.update { it.copy(templates = list) } }
         }
@@ -117,15 +105,19 @@ class NewGroupViewModel @Inject constructor(
 
     fun setColor(color: TileColor) = _uiState.update { it.copy(color = color) }
 
-    /** A fresh timing per preset: "A week" needs every day, "A weekend" Fri–Sun, and so on. */
-    fun selectPreset(preset: TimingPreset) {
+    /** The default timing (a weekend); step 2 fine-tunes it. */
+    private fun resetTiming() {
         _uiState.update { it.copy(templateId = null) }
         val base = RequirementPresets.defaultDraft(DateTimes.today(), timezone)
-        editor.reset(RequirementPresets.applyPreset(base, preset))
+        editor.reset(RequirementPresets.applyPreset(base, TimingPreset.Weekend))
     }
 
-    /** Starts from a saved timing: same rules, but searching from today in your time zone. */
+    /**
+     * Starts from a saved timing: same rules, but searching from today in your time zone.
+     * Tapping the selected template again goes back to the default timing.
+     */
     fun selectTemplate(template: RequirementTemplate) {
+        if (_uiState.value.templateId == template.id) return resetTiming()
         _uiState.update { it.copy(templateId = template.id) }
         val requirement = Templates.requirementFromTemplate(template.requirement, DateTimes.today(), timezone)
         editor.reset(RequirementPresets.fromRequirement(requirement))
