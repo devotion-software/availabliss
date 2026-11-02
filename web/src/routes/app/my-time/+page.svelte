@@ -10,17 +10,20 @@
 	import Button from '#lib/components/ui/Button.svelte';
 	import GlassPanel from '#lib/components/ui/GlassPanel.svelte';
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
-	import WeekBusyGrid from '#lib/components/mytime/WeekBusyGrid.svelte';
+	import WeekTimeGrid from '#lib/components/mytime/WeekTimeGrid.svelte';
 	import BlockRow from '#lib/components/mytime/BlockRow.svelte';
 	import BlockTimeSheet from '#lib/components/mytime/BlockTimeSheet.svelte';
-	import { toggleableBlock, weekCells, type Cell } from '#lib/components/mytime/parts';
+	import { clock, layoutWeek, rangeToIso } from '#lib/components/mytime/parts';
+	import { weekdayName } from '#lib/client/format';
 
 	let { data } = $props();
 
 	const tz = $derived(data.user.timezone);
 	const weekEnd = $derived(addDays(data.weekStart, 6));
-	const rows = $derived(weekCells(data.weekStart, data.intervals, tz));
-	const blockedCount = $derived(rows.flatMap((r) => r.cells).filter((c) => !c.calendar && c.manual).length);
+	const layout = $derived(layoutWeek(data.weekStart, data.intervals, tz));
+	const blockedCount = $derived(
+		new Set(data.intervals.filter((i) => i.source === 'manual').map((i) => `${i.blockId}-${i.start}`)).size
+	);
 	const weekLabel = $derived(
 		data.weekStart.slice(0, 7) === weekEnd.slice(0, 7)
 			? `${dayNumber(data.weekStart)} – ${dayNumber(weekEnd)} ${monthTitle(weekEnd).split(' ')[0]}`
@@ -28,32 +31,28 @@
 	);
 	const isThisWeek = $derived(data.weekStart === startOfWeek(data.today));
 
-	let pending = $state(new Set<string>());
 	let sheetOpen = $state(false);
 	let editing = $state<ManualBlock | null>(null);
+	let sheetDay = $state('');
+	let sheetRange = $state<{ from: number; to: number } | null>(null);
 	let deleting = $state<ManualBlock | null>(null);
 	let confirmOpen = $state(false);
 
 	const refresh = () => invalidate('app:my-time');
 
-	async function toggle(cell: Cell) {
-		const key = `${cell.day}-${cell.part.id}`;
-		if (pending.has(key)) return;
-		if (cell.manual) {
-			const block = toggleableBlock(cell, data.blocks);
-			if (!block) {
-				toasts.info('This time is part of a longer or repeating block. Edit it in the list below.');
-				return;
-			}
-			pending = new Set(pending).add(key);
-			await run(() => deleteBlock(block.id));
-		} else {
-			pending = new Set(pending).add(key);
-			await run(() => createBlock({ start: cell.start, end: cell.end, allDay: false, repeat: 'none', until: null, note: null }));
+	/** A mouse drag blocks that exact time straight away; a tap opens the sheet on that hour. */
+	async function select(day: string, from: number, to: number, dragged: boolean) {
+		if (!dragged) {
+			editing = null;
+			sheetDay = day;
+			sheetRange = { from, to };
+			sheetOpen = true;
+			return;
 		}
-		const next = new Set(pending);
-		next.delete(key);
-		pending = next;
+		await run(async () => {
+			await createBlock({ ...rangeToIso(day, from, to, tz), allDay: false, repeat: 'none', until: null, note: null });
+			toasts.success(`Blocked ${weekdayName(day)} ${clock(from)} – ${clock(to)}`);
+		});
 	}
 
 	async function run(action: () => Promise<unknown>) {
@@ -67,6 +66,8 @@
 
 	function openNew() {
 		editing = null;
+		sheetDay = isThisWeek ? data.today : data.weekStart;
+		sheetRange = null;
 		sheetOpen = true;
 	}
 	function openEdit(block: ManualBlock) {
@@ -86,7 +87,7 @@
 <svelte:head><title>My time · Availabliss</title></svelte:head>
 
 <div class="page">
-	<PageHeader title="My time" subtitle="Tap to block time you're busy" backHref="/app" backLabel="Home" backIcon="home">
+	<PageHeader title="My time" subtitle="Tap or drag to block time you're busy" backHref="/app" backLabel="Home" backIcon="home">
 		{#snippet actions()}
 			<IconButton href="/app/calendars" icon="calendar-sync" label="Connected calendars" />
 		{/snippet}
@@ -118,7 +119,7 @@
 			</div>
 
 			<GlassPanel as="section" padding="12px" aria-label="Busy times this week">
-				<WeekBusyGrid {rows} today={data.today} {pending} ontoggle={toggle} />
+				<WeekTimeGrid {layout} today={data.today} timeZone={tz} onselect={select} />
 				<div class="legend">
 					<span><i class="sw manual"></i>Blocked by you</span>
 					<span><i class="sw cal"></i>From a calendar</span>
@@ -141,7 +142,7 @@
 	</div>
 </div>
 
-<BlockTimeSheet bind:open={sheetOpen} timeZone={tz} block={editing} defaultDay={isThisWeek ? data.today : data.weekStart} onsaved={refresh} />
+<BlockTimeSheet bind:open={sheetOpen} timeZone={tz} block={editing} defaultDay={sheetDay} defaultRange={sheetRange} onsaved={refresh} />
 <ConfirmSheet
 	bind:open={confirmOpen}
 	title="Delete this block?"

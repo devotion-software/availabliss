@@ -5,28 +5,28 @@
 	import { addDays, dayKeyIn, timeIn, zonedToIso } from '#lib/client/dates';
 	import { toasts } from '#lib/client/toast.svelte';
 	import Sheet from '#lib/components/ui/Sheet.svelte';
-	import Chip from '#lib/components/ui/Chip.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';
 	import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
-	import { PARTS, partRange, type PartId } from './parts';
+	import { clock } from './parts';
 
-	/** "Block a time" (BlockTime.dc.html): a date, which part of it, repeat, and a private note. */
+	/** "Block a time" (BlockTime.dc.html): a date, all day or exact times, repeat, and a private note. */
 	interface Props {
 		open: boolean;
 		timeZone: string;
 		/** Edit this block instead of creating one. */
 		block?: ManualBlock | null;
 		defaultDay: string;
+		/** Prefill exact times (minutes since midnight on `defaultDay`), e.g. from a tap on the week grid. */
+		defaultRange?: { from: number; to: number } | null;
 		onsaved: (block: ManualBlock) => void;
 	}
-	let { open = $bindable(), timeZone, block = null, defaultDay, onsaved }: Props = $props();
+	let { open = $bindable(), timeZone, block = null, defaultDay, defaultRange = null, onsaved }: Props = $props();
 
-	type When = 'day' | PartId | 'custom';
+	type When = 'day' | 'times';
 	const WHENS: { value: When; label: string }[] = [
-		{ value: 'day', label: 'All day' },
-		...PARTS.map((p) => ({ value: p.id as When, label: p.label })),
-		{ value: 'custom', label: 'Custom' }
+		{ value: 'times', label: 'Set times' },
+		{ value: 'day', label: 'All day' }
 	];
 	const REPEATS: { value: Repeat; label: string }[] = [
 		{ value: 'none', label: 'Once' },
@@ -50,7 +50,10 @@
 		error = null;
 		if (!block) {
 			date = defaultDay;
-			when = 'day';
+			when = 'times';
+			from = defaultRange ? clock(defaultRange.from) : '09:00';
+			// 24:00 is entered as 00:00, which the form reads as "runs to midnight".
+			to = defaultRange ? clock(defaultRange.to % (24 * 60)) : '10:00';
 			repeat = 'none';
 			until = '';
 			note = '';
@@ -64,27 +67,20 @@
 			when = 'day';
 			return;
 		}
-		const part = PARTS.find((p) => {
-			const r = partRange(date, p, timeZone);
-			return new Date(r.start).getTime() === new Date(block!.start).getTime() && new Date(r.end).getTime() === new Date(block!.end).getTime();
-		});
-		when = part?.id ?? 'custom';
+		when = 'times';
 		from = timeIn(block.start, timeZone);
 		to = timeIn(block.end, timeZone);
 	});
 
-	const timeLabel = $derived(when === 'custom' ? `${from} – ${to}` : WHENS.find((w) => w.value === when)!.label);
+	const timeLabel = $derived(when === 'times' ? `${from} – ${to}` : 'All day');
 
 	function range(): { start: string; end: string; allDay: boolean } | string {
 		if (!date) return 'Choose a date';
 		if (when === 'day') return { start: zonedToIso(date, '00:00', timeZone), end: zonedToIso(addDays(date, 1), '00:00', timeZone), allDay: true };
-		if (when === 'custom') {
-			if (!from || !to) return 'Choose a start and end time';
-			// An end at or before the start runs past midnight.
-			const endDay = to <= from ? addDays(date, 1) : date;
-			return { start: zonedToIso(date, from, timeZone), end: zonedToIso(endDay, to, timeZone), allDay: false };
-		}
-		return { ...partRange(date, PARTS.find((p) => p.id === when)!, timeZone), allDay: false };
+		if (!from || !to) return 'Choose a start and end time';
+		// An end at or before the start runs past midnight.
+		const endDay = to <= from ? addDays(date, 1) : date;
+		return { start: zonedToIso(date, from, timeZone), end: zonedToIso(endDay, to, timeZone), allDay: false };
 	}
 
 	async function submit(e: SubmitEvent) {
@@ -124,13 +120,9 @@
 			</div>
 		</div>
 
-		<div class="chips" role="group" aria-label="Time of day">
-			{#each WHENS as w (w.value)}
-				<Chip size="sm" selected={when === w.value} onclick={() => (when = w.value)}>{w.label}</Chip>
-			{/each}
-		</div>
+		<SegmentedControl options={WHENS} bind:value={when} label="All day or set times" variant="soft" size="sm" block />
 
-		{#if when === 'custom'}
+		{#if when === 'times'}
 			<div class="pair">
 				<TextField label="From" type="time" bind:value={from} />
 				<TextField label="To" type="time" bind:value={to} />
@@ -182,11 +174,6 @@
 	.v {
 		font-size: 15px;
 		font-weight: 600;
-	}
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
 	}
 	.repeat {
 		display: flex;
