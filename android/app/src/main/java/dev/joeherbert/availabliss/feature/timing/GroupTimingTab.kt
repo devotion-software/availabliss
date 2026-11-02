@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -104,7 +105,8 @@ fun GroupTimingTab(
     }
     GroupTimingContent(
         state = state,
-        actions = viewModel.editor.actions(onBack = onBack, onRetry = viewModel::load, onSave = viewModel::save),
+        actions = viewModel.editor.actions(onBack = onBack, onRetry = viewModel::load, onSave = viewModel::save)
+            .copy(onSaveTemplate = viewModel::saveTemplate),
         snackbar = { AvSnackbarHost(snackbar) },
     )
 }
@@ -130,12 +132,15 @@ data class TimingActions(
     val onAddRange: (RangeList, LocalDate, LocalDate) -> Unit = { _, _, _ -> },
     val onRemoveRange: (RangeList, DateRange) -> Unit = { _, _ -> },
     val onSave: () -> Unit = {},
+    /** "Save this timing as a template" with the chosen name. */
+    val onSaveTemplate: (String) -> Unit = {},
 )
 
 @Composable
 fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackbar: @Composable () -> Unit = {}) {
     AvailablissBackground(OrbLayout.Timing) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        // imePadding: the template name field sits at the bottom of the scroller.
+        Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             ScreenHeader(
                 title = "Timing",
                 subtitle = state.groupName,
@@ -172,6 +177,8 @@ fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackb
                         )
                     }
                     TimingEditorSections(editor, state.canEdit, actions)
+                    // Anyone can keep a copy of a group's timing, not just admins.
+                    SaveTemplateRow(state.templateSave, actions.onSaveTemplate, suggestion = state.groupName, bottomClearance = 110.dp)
                 }
             }
         }

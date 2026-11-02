@@ -7,10 +7,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.auth.AuthRepository
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.AppPreferences
+import dev.joeherbert.availabliss.core.data.TemplatesRepository
 import dev.joeherbert.availabliss.core.data.Appearance
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.User
+import dev.joeherbert.availabliss.feature.timing.Templates
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +33,11 @@ data class YouUiState(
     val deleting: Boolean = false,
     /** Set after the account is deleted; the UI then runs sign-out cleanup. */
     val deleted: Boolean = false,
+    /** Your timing templates; null until loaded. */
+    val templates: List<TemplateRowUi>? = null,
+    /** The template being renamed, and its name so far. */
+    val renamingTemplateId: String? = null,
+    val templateNameDraft: String = "",
     val message: UserMessage? = null,
 ) {
     /** "United Kingdom · GB-ENG" */
@@ -49,6 +56,7 @@ data class YouUiState(
 class YouViewModel @Inject constructor(
     private val users: UserRepository,
     private val auth: AuthRepository,
+    private val templatesRepo: TemplatesRepository,
     prefs: AppPreferences,
 ) : ViewModel() {
 
@@ -61,6 +69,55 @@ class YouViewModel @Inject constructor(
                 .collect { (user, appearance) -> _state.update { it.copy(user = user, appearance = appearance) } }
         }
     }
+
+    // region Timing templates
+    /** Reloads the list (templates are saved from New group and the Timing tab). */
+    fun refreshTemplates() {
+        viewModelScope.launch {
+            when (val result = templatesRepo.list()) {
+                is ApiResult.Success -> _state.update { it.copy(templates = result.value.map(TemplateRowUi::from)) }
+                is ApiResult.Failure -> _state.update { it.copy(templates = it.templates ?: emptyList()) }
+            }
+        }
+    }
+
+    fun startRenamingTemplate(id: String) = _state.update { s ->
+        s.copy(renamingTemplateId = id, templateNameDraft = s.templates?.firstOrNull { it.id == id }?.name.orEmpty())
+    }
+
+    fun onTemplateNameChange(value: String) = _state.update { it.copy(templateNameDraft = value.take(Templates.MAX_NAME)) }
+
+    fun cancelRenamingTemplate() = _state.update { it.copy(renamingTemplateId = null) }
+
+    fun saveTemplateName() {
+        val id = _state.value.renamingTemplateId ?: return
+        val name = _state.value.templateNameDraft.trim()
+        if (name.isEmpty()) return
+        viewModelScope.launch {
+            when (val result = templatesRepo.rename(id, name)) {
+                is ApiResult.Success -> _state.update { s ->
+                    s.copy(
+                        renamingTemplateId = null,
+                        templates = s.templates?.map { if (it.id == id) TemplateRowUi.from(result.value) else it },
+                    )
+                }
+                is ApiResult.Failure -> _state.update { it.copy(message = UserMessage(result.error.message)) }
+            }
+        }
+    }
+
+    fun deleteTemplate(id: String) {
+        val template = _state.value.templates?.firstOrNull { it.id == id } ?: return
+        viewModelScope.launch {
+            when (val result = templatesRepo.delete(id)) {
+                is ApiResult.Success -> _state.update { s ->
+                    s.copy(templates = s.templates?.filterNot { it.id == id }, message = UserMessage("Deleted “${template.name}”"))
+                }
+                is ApiResult.Failure -> _state.update { it.copy(message = UserMessage(result.error.message)) }
+            }
+        }
+    }
+    // endregion
 
     fun startEditingName() = _state.update { it.copy(nameDraft = it.user?.name.orEmpty()) }
 

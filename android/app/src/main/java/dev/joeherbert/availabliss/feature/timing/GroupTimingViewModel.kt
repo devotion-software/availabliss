@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.RegionsRepository
+import dev.joeherbert.availabliss.core.data.TemplatesRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiError
 import dev.joeherbert.availabliss.core.network.ApiResult
@@ -26,6 +27,8 @@ data class GroupTimingUiState(
     /** The editor sections; null until the group loads. */
     val editor: TimingEditorUiState? = null,
     val dirty: Boolean = false,
+    /** "Save this timing as a template" (anyone can: it's a personal copy). */
+    val templateSave: TemplateSaveState = TemplateSaveState(),
     val saving: Boolean = false,
     /** Set after a successful save; the screen navigates and calls [GroupTimingViewModel.savedHandled]. */
     val saved: Boolean = false,
@@ -38,6 +41,7 @@ data class GroupTimingUiState(
 class GroupTimingViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val groups: GroupsRepository,
+    templates: TemplatesRepository,
     users: UserRepository,
     regions: RegionsRepository,
 ) : ViewModel() {
@@ -49,10 +53,13 @@ class GroupTimingViewModel @Inject constructor(
     val editor = TimingEditor(viewModelScope, groups, users, regions).apply { canEdit = false }
     private var original: TimingDraft? = null
 
+    private val templateSaver = TemplateSaver(viewModelScope, templates, onMessage = { text -> _uiState.update { it.copy(message = UserMessage(text)) } })
+
     init {
         viewModelScope.launch {
             editor.state.collect { e -> _uiState.update { it.copy(editor = e, dirty = e != null && e.draft != original) } }
         }
+        viewModelScope.launch { templateSaver.state.collect { t -> _uiState.update { it.copy(templateSave = t) } } }
         load()
     }
 
@@ -94,6 +101,12 @@ class GroupTimingViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /** Saves the timing as shown (including unsaved edits) as a template for new groups. */
+    fun saveTemplate(name: String) {
+        val draft = editor.draft ?: return
+        templateSaver.save(name, draft.toRequirement())
     }
 
     fun savedHandled() = _uiState.update { it.copy(saved = false) }

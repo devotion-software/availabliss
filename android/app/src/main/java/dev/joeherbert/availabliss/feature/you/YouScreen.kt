@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -71,6 +72,7 @@ fun YouScreen(
     val snackbar = rememberSnackbarHostState()
 
     LaunchedEffect(state.deleted) { if (state.deleted) onSignOut() }
+    LaunchedEffect(Unit) { viewModel.refreshTemplates() }
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
 
     AvailablissBackground(OrbLayout.Main) {
@@ -83,6 +85,13 @@ fun YouScreen(
             onAddPasskey = { viewModel.addPasskey(context) },
             onSignOut = onSignOut,
             onDelete = viewModel::requestDelete,
+            templateActions = TemplateActions(
+                onRename = viewModel::startRenamingTemplate,
+                onNameChange = viewModel::onTemplateNameChange,
+                onSaveName = viewModel::saveTemplateName,
+                onCancelRename = viewModel::cancelRenamingTemplate,
+                onDelete = viewModel::deleteTemplate,
+            ),
         )
         AvSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.tabBarClearance))
     }
@@ -140,12 +149,15 @@ fun YouContent(
     onAddPasskey: () -> Unit,
     onSignOut: () -> Unit,
     onDelete: () -> Unit,
+    templateActions: TemplateActions = TemplateActions(),
 ) {
     val colors = AvailablissTheme.colors
     Column(
         Modifier
             .fillMaxSize()
             .statusBarsPadding()
+            // Keeps a template's rename field above the keyboard.
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
             .padding(start = 20.dp, end = 20.dp, top = 28.dp, bottom = Spacing.tabBarClearance),
@@ -170,6 +182,8 @@ fun YouContent(
                 loading = state.addingPasskey,
             )
         }
+
+        TemplatesSection(state, templateActions)
 
         GlassPanel(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp), verticalArrangement = Arrangement.Top) {
             SettingsRow(AvIcons.SignOut, "Sign out", null, onSignOut, showChevron = false)

@@ -18,7 +18,9 @@ import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
+import dev.joeherbert.availabliss.core.network.model.RequirementTemplate
 import dev.joeherbert.availabliss.feature.timing.FitSummary
+import dev.joeherbert.availabliss.feature.timing.SaveTemplateRow
 import dev.joeherbert.availabliss.feature.timing.TimingActions
 import dev.joeherbert.availabliss.feature.timing.TimingEditorSections
 import dev.joeherbert.availabliss.feature.timing.TimingEditorUiState
@@ -85,11 +87,16 @@ fun NewGroupScreen(
     }
     BackHandler(enabled = state.step == NewGroupStep.Timing, onBack = viewModel::back)
     when (state.step) {
-        NewGroupStep.Details -> NewGroupContent(state, onBack, viewModel::setName, viewModel::setColor, viewModel::selectPreset, viewModel::next)
+        NewGroupStep.Details -> NewGroupContent(state, onBack, viewModel::setName, viewModel::setColor, viewModel::selectPreset, viewModel::next, viewModel::selectTemplate)
         NewGroupStep.Timing -> {
             val editor = state.editor
             if (editor != null) {
-                NewGroupTimingContent(state, editor, viewModel.editor.actions(onBack = viewModel::back), viewModel::create)
+                NewGroupTimingContent(
+                    state,
+                    editor,
+                    viewModel.editor.actions(onBack = viewModel::back).copy(onSaveTemplate = viewModel::saveTemplate),
+                    viewModel::create,
+                )
             }
         }
     }
@@ -108,6 +115,7 @@ fun NewGroupContent(
     onColorChange: (TileColor) -> Unit,
     onPreset: (TimingPreset) -> Unit,
     onNext: () -> Unit,
+    onTemplate: (RequirementTemplate) -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
     val focus = remember { FocusRequester() }
@@ -173,7 +181,15 @@ fun NewGroupContent(
                     }
                 }
                 GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionLabel("What are you planning?")
+                    if (state.templates.isNotEmpty()) {
+                        SectionLabel("Your templates")
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            state.templates.forEach { t ->
+                                Chip(t.name, selected = state.templateId == t.id, onClick = { onTemplate(t) })
+                            }
+                        }
+                    }
+                    SectionLabel(if (state.templates.isNotEmpty()) "Or start from" else "What are you planning?")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         NewGroupUiState.QUICK_PRESETS.forEach { preset ->
                             Chip(preset.label, selected = state.preset == preset, onClick = { onPreset(preset) })
@@ -200,7 +216,7 @@ fun NewGroupContent(
 @Composable
 fun NewGroupTimingContent(state: NewGroupUiState, editor: TimingEditorUiState, actions: TimingActions, onCreate: () -> Unit) {
     AvailablissBackground(OrbLayout.Timing) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             ScreenHeader(
                 title = "When are you looking for?",
                 subtitle = "Fine-tune the timing for ${state.name.trim()}. You can change it later.",
@@ -219,6 +235,7 @@ fun NewGroupTimingContent(state: NewGroupUiState, editor: TimingEditorUiState, a
             ) {
                 StepDots(total = 2, step = 2)
                 TimingEditorSections(editor, canEdit = true, actions = actions)
+                SaveTemplateRow(state.templateSave, actions.onSaveTemplate, bottomClearance = 170.dp)
             }
         }
         Column(

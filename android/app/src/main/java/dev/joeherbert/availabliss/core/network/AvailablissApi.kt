@@ -1,6 +1,10 @@
 package dev.joeherbert.availabliss.core.network
 
 import dev.joeherbert.availabliss.core.network.model.Availability
+import dev.joeherbert.availabliss.core.network.model.CreateTemplateRequest
+import dev.joeherbert.availabliss.core.network.model.RenameTemplateRequest
+import dev.joeherbert.availabliss.core.network.model.RequirementTemplate
+import dev.joeherbert.availabliss.core.network.model.TemplatesResponse
 import dev.joeherbert.availabliss.core.network.model.BlocksResponse
 import dev.joeherbert.availabliss.core.network.model.BusyResponse
 import dev.joeherbert.availabliss.core.network.model.CalDavRequest
@@ -210,6 +214,20 @@ interface AvailablissApi {
     // region Proposals
     @GET("api/v1/groups/{id}/proposals")
     suspend fun getProposals(@Path("id") groupId: String, @Query("status") status: String? = null): ProposalsResponse
+
+    // region Timing templates
+    @GET("api/v1/me/templates")
+    suspend fun getTemplates(): TemplatesResponse
+
+    @POST("api/v1/me/templates")
+    suspend fun createTemplate(@Body body: CreateTemplateRequest): RequirementTemplate
+
+    @PATCH("api/v1/me/templates/{id}")
+    suspend fun renameTemplate(@Path("id") id: String, @Body body: RenameTemplateRequest): RequirementTemplate
+
+    @DELETE("api/v1/me/templates/{id}")
+    suspend fun deleteTemplate(@Path("id") id: String)
+    // endregion
 
     @POST("api/v1/groups/{id}/proposals")
     suspend fun createProposal(@Path("id") groupId: String, @Body body: CreateProposalRequest): Proposal
