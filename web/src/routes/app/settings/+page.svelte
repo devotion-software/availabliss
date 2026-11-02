@@ -139,6 +139,8 @@
 				<Button variant="secondary" icon="logout" block onclick={signOut}>Sign out</Button>
 				<Button variant="danger" icon="trash" block onclick={() => (confirmDelete = true)}>Delete account</Button>
 			</GlassPanel>
+
+			<p class="version muted">Availabliss v{__APP_VERSION__}</p>
 		</div>
 	</div>
 </div>
@@ -184,6 +186,11 @@
 	}
 	.small {
 		font-size: 13px;
+	}
+	.version {
+		font-size: 12px;
+		text-align: center;
+		padding: 2px 0 8px;
 	}
 	.link-row {
 		border-radius: 20px;

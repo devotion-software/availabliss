@@ -20,6 +20,7 @@ struct ProfileView: View {
                 VStack(spacing: 4) {
                     Button("Sign out") { confirmsSignOut = true }.buttonStyle(.textAction)
                     Button("Delete account") { confirmsDelete = true }.buttonStyle(.textAction).foregroundStyle(theme.warnInk)
+                    Text(Self.version).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted).padding(.top, 8)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -42,6 +43,14 @@ struct ProfileView: View {
         }
         .errorAlert($error)
         .toast($toast)
+    }
+
+    /// "Availabliss v1.2.0 (14)": marketing version and build number from Info.plist.
+    private static var version: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "Availabliss v\(short) (\(build))"
     }
 
     private var account: some View {
