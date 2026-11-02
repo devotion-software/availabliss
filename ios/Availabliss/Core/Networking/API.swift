@@ -69,6 +69,10 @@ enum API {
         static func removeMember(groupId: String, userId: String) -> Endpoint<EmptyResponse> {
             .init(.delete, "/groups/\(groupId.pathEncoded)/members/\(userId.pathEncoded)")
         }
+        /// Members whose calendars or blocked time clash with `start`–`end`.
+        static func conflicts(groupId: String, start: Date, end: Date) -> Endpoint<ConflictsResponse> {
+            .init(.get, "/groups/\(groupId.pathEncoded)/conflicts", query: ["start": iso(start), "end": iso(end)])
+        }
         static func nudge(groupId: String) -> Endpoint<NudgeResponse> { .init(.post, "/groups/\(groupId.pathEncoded)/nudge") }
         static func createInvite(groupId: String, email: String? = nil) -> Endpoint<InviteLink> {
             .init(.post, "/groups/\(groupId.pathEncoded)/invites", body: CreateInviteBody(email: email))

@@ -106,7 +106,7 @@ struct ProposalCard: View {
                 Text(proposal.title ?? Formatting.span(start: proposal.start, end: proposal.end, allDay: proposal.allDay))
                     .bodyFont(15, .semibold)
                     .lineLimit(2)
-                Text(status).bodyFont(12, .semibold, relativeTo: .caption).foregroundStyle(proposal.status == .cancelled ? theme.muted : theme.okInk)
+                statusText.bodyFont(12, .semibold, relativeTo: .caption)
             }
             Spacer(minLength: 4)
             Text(action).bodyFont(13, .semibold, relativeTo: .subheadline).foregroundStyle(theme.accentInk)
@@ -120,6 +120,13 @@ struct ProposalCard: View {
     private var proposer: String {
         let who = proposal.createdBy == me ? "You" : (group.member(proposal.createdBy)?.firstName ?? "Someone")
         return "\(who) proposed a time"
+    }
+
+    /// "2 of 4 accepted · Priya busy then" (the clash in warn-ink).
+    private var statusText: Text {
+        let base = Text(status).foregroundColor(proposal.status == .cancelled ? theme.muted : theme.okInk)
+        guard let clash = Clash.short(proposal.openClashIds, group: group) else { return base }
+        return base + Text(" \u{00B7} \(clash)").foregroundColor(theme.warnInk)
     }
 
     private var status: String {

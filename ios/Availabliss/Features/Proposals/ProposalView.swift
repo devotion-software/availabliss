@@ -75,6 +75,9 @@ private struct PendingProposalView: View {
                     }
                 }
                 summaryCard
+                if let clash = model.clash(me: me) {
+                    ClashPanel(headline: clash, detail: clashDetail, cornerRadius: 18)
+                }
                 membersList
                 if group.role.isAdmin {
                     Label("As an admin you can set anyone's reply.", systemImage: "shield")
@@ -102,6 +105,12 @@ private struct PendingProposalView: View {
                 Task { if await model.cancel() { app.router.pop() } }
             }
         }
+    }
+
+    private var clashDetail: String {
+        proposal.openClashIds == [me]
+            ? "Your calendar or blocked time overlaps. You can still accept if you can move things."
+            : "Their calendars or blocked time overlap. They can still accept if they can move things."
     }
 
     private var summaryCard: some View {
@@ -148,7 +157,7 @@ private struct PendingProposalView: View {
     private var replyBar: some View {
         let mine = model.myResponse(me)
         return VStack(alignment: .leading, spacing: 10) {
-            Text(mine == .accepted ? "You're in. Changed your mind?" : mine == .declined ? "You said you can't make it." : "Can you make it?")
+            Text(mine == .accepted ? "You're in. Changed your mind?" : mine == .declined ? "You said you can't make it." : model.isBusy(me) ? "You're busy then. Can you still make it?" : "Can you make it?")
                 .bodyFont(13, .semibold, relativeTo: .subheadline)
                 .padding(.leading, 4)
             HStack(spacing: 8) {

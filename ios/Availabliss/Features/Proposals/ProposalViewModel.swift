@@ -40,6 +40,16 @@ final class ProposalViewModel {
     var acceptedCount: Int { proposal?.acceptedCount ?? 0 }
     var progress: Double { memberCount == 0 ? 0 : Double(acceptedCount) / Double(memberCount) }
 
+    /// "Priya is busy then" while open, else nil.
+    func clash(me: String?) -> String? {
+        Clash.text(proposal?.openClashIds ?? [], group: group, me: me)
+    }
+
+    func isBusy(_ me: String?) -> Bool {
+        guard let me else { return false }
+        return proposal?.openClashIds.contains(me) ?? false
+    }
+
     func myResponse(_ me: String?) -> ResponseKind? {
         guard let me else { return nil }
         return proposal?.response(for: me)?.response
@@ -79,7 +89,11 @@ final class ProposalViewModel {
             return "Set by \(admin) (admin)"
         }
         if !member.synced { return "Not synced yet" }
-        if proposal.response(for: member.userId)?.response ?? .pending == .pending { return "Hasn\u{2019}t replied" }
+        let response = proposal.response(for: member.userId)?.response ?? .pending
+        let busy = proposal.openClashIds.contains(member.userId)
+        if busy && response == .pending { return "Busy then \u{00B7} hasn\u{2019}t replied" }
+        if busy && response == .accepted { return "Busy then, but in" }
+        if response == .pending { return "Hasn\u{2019}t replied" }
         return member.role.isAdmin ? member.role.label : "Synced"
     }
 

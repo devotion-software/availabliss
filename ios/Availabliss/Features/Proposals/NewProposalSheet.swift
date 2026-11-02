@@ -35,8 +35,10 @@ struct ProposalDraft: Identifiable {
 }
 
 /// Create a proposal: time (prefilled from the slot), optional title, place and note.
+/// Times that clash with someone's busy time can still be proposed, with a warning naming who's busy.
 struct NewProposalSheet: View {
-    let groupId: String
+    let group: Group
+    let me: String?
     let api: APIClient
     let onCreated: (Proposal) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -47,9 +49,19 @@ struct NewProposalSheet: View {
     @State private var note = ""
     @State private var isSaving = false
     @State private var error: String?
+    @State private var busyIds: [String] = []
 
-    init(groupId: String, draft: ProposalDraft, api: APIClient, onCreated: @escaping (Proposal) -> Void) {
-        self.groupId = groupId
+    private var groupId: String { group.id }
+    private var clash: String? { Clash.text(busyIds, group: group, me: me) }
+
+    /// Changes whenever the proposed times do, to re-check who's busy.
+    private struct TimesKey: Equatable {
+        let start: Date, end: Date, allDay: Bool
+    }
+
+    init(group: Group, me: String?, draft: ProposalDraft, api: APIClient, onCreated: @escaping (Proposal) -> Void) {
+        self.group = group
+        self.me = me
         self.api = api
         self.onCreated = onCreated
         _draft = State(initialValue: draft)
@@ -77,15 +89,37 @@ struct NewProposalSheet: View {
             Text("You'll accept automatically, and a card is posted in the group chat.")
                 .bodyFont(12, relativeTo: .caption)
                 .foregroundStyle(theme.muted)
+            if let clash {
+                ClashPanel(headline: clash, detail: "You can still propose it; everyone will see the clash before they reply.")
+                    .transition(.opacity)
+            }
             Button {
                 Task { await submit() }
             } label: {
-                LoadingLabel(title: "Send proposal", isLoading: isSaving)
+                LoadingLabel(title: clash == nil ? "Send proposal" : "Propose anyway", isLoading: isSaving)
             }
             .buttonStyle(.accent)
             .disabled(isSaving || draft.end <= draft.start)
         }
+        .animation(.easeInOut(duration: 0.2), value: clash)
+        .task(id: TimesKey(start: draft.start, end: draft.end, allDay: draft.allDay)) { await checkConflicts() }
         .errorAlert($error)
+    }
+
+    /// Debounced: a newer change cancels this task before the request goes out.
+    private func checkConflicts() async {
+        guard draft.end > draft.start else {
+            busyIds = []
+            return
+        }
+        do {
+            try await Task.sleep(for: .milliseconds(250))
+            busyIds = try await api.send(API.Groups.conflicts(groupId: groupId, start: draft.start, end: draft.end)).busyMemberIds
+        } catch where error.isCancellation {
+            // Superseded by a newer time.
+        } catch {
+            busyIds = []
+        }
     }
 
     private func submit() async {

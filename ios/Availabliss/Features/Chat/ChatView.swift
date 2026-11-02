@@ -101,7 +101,7 @@ struct ChatView: View {
         case .poll:
             NewPollSheet { question, options, multi in await model.createPoll(question: question, options: options, multi: multi) }
         case .propose:
-            NewProposalSheet(groupId: group.id, draft: .blank(), api: detail.api) { _ in }
+            NewProposalSheet(group: group, me: me, draft: .blank(), api: detail.api) { _ in }
         case .event:
             EventEditorSheet(groupId: group.id, target: .new, api: detail.api) { _ in }
         case .info(let message):

@@ -48,7 +48,7 @@ struct GroupAvailabilityView: View {
             }
         }
         .sheet(item: $proposalDraft) { draft in
-            NewProposalSheet(groupId: group.id, draft: draft, api: detail.api) { proposal in
+            NewProposalSheet(group: group, me: app.session.user?.id, draft: draft, api: detail.api) { proposal in
                 app.router.push(.proposal(id: proposal.id))
             }
         }
@@ -356,6 +356,13 @@ private struct DayDetailCard: View {
                         propose(ProposalDraft(slot: slot, requirement: group.requirement))
                     }
                     .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))
+                } else if let status = model.day(model.selectedDay)?.status, status == .busy || status == .free {
+                    // Doesn't work for everyone: the proposal sheet warns who's busy.
+                    Button("Propose anyway") {
+                        let day = model.selectedDay
+                        propose(ProposalDraft(start: WallTime(hour: 18, minute: 0).date(on: day), end: WallTime(hour: 21, minute: 0).date(on: day), allDay: false))
+                    }
+                    .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
                 }
                 Button("See who's free") { Task { await model.showDay(model.selectedDay) } }
                     .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
