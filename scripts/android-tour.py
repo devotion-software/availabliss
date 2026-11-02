@@ -36,20 +36,22 @@ def screen_nodes() -> list[ET.Element]:
     return list(ET.fromstring(adb("shell", "cat", "/sdcard/ui.xml")).iter("node"))
 
 
-def find(label: str, timeout: float = 10) -> ET.Element | None:
-    """First node whose text or content description starts with `label`."""
+def find(label: str, timeout: float = 10, last: bool = False) -> ET.Element | None:
+    """First (or last) node whose text or content description starts with `label`."""
     deadline = time.time() + timeout
     while time.time() < deadline:
-        for node in screen_nodes():
-            for attr in ("text", "content-desc"):
-                if node.get(attr, "").startswith(label):
-                    return node
+        matches = [
+            node for node in screen_nodes()
+            if any(node.get(attr, "").startswith(label) for attr in ("text", "content-desc"))
+        ]
+        if matches:
+            return matches[-1] if last else matches[0]
         time.sleep(0.5)
     return None
 
 
-def tap(label: str, timeout: float = 10) -> bool:
-    node = find(label, timeout)
+def tap(label: str, timeout: float = 10, last: bool = False) -> bool:
+    node = find(label, timeout, last)
     if node is None:
         failures.append(f"'{label}' not found")
         print(f"✗ '{label}' not found")
@@ -81,6 +83,10 @@ def latest_code() -> str:
     raise SystemExit(f"No sign-in code arrived for {email}")
 
 
+# Wake the device: an activity started on a sleeping screen stays in the background.
+adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+adb("shell", "wm", "dismiss-keyguard")
+
 # Fresh start: clear app data so we're signed out, then launch.
 adb("shell", "pm", "clear", PACKAGE)
 for permission in ("POST_NOTIFICATIONS", "ACCESS_LOCAL_NETWORK"):  # the latter reaches the dev server
@@ -105,7 +111,8 @@ if find("Your groups", 20) is None:
 time.sleep(2)
 snapshot("03-groups-home")
 
-if tap("Lake District crew"):
+# The group's name can also appear in the "Up next" card; the list entry is the last match.
+if tap("Lake District crew", last=True):
     time.sleep(2)
     snapshot("04-group-month")
     for label, name in [("Week", "05-group-week"), ("Day", "06-group-day")]:

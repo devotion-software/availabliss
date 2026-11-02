@@ -53,12 +53,12 @@ class SignInViewModel @Inject constructor(
     val state: StateFlow<SignInUiState> = _state.asStateFlow()
 
     init {
-        // Return from the Apple web flow: availabliss://auth/callback?token=…
+        // Return from the Apple web flow: availabliss://auth/callback?code=…
         viewModelScope.launch {
             deepLinks.pending.collect { link ->
                 if (link is DeepLink.AuthCallback) {
                     deepLinks.consume(link)
-                    run(SignInBusy.Apple) { auth.completeWebSignIn(link.token, link.error) }
+                    run(SignInBusy.Apple) { auth.completeWebSignIn(link.code, link.error) }
                 }
             }
         }
@@ -101,13 +101,7 @@ class SignInViewModel @Inject constructor(
 
     fun signInWithApple() {
         if (_state.value.busy != null) return
-        viewModelScope.launch {
-            _state.update { it.copy(busy = SignInBusy.Apple, error = null) }
-            when (val result = auth.startAppleSignIn()) {
-                is ApiResult.Success -> _state.update { it.copy(busy = null, appleUrl = result.value) }
-                is ApiResult.Failure -> _state.update { it.copy(busy = null, error = result.error.message) }
-            }
-        }
+        _state.update { it.copy(error = null, appleUrl = auth.appleSignInUrl()) }
     }
 
     fun onAppleUrlOpened() = _state.update { it.copy(appleUrl = null) }

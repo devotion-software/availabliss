@@ -81,6 +81,14 @@ const poll = (
 const votes: [SignedIn, number][] = [[priya, 0], [ana, 0], [tom, 1]];
 for (const [person, option] of votes) await call(person.token, 'POST', `/api/v1/polls/${poll.id}/vote`, { optionIds: [poll.options[option].id] });
 await say(ana, 'Cottage. It has a wood burner, case closed');
+// An event added directly (no proposal): shows as an event card in chat.
+const quizNight = addDays(nextTuesday, 7);
+await call(tom.token, 'POST', `/api/v1/groups/${lakes.id}/events`, {
+	title: 'Pub quiz warm-up',
+	start: at(quizNight, '19:30'),
+	end: at(quizNight, '22:00'),
+	location: 'The Bell'
+});
 const latest = (await call(priya.token, 'GET', `/api/v1/groups/${lakes.id}/messages?limit=50`)).data.messages.at(-1);
 for (const person of [priya, ana, tom]) {
 	await call(person.token, 'POST', `/api/v1/groups/${lakes.id}/messages/receipts`, { upTo: latest.id, state: 'seen' });

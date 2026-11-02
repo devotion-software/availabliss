@@ -29,7 +29,8 @@ enum class GroupTab { Calendar, Chat, Proposals, Timing }
 @Serializable data class EventsRoute(val groupId: String)
 
 /** Add an event to a group, optionally prefilled with ISO [start] / [end]. */
-@Serializable data class EventEditorRoute(val groupId: String, val start: String? = null, val end: String? = null)
+/** Adds an event (optionally prefilled with a time), or opens an existing one by [eventId]. */
+@Serializable data class EventEditorRoute(val groupId: String, val start: String? = null, val end: String? = null, val eventId: String? = null)
 
 @Serializable data class InviteRoute(val token: String)
 @Serializable data object AppearanceRoute

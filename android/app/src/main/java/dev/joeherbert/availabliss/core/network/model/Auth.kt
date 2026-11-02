@@ -22,17 +22,12 @@ data class SocialIdToken(val token: String, val nonce: String? = null)
 @Serializable
 data class SocialIdTokenSignInRequest(val provider: String, val idToken: SocialIdToken)
 
-/** Web-redirect sign in (Apple on Android); the response carries the provider `url`. */
+/** Swaps the one-time code from a web-flow sign-in (Apple on Android) for a bearer token. */
 @Serializable
-data class SocialRedirectSignInRequest(
-    val provider: String,
-    val callbackURL: String,
-    /** Must be sent explicitly (properties equal to their default are omitted). */
-    val disableRedirect: Boolean,
-)
+data class NativeSignInCodeRequest(val code: String)
 
 @Serializable
-data class SocialRedirectResponse(val url: String? = null, val redirect: Boolean = false)
+data class NativeSignInTokenResponse(val token: String)
 
 /** All sign-in calls return `{ user, ... }` plus the `set-auth-token` header. */
 @Serializable

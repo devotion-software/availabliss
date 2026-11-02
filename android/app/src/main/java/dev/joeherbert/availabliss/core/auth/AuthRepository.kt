@@ -1,6 +1,7 @@
 package dev.joeherbert.availabliss.core.auth
 
 import android.content.Context
+import dev.joeherbert.availabliss.BuildConfig
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiError
 import dev.joeherbert.availabliss.core.network.ApiResult
@@ -15,7 +16,7 @@ import dev.joeherbert.availabliss.core.network.model.SendOtpRequest
 import dev.joeherbert.availabliss.core.network.model.SignInResponse
 import dev.joeherbert.availabliss.core.network.model.SocialIdToken
 import dev.joeherbert.availabliss.core.network.model.SocialIdTokenSignInRequest
-import dev.joeherbert.availabliss.core.network.model.SocialRedirectSignInRequest
+import dev.joeherbert.availabliss.core.network.model.NativeSignInCodeRequest
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.core.network.toApiError
 import kotlinx.serialization.json.Json
@@ -115,22 +116,19 @@ class AuthRepository @Inject constructor(
 
     // region Apple (web flow in a Custom Tab)
     /**
-     * Starts Sign in with Apple and returns Apple's authorize URL to open in a Custom Tab.
-     * When the user finishes, the server is expected to redirect to
-     * `availabliss://auth/callback?token=<bearer>`; see [completeWebSignIn] and the README.
+     * Sign in with Apple has no Android SDK, so it runs as a web flow in a Custom Tab.
+     * The server starts it and finishes by redirecting to
+     * `availabliss://auth/callback?code=<one-time code>`; see [completeWebSignIn].
      */
-    suspend fun startAppleSignIn(): ApiResult<String> {
-        val request = SocialRedirectSignInRequest(provider = "apple", callbackURL = APPLE_CALLBACK, disableRedirect = true)
-        return when (val result = authCall { authApi.startSocialRedirect(request) }) {
-            is ApiResult.Failure -> result
-            is ApiResult.Success -> result.value.body()?.url?.let { ApiResult.Success(it) }
-                ?: ApiResult.Failure(ApiError.Unknown("Sign in with Apple isn't available right now."))
-        }
-    }
+    fun appleSignInUrl(): String = "${BuildConfig.API_BASE_URL}/api/v1/auth/native/apple/start"
 
     /** Completes a web sign-in from the `availabliss://auth/callback` deep link. */
-    suspend fun completeWebSignIn(token: String?, error: String?): SignInResult {
-        if (token.isNullOrBlank()) return SignInResult.Failed(error ?: "Sign in didn't finish. Please try again.")
+    suspend fun completeWebSignIn(code: String?, error: String?): SignInResult {
+        if (code.isNullOrBlank()) return SignInResult.Failed(error ?: "Sign in didn't finish. Please try again.")
+        val token = when (val result = authCall { authApi.exchangeNativeSignInCode(NativeSignInCodeRequest(code)) }) {
+            is ApiResult.Success -> result.value.body()?.token
+            is ApiResult.Failure -> return SignInResult.Failed(result.error.message)
+        } ?: return SignInResult.Failed("Sign in didn't finish. Please try again.")
         tokenStore.save(token)
         return when (val me = users.refresh()) {
             is ApiResult.Success -> SignInResult.Success(me.value)
@@ -181,6 +179,5 @@ class AuthRepository @Inject constructor(
         }
 
     companion object {
-        const val APPLE_CALLBACK = "availabliss://auth/callback"
     }
 }

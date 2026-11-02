@@ -16,6 +16,7 @@ import dev.joeherbert.availabliss.core.network.model.BusySource
 import dev.joeherbert.availabliss.core.network.model.CreateBlockRequest
 import dev.joeherbert.availabliss.core.network.model.ManualBlock
 import dev.joeherbert.availabliss.core.network.model.Repeat
+import dev.joeherbert.availabliss.core.network.model.wireName
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -151,7 +152,7 @@ class MyTimeViewModel @Inject constructor(
         val removedIntervals = intervals.filter { it.blockId == block.id }
         intervals = intervals - removedIntervals.toSet()
         blocks = blocks.filterNot { it.id == block.id }
-        _state.update { if (it.editing?.block?.id == block.id) it.copy(editing = null) else it }
+        _state.update { if (it.draft?.editingId == block.id) it.copy(draft = null, savingDraft = false) else it }
         publish()
         viewModelScope.launch {
             when (val result = blocksRepository.delete(block.id)) {
@@ -171,37 +172,19 @@ class MyTimeViewModel @Inject constructor(
     }
     // endregion
 
-    // region Edit sheet
+    // region Editing an existing block (same sheet as adding one)
     fun openEditor(id: String) {
         blocks.firstOrNull { it.id == id }?.let(::openEditor)
     }
 
     private fun openEditor(block: ManualBlock) {
-        _state.update { it.copy(editing = BlockEditState(block, block.title(), block.scheduleLabel(), block.note.orEmpty())) }
+        val draft = BlockDraft.fromBlock(block) ?: return showMessage("That block couldn't be opened.")
+        _state.update { it.copy(draft = draft, savingDraft = false) }
     }
 
-    fun onEditNote(note: String) = _state.update { s -> s.copy(editing = s.editing?.copy(note = note.take(120))) }
-
-    fun closeEditor() = _state.update { it.copy(editing = null) }
-
-    fun saveEdit() {
-        val editing = _state.value.editing ?: return
-        _state.update { it.copy(editing = editing.copy(saving = true)) }
-        viewModelScope.launch {
-            val note = editing.note.trim().ifBlank { null }
-            when (val result = blocksRepository.update(editing.block.id) { set("note", note) }) {
-                is ApiResult.Success -> {
-                    blocks = blocks.map { if (it.id == result.value.id) result.value else it }
-                    _state.update { it.copy(editing = null) }
-                    publish()
-                    load(silent = true)
-                }
-                is ApiResult.Failure -> {
-                    _state.update { s -> s.copy(editing = s.editing?.copy(saving = false)) }
-                    showMessage(result.error.message)
-                }
-            }
-        }
+    /** Deletes the block open in the sheet (every occurrence of a repeat). */
+    fun deleteEditingBlock() {
+        _state.value.draft?.editingId?.let(::deleteBlock)
     }
     // endregion
 
@@ -238,11 +221,23 @@ class MyTimeViewModel @Inject constructor(
         if (!draft.isValid || _state.value.savingDraft) return
         _state.update { it.copy(savingDraft = true) }
         viewModelScope.launch {
-            when (val result = blocksRepository.create(draft.toRequest())) {
+            val request = draft.toRequest()
+            val result = draft.editingId?.let { id ->
+                blocksRepository.update(id) {
+                    set("start", request.start)
+                    set("end", request.end)
+                    set("allDay", request.allDay)
+                    set("repeat", request.repeat.wireName)
+                    set("until", request.until)
+                    set("note", request.note)
+                }
+            } ?: blocksRepository.create(request)
+            when (result) {
                 is ApiResult.Success -> {
-                    blocks = blocks + result.value
+                    blocks = blocks.filterNot { it.id == result.value.id } + result.value
                     _state.update { it.copy(draft = null, savingDraft = false) }
-                    showMessage("Blocked ${DateTimes.shortDay(draft.date)} · ${draft.timeLabel.lowercase()}")
+                    val verb = if (draft.isEditing) "Updated" else "Blocked"
+                    showMessage("$verb ${DateTimes.shortDay(draft.date)} · ${draft.timeLabel.lowercase()}")
                     load(silent = true)
                 }
                 is ApiResult.Failure -> {

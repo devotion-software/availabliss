@@ -43,7 +43,7 @@ sealed interface ChatItem {
         override val key get() = id
     }
 
-    data class EventCard(val id: String, val proposalId: String?, val card: ProposalCardUi) : ChatItem {
+    data class EventCard(val id: String, val eventId: String, val proposalId: String?, val card: ProposalCardUi) : ChatItem {
         override val key get() = id
     }
 
@@ -103,6 +103,7 @@ fun buildChatItems(
                     val d = DateTimes.localDate(e.start)
                     items += ChatItem.EventCard(
                         m.id,
+                        e.id,
                         e.proposalId,
                         ProposalCardUi(
                             month = d?.let(DateTimes::monthAbbrev).orEmpty(),

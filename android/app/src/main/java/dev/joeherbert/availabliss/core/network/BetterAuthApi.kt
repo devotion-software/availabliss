@@ -6,8 +6,8 @@ import dev.joeherbert.availabliss.core.network.model.PasskeyVerifyRequest
 import dev.joeherbert.availabliss.core.network.model.SendOtpRequest
 import dev.joeherbert.availabliss.core.network.model.SignInResponse
 import dev.joeherbert.availabliss.core.network.model.SocialIdTokenSignInRequest
-import dev.joeherbert.availabliss.core.network.model.SocialRedirectResponse
-import dev.joeherbert.availabliss.core.network.model.SocialRedirectSignInRequest
+import dev.joeherbert.availabliss.core.network.model.NativeSignInCodeRequest
+import dev.joeherbert.availabliss.core.network.model.NativeSignInTokenResponse
 import kotlinx.serialization.json.JsonObject
 import retrofit2.Response
 import retrofit2.http.Body
@@ -29,8 +29,9 @@ interface BetterAuthApi {
     @POST("api/auth/sign-in/social")
     suspend fun signInWithIdToken(@Body body: SocialIdTokenSignInRequest): Response<SignInResponse>
 
-    @POST("api/auth/sign-in/social")
-    suspend fun startSocialRedirect(@Body body: SocialRedirectSignInRequest): Response<SocialRedirectResponse>
+    /** Completes a web-flow sign-in started at `/api/v1/auth/native/{provider}/start`. */
+    @POST("api/v1/auth/native/exchange")
+    suspend fun exchangeNativeSignInCode(@Body body: NativeSignInCodeRequest): Response<NativeSignInTokenResponse>
 
     /** WebAuthn `PublicKeyCredentialRequestOptionsJSON`, passed straight to Credential Manager. */
     @GET("api/auth/passkey/generate-authenticate-options")

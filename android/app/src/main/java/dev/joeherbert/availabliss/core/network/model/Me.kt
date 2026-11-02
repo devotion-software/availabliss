@@ -29,6 +29,9 @@ enum class Repeat {
     @SerialName("fortnightly") Fortnightly,
 }
 
+/** The API's name for this value (its @SerialName), for JSON patches. */
+val Repeat.wireName: String get() = Repeat.serializer().descriptor.getElementName(ordinal)
+
 @Serializable
 data class ManualBlock(
     val id: String,

@@ -16,8 +16,8 @@ sealed interface DeepLink {
     data class Proposal(val proposalId: String) : DeepLink
     /** OAuth return from connecting Google / Microsoft calendars. */
     data class Calendars(val connectedId: String?, val error: String?) : DeepLink
-    /** Return from the Sign in with Apple web flow. */
-    data class AuthCallback(val token: String?, val error: String?) : DeepLink
+    /** Return from the Sign in with Apple web flow, carrying a one-time code to exchange. */
+    data class AuthCallback(val code: String?, val error: String?) : DeepLink
     data object MyTime : DeepLink
     data object Activity : DeepLink
 
@@ -52,7 +52,7 @@ sealed interface DeepLink {
                 "invite" -> segments.getOrNull(1)?.let(::Invite)
                 "calendars" -> Calendars(uri.getQueryParameter("connected"), uri.getQueryParameter("error"))
                 "auth" -> AuthCallback(
-                    token = uri.getQueryParameter("token") ?: uri.getQueryParameter("set-auth-token"),
+                    code = uri.getQueryParameter("code"),
                     error = uri.getQueryParameter("error"),
                 )
                 "app" -> parseApp(segments.drop(1))

@@ -38,6 +38,7 @@ fun GroupScreen(
     onOpenProposal: (String) -> Unit,
     onCreateProposal: (start: String, end: String, allDay: Boolean) -> Unit,
     onOpenEvents: () -> Unit,
+    onOpenEvent: (eventId: String) -> Unit,
     onAddEvent: (start: String?, end: String?) -> Unit,
     viewModel: GroupViewModel = hiltViewModel(),
 ) {
@@ -64,6 +65,7 @@ fun GroupScreen(
                 GroupTab.Chat -> GroupChatTab(
                     onBack = toCalendar,
                     onOpenProposal = onOpenProposal,
+                    onOpenEvent = onOpenEvent,
                     onProposeTime = toCalendar,
                     onAddEvent = { onAddEvent(null, null) },
                 )

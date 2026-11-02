@@ -70,6 +70,7 @@ data class ChatActions(
     val onProposeTime: () -> Unit = {},
     val onAddEvent: () -> Unit = {},
     val onOpenProposal: (String) -> Unit = {},
+    val onOpenEvent: (String) -> Unit = {},
     val onVote: (messageId: String, optionId: String) -> Unit = { _, _ -> },
     val onClosePoll: (messageId: String) -> Unit = {},
     val onOpenInfo: (messageId: String) -> Unit = {},
@@ -80,6 +81,7 @@ data class ChatActions(
 fun GroupChatTab(
     onBack: () -> Unit,
     onOpenProposal: (String) -> Unit,
+    onOpenEvent: (String) -> Unit,
     onProposeTime: () -> Unit,
     onAddEvent: () -> Unit,
     viewModel: ChatViewModel = hiltViewModel(),
@@ -112,6 +114,7 @@ fun GroupChatTab(
                 onAddEvent()
             },
             onOpenProposal = onOpenProposal,
+            onOpenEvent = onOpenEvent,
             onVote = viewModel::onVote,
             onClosePoll = viewModel::onClosePoll,
             onOpenInfo = viewModel::openInfo,
@@ -250,8 +253,9 @@ private fun ChatRow(item: ChatItem, actions: ChatActions) {
         )
         is ChatItem.EventCard -> ProposalCard(
             ui = item.card,
-            onClick = { item.proposalId?.let(actions.onOpenProposal) },
-            actionLabel = if (item.proposalId != null) "View" else null,
+            // Events from a confirmed proposal open the proposal; others open the event itself.
+            onClick = { item.proposalId?.let(actions.onOpenProposal) ?: actions.onOpenEvent(item.eventId) },
+            actionLabel = "View",
         )
         is ChatItem.PollItem -> Box(Modifier.fillMaxWidth(), contentAlignment = if (item.own) Alignment.CenterEnd else Alignment.CenterStart) {
             PollCard(

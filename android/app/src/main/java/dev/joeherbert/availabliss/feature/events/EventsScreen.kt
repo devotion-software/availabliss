@@ -52,7 +52,7 @@ import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 import dev.joeherbert.availabliss.feature.common.CalendarPickerRow
 
 @Composable
-fun EventsScreen(onBack: () -> Unit, onAddEvent: () -> Unit, viewModel: EventsViewModel = hiltViewModel()) {
+fun EventsScreen(onBack: () -> Unit, onAddEvent: () -> Unit, onOpenEvent: (String) -> Unit, viewModel: EventsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
@@ -61,6 +61,7 @@ fun EventsScreen(onBack: () -> Unit, onAddEvent: () -> Unit, viewModel: EventsVi
         state = state,
         onBack = onBack,
         onAddEvent = onAddEvent,
+        onOpenEvent = onOpenEvent,
         onRetry = viewModel::refresh,
         onAddToCalendar = viewModel::onAddToCalendar,
         onSelectCalendar = viewModel::onSelectCalendar,
@@ -74,6 +75,7 @@ private fun EventsContent(
     state: EventsUiState,
     onBack: () -> Unit,
     onAddEvent: () -> Unit,
+    onOpenEvent: (String) -> Unit,
     onRetry: () -> Unit,
     onAddToCalendar: (String) -> Unit,
     onSelectCalendar: (Long) -> Unit,
@@ -118,36 +120,42 @@ private fun EventsContent(
                 if (state.upcoming.isNotEmpty()) {
                     item { SectionLabel("Coming up", Modifier.padding(top = 4.dp)) }
                     items(state.upcoming, key = { it.id }) { row ->
-                        EventRow(row, past = false, onAddToCalendar = { onAddToCalendar(row.id) }, onDelete = { confirmDelete = row })
+                        EventRow(row, past = false, onOpen = { onOpenEvent(row.id) }, onAddToCalendar = { onAddToCalendar(row.id) }, onDelete = { confirmDelete = row })
                     }
                 }
                 if (state.past.isNotEmpty()) {
                     item { SectionLabel("Past", Modifier.padding(top = 8.dp)) }
                     items(state.past, key = { "past-" + it.id }) { row ->
-                        EventRow(row, past = true, onAddToCalendar = {}, onDelete = { confirmDelete = row })
+                        EventRow(row, past = true, onOpen = { onOpenEvent(row.id) }, onAddToCalendar = {}, onDelete = { confirmDelete = row })
                     }
                 }
             }
         }
     }
     confirmDelete?.let { row ->
-        val colors = AvailablissTheme.colors
-        AlertDialog(
-            onDismissRequest = { confirmDelete = null },
-            containerColor = colors.bg,
-            shape = Shapes.cardLarge,
-            title = { Text("Delete ${row.title}?", style = AvailablissTheme.type.headlineSmall, color = colors.ink) },
-            text = { Text("It will be removed for everyone in the group.", style = AvailablissTheme.type.body, color = colors.muted) },
-            confirmButton = { TextAction("Delete", { onDelete(row.id); confirmDelete = null }, color = colors.warnInk) },
-            dismissButton = { TextAction("Keep", { confirmDelete = null }, color = colors.muted) },
-        )
+        DeleteEventDialog(row.title, onConfirm = { onDelete(row.id); confirmDelete = null }, onDismiss = { confirmDelete = null })
     }
 }
 
+/** Confirms deleting a group event (shared by the events list and the event screen). */
 @Composable
-private fun EventRow(row: EventRowUi, past: Boolean, onAddToCalendar: () -> Unit, onDelete: () -> Unit) {
+fun DeleteEventDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val colors = AvailablissTheme.colors
-    GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.row, contentPadding = PaddingValues(12.dp)) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = colors.bg,
+        shape = Shapes.cardLarge,
+        title = { Text("Delete $title?", style = AvailablissTheme.type.headlineSmall, color = colors.ink) },
+        text = { Text("It will be removed for everyone in the group.", style = AvailablissTheme.type.body, color = colors.muted) },
+        confirmButton = { TextAction("Delete", onConfirm, color = colors.warnInk) },
+        dismissButton = { TextAction("Keep", onDismiss, color = colors.muted) },
+    )
+}
+
+@Composable
+private fun EventRow(row: EventRowUi, past: Boolean, onOpen: () -> Unit, onAddToCalendar: () -> Unit, onDelete: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.row, contentPadding = PaddingValues(12.dp), onClick = onOpen, onClickLabel = "Open ${row.title}") {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             DateTile(row.month, row.day, muted = past)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -183,7 +191,7 @@ private fun EventsPreview() {
                 upcoming = listOf(EventRowUi("1", "Book club", "Wed 11 Nov · 18:30 – 21:00", "At Hana's", "NOV", "11", canDelete = true, added = false)),
                 calendar = AddToCalendarState(),
             ),
-            onBack = {}, onAddEvent = {}, onRetry = {}, onAddToCalendar = {}, onSelectCalendar = {}, onDelete = {},
+            onBack = {}, onAddEvent = {}, onOpenEvent = {}, onRetry = {}, onAddToCalendar = {}, onSelectCalendar = {}, onDelete = {},
         )
     }
 }

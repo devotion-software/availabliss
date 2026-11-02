@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.network.model.DateRange
 import dev.joeherbert.availabliss.core.network.model.RequirementLength
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvDatePickerDialog
@@ -79,7 +81,7 @@ import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import java.time.LocalDate
 
 /** Which picker is open; UI-only state. */
-private enum class TimingPicker { None, StartTime, EndTime, SpanStart, SpanEnd, RangeFrom, RangeTo, Dates }
+private enum class TimingPicker { None, StartTime, EndTime, SpanStart, SpanEnd, RangeFrom, RangeTo, Dates, SchoolHolidays }
 
 /** Group timing editor (Requirements.dc.html). Read-only for non-admins. */
 @Composable
@@ -116,8 +118,8 @@ fun GroupTimingTab(
             onSpanEnd = viewModel::setSpanEnd,
             onRangeFrom = viewModel::setRangeFrom,
             onRangeTo = viewModel::setRangeTo,
-            onAddDates = viewModel::addDates,
-            onRemoveDates = viewModel::removeDates,
+            onAddRange = viewModel::addRange,
+            onRemoveRange = viewModel::removeRange,
             onSave = viewModel::save,
         ),
         snackbar = { AvSnackbarHost(snackbar) },
@@ -142,8 +144,8 @@ data class TimingActions(
     val onSpanEnd: (SpanEnd) -> Unit = {},
     val onRangeFrom: (LocalDate) -> Unit = {},
     val onRangeTo: (LocalDate) -> Unit = {},
-    val onAddDates: (LocalDate, LocalDate) -> Unit = { _, _ -> },
-    val onRemoveDates: (dev.joeherbert.availabliss.core.network.model.DateRange) -> Unit = {},
+    val onAddRange: (RangeList, LocalDate, LocalDate) -> Unit = { _, _, _ -> },
+    val onRemoveRange: (RangeList, DateRange) -> Unit = { _, _ -> },
     val onSave: () -> Unit = {},
 )
 
@@ -175,6 +177,8 @@ fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackb
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
                         .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 120.dp)
+                        // The floating save bar sits above the navigation bar, so clear that too.
+                        .navigationBarsPadding()
                         .alpha(if (state.canEdit) 1f else 0.85f),
                     verticalArrangement = Arrangement.spacedBy(Spacing.l),
                 ) {
@@ -187,7 +191,7 @@ fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackb
                     }
                     LengthSection(draft, state.canEdit, actions)
                     StartsEndsSection(state, draft, actions, openPicker = { picker = it })
-                    ExtrasSection(state, draft, actions)
+                    ExtrasSection(state, draft, actions, openPicker = { picker = it })
                     RangeSection(state, draft, actions, openPicker = { picker = it })
                 }
             }
@@ -300,7 +304,8 @@ private fun StartsEndsSection(state: GroupTimingUiState, draft: TimingDraft, act
 }
 
 @Composable
-private fun ExtrasSection(state: GroupTimingUiState, draft: TimingDraft, actions: TimingActions) {
+private fun ExtrasSection(state: GroupTimingUiState, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
+    val colors = AvailablissTheme.colors
     Column(Modifier.fillMaxWidth().glass(Shapes.card).padding(horizontal = 16.dp, vertical = 4.dp)) {
         ToggleRow(
             title = "Bank holidays",
@@ -315,10 +320,39 @@ private fun ExtrasSection(state: GroupTimingUiState, draft: TimingDraft, actions
             checked = draft.schoolHolidaysOnly,
             onCheckedChange = { if (state.canEdit) actions.onSchoolHolidays(it) },
         )
+        if (draft.schoolHolidaysOnly) {
+            // The group's own term breaks, for authorities we don't have dates for (or extra days off).
+            Column(Modifier.padding(bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Add your own holiday dates if your school's aren't listed.",
+                    style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
+                    color = colors.muted,
+                )
+                RangeChips(
+                    ranges = draft.customSchoolHolidays,
+                    canEdit = state.canEdit,
+                    addLabel = "+ Add school holiday",
+                    onAdd = { openPicker(TimingPicker.SchoolHolidays) },
+                    onRemove = { actions.onRemoveRange(RangeList.SchoolHolidays, it) },
+                )
+            }
+        }
     }
 }
 
+/** Removable chips for a list of date ranges, plus an add chip for editors. */
 @OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RangeChips(ranges: List<DateRange>, canEdit: Boolean, addLabel: String, onAdd: () -> Unit, onRemove: (DateRange) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ranges.forEach { range ->
+            val label = TimingLabels.dateRange(range.from, range.to)
+            RemovableChip(label, "Remove $label", onRemove = { if (canEdit) onRemove(range) })
+        }
+        if (canEdit) DashedChip(addLabel, onClick = onAdd)
+    }
+}
+
 @Composable
 private fun RangeSection(state: GroupTimingUiState, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
     val colors = AvailablissTheme.colors
@@ -340,13 +374,13 @@ private fun RangeSection(state: GroupTimingUiState, draft: TimingDraft, actions:
             )
         }
         SectionLabel("Or only these dates", Modifier.padding(top = 4.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            draft.dates.forEach { range ->
-                val label = TimingLabels.dateRange(range.from, range.to)
-                RemovableChip(label, "Remove $label", onRemove = { if (state.canEdit) actions.onRemoveDates(range) })
-            }
-            if (state.canEdit) DashedChip("+ Add date range", onClick = { openPicker(TimingPicker.Dates) })
-        }
+        RangeChips(
+            ranges = draft.dates,
+            canEdit = state.canEdit,
+            addLabel = "+ Add date range",
+            onAdd = { openPicker(TimingPicker.Dates) },
+            onRemove = { actions.onRemoveRange(RangeList.Dates, it) },
+        )
     }
 }
 
@@ -400,7 +434,8 @@ private fun TimingPickers(state: GroupTimingUiState, picker: TimingPicker, actio
         TimingPicker.SpanEnd -> SpanEndSheet("Ends", state.spanEnd, onDone = { actions.onSpanEnd(it); close() }, onDismiss = close)
         TimingPicker.RangeFrom -> AvDatePickerDialog(state.rangeFrom, actions.onRangeFrom, close)
         TimingPicker.RangeTo -> AvDatePickerDialog(state.rangeTo, actions.onRangeTo, close, minDate = state.rangeFrom)
-        TimingPicker.Dates -> AvDateRangePickerDialog(null, null, actions.onAddDates, close)
+        TimingPicker.Dates -> AvDateRangePickerDialog(null, null, { from, to -> actions.onAddRange(RangeList.Dates, from, to) }, close)
+        TimingPicker.SchoolHolidays -> AvDateRangePickerDialog(null, null, { from, to -> actions.onAddRange(RangeList.SchoolHolidays, from, to) }, close)
     }
 }
 

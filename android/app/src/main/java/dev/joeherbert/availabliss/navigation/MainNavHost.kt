@@ -91,6 +91,7 @@ fun MainNavHost(root: RootViewModel) {
                     onOpenProposal = { nav.navigate(ProposalRoute(it)) },
                     onCreateProposal = { start, end, allDay -> nav.navigate(CreateProposalRoute(route.groupId, start, end, allDay)) },
                     onOpenEvents = { nav.navigate(EventsRoute(route.groupId)) },
+                    onOpenEvent = { nav.navigate(EventEditorRoute(route.groupId, eventId = it)) },
                     onAddEvent = { start, end -> nav.navigate(EventEditorRoute(route.groupId, start, end)) },
                 )
             }
@@ -123,7 +124,11 @@ fun MainNavHost(root: RootViewModel) {
             }
             composable<EventsRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<EventsRoute>()
-                EventsScreen(onBack = { nav.popBackStack() }, onAddEvent = { nav.navigate(EventEditorRoute(route.groupId)) })
+                EventsScreen(
+                    onBack = { nav.popBackStack() },
+                    onAddEvent = { nav.navigate(EventEditorRoute(route.groupId)) },
+                    onOpenEvent = { nav.navigate(EventEditorRoute(route.groupId, eventId = it)) },
+                )
             }
             composable<EventEditorRoute> { EventEditorScreen(onBack = { nav.popBackStack() }, onSaved = { nav.popBackStack() }) }
             composable<AppearanceRoute> { AppearanceScreen(onBack = { nav.popBackStack() }) }

@@ -99,15 +99,7 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
             onUntil = viewModel::onDraftUntil,
             onNote = viewModel::onDraftNote,
             onSave = viewModel::saveDraft,
-        )
-    }
-    state.editing?.let { editing ->
-        EditBlockSheet(
-            state = editing,
-            onDismiss = viewModel::closeEditor,
-            onNote = viewModel::onEditNote,
-            onSave = viewModel::saveEdit,
-            onDelete = { viewModel.deleteBlock(editing.block) },
+            onDelete = viewModel::deleteEditingBlock,
         )
     }
 }

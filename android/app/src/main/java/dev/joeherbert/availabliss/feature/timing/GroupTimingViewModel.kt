@@ -168,12 +168,13 @@ class GroupTimingViewModel @Inject constructor(
         d.copy(range = DateRange(from.toString(), date.toString()))
     }
 
-    fun addDates(from: LocalDate, to: LocalDate) = edit { d ->
+    fun addRange(list: RangeList, from: LocalDate, to: LocalDate) = edit { d ->
         val range = DateRange(minOf(from, to).toString(), maxOf(from, to).toString())
-        if (range in d.dates) d else d.copy(dates = (d.dates + range).sortedBy { it.from })
+        val current = list.of(d)
+        if (range in current) d else list.with(d, (current + range).sortedBy { it.from })
     }
 
-    fun removeDates(range: DateRange) = edit { it.copy(dates = it.dates - range) }
+    fun removeRange(list: RangeList, range: DateRange) = edit { d -> list.with(d, list.of(d) - range) }
 
     fun save() {
         val state = _uiState.value
@@ -274,5 +275,24 @@ class GroupTimingViewModel @Inject constructor(
     private companion object {
         const val END_OF_DAY = "23:59"
         const val PREVIEW_DEBOUNCE_MS = 400L
+    }
+}
+
+/** The editable lists of date ranges on a timing draft. */
+enum class RangeList {
+    /** "Or only these dates": the only dates the group considers. */
+    Dates,
+
+    /** The group's own school holiday dates, used with "School holidays only". */
+    SchoolHolidays;
+
+    fun of(draft: TimingDraft): List<DateRange> = when (this) {
+        Dates -> draft.dates
+        SchoolHolidays -> draft.customSchoolHolidays
+    }
+
+    fun with(draft: TimingDraft, ranges: List<DateRange>): TimingDraft = when (this) {
+        Dates -> draft.copy(dates = ranges)
+        SchoolHolidays -> draft.copy(customSchoolHolidays = ranges)
     }
 }

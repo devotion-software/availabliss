@@ -58,6 +58,8 @@ enum class WhenOption(val label: String) { AllDay("All day"), Morning("Morning")
 /** The "Block a time" sheet form. */
 data class BlockDraft(
     val date: LocalDate,
+    /** Set when editing an existing block rather than adding one. */
+    val editingId: String? = null,
     val whenOption: WhenOption = WhenOption.AllDay,
     val customStart: LocalTime = LocalTime.of(14, 0),
     val customEnd: LocalTime = LocalTime.of(18, 0),
@@ -83,6 +85,8 @@ data class BlockDraft(
         WhenOption.Custom -> date.atTime(customStart) to date.atTime(customEnd)
     }
 
+    val isEditing: Boolean get() = editingId != null
+
     fun toRequest(): CreateBlockRequest {
         val (start, end) = range()
         return CreateBlockRequest(
@@ -94,16 +98,34 @@ data class BlockDraft(
             note = note.trim().ifBlank { null },
         )
     }
-}
 
-/** Edit / delete sheet for an existing block. */
-data class BlockEditState(
-    val block: ManualBlock,
-    val title: String,
-    val schedule: String,
-    val note: String,
-    val saving: Boolean = false,
-)
+    companion object {
+        /** Prefills the sheet from an existing block so every part of it can be edited. */
+        fun fromBlock(block: ManualBlock): BlockDraft? {
+            val start = DateTimes.localDateTime(block.start) ?: return null
+            val end = DateTimes.localDateTime(block.end) ?: return null
+            val date = start.toLocalDate()
+            // The sheet edits single-day times; a block that runs to midnight ends at 23:59 here.
+            val endTime = if (end.toLocalDate().isAfter(date)) LocalTime.of(23, 59) else end.toLocalTime()
+            val option = when {
+                block.allDay -> WhenOption.AllDay
+                start.toLocalTime() == DayPart.Morning.start && endTime == DayPart.Morning.end -> WhenOption.Morning
+                start.toLocalTime() == DayPart.Evening.start && endTime == DayPart.Evening.end -> WhenOption.Evening
+                else -> WhenOption.Custom
+            }
+            return BlockDraft(
+                date = date,
+                editingId = block.id,
+                whenOption = option,
+                customStart = start.toLocalTime(),
+                customEnd = endTime,
+                repeat = block.repeat,
+                until = block.until?.let(DateTimes::parseDate),
+                note = block.note.orEmpty(),
+            )
+        }
+    }
+}
 
 data class MyTimeUiState(
     val weekStart: LocalDate,
@@ -115,6 +137,5 @@ data class MyTimeUiState(
     val error: String? = null,
     val draft: BlockDraft? = null,
     val savingDraft: Boolean = false,
-    val editing: BlockEditState? = null,
     val message: UserMessage? = null,
 )

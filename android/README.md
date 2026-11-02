@@ -116,20 +116,15 @@ the WebAuthn challenge in a cookie, so the app keeps an in-memory cookie jar for
 
 ## Sign in with Apple (web flow)
 
-Android has no native Apple SDK, so the app uses Better Auth's web flow:
+Android has no Apple SDK, so Sign in with Apple runs as a web flow in a **Custom Tab**:
 
-1. `POST /api/auth/sign-in/social { provider: "apple", callbackURL: "availabliss://auth/callback", disableRedirect: true }`
-   returns Apple's authorize URL.
-2. The app opens it in a **Custom Tab**. Apple posts back to `/api/auth/callback/apple`.
-3. Better Auth then redirects to `callbackURL`. The app handles
-   `availabliss://auth/callback?token=<bearer token>` (also accepts `set-auth-token=`),
-   stores the token and loads `/me`.
-
-This needs server support that is not in API.md yet (see "API gaps and assumptions"): the callback must
-append the session's bearer token to the deep link (e.g. via Better Auth's `oneTimeToken`
-plugin + exchange, or a small redirect bridge), `availabliss://` must be a trusted
-callback origin, and the OAuth state check must not depend on a cookie set on the app's
-OkHttp request (the Custom Tab has a different cookie jar).
+1. The app opens `{apiBaseUrl}/api/v1/auth/native/apple/start`. The server starts Better Auth's
+   Apple sign-in inside the Custom Tab (so its state cookie lives there) and redirects to Apple.
+2. Apple returns to the server, which finishes the sign-in and redirects to
+   `availabliss://auth/callback?code=<one-time code>`.
+3. The app exchanges the code at `POST /api/v1/auth/native/exchange` for its bearer token, then
+   loads `/me`. Codes are single-use and expire after two minutes, so the token never appears in
+   a URL.
 
 ## Release signing
 
@@ -208,20 +203,14 @@ with its bearer token, opens the returned consent `url` in a Custom Tab, and han
 `availabliss://calendars?connected=<id>` (or `?error=`) return. iCloud uses the CalDAV form
 (`POST /calendars/caldav`, app-specific password).
 
-## API gaps and assumptions (docs/API.md)
+## API notes and assumptions
 
-- **Sign in with Apple on Android:** the web flow returns the session as a cookie in the Custom Tab,
-  not to the app. The server needs to redirect to `availabliss://auth/callback?token=<bearer>`
-  (and trust that callback, and not require the OAuth state cookie set on the app's own request).
-- **Passkeys on Android:** Credential Manager assertions carry the origin
-  `android:apk-key-hash:<base64url SHA-256 of the signing cert>`. Better Auth's passkey plugin is
-  configured with `origin = BETTER_AUTH_URL` only, so it must also accept the Android origin(s).
-- **All-day ends:** the app sends an all-day proposal/event end as local midnight after the last day
-  (exclusive); API.md doesn't say whether ends are exclusive.
-- **`BusyInterval.calendarId`** is assumed to equal `CalendarConnection.calendars[].id` (used for the
-  calendar colour dots on My time).
-- **Not in the API:** an attendee count on `GroupEvent` (the "N going" line uses the member count), the
-  group owner's region on `Group` (bank-holiday subtitle), whether `POST /groups/:id/invites { email }`
-  sends an email, and what happens when an owner leaves (the app offers owners Delete, not Leave).
-- Editing a manual block's time/repeat isn't offered (delete and re-add); deleting a repeating block
-  removes every occurrence (no per-occurrence exceptions in the API).
+- **All-day ends** are exclusive: an all-day event or proposal ends at local midnight after its last
+  day (documented in docs/API.md).
+- **`BusyInterval.calendarId`** equals `CalendarConnection.calendars[].id` (used for the calendar
+  colour dots on My time).
+- **Not in the API:** an attendee count on `GroupEvent` (the "N going" line uses the member count) and
+  the group owner's region on `Group` (the bank-holiday subtitle says "group owner's region"). Owners
+  can delete a group but not leave it.
+- **Repeating busy blocks** are edited and deleted as a whole series; the API has no per-occurrence
+  exceptions.

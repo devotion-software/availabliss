@@ -27,12 +27,10 @@ import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
 import dev.joeherbert.availabliss.designsystem.component.Chip
 import dev.joeherbert.availabliss.designsystem.component.FieldTile
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
-import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.Segment
 import dev.joeherbert.availabliss.designsystem.component.SegmentedControl
 import dev.joeherbert.availabliss.designsystem.component.SegmentedStyle
 import dev.joeherbert.availabliss.designsystem.component.TextAction
-import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import java.time.LocalDate
@@ -61,12 +59,14 @@ fun BlockTimeSheet(
     onUntil: (LocalDate?) -> Unit,
     onNote: (String) -> Unit,
     onSave: () -> Unit,
+    /** Shown when editing an existing block; deletes every occurrence. */
+    onDelete: () -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
     var picker by rememberSaveable { mutableStateOf<PickerTarget?>(null) }
 
-    AvBottomSheet(title = "Block a time", onDismissRequest = onDismiss) {
+    AvBottomSheet(title = if (draft.isEditing) "Edit busy time" else "Block a time", onDismissRequest = onDismiss) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FieldTile("Date", DateTimes.shortDay(draft.date), onClick = { picker = PickerTarget.Date }, modifier = Modifier.weight(1f))
             FieldTile("Time", draft.timeLabel, onClick = { picker = PickerTarget.Start }, modifier = Modifier.weight(1f))
@@ -114,7 +114,7 @@ fun BlockTimeSheet(
             textStyle = type.bodyLarge.copy(fontSize = 15.sp, fontWeight = FontWeight.Normal),
         )
         PrimaryButton(
-            text = "Block this time",
+            text = if (draft.isEditing) "Save changes" else "Block this time",
             onClick = onSave,
             style = ButtonStyle.Accent,
             height = 52.dp,
@@ -123,6 +123,14 @@ fun BlockTimeSheet(
             loading = saving,
             modifier = Modifier.fillMaxWidth(),
         )
+        if (draft.isEditing) {
+            TextAction(
+                text = if (draft.repeat == Repeat.None) "Delete" else "Delete every occurrence",
+                onClick = onDelete,
+                color = colors.warnInk,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+        }
     }
 
     when (picker) {
@@ -155,48 +163,5 @@ fun BlockTimeSheet(
             onDismiss = { if (picker == PickerTarget.End) picker = null },
         )
         null -> Unit
-    }
-}
-
-/** Details of an existing block with note editing and delete. */
-@Composable
-fun EditBlockSheet(
-    state: BlockEditState,
-    onDismiss: () -> Unit,
-    onNote: (String) -> Unit,
-    onSave: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    val colors = AvailablissTheme.colors
-    val type = AvailablissTheme.type
-    AvBottomSheet(title = state.title, onDismissRequest = onDismiss) {
-        Text(state.schedule, style = type.body, color = colors.muted)
-        if (state.block.repeat != Repeat.None) {
-            Text("Deleting removes every occurrence.", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
-        }
-        AvTextField(
-            value = state.note,
-            onValueChange = onNote,
-            label = "Note (only you see this)",
-            placeholder = "e.g. Wedding",
-            height = 48.dp,
-            shape = Shapes.controlSmall,
-            textStyle = type.bodyLarge.copy(fontSize = 15.sp, fontWeight = FontWeight.Normal),
-        )
-        PrimaryButton(
-            text = "Save",
-            onClick = onSave,
-            height = 52.dp,
-            shape = Shapes.control,
-            loading = state.saving,
-            enabled = state.note.trim() != state.block.note.orEmpty(),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        SecondaryButton(
-            text = "Delete block",
-            onClick = onDelete,
-            icon = AvIcons.Trash,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
