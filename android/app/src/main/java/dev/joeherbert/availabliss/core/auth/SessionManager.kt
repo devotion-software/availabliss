@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.core.auth
 
+import dev.joeherbert.availabliss.core.billing.PlanRepository
+import dev.joeherbert.availabliss.core.billing.StoreBilling
 import dev.joeherbert.availabliss.core.calendar.CalendarChangeObserver
 import dev.joeherbert.availabliss.core.calendar.CalendarSyncScheduler
 import dev.joeherbert.availabliss.core.common.ApplicationScope
@@ -42,6 +44,8 @@ class SessionManager @Inject constructor(
     private val syncScheduler: CalendarSyncScheduler,
     private val calendarObserver: CalendarChangeObserver,
     private val cookieJar: PasskeyCookieJar,
+    private val plans: PlanRepository,
+    private val billing: StoreBilling,
     authInterceptor: AuthInterceptor,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
@@ -83,6 +87,8 @@ class SessionManager @Inject constructor(
         tokenStore.clear()
         cookieJar.clear()
         users.clear()
+        plans.clear()
+        billing.logOut()
         groups.clear()
         calendars.clear()
         notifications.clear()

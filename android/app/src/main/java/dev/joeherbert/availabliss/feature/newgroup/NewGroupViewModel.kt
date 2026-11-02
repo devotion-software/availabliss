@@ -3,6 +3,8 @@ package dev.joeherbert.availabliss.feature.newgroup
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.joeherbert.availabliss.core.billing.PlanLabels
+import dev.joeherbert.availabliss.core.billing.PlanRepository
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.GroupsRepository
@@ -45,6 +47,9 @@ data class NewGroupUiState(
     val creating: Boolean = false,
     val error: String? = null,
     val message: UserMessage? = null,
+    /** Free plan, already at its group limit: show the limit and a way to Pro instead of the form. */
+    val atLimit: Boolean = false,
+    val groupLimit: Int = PlanLabels.FREE_GROUP_LIMIT,
     /** Set once created; the screen navigates and calls [NewGroupViewModel.createdHandled]. */
     val createdGroupId: String? = null,
 ) {
@@ -72,6 +77,7 @@ data class NewGroupUiState(
 @HiltViewModel
 class NewGroupViewModel @Inject constructor(
     private val groups: GroupsRepository,
+    private val plans: PlanRepository,
     private val templates: TemplatesRepository,
     private val users: UserRepository,
     regions: RegionsRepository,
@@ -95,7 +101,15 @@ class NewGroupViewModel @Inject constructor(
         viewModelScope.launch {
             templates.list().getOrNull()?.let { list -> _uiState.update { it.copy(templates = list) } }
         }
+        viewModelScope.launch {
+            plans.refresh().getOrNull()?.let { plan ->
+                _uiState.update { it.copy(atLimit = !plan.canCreateGroup, groupLimit = plan.groupLimit ?: it.groupLimit) }
+            }
+        }
     }
+
+    /** After the upgrade sheet switched Pro on: back to the form. */
+    fun upgraded(message: String) = _uiState.update { it.copy(atLimit = false, message = UserMessage(message)) }
 
     private val timezone: String get() = users.user.value?.timezone ?: DateTimes.zone.id
 
@@ -147,13 +161,15 @@ class NewGroupViewModel @Inject constructor(
                     groups.refreshGroups()
                     _uiState.update { it.copy(creating = false, createdGroupId = result.value.id) }
                 }
+                is ApiResult.Failure if result.error is ApiError.UpgradeRequired -> {
+                    _uiState.update { it.copy(creating = false, atLimit = true) }
+                }
                 is ApiResult.Failure -> {
                     val nameIssue = (result.error as? ApiError.Validation)?.issueFor("name")
                     _uiState.update {
                         if (nameIssue != null) {
                             it.copy(creating = false, step = NewGroupStep.Details, error = nameIssue)
                         } else {
-                            // Includes 402 upgrade_required: the server explains the free group limit.
                             val text = (result.error as? ApiError.Validation)?.issues?.firstOrNull()?.message ?: result.error.message
                             it.copy(creating = false, message = UserMessage(text))
                         }

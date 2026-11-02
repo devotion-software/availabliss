@@ -126,6 +126,30 @@ Android has no Apple SDK, so Sign in with Apple runs as a web flow in a **Custom
    loads `/me`. Codes are single-use and expire after two minutes, so the token never appears in
    a URL.
 
+## Pro (RevenueCat, Google Play Billing)
+
+Pro is bought through [RevenueCat](https://www.revenuecat.com) on every platform; see
+[`docs/BILLING.md`](../docs/BILLING.md) for the project, entitlement and webhook setup. On
+Android:
+
+1. **Play Console**: create the subscription products (e.g. `pro_monthly`, `pro_annual`, each
+   with a base plan) on the `dev.joeherbert.availabliss` app, and add license testers for
+   test purchases. The app must be uploaded to a testing track before products load.
+2. **RevenueCat**: add the Play Store app (package `dev.joeherbert.availabliss`), upload the
+   Google Play service account credentials, import the products, attach them to the `pro`
+   entitlement and the *current* offering (`$rc_monthly` / `$rc_annual`).
+3. **Server**: set `REVENUECAT_ANDROID_KEY` to RevenueCat's public Google key. The app reads
+   it from `GET /api/v1/me/plan` (`purchase.android`), so no rebuild is needed. Without it the
+   upgrade sheet says Pro can be bought on the web instead.
+
+The `com.android.vending.BILLING` permission comes with the RevenueCat SDK
+(`com.revenuecat.purchases:purchases`, in `gradle/libs.versions.toml`). RevenueCat is
+configured lazily (when the upgrade sheet opens) with the signed-in user's id as its app
+user id, so Pro follows the account to iPhone and the web; signing out logs RevenueCat out.
+The paywall is our own (`feature/plan/UpgradeSheet.kt`), not RevenueCat's UI library.
+
+Test Pro without a purchase: `make set-plan EMAIL=… PLAN=pro DAYS=1` (and `PLAN=free`).
+
 ## Release signing
 
 Create `android/keystore.properties` (git-ignored):

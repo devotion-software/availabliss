@@ -6,11 +6,13 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.auth.AuthRepository
 import dev.joeherbert.availabliss.core.common.UserMessage
+import dev.joeherbert.availabliss.core.billing.PlanRepository
 import dev.joeherbert.availabliss.core.data.AppPreferences
 import dev.joeherbert.availabliss.core.data.TemplatesRepository
 import dev.joeherbert.availabliss.core.data.Appearance
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiResult
+import dev.joeherbert.availabliss.core.network.model.Plan
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.feature.timing.Templates
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +35,8 @@ data class YouUiState(
     val deleting: Boolean = false,
     /** Set after the account is deleted; the UI then runs sign-out cleanup. */
     val deleted: Boolean = false,
+    /** Your plan (Free / Pro); null until loaded. */
+    val plan: Plan? = null,
     /** Your timing templates; null until loaded. */
     val templates: List<TemplateRowUi>? = null,
     /** The template being renamed, and its name so far. */
@@ -57,6 +61,7 @@ class YouViewModel @Inject constructor(
     private val users: UserRepository,
     private val auth: AuthRepository,
     private val templatesRepo: TemplatesRepository,
+    private val plans: PlanRepository,
     prefs: AppPreferences,
 ) : ViewModel() {
 
@@ -64,11 +69,19 @@ class YouViewModel @Inject constructor(
     val state: StateFlow<YouUiState> = _state.asStateFlow()
 
     init {
+        viewModelScope.launch { plans.plan.collect { plan -> _state.update { it.copy(plan = plan) } } }
         viewModelScope.launch {
             combine(users.user, prefs.appearance) { user, appearance -> user to appearance }
                 .collect { (user, appearance) -> _state.update { it.copy(user = user, appearance = appearance) } }
         }
     }
+
+    fun refreshPlan() {
+        viewModelScope.launch { plans.refresh() }
+    }
+
+    /** After the upgrade sheet switched Pro on. */
+    fun upgraded(message: String) = _state.update { it.copy(message = UserMessage(message)) }
 
     // region Timing templates
     /** Reloads the list (templates are saved from New group and the Timing tab). */

@@ -28,6 +28,8 @@ sealed interface ApiError {
         fun issueFor(path: String): String? = issues.firstOrNull { it.path == path }?.message
     }
     data class Conflict(override val message: String = "That conflicts with something that already exists.") : ApiError
+    /** 402 `upgrade_required`: the free plan's limit (e.g. 3 groups) or a Pro-only feature. */
+    data class UpgradeRequired(override val message: String = "That's part of Availabliss Pro.") : ApiError
     data class RateLimited(override val message: String = "Slow down a little and try again shortly.") : ApiError
     data class Server(override val message: String = "Something went wrong on our side. Please try again.") : ApiError
     data class Network(override val message: String = "You appear to be offline. Check your connection and try again.") : ApiError
@@ -40,6 +42,7 @@ sealed interface ApiError {
             val code = body?.code ?: when (httpCode) {
                 400, 422 -> "validation_error"
                 401 -> "unauthorized"
+                402 -> "upgrade_required"
                 403 -> "forbidden"
                 404 -> "not_found"
                 409 -> "conflict"
@@ -54,6 +57,7 @@ sealed interface ApiError {
                 "validation_error" -> Validation(msg ?: Validation().message, body?.issues.orEmpty())
                 "conflict" -> msg?.let(::Conflict) ?: Conflict()
                 "rate_limited" -> msg?.let(::RateLimited) ?: RateLimited()
+                "upgrade_required" -> msg?.let(::UpgradeRequired) ?: UpgradeRequired()
                 "server_error" -> msg?.let(::Server) ?: Server()
                 else -> Unknown(msg ?: Unknown().message, httpCode)
             }

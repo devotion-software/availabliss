@@ -1,6 +1,7 @@
 package dev.joeherbert.availabliss.core.network
 
 import dev.joeherbert.availabliss.core.network.model.Availability
+import dev.joeherbert.availabliss.core.network.model.Plan
 import dev.joeherbert.availabliss.core.network.model.CreateTemplateRequest
 import dev.joeherbert.availabliss.core.network.model.RenameTemplateRequest
 import dev.joeherbert.availabliss.core.network.model.RequirementTemplate
@@ -214,6 +215,15 @@ interface AvailablissApi {
     // region Proposals
     @GET("api/v1/groups/{id}/proposals")
     suspend fun getProposals(@Path("id") groupId: String, @Query("status") status: String? = null): ProposalsResponse
+
+    // region Plan (Pro)
+    @GET("api/v1/me/plan")
+    suspend fun getPlan(): Plan
+
+    /** Re-reads RevenueCat right after a purchase or restore (the webhook may lag). */
+    @POST("api/v1/me/plan/refresh")
+    suspend fun refreshPlan(): Plan
+    // endregion
 
     // region Timing templates
     @GET("api/v1/me/templates")

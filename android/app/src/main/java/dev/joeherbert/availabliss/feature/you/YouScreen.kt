@@ -22,6 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import dev.joeherbert.availabliss.feature.plan.UpgradeSheet
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -72,7 +76,12 @@ fun YouScreen(
     val snackbar = rememberSnackbarHostState()
 
     LaunchedEffect(state.deleted) { if (state.deleted) onSignOut() }
-    LaunchedEffect(Unit) { viewModel.refreshTemplates() }
+    LaunchedEffect(Unit) {
+        viewModel.refreshTemplates()
+        viewModel.refreshPlan()
+    }
+    var upgrading by rememberSaveable { mutableStateOf(false) }
+    if (upgrading) UpgradeSheet(onDismiss = { upgrading = false }, onUpgraded = viewModel::upgraded)
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
 
     AvailablissBackground(OrbLayout.Main) {
@@ -85,6 +94,7 @@ fun YouScreen(
             onAddPasskey = { viewModel.addPasskey(context) },
             onSignOut = onSignOut,
             onDelete = viewModel::requestDelete,
+            onOpenPro = { upgrading = true },
             templateActions = TemplateActions(
                 onRename = viewModel::startRenamingTemplate,
                 onNameChange = viewModel::onTemplateNameChange,
@@ -149,6 +159,7 @@ fun YouContent(
     onAddPasskey: () -> Unit,
     onSignOut: () -> Unit,
     onDelete: () -> Unit,
+    onOpenPro: () -> Unit = {},
     templateActions: TemplateActions = TemplateActions(),
 ) {
     val colors = AvailablissTheme.colors
@@ -182,6 +193,8 @@ fun YouContent(
                 loading = state.addingPasskey,
             )
         }
+
+        PlanSection(state.plan, onOpenPro)
 
         TemplatesSection(state, templateActions)
 

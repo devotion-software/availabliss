@@ -60,6 +60,8 @@ object AvIcons {
     val Palette = line("Palette", "M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.4-4-7.8-9-7.8z", circle(7.5f, 11f, .5f), circle(10.5f, 7.5f, .5f), circle(15f, 8f, .5f))
     val Refresh = line("Refresh", "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5")
     val Globe = line("Globe", circle(12f, 12f, 9f), "M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z")
+    /** Pro and AI planning. */
+    val Sparkle = line("Sparkle", "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z")
     val Star = line("Star", "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z")
 
     /** Double tick for read receipts (28×18 viewport, as in the concept). */

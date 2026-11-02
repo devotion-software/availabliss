@@ -25,6 +25,13 @@ import dev.joeherbert.availabliss.feature.timing.TimingActions
 import dev.joeherbert.availabliss.feature.timing.TimingEditorSections
 import dev.joeherbert.availabliss.feature.timing.TimingEditorUiState
 import dev.joeherbert.availabliss.feature.timing.TimingPreset
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.heading
+import dev.joeherbert.availabliss.feature.plan.UpgradeSheet
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -85,10 +92,12 @@ fun NewGroupScreen(
         viewModel.createdHandled()
         onCreated(id)
     }
-    BackHandler(enabled = state.step == NewGroupStep.Timing, onBack = viewModel::back)
-    when (state.step) {
-        NewGroupStep.Details -> NewGroupContent(state, onBack, viewModel::setName, viewModel::setColor, viewModel::selectPreset, viewModel::next, viewModel::selectTemplate)
-        NewGroupStep.Timing -> {
+    var upgrading by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = state.step == NewGroupStep.Timing && !state.atLimit, onBack = viewModel::back)
+    when {
+        state.atLimit -> GroupLimitContent(state.groupLimit, onBack, onSeePro = { upgrading = true })
+        state.step == NewGroupStep.Details -> NewGroupContent(state, onBack, viewModel::setName, viewModel::setColor, viewModel::selectPreset, viewModel::next, viewModel::selectTemplate)
+        else -> {
             val editor = state.editor
             if (editor != null) {
                 NewGroupTimingContent(
@@ -100,8 +109,52 @@ fun NewGroupScreen(
             }
         }
     }
+    if (upgrading) {
+        UpgradeSheet(
+            onDismiss = { upgrading = false },
+            onUpgraded = viewModel::upgraded,
+            reason = "You've used your ${state.groupLimit} free groups. Pro gives you as many as you like.",
+        )
+    }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         AvSnackbarHost(snackbar, Modifier.navigationBarsPadding().padding(bottom = if (state.step == NewGroupStep.Timing) 150.dp else 90.dp))
+    }
+}
+
+/** Shown instead of the form when a free account already owns its groups. */
+@Composable
+fun GroupLimitContent(limit: Int, onBack: () -> Unit, onSeePro: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    AvailablissBackground(OrbLayout.Main) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            ScreenHeader(title = "New group", onBack = onBack)
+            GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(colors.accentSoft), contentAlignment = Alignment.Center) {
+                    Icon(AvIcons.Groups, null, tint = colors.accentInk, modifier = Modifier.size(24.dp))
+                }
+                Text("You've made $limit groups", style = AvailablissTheme.type.titleMedium, color = colors.ink, modifier = Modifier.semantics { heading() })
+                Text(
+                    "Free accounts can create $limit. Upgrade to Pro for unlimited groups, or delete one you no longer need. " +
+                        "You can still join groups other people make.",
+                    style = AvailablissTheme.type.body,
+                    color = colors.muted,
+                )
+                PrimaryButton(
+                    text = "See Pro",
+                    onClick = onSeePro,
+                    style = ButtonStyle.Accent,
+                    icon = AvIcons.Sparkle,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                )
+            }
+        }
     }
 }
 
