@@ -4,6 +4,10 @@ import { auth } from '#lib/auth';
 import { COLOR_THEMES, THEME_MODES, type ColorTheme, type ThemeMode } from '#lib/types';
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
 import { syncStaleConnections } from '#lib/server/calendars';
+import { isForbiddenCrossSite, selfOrigins } from '#lib/server/csrf';
+import { env } from '#lib/server/env';
+
+const ALLOWED_ORIGINS = selfOrigins(env.baseUrl, env.trustedOrigins);
 
 const CALENDAR_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -16,6 +20,10 @@ export const init: ServerInit = () => {
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
+	if (isForbiddenCrossSite(event.request, event.url, ALLOWED_ORIGINS)) {
+		return Response.json({ message: 'Cross-site request blocked', code: 'forbidden' }, { status: 403 });
+	}
+
 	// Resolves both cookie sessions (web) and `Authorization: Bearer` tokens (native).
 	let session;
 	try {

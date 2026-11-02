@@ -43,6 +43,19 @@ Run `make help` for every task. The useful ones:
 | `make android-build` / `make android-test` | Build the Android debug APK / run its unit tests |
 | `make android-tour` | Sign in on the emulator as the demo user and tour every main screen |
 
+## Continuous integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main`
+and every pull request, and only builds the platforms a change touches:
+
+| Job | Runs |
+| --- | ---- |
+| Web | type-check, unit tests with coverage, production build |
+| Smoke | the production build against MariaDB + Mailpit, then `scripts/smoke.ts` end to end |
+| Docker | builds the Coolify image |
+| Android | unit tests and the debug APK |
+| iOS | XcodeGen + a simulator build |
+
 ## How it fits together
 
 - **One API for every client.** The SvelteKit app serves the web UI and

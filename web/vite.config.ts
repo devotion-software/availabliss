@@ -14,7 +14,10 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter()
+			adapter: adapter(),
+			// SvelteKit's origin check also rejects body-less POST/DELETE from the native
+			// apps (no Origin header). hooks.server.ts applies a bearer-aware check instead.
+			csrf: { trustedOrigins: ['*'] }
 		})
 	],
 	server: {

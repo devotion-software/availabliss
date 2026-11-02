@@ -1,0 +1,187 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Decide which platforms a change touches so a web-only change doesn't wait on Xcode.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      ios: ${{ steps.filter.outputs.ios }}
+      android: ${{ steps.filter.outputs.android }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'web/**'
+              - 'Dockerfile'
+              - 'docker-compose.yml'
+              - '.github/workflows/ci.yml'
+            ios:
+              - 'ios/**'
+              - '.github/workflows/ci.yml'
+            android:
+              - 'android/**'
+              - '.github/workflows/ci.yml'
+
+  web:
+    name: Web · type-check, unit tests, build
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - name: Type-check
+        run: bun run check
+      - name: Unit tests
+        run: bun test src --coverage
+      - name: Build
+        run: bun run build
+        env:
+          DATABASE_URL: mysql://build:build@localhost:3306/build
+          BETTER_AUTH_SECRET: ci-build-placeholder
+
+  smoke:
+    name: Web · end-to-end smoke test (production build)
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: availabliss
+          MARIADB_USER: availabliss
+          MARIADB_PASSWORD: availablisspass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      mailpit:
+        image: axllent/mailpit:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+    env:
+      DATABASE_URL: mysql://availabliss:availablisspass@127.0.0.1:3306/availabliss
+      BETTER_AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
+      BETTER_AUTH_URL: http://localhost:3000
+      ORIGIN: http://localhost:3000
+      PORT: 3000
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: 1025
+      SMTP_SECURE: 'false'
+      BASE_URL: http://localhost:3000
+      MAILPIT_URL: http://localhost:8025
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - name: Build
+        run: bun run build
+      - name: Migrate
+        run: node scripts/migrate.js
+      - name: Start server
+        run: |
+          node build > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3000/api/v1/health && exit 0; sleep 1; done
+          cat server.log; exit 1
+      - name: Smoke test
+        run: bun scripts/smoke.ts
+      - name: Server log
+        if: failure()
+        run: cat server.log
+
+  docker:
+    name: Web · Docker image
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: availabliss-web:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  android:
+    name: Android · unit tests, debug build
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Install SDK 37
+        run: sdkmanager "platforms;android-37"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: android-test-reports
+          path: android/app/build/reports/tests
+
+  ios:
+    name: iOS · simulator build
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: cd ios && xcodegen generate
+      - name: Build
+        run: >-
+          xcodebuild -project ios/Availabliss.xcodeproj -scheme Availabliss
+          -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/build
+          CODE_SIGNING_ALLOWED=NO build
