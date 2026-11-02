@@ -159,3 +159,17 @@ export const rangeQuerySchema = z.object({ from: dateString, to: dateString });
 
 export const createTemplateSchema = z.object({ name: trimmed(60), requirement: requirementSchema });
 export const updateTemplateSchema = z.object({ name: trimmed(60).optional(), requirement: requirementSchema.optional() });
+
+export const linkProviderSchema = z.enum(['apple', 'google']);
+
+/** POST /me/accounts/link (native apps: an id token from Sign in with Apple / Google). */
+export const linkAccountSchema = z.object({
+	provider: linkProviderSchema,
+	idToken: z.string().min(10).max(8192),
+	nonce: z.string().max(512).optional(),
+	/** The sign-in has its own account and the person confirmed merging it into this one. */
+	merge: z.boolean().optional()
+});
+
+/** POST /me/accounts/merge-intent (web) */
+export const mergeIntentSchema = z.object({ provider: linkProviderSchema });

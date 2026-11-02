@@ -309,6 +309,25 @@ export interface ApiErrorBody {
 	issues?: { path: string; message: string }[];
 }
 
+/** Sign-in providers that can be linked to an account. */
+export type LinkProvider = 'apple' | 'google';
+
+/** GET /me/accounts */
+export interface LinkedAccounts {
+	/** Apple / Google sign-ins on this account (email always works too). */
+	linked: { provider: LinkProvider; linkedAt: string }[];
+	/** Providers this server can link. */
+	available: LinkProvider[];
+}
+
+/** The account a sign-in already belongs to, shown before merging it into yours. */
+export interface MergeCandidate {
+	name: string;
+	email: string;
+	/** How many groups it's in. */
+	groups: number;
+}
+
 export type PlanTier = 'free' | 'pro';
 
 /** GET /me/plan */

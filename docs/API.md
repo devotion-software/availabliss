@@ -33,6 +33,17 @@ All sign-in calls return `{ "user": User, ... }` plus the `set-auth-token` heade
 | Add a passkey (signed in) | `GET /api/auth/passkey/generate-register-options` → platform attestation → `POST /api/auth/passkey/verify-registration` `{ "response": <RegistrationResponseJSON>, "name"? }` |
 | Sign out | `POST /api/auth/sign-out` |
 
+### Linking Apple / Google to an account
+
+Native apps get an id token exactly as for sign-in and send it to `POST /api/v1/me/accounts/link`
+(see Endpoints). The web links with a redirect: `POST /api/auth/link-social` `{ provider, callbackURL,
+errorCallbackURL }`. If that sign-in already has its own account the redirect comes back with
+`?error=account_already_linked_to_different_user`; after the person confirms, the web calls
+`POST /api/v1/me/accounts/merge-intent` (which sets a cookie in this browser), then signs in with the
+provider with `callbackURL: "/link/complete"`. That route merges the account just signed in to into
+the one that started, moves the session over and redirects to `/app/settings?merged=<provider>`
+(or `?link_error=merge_expired | merge_not_signed_in | merge_wrong_account | merge_failed`).
+
 Passkeys on native need the relying-party domain associated with the app. The web
 app serves `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`
 from the `APPLE_TEAM_ID`, `IOS_BUNDLE_ID`, `ANDROID_PACKAGE` and
@@ -189,6 +200,9 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded'>>` | `User` |
 | GET 🔒 | `/me/busy?from&to` (ISO instants) | | `{ intervals: BusyInterval[] }` (own merged busy time; `label` is only ever returned to the owner) |
 | DELETE 🔒 | `/me` | | `204` (deletes the account and all data) |
+| GET 🔒 | `/me/accounts` | | `{ linked: { provider: 'apple' \| 'google'; linkedAt }[]; available: ('apple' \| 'google')[] }` (Apple / Google sign-ins on the account, and which ones this server can link) |
+| POST 🔒 | `/me/accounts/link` | `{ provider: 'apple' \| 'google', idToken, nonce?, merge? }` | `{ linked: true, merged }`, or `409` `{ message, code: 'conflict', account: { name, email, groups } }` when that sign-in already has its own account. Show it, then send again with `merge: true` to merge it into this account (its groups, busy time, calendars, chats, templates and Pro move here; the other account is deleted). Native only: the id token comes from Sign in with Apple / Google. |
+| POST 🔒 | `/me/accounts/merge-intent` | `{ provider }` | `204` + a short-lived cookie (web only; see Linking on the web) |
 
 ```ts
 interface BusyInterval { start: string; end: string; source: 'calendar' | 'manual'; label: string | null; calendarId: string | null; blockId: string | null }

@@ -55,7 +55,11 @@ export const auth = betterAuth({
 	account: {
 		accountLinking: {
 			enabled: true,
-			trustedProviders: ['google', 'apple', 'email-otp']
+			trustedProviders: ['google', 'apple', 'email-otp'],
+			// Linking from You / settings: the Apple or Google address often differs from the
+			// account's (Hide My Email, a personal Gmail). The person is signed in and proves the
+			// other sign-in, so a different address is fine.
+			allowDifferentEmails: true
 		}
 	},
 	user: {

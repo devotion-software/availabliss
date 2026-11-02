@@ -14,6 +14,7 @@
 	import { regionFromUser, regionPatch, type RegionValue } from '#lib/components/region/region';
 	import AppearanceSection from '#lib/components/settings/AppearanceSection.svelte';
 	import PasskeysSection from '#lib/components/settings/PasskeysSection.svelte';
+	import SignInMethodsSection from '#lib/components/settings/SignInMethodsSection.svelte';
 	import PlanSection from '#lib/components/settings/PlanSection.svelte';
 	import TemplatesSection from '#lib/components/settings/TemplatesSection.svelte';
 
@@ -131,6 +132,8 @@
 				</span>
 				<Icon name="chevron-right" size={18} />
 			</a>
+
+			<SignInMethodsSection email={data.user.email} />
 
 			<PasskeysSection />
 

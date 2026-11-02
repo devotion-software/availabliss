@@ -8,7 +8,7 @@
 import { and, count, eq } from 'drizzle-orm';
 import type { Plan } from '#lib/types';
 import { db } from './db';
-import { groupMembers, user, userPlans } from './db/schema';
+import { groupMembers, user, userAliases, userPlans } from './db/schema';
 import { ApiError } from './http';
 import { env } from './env';
 
@@ -151,7 +151,10 @@ async function fetchSubscriber(appUserId: string): Promise<RcSubscriber> {
 async function knownUser(id: string | undefined): Promise<string | null> {
 	if (!id || id.startsWith('$RCAnonymousID')) return null;
 	const row = await db.query.user.findFirst({ where: eq(user.id, id), columns: { id: true } });
-	return row?.id ?? null;
+	if (row) return row.id;
+	// An account merged into another one: its purchases now belong to that account.
+	const alias = await db.query.userAliases.findFirst({ where: eq(userAliases.oldUserId, id), columns: { userId: true } });
+	return alias?.userId ?? null;
 }
 
 /** Re-reads a user's entitlement from RevenueCat. Returns false when billing isn't configured. */

@@ -372,6 +372,19 @@ export const requirementTemplates = mysqlTable(
 	(t) => [index('requirement_templates_user_idx').on(t.userId)]
 );
 
+// ─── Merged accounts ──────────────────────────────────────────────────────
+
+/**
+ * Accounts merged into another one (linking an Apple / Google sign-in that had
+ * its own account). Outside systems that still know the old id, like
+ * RevenueCat's app user id, resolve through here to the account that remains.
+ */
+export const userAliases = mysqlTable('user_aliases', {
+	oldUserId: varchar('old_user_id', { length: 36 }).primaryKey(),
+	userId: userRef(),
+	createdAt: createdAt()
+});
+
 // ─── Plans ────────────────────────────────────────────────────────────────
 
 /**
