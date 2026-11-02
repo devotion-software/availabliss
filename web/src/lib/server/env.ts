@@ -21,6 +21,8 @@ export const env = {
 	secretsKey: optional('SECRETS_KEY') ?? optional('BETTER_AUTH_SECRET'),
 	/** Shared state for multiple instances (live updates, sign-in codes, rate limits, locks). */
 	redisUrl: optional('REDIS_URL'),
+	/** Rate limiting: on in production, off in dev unless RATE_LIMIT=on. RATE_LIMIT=off disables it anywhere. */
+	rateLimit: (optional('RATE_LIMIT') ?? (process.env.NODE_ENV === 'production' ? 'on' : 'off')) !== 'off',
 
 	google: {
 		/** Web client first; iOS / Android client ids are accepted for native ID-token sign-in. */

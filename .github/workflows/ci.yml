@@ -123,6 +123,9 @@ jobs:
       - name: Migrate
         run: node scripts/migrate.js
       - name: Start server
+        env:
+          # Production mode, so rate limits are on as they are when deployed.
+          NODE_ENV: production
         run: |
           node build > server.log 2>&1 &
           for i in $(seq 1 60); do curl -sf http://localhost:3000/api/v1/health && exit 0; sleep 1; done

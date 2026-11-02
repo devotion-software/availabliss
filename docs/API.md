@@ -50,6 +50,33 @@ Non-2xx responses have the body:
 `validation_error` (400), `conflict` (409), `rate_limited` (429), `server_error` (500).
 `issues` is only present for `validation_error`.
 
+### Rate limits
+
+Every `/api/v1` request counts against a per-user budget (per IP when signed
+out): 600 reads and 120 writes a minute signed in, 120 requests a minute signed
+out. Some endpoints have tighter limits of their own:
+
+| Endpoint | Limit |
+| -------- | ----- |
+| `POST /auth/native/exchange` | 10 / minute per IP |
+| `GET /invites/:token`, `POST /invites/:token/accept` | 30 / 10 minutes per IP |
+| `GET /live` | 20 connections / minute |
+| `POST /calendars/:id/sync` | 6 / minute |
+| `POST /calendars/caldav`, `POST /calendars/oauth/:provider/url` | 10 / 10 minutes |
+| `PUT /calendars/device` | 30 / minute |
+| `POST /groups` | 20 / hour |
+| `POST /groups/:id/invites` | 30 / hour |
+| `POST /groups/:id/messages` | 30 / minute |
+| `GET /groups/:id/availability[/day]` | 120 / minute |
+| `POST /requirements/preview` | 120 / minute |
+| `GET /regions/detect` | 30 / minute per IP |
+| `POST /api/auth/email-otp/send-verification-otp` | 5 / minute per IP and 5 / 15 minutes per email address |
+| `POST /api/auth/sign-in/email-otp` | 10 / minute per IP |
+
+Over a limit the response is `429` with `code: "rate_limited"`, a readable
+`message` and a `Retry-After` header in seconds. Limits are enforced in
+production (`RATE_LIMIT=on|off` overrides).
+
 ## Shared types
 
 ```ts

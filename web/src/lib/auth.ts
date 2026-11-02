@@ -37,6 +37,13 @@ export const auth = betterAuth({
 	// Apple's web flow posts back from appleid.apple.com; TRUSTED_ORIGINS adds dev hosts.
 	trustedOrigins: ['https://appleid.apple.com', ...env.trustedOrigins],
 	rateLimit: {
+		enabled: env.rateLimit,
+		customRules: {
+			// Each code is an email we send; per-address limits are in hooks.server.ts.
+			'/email-otp/send-verification-otp': { window: 60, max: 5 },
+			// Six-digit codes: keep guessing slow.
+			'/sign-in/email-otp': { window: 60, max: 10 }
+		},
 		// Counters live in the shared store (Redis) so limits hold across instances.
 		customStorage: {
 			async consume(key, rule) {
