@@ -14,6 +14,9 @@ enum API {
         }
         static func delete() -> Endpoint<EmptyResponse> { .init(.delete, "/me") }
         static func upcoming() -> Endpoint<EventsResponse> { .init(.get, "/me/upcoming") }
+        static func plan() -> Endpoint<Plan> { .init(.get, "/me/plan") }
+        /// Re-reads RevenueCat after a purchase or restore.
+        static func refreshPlan() -> Endpoint<Plan> { .init(.post, "/me/plan/refresh") }
         static func templates() -> Endpoint<TemplatesResponse> { .init(.get, "/me/templates") }
         static func createTemplate(name: String, requirement: Requirement) -> Endpoint<RequirementTemplate> {
             .init(.post, "/me/templates", body: CreateTemplateBody(name: name, requirement: requirement))

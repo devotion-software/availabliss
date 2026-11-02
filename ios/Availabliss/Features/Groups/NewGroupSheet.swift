@@ -16,6 +16,9 @@ struct NewGroupSheet: View {
     @State private var templates: [RequirementTemplate] = []
     @State private var templateId: String?
     @State private var toast: String?
+    /// Free accounts at their group limit see the limit panel instead of the form.
+    @State private var limit: Int?
+    @State private var showsUpgrade = false
     @State private var timing: TimingEditorViewModel
     @State private var isSaving = false
     @State private var error: String?
@@ -33,11 +36,26 @@ struct NewGroupSheet: View {
     private var timezone: String { app.session.user?.timezone ?? TimeZone.current.identifier }
 
     var body: some View {
-        BottomSheet(title: step == 1 ? "New group" : "When are you looking for?") {
-            if step == 1 { details } else { timingStep }
+        BottomSheet(title: limit != nil || step == 1 ? "New group" : "When are you looking for?") {
+            if let limit {
+                GroupLimitPanel(limit: limit) { showsUpgrade = true }
+            } else if step == 1 {
+                details
+            } else {
+                timingStep
+            }
         }
         .safeAreaInset(edge: .bottom) {
-            if step == 2 { createBar }
+            if step == 2 && limit == nil { createBar }
+        }
+        .task {
+            if let plan = try? await api.send(API.Me.plan()), !plan.canCreateGroup { limit = plan.groupLimit ?? 3 }
+        }
+        .sheet(isPresented: $showsUpgrade) {
+            UpgradeSheet(reason: "You've used your \(limit ?? 3) free groups. Pro gives you as many as you like.") { _ in
+                limit = nil
+                toast = "Welcome to Pro"
+            }
         }
         .task { await timing.loadAuthorities(country: app.session.user?.country) }
         .task { templates = (try? await api.send(API.Me.templates()).templates) ?? [] }
@@ -180,9 +198,16 @@ struct NewGroupSheet: View {
             dismiss()
             onCreated(group)
         } catch let failure as APIError {
-            // A free account at its group limit gets a 402 `upgrade_required` with a message to show.
-            if case .validation(_, let issues) = failure, issues.contains(where: { $0.path == "name" }) { step = 1 }
-            error = failure.userMessage
+            switch failure {
+            case .http(status: 402, _):
+                // `upgrade_required`: a free account at its group limit.
+                limit = (try? await api.send(API.Me.plan()))?.groupLimit ?? 3
+            case .validation(_, let issues) where issues.contains(where: { $0.path == "name" }):
+                step = 1
+                error = failure.userMessage
+            default:
+                error = failure.userMessage
+            }
         } catch {
             self.error = error.userMessage
         }

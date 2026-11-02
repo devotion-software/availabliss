@@ -15,6 +15,7 @@ final class AppModel {
     let live: LiveEventsClient
     let push: PushManager
     let deviceCalendar: DeviceCalendarService
+    let billing = Billing()
 
     private(set) var unreadNotifications = 0
     @ObservationIgnored private var liveTask: Task<Void, Never>?
@@ -49,6 +50,7 @@ final class AppModel {
 
     func signOut() async {
         await push.unregister()
+        await billing.signOut()
         await session.signOut()
         didSignOut()
     }
@@ -56,6 +58,7 @@ final class AppModel {
     func deleteAccount() async throws {
         await push.unregister()
         try await session.deleteAccount()
+        await billing.signOut()
         didSignOut()
     }
 

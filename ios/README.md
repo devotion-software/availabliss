@@ -4,9 +4,11 @@ Native SwiftUI client for the Availabliss API (`docs/API.md`), styled after the 
 concept (`docs/DESIGN.md`, `docs/design-concept/`).
 
 - iOS 17+, SwiftUI, Swift 6 language mode (strict concurrency), `@Observable`, async/await
-- **No third-party dependencies.** Google sign-in uses OAuth 2.0 + PKCE in
-  `ASWebAuthenticationSession` and exchanges the code for an ID token (iOS OAuth clients are public
-  clients — no secret), so the GoogleSignIn SDK isn't needed.
+- **One third-party dependency:** [RevenueCat](https://github.com/RevenueCat/purchases-ios-spm)
+  (Swift Package Manager, declared in `project.yml`) for Pro purchases. The paywall is our own
+  (`Features/Plan/UpgradeSheet.swift`); RevenueCatUI isn't used. Google sign-in uses OAuth 2.0 +
+  PKCE in `ASWebAuthenticationSession` and exchanges the code for an ID token (iOS OAuth clients
+  are public clients — no secret), so the GoogleSignIn SDK isn't needed.
 
 ## Setup
 
@@ -46,6 +48,29 @@ Values reach the app through Info.plist keys (`AVAPIBaseURL`, …) read by `App/
 - **Background Modes** — Background fetch (calendar refresh, `BGAppRefreshTask` id
   `dev.joeherbert.availabliss.calendar-refresh`) and Remote notifications.
 
+### Pro purchases (RevenueCat)
+
+Pro is sold through RevenueCat on every platform; see `docs/BILLING.md` for the RevenueCat project,
+entitlement, offering and webhook. For the iOS app:
+
+1. **App Store Connect**: create the auto-renewable subscriptions (e.g. `pro_monthly`,
+   `pro_annual`, in one subscription group) and any lifetime purchase, and sign the Paid
+   Applications agreement. Products come from App Store Connect; nothing is hard-coded in the app.
+2. **RevenueCat**: add the App Store app (bundle id `dev.joeherbert.availabliss`) with its App Store
+   Connect API / in-app purchase key, attach the products to the `pro` entitlement and to the
+   *current* offering (`$rc_annual`, `$rc_monthly`, …).
+3. **Server**: set `REVENUECAT_IOS_KEY` to the app's **public** SDK key. The app reads it from
+   `GET /me/plan` (`purchase.ios`), so there's no key in the build; while it's unset the upgrade
+   sheet says to upgrade on the web instead.
+4. **Xcode**: the In-App Purchase capability is on by default for App IDs; no entitlement is
+   needed. To test in the simulator without App Store Connect, add a StoreKit configuration file
+   to the scheme (Edit Scheme → Run → Options) with matching product ids.
+
+The app configures RevenueCat lazily (the first time the upgrade sheet opens) with the signed-in
+user's id as the app user id, logs out of RevenueCat on sign-out, and calls
+`POST /me/plan/refresh` after a purchase or restore; the server stays the source of truth for Pro.
+Grant Pro without a purchase for testing with `make set-plan EMAIL=… PLAN=pro DAYS=1`.
+
 ### Google client id
 
 1. Google Cloud Console → Credentials → Create OAuth client ID → **iOS**, bundle id
@@ -71,6 +96,7 @@ Availabliss/
     Live/         SSE client for GET /api/v1/live with fan-out AsyncStreams and backoff reconnects
     Push/         APNs registration
     DeepLinks/    URL + push payload → DeepLink
+    Billing/      RevenueCat wrapper for Pro purchases
     Calendar/     EventKit: permission, busy calendars, device sync upload, add-to-calendar, background refresh
     Utilities/    date/text formatting
   Models/         Codable types mirroring docs/API.md (CalendarDay / WallTime for YYYY-MM-DD / HH:MM)
