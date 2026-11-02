@@ -82,4 +82,26 @@ class RequirementPresetsTest {
         assertEquals("weekends", requirementFor(TimingPreset.Weekend).slotNoun(plural = true))
         assertEquals("evening", requirementFor(TimingPreset.Evening).slotNoun())
     }
+
+    @Test
+    fun week_opensUpEveryDay_shorterPresetsKeepTheChosenDays() {
+        // A weekend group as stored by the server: Fri–Sun.
+        val weekend = RequirementPresets.fromRequirement(requirementFor(TimingPreset.Weekend))
+        assertEquals(setOf(4, 5, 6), weekend.days)
+        assertEquals(setOf(4, 5, 6), RequirementPresets.applyPreset(weekend, TimingPreset.Evening).days)
+        val week = RequirementPresets.applyPreset(weekend, TimingPreset.Week)
+        assertEquals((0..6).toSet(), week.days)
+        assertEquals(TimingPreset.Week, RequirementPresets.fromRequirement(week.toRequirement()).preset)
+        // "Any day" (empty) already allows a week.
+        assertEquals(emptySet<Int>(), RequirementPresets.applyPreset(base, TimingPreset.Week).days)
+    }
+
+    @Test
+    fun summary_describesTheTiming() {
+        val weekend = RequirementPresets.applyPreset(base, TimingPreset.Weekend)
+        assertEquals("A weekend · Fri from 18:00 → Sun · Nov – Feb", TimingLabels.summary(weekend))
+        val evening = RequirementPresets.applyPreset(base, TimingPreset.Evening).copy(days = setOf(0, 1, 2, 3, 4))
+        assertEquals("An evening from 18:00 · weekdays · Nov – Feb", TimingLabels.summary(evening))
+        assertEquals("2 hours · 08:00–23:00 · any day · Nov – Feb", TimingLabels.summary(base))
+    }
 }

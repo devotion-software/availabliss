@@ -99,7 +99,7 @@ fun MainNavHost(root: RootViewModel) {
                 NewGroupScreen(
                     onBack = { nav.popBackStack() },
                     onCreated = { id ->
-                        nav.navigate(GroupRoute(id, GroupTab.Timing.name)) { popUpTo<NewGroupRoute> { inclusive = true } }
+                        nav.navigate(GroupRoute(id)) { popUpTo<NewGroupRoute> { inclusive = true } }
                     },
                 )
             }

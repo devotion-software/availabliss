@@ -108,11 +108,15 @@ object RequirementPresets {
         timezone = requirement.timezone,
     )
 
-    /** Applies a chip. Weekday choice and everything else is kept. */
+    val ALL_DAYS: Set<Int> = (0..6).toSet()
+
+    /** Applies a chip. Weekday choice and everything else is kept, unless the run is longer than the days allowed. */
     fun applyPreset(draft: TimingDraft, preset: TimingPreset): TimingDraft {
         if (preset == TimingPreset.Custom) return draft.copy(preset = TimingPreset.Custom, customKind = customKindOf(draft.length))
         val (length, window) = lengthAndWindow(preset, draft)
-        return draft.copy(preset = preset, customKind = customKindOf(length), length = length, window = window)
+        // "A week" (7 days in a row) can never fit in Fri–Sun: open up every day when the run is longer than the days allowed.
+        val days = if (length is RequirementLength.Days && draft.days.isNotEmpty() && length.count > draft.days.size) ALL_DAYS else draft.days
+        return draft.copy(preset = preset, customKind = customKindOf(length), length = length, window = window, days = days)
     }
 
     /** Switches the Custom editor between hours / days / span, with sensible starting values. */

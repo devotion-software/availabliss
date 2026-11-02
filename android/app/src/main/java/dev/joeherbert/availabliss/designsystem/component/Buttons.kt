@@ -56,13 +56,14 @@ fun PrimaryButton(
         ButtonStyle.Solid -> colors.solid to colors.onSolid
         ButtonStyle.Accent -> colors.accent to colors.onAccent
         ButtonStyle.Success -> colors.okBg to colors.okInk
-    }
+    }.let { (bg, fg) -> bg to if (enabled) fg else fg.copy(alpha = fg.alpha * 0.5f) }
+    // Disabled fades the label rather than using a layer: an alpha layer here left the
+    // background undrawn after the button switched from disabled to enabled.
     Row(
         modifier = modifier
             .height(height)
             .clip(shape)
             .background(bg)
-            .alpha(if (enabled) 1f else 0.5f)
             .clickable(enabled = enabled && !loading, role = Role.Button, onClick = onClick)
             .padding(horizontal = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -91,20 +92,21 @@ fun SecondaryButton(
     enabled: Boolean = true,
 ) {
     val colors = AvailablissTheme.colors
+    // Disabled fades the label, not the whole button: see PrimaryButton.
+    val ink = if (enabled) colors.ink else colors.ink.copy(alpha = colors.ink.alpha * 0.5f)
     Row(
         modifier = modifier
             .height(height)
             .clip(shape)
             .background(colors.surface)
             .border(1.dp, borderColor, shape)
-            .alpha(if (enabled) 1f else 0.5f)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        icon?.let { Icon(it, contentDescription = null, tint = colors.ink, modifier = Modifier.size(18.dp)) }
-        Text(text, style = textStyle, color = colors.ink, maxLines = 1)
+        icon?.let { Icon(it, contentDescription = null, tint = ink, modifier = Modifier.size(18.dp)) }
+        Text(text, style = textStyle, color = ink, maxLines = 1)
     }
 }
 

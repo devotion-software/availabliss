@@ -65,6 +65,71 @@ object TimingLabels {
         return if (from != null && to != null) "Searching ${DateTimes.dayMonth(from)} – ${DateTimes.dayMonth(to)}" else ""
     }
 
+    /** The one-liner (web `summarize`): "A weekend · Fri from 18:00 → Sun · Nov – Jan". */
+    fun summary(draft: TimingDraft): String = "${lengthLabel(draft)} · ${detail(draft)}"
+
+    /** "A weekend", "2 hours", "An evening from 18:00". */
+    private fun lengthLabel(draft: TimingDraft): String = when {
+        draft.preset == TimingPreset.Evening -> "An evening from ${draft.window?.from ?: "18:00"}"
+        draft.preset != TimingPreset.Custom -> draft.preset.label
+        else -> when (val l = draft.length) {
+            is RequirementLength.Duration -> if (l.minutes % 60 == 0) plural(l.minutes / 60, "hour") else plural(l.minutes, "minute")
+            is RequirementLength.Days -> when (l.count) {
+                7 -> "A week"
+                1 -> "One day"
+                else -> "${l.count} days"
+            }
+            is RequirementLength.Span -> "A span"
+        }
+    }
+
+    /** Everything after the shape: "Fri from 18:00 → Sun · Nov – Jan". */
+    private fun detail(draft: TimingDraft): String {
+        val bits = mutableListOf<String>()
+        val window = draft.window
+        when (val l = draft.length) {
+            is RequirementLength.Span -> bits += spanLabel(l)
+            else -> {
+                if (window != null && draft.preset != TimingPreset.Evening) bits += "${window.from}–${window.to}"
+                bits += daysLabel(draft.days)
+            }
+        }
+        if (draft.schoolHolidaysOnly) bits += "school holidays only"
+        bits += if (draft.dates.isNotEmpty()) plural(draft.dates.size, "date range") else monthSpan(draft.range.from, draft.range.to)
+        return bits.joinToString(" · ")
+    }
+
+    /** "Fri from 18:00 → Sun", "Tue → following Thu". */
+    private fun spanLabel(l: RequirementLength.Span): String {
+        val start = DateTimes.shortWeekday(l.startDay) + if (l.startTime == "00:00") "" else " from ${l.startTime}"
+        val endDay = (if (l.weeksLater == 1) "following " else "") + DateTimes.shortWeekday(l.endDay)
+        return "$start → " + if (l.endTime == END_OF_DAY) endDay else "$endDay ${l.endTime}"
+    }
+
+    /** "any day", "weekdays", "weekends", "Fri–Sun", "Mon, Wed, Fri". */
+    fun daysLabel(days: Set<Int>): String {
+        val sorted = days.sorted()
+        return when {
+            sorted.isEmpty() || sorted.size == 7 -> "any day"
+            sorted == listOf(0, 1, 2, 3, 4) -> "weekdays"
+            sorted == listOf(5, 6) -> "weekends"
+            sorted.size > 2 && sorted.zipWithNext().all { (a, b) -> b == a + 1 } ->
+                "${DateTimes.shortWeekday(sorted.first())}–${DateTimes.shortWeekday(sorted.last())}"
+            else -> sorted.joinToString(", ") { DateTimes.shortWeekday(it) }
+        }
+    }
+
+    /** "Nov – Feb", or "Nov" when it's all one month. */
+    private fun monthSpan(from: String, to: String): String {
+        val a = DateTimes.parseDate(from)?.let(::monthShort) ?: return ""
+        val b = DateTimes.parseDate(to)?.let(::monthShort) ?: return a
+        return if (a == b) a else "$a – $b"
+    }
+
+    private fun monthShort(date: java.time.LocalDate) = date.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.UK).take(3)
+
+    private fun plural(n: Int, one: String) = "$n $one${if (n == 1) "" else "s"}"
+
     fun dateRange(from: String, to: String): String {
         val f = DateTimes.parseDate(from) ?: return "$from – $to"
         val t = DateTimes.parseDate(to) ?: return "$from – $to"

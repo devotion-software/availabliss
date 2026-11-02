@@ -29,6 +29,7 @@ fun ScreenHeader(
     onBack: (() -> Unit)? = null,
     backDescription: String = "Back",
     titleStyle: TextStyle = AvailablissTheme.type.headlineMedium,
+    subtitleMaxLines: Int = 1,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
@@ -43,7 +44,7 @@ fun ScreenHeader(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.semantics { heading() },
             )
-            subtitle?.let { Text(it, style = AvailablissTheme.type.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal), color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            subtitle?.let { Text(it, style = AvailablissTheme.type.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal), color = colors.muted, maxLines = subtitleMaxLines, overflow = TextOverflow.Ellipsis) }
         }
         actions()
     }

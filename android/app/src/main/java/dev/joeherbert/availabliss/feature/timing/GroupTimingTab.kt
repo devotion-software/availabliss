@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,7 +35,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -101,27 +104,7 @@ fun GroupTimingTab(
     }
     GroupTimingContent(
         state = state,
-        actions = TimingActions(
-            onBack = onBack,
-            onRetry = viewModel::load,
-            onPreset = viewModel::selectPreset,
-            onCustomKind = viewModel::selectCustomKind,
-            onDuration = viewModel::changeDuration,
-            onDayCount = viewModel::changeDayCount,
-            onWeeksLater = viewModel::setWeeksLater,
-            onToggleDay = viewModel::toggleDay,
-            onBankHolidays = viewModel::setBankHolidays,
-            onSchoolHolidays = viewModel::setSchoolHolidaysOnly,
-            onStartTime = viewModel::setStartTime,
-            onEndTime = viewModel::setEndTime,
-            onSpanStart = viewModel::setSpanStart,
-            onSpanEnd = viewModel::setSpanEnd,
-            onRangeFrom = viewModel::setRangeFrom,
-            onRangeTo = viewModel::setRangeTo,
-            onAddRange = viewModel::addRange,
-            onRemoveRange = viewModel::removeRange,
-            onSave = viewModel::save,
-        ),
+        actions = viewModel.editor.actions(onBack = onBack, onRetry = viewModel::load, onSave = viewModel::save),
         snackbar = { AvSnackbarHost(snackbar) },
     )
 }
@@ -151,7 +134,6 @@ data class TimingActions(
 
 @Composable
 fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackbar: @Composable () -> Unit = {}) {
-    var picker by rememberSaveable { mutableStateOf(TimingPicker.None) }
     AvailablissBackground(OrbLayout.Timing) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             ScreenHeader(
@@ -168,10 +150,10 @@ fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackb
                     padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 5.dp),
                 )
             }
-            val draft = state.draft
+            val editor = state.editor
             when {
                 state.loading -> LoadingIndicator()
-                draft == null -> ErrorBanner(state.error ?: "Couldn't load the timing.", Modifier.padding(20.dp), onRetry = actions.onRetry)
+                editor == null -> ErrorBanner(state.error ?: "Couldn't load the timing.", Modifier.padding(20.dp), onRetry = actions.onRetry)
                 else -> Column(
                     Modifier
                         .weight(1f)
@@ -189,19 +171,45 @@ fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackb
                             color = AvailablissTheme.colors.muted,
                         )
                     }
-                    LengthSection(draft, state.canEdit, actions)
-                    StartsEndsSection(state, draft, actions, openPicker = { picker = it })
-                    ExtrasSection(state, draft, actions, openPicker = { picker = it })
-                    RangeSection(state, draft, actions, openPicker = { picker = it })
+                    TimingEditorSections(editor, state.canEdit, actions)
                 }
             }
         }
-        if (state.draft != null) {
-            SaveBar(state, actions.onSave, Modifier.align(Alignment.BottomCenter))
+        state.editor?.let { editor ->
+            SaveBar(state, editor, actions.onSave, Modifier.align(Alignment.BottomCenter))
         }
         Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp)) { snackbar() }
     }
+}
+
+/**
+ * The timing editor's sections (length, starts and ends, holidays, search range) and
+ * their pickers. Shared by the group Timing tab and New group's second step.
+ */
+@Composable
+fun TimingEditorSections(state: TimingEditorUiState, canEdit: Boolean, actions: TimingActions) {
+    var picker by rememberSaveable { mutableStateOf(TimingPicker.None) }
+    val draft = state.draft
+    LengthSection(draft, canEdit, actions)
+    StartsEndsSection(state, canEdit, draft, actions, openPicker = { picker = it })
+    ExtrasSection(state, canEdit, draft, actions, openPicker = { picker = it })
+    RangeSection(state, canEdit, draft, actions, openPicker = { picker = it })
     TimingPickers(state, picker, actions, close = { picker = TimingPicker.None })
+}
+
+/** "13 weekends / fit this timing between 2 Nov and 1 Feb", with a spinner while counting. */
+@Composable
+fun FitSummary(state: TimingEditorUiState, modifier: Modifier = Modifier) {
+    val colors = AvailablissTheme.colors
+    Row(modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f, fill = false)) {
+            Text(state.summaryTitle, style = AvailablissTheme.type.titleMedium.copy(fontWeight = FontWeight.Bold), color = colors.ink, maxLines = 1)
+            Text(state.summarySubtitle, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted, maxLines = 1)
+        }
+        if (state.counting) {
+            CircularProgressIndicator(Modifier.padding(start = 8.dp).size(14.dp), color = colors.muted, strokeWidth = 2.dp)
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -250,7 +258,7 @@ private fun Stepper(value: String, what: String, enabled: Boolean, onMinus: () -
 }
 
 @Composable
-private fun StartsEndsSection(state: GroupTimingUiState, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
+private fun StartsEndsSection(state: TimingEditorUiState, canEdit: Boolean, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
     val colors = AvailablissTheme.colors
     Section {
         SectionLabel("Starts and ends")
@@ -258,13 +266,13 @@ private fun StartsEndsSection(state: GroupTimingUiState, draft: TimingDraft, act
             FieldTile(
                 "Starts",
                 state.startsLabel,
-                onClick = { if (state.canEdit) openPicker(if (draft.isSpan) TimingPicker.SpanStart else TimingPicker.StartTime) },
+                onClick = { if (canEdit) openPicker(if (draft.isSpan) TimingPicker.SpanStart else TimingPicker.StartTime) },
                 modifier = Modifier.weight(1f),
             )
             FieldTile(
                 "Ends",
                 state.endsLabel,
-                onClick = { if (state.canEdit) openPicker(if (draft.isSpan) TimingPicker.SpanEnd else TimingPicker.EndTime) },
+                onClick = { if (canEdit) openPicker(if (draft.isSpan) TimingPicker.SpanEnd else TimingPicker.EndTime) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -274,7 +282,7 @@ private fun StartsEndsSection(state: GroupTimingUiState, draft: TimingDraft, act
         ) {
             (0..6).forEach { day ->
                 val on = day in state.highlightedDays
-                val toggleable = state.canEdit && !draft.isSpan
+                val toggleable = canEdit && !draft.isSpan
                 Box(
                     Modifier
                         .weight(1f)
@@ -304,21 +312,21 @@ private fun StartsEndsSection(state: GroupTimingUiState, draft: TimingDraft, act
 }
 
 @Composable
-private fun ExtrasSection(state: GroupTimingUiState, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
+private fun ExtrasSection(state: TimingEditorUiState, canEdit: Boolean, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
     val colors = AvailablissTheme.colors
     Column(Modifier.fillMaxWidth().glass(Shapes.card).padding(horizontal = 16.dp, vertical = 4.dp)) {
         ToggleRow(
             title = "Bank holidays",
             subtitle = state.bankSubtitle,
             checked = draft.bankHolidays,
-            onCheckedChange = { if (state.canEdit) actions.onBankHolidays(it) },
+            onCheckedChange = { if (canEdit) actions.onBankHolidays(it) },
         )
         RowDivider()
         ToggleRow(
             title = "School holidays only",
             subtitle = state.schoolSubtitle,
             checked = draft.schoolHolidaysOnly,
-            onCheckedChange = { if (state.canEdit) actions.onSchoolHolidays(it) },
+            onCheckedChange = { if (canEdit) actions.onSchoolHolidays(it) },
         )
         if (draft.schoolHolidaysOnly) {
             // The group's own term breaks, for authorities we don't have dates for (or extra days off).
@@ -330,7 +338,7 @@ private fun ExtrasSection(state: GroupTimingUiState, draft: TimingDraft, actions
                 )
                 RangeChips(
                     ranges = draft.customSchoolHolidays,
-                    canEdit = state.canEdit,
+                    canEdit = canEdit,
                     addLabel = "+ Add school holiday",
                     onAdd = { openPicker(TimingPicker.SchoolHolidays) },
                     onRemove = { actions.onRemoveRange(RangeList.SchoolHolidays, it) },
@@ -354,21 +362,21 @@ private fun RangeChips(ranges: List<DateRange>, canEdit: Boolean, addLabel: Stri
 }
 
 @Composable
-private fun RangeSection(state: GroupTimingUiState, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
+private fun RangeSection(state: TimingEditorUiState, canEdit: Boolean, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
     val colors = AvailablissTheme.colors
     Section {
         SectionLabel("Search between")
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ValueBox(
                 DateTimes.dayMonthYear(state.rangeFrom),
-                onClick = { if (state.canEdit) openPicker(TimingPicker.RangeFrom) },
+                onClick = { if (canEdit) openPicker(TimingPicker.RangeFrom) },
                 contentDescription = "From ${DateTimes.dayMonthYear(state.rangeFrom)}",
                 modifier = Modifier.weight(1f),
             )
             Icon(AvIcons.ArrowRight, null, tint = colors.muted, modifier = Modifier.size(16.dp))
             ValueBox(
                 DateTimes.dayMonthYear(state.rangeTo),
-                onClick = { if (state.canEdit) openPicker(TimingPicker.RangeTo) },
+                onClick = { if (canEdit) openPicker(TimingPicker.RangeTo) },
                 contentDescription = "To ${DateTimes.dayMonthYear(state.rangeTo)}",
                 modifier = Modifier.weight(1f),
             )
@@ -376,7 +384,7 @@ private fun RangeSection(state: GroupTimingUiState, draft: TimingDraft, actions:
         SectionLabel("Or only these dates", Modifier.padding(top = 4.dp))
         RangeChips(
             ranges = draft.dates,
-            canEdit = state.canEdit,
+            canEdit = canEdit,
             addLabel = "+ Add date range",
             onAdd = { openPicker(TimingPicker.Dates) },
             onRemove = { actions.onRemoveRange(RangeList.Dates, it) },
@@ -385,7 +393,7 @@ private fun RangeSection(state: GroupTimingUiState, draft: TimingDraft, actions:
 }
 
 @Composable
-private fun SaveBar(state: GroupTimingUiState, onSave: () -> Unit, modifier: Modifier = Modifier) {
+private fun SaveBar(state: GroupTimingUiState, editor: TimingEditorUiState, onSave: () -> Unit, modifier: Modifier = Modifier) {
     val colors = AvailablissTheme.colors
     Row(
         modifier
@@ -397,10 +405,7 @@ private fun SaveBar(state: GroupTimingUiState, onSave: () -> Unit, modifier: Mod
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(state.summaryTitle, style = AvailablissTheme.type.titleMedium.copy(fontWeight = FontWeight.Bold), color = colors.ink, maxLines = 1)
-            Text(state.summarySubtitle, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted, maxLines = 1)
-        }
+        FitSummary(editor, Modifier.weight(1f))
         if (state.canEdit) {
             PrimaryButton(
                 text = "Save timing",
@@ -425,7 +430,7 @@ private fun Section(content: @Composable androidx.compose.foundation.layout.Colu
 }
 
 @Composable
-private fun TimingPickers(state: GroupTimingUiState, picker: TimingPicker, actions: TimingActions, close: () -> Unit) {
+private fun TimingPickers(state: TimingEditorUiState, picker: TimingPicker, actions: TimingActions, close: () -> Unit) {
     when (picker) {
         TimingPicker.None -> Unit
         TimingPicker.StartTime -> AvTimePickerDialog("Starts", state.startTime, actions.onStartTime, close)
@@ -466,12 +471,14 @@ private fun GroupTimingPreview() {
                 loading = false,
                 groupName = "Lake District crew",
                 canEdit = true,
-                draft = draft,
-                startsLabel = TimingLabels.starts(draft),
-                endsLabel = TimingLabels.ends(draft),
-                summaryTitle = TimingLabels.title(draft),
-                summarySubtitle = TimingLabels.searchRange(draft),
-                highlightedDays = setOf(4, 5, 6),
+                editor = TimingEditorUiState(
+                    draft = draft,
+                    startsLabel = TimingLabels.starts(draft),
+                    endsLabel = TimingLabels.ends(draft),
+                    summaryTitle = TimingLabels.title(draft),
+                    summarySubtitle = TimingLabels.searchRange(draft),
+                    highlightedDays = setOf(4, 5, 6),
+                ),
                 dirty = true,
             ),
             actions = TimingActions(),
