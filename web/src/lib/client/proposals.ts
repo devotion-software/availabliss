@@ -19,3 +19,6 @@ export const respondToProposal = (id: string, response: 'accepted' | 'declined')
 export const overrideResponse = (id: string, userId: string, response: ResponseKind) =>
 	api.post<Proposal>(`/proposals/${id}/override`, { userId, response });
 export const cancelProposal = (id: string) => api.del(`/proposals/${id}`);
+/** Members who are busy during a time, to warn before proposing it. */
+export const getConflicts = (groupId: string, start: string, end: string) =>
+	api.get<{ busyMemberIds: string[] }>(`/groups/${groupId}/conflicts`, { query: { start, end } }).then((r) => r.busyMemberIds);

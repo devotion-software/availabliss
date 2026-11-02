@@ -62,7 +62,7 @@
 	{/each}
 </div>
 
-<ProposeSheet bind:open={proposing} groupId={data.group.id} />
+<ProposeSheet bind:open={proposing} group={data.group} meId={data.user.id} />
 
 <style>
 	.page {

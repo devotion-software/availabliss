@@ -5,6 +5,7 @@
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import { RESPONSE_PILL, acceptedCount, askedCount, myResponse } from './responses';
+	import { clashShort } from './clash';
 
 	/** A proposal in a list: date badge, who proposed, range, acceptance, your status. */
 	interface Props {
@@ -20,6 +21,7 @@
 	const mine = $derived(myResponse(proposal, meId));
 	const yes = $derived(acceptedCount(proposal));
 	const total = $derived(askedCount(proposal, group));
+	const clash = $derived(proposal.status === 'open' ? clashShort(proposal.busyMemberIds ?? [], members) : null);
 	const by = $derived(proposal.createdBy === meId ? 'You' : memberLabel(members, proposal.createdBy, meId, { first: true }));
 </script>
 
@@ -32,7 +34,7 @@
 		<span class="by">{by} proposed{proposal.title ? ` · ${proposal.title}` : ''}</span>
 		<span class="when">{fmt.current.when(proposal.start, proposal.end, proposal.allDay)}</span>
 		{#if proposal.status === 'open'}
-			<span class="count">{yes} of {total} accepted</span>
+			<span class="count">{yes} of {total} accepted{#if clash}<span class="clash"> · {clash}</span>{/if}</span>
 		{:else if proposal.status === 'confirmed'}
 			<span class="count">Everyone's in</span>
 		{:else}
@@ -122,5 +124,8 @@
 	}
 	.row :global(.chev) {
 		color: var(--muted);
+	}
+	.clash {
+		color: var(--warn-ink);
 	}
 </style>

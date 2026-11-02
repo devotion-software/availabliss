@@ -142,8 +142,8 @@
 	}
 
 	let proposeOpen = $state(false);
-	let proposeInitial = $state<Slot | null>(null);
-	function propose(slot: Slot | null) {
+	let proposeInitial = $state<Slot | { day: string } | null>(null);
+	function propose(slot: Slot | { day: string } | null) {
 		proposeInitial = slot;
 		proposeOpen = true;
 	}
@@ -242,6 +242,7 @@
 				{members}
 				{noun}
 				onpropose={propose}
+				onproposeday={(day) => propose({ day })}
 				onseeday={() => (view = 'day')}
 			/>
 		{/if}
@@ -255,7 +256,7 @@
 	</aside>
 </div>
 
-<ProposeSheet bind:open={proposeOpen} groupId={group.id} initial={proposeInitial} />
+<ProposeSheet bind:open={proposeOpen} {group} meId={data.user.id} initial={proposeInitial} />
 
 <style>
 	.page {

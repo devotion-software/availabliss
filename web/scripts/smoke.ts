@@ -109,6 +109,15 @@ check('day view hides block labels from others', !JSON.stringify(day.data).inclu
 const slot = avail.data.slots[0];
 const proposal = await call(sam.token, 'POST', `/api/v1/groups/${groupId}/proposals`, { start: slot.start, end: slot.end, location: 'Keswick' });
 check('create proposal (creator auto-accepts)', proposal.status === 201 && proposal.data.status === 'open', proposal.data);
+check('a time that works has no clashes', JSON.stringify(proposal.data.busyMemberIds) === '[]', proposal.data.busyMemberIds);
+
+// Proposing a time someone is busy for: allowed, with the clash reported.
+const busySat = { start: `${saturday}T18:00:00Z`, end: `${saturday}T21:00:00Z` };
+const conflicts = await call(sam.token, 'GET', `/api/v1/groups/${groupId}/conflicts?start=${encodeURIComponent(busySat.start)}&end=${encodeURIComponent(busySat.end)}`);
+check('conflicts names who is busy', JSON.stringify(conflicts.data.busyMemberIds) === JSON.stringify([priya.id]), conflicts.data);
+const clashing = await call(sam.token, 'POST', `/api/v1/groups/${groupId}/proposals`, { ...busySat, title: 'Despite the wedding' });
+check('can propose a clashing time; proposal lists who is busy', clashing.status === 201 && clashing.data.busyMemberIds?.includes(priya.id), clashing.data);
+await call(sam.token, 'DELETE', `/api/v1/proposals/${clashing.data.id}`);
 const summaries = await call(priya.token, 'GET', '/api/v1/groups');
 check('group list says Priya needs to reply', summaries.data.groups[0].status.kind === 'needs_reply', summaries.data.groups[0]);
 const accepted = await call(priya.token, 'POST', `/api/v1/proposals/${proposal.data.id}/respond`, { response: 'accepted' });

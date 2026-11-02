@@ -14,9 +14,11 @@
 		/** "weekend", "evening", … for "Propose this weekend". */
 		noun: string;
 		onpropose: (slot: Slot) => void;
+		/** Propose a day that doesn't work for everyone (the proposal sheet warns who's busy). */
+		onproposeday?: (date: string) => void;
 		onseeday: () => void;
 	}
-	let { date, day, slot, members, noun, onpropose, onseeday }: Props = $props();
+	let { date, day, slot, members, noun, onpropose, onproposeday, onseeday }: Props = $props();
 
 	const fmt = useFormat();
 	const works = $derived(day?.status === 'match' && slot !== null);
@@ -50,6 +52,8 @@
 	<div class="actions">
 		{#if works && slot}
 			<Button variant="accent" size="sm" class="act" onclick={() => onpropose(slot)}>Propose this {noun}</Button>
+		{:else if onproposeday && (day?.status === 'busy' || day?.status === 'free')}
+			<Button variant="secondary" size="sm" class="act" onclick={() => onproposeday(date)}>Propose anyway</Button>
 		{/if}
 		<Button variant="secondary" size="sm" class="act" onclick={onseeday}>See who's free</Button>
 	</div>

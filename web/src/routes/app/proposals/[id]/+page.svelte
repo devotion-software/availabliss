@@ -17,6 +17,7 @@
 	import OverrideSheet from '#lib/components/proposals/OverrideSheet.svelte';
 	import EveryoneIn from '#lib/components/proposals/EveryoneIn.svelte';
 	import { RESPONSE_PILL, acceptedCount, askedCount, myResponse } from '#lib/components/proposals/responses';
+	import { clashText } from '#lib/components/proposals/clash';
 
 	let { data } = $props();
 
@@ -33,6 +34,9 @@
 	const canWithdraw = $derived(proposal.status === 'open' && (proposal.createdBy === me || admin));
 	const startHint = $derived(proposal.allDay ? '' : fmt.current.startsAt(proposal.start));
 	const sub = $derived([startHint, proposal.location].filter(Boolean).join(' · '));
+	const busyIds = $derived(proposal.status === 'open' ? (proposal.busyMemberIds ?? []) : []);
+	const clash = $derived(clashText(busyIds, members, me));
+	const iAmBusy = $derived(busyIds.includes(me));
 
 	const rows = $derived(
 		group.members.map((m) => {
@@ -45,6 +49,8 @@
 		if (m.userId === proposal.createdBy) return 'Proposed this';
 		if (setBy && setBy !== m.userId) return `Set by ${setBy === me ? 'you' : memberLabel(members, setBy, me, { first: true })} (admin)`;
 		if (!m.synced) return 'Not synced yet';
+		if (response === 'pending' && busyIds.includes(m.userId)) return 'Busy then · hasn’t replied';
+		if (response === 'accepted' && busyIds.includes(m.userId)) return 'Busy then, but in';
 		if (response === 'pending') return 'Hasn’t replied';
 		if (response === 'declined') return 'Can’t make it';
 		if (m.role === 'owner') return 'Owner';
@@ -142,6 +148,18 @@
 						</SyncRing>
 					</section>
 
+					{#if clash}
+						<div class="clash" role="status">
+							<Icon name="alert" size={18} />
+							<span>
+								<strong>{clash}.</strong>
+								{busyIds.length === 1 && iAmBusy
+									? 'Your calendar or blocked time overlaps. You can still accept if you can move things.'
+									: 'Their calendars or blocked time overlap. They can still accept if they can move things.'}
+							</span>
+						</div>
+					{/if}
+
 					{#if proposal.note}
 						<p class="note glass">{proposal.note}</p>
 					{/if}
@@ -181,7 +199,13 @@
 
 			<div class="reply glass" role="group" aria-labelledby="reply-q">
 				<span id="reply-q" class="q">
-					{mine === 'accepted' ? "You're in. Changed your mind?" : mine === 'declined' ? "You said you can't make it" : 'Can you make it?'}
+					{mine === 'accepted'
+						? "You're in. Changed your mind?"
+						: mine === 'declined'
+							? "You said you can't make it"
+							: iAmBusy
+								? "You're busy then. Can you still make it?"
+								: 'Can you make it?'}
 				</span>
 				<div class="buttons">
 					<Button
@@ -358,5 +382,20 @@
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 8px;
+	}
+	.clash {
+		display: flex;
+		gap: 10px;
+		align-items: flex-start;
+		padding: 12px 14px;
+		border-radius: 18px;
+		background: var(--warn-bg);
+		color: var(--warn-ink);
+		font-size: 13px;
+		line-height: 1.4;
+	}
+	.clash :global(svg) {
+		flex: none;
+		margin-top: 1px;
 	}
 </style>

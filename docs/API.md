@@ -322,13 +322,18 @@ interface Proposal {
   createdBy: string; createdAt: string;
   eventId: string | null;               // set once confirmed
   responses: { userId: string; response: ResponseKind; setBy: string | null; updatedAt: string }[];
+  busyMemberIds: string[];              // open proposals: members busy at this time (empty otherwise)
 }
 ```
+
+A time doesn't have to work for everyone to be proposed. Clients warn first
+(`/groups/:id/conflicts`) and show `busyMemberIds` while people reply.
 
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/groups/:id/proposals?status=` | | `{ proposals: Proposal[] }` |
 | POST 🔒 | `/groups/:id/proposals` | `{ start, end, allDay?, title?, location?, note? }` | `Proposal` (creator auto-accepts; posts a chat card) |
+| GET 🔒 | `/groups/:id/conflicts?start=&end=` | | `{ busyMemberIds: string[] }` (who's busy then; ISO instants) |
 | GET 🔒 | `/proposals/:id` | | `Proposal` |
 | POST 🔒 | `/proposals/:id/respond` | `{ response: 'accepted' \| 'declined' }` | `Proposal` |
 | POST 👑 | `/proposals/:id/override` | `{ userId, response: ResponseKind }` | `Proposal` |

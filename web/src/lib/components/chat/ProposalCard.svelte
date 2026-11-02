@@ -4,6 +4,7 @@
 	import { live, proposalOf } from '#lib/client/live.svelte';
 	import { useFormat, monthShort } from '#lib/client/format';
 	import { memberLabel } from '#lib/client/members';
+	import { clashShort } from '#lib/components/proposals/clash';
 
 	/** A proposal posted in the chat: date block, who proposed, how many accepted, link to reply. */
 	interface Props {
@@ -33,6 +34,7 @@
 	const accepted = $derived(proposal?.responses.filter((r) => r.response === 'accepted').length ?? 0);
 	const total = $derived(proposal?.responses.length || members.size);
 	const myResponse = $derived(proposal?.responses.find((r) => r.userId === meId)?.response ?? 'pending');
+	const clash = $derived(proposal?.status === 'open' ? clashShort(proposal.busyMemberIds ?? [], members) : null);
 	const status = $derived.by(() => {
 		if (!proposal) return { text: '', tone: 'muted' };
 		if (proposal.status === 'confirmed') return { text: "Everyone's in", tone: 'ok' };
@@ -50,7 +52,7 @@
 		<span class="text">
 			<span class="who">{memberLabel(members, proposal.createdBy, meId, { first: true })} proposed {proposal.title ? proposal.title : 'a time'}</span>
 			<span class="when">{fmt.current.when(proposal.start, proposal.end, proposal.allDay)}</span>
-			<span class="status {status.tone}">{status.text}</span>
+			<span class="status {status.tone}">{status.text}{#if clash}<span class="clash"> · {clash}</span>{/if}</span>
 		</span>
 		<span class="cta">{proposal.status === 'open' && myResponse === 'pending' ? 'Reply' : 'View'}</span>
 	</a>
@@ -150,5 +152,8 @@
 		align-self: center;
 		font-size: 12px;
 		color: var(--muted);
+	}
+	.clash {
+		color: var(--warn-ink);
 	}
 </style>

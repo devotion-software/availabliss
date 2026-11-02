@@ -62,7 +62,7 @@
 </div>
 
 <PollComposerSheet bind:open={pollOpen} onsubmit={(poll) => thread.sendPoll(poll)} />
-<ProposeSheet bind:open={proposeOpen} groupId={group.id} initial={null} />
+<ProposeSheet bind:open={proposeOpen} {group} meId={data.user.id} initial={null} />
 
 <style>
 	/* Phone: a full-screen conversation above the orbs (Chat.dc.html). */

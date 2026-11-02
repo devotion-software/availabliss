@@ -214,6 +214,8 @@ export interface Proposal {
 	createdAt: string;
 	eventId: string | null;
 	responses: ProposalResponse[];
+	/** Open proposals only: members whose calendars or blocks say they're busy at this time. */
+	busyMemberIds: string[];
 }
 
 export interface GroupEvent {

@@ -17,11 +17,12 @@ import { insertEvent, toGroupEvent } from './events';
 import { slotLabel } from './availability/labels';
 import { sendConfirmedEmail } from './email';
 import { env } from './env';
+import { busyDuring } from './busy';
 
 type ProposalRow = typeof proposals.$inferSelect;
 type ResponseRow = typeof proposalResponses.$inferSelect;
 
-const toProposal = (row: ProposalRow, responses: ResponseRow[]): Proposal => ({
+const toProposal = (row: ProposalRow, responses: ResponseRow[], busyMemberIds: string[]): Proposal => ({
 	id: row.id,
 	groupId: row.groupId,
 	title: row.title,
@@ -39,7 +40,8 @@ const toProposal = (row: ProposalRow, responses: ResponseRow[]): Proposal => ({
 		response: r.response,
 		setBy: r.setBy,
 		updatedAt: r.updatedAt.toISOString()
-	}))
+	})),
+	busyMemberIds
 });
 
 async function load(rows: ProposalRow[]): Promise<Proposal[]> {
@@ -48,7 +50,14 @@ async function load(rows: ProposalRow[]): Promise<Proposal[]> {
 		.select()
 		.from(proposalResponses)
 		.where(inArray(proposalResponses.proposalId, rows.map((r) => r.id)));
-	return rows.map((row) => toProposal(row, responses.filter((r) => r.proposalId === row.id)));
+	return Promise.all(
+		rows.map(async (row) => {
+			const own = responses.filter((r) => r.proposalId === row.id);
+			// Who can't make it, so people see the clash before they accept or decline.
+			const busy = row.status === 'open' ? await busyDuring(own.map((r) => r.userId), row.start.getTime(), row.end.getTime()) : [];
+			return toProposal(row, own, busy);
+		})
+	);
 }
 
 async function getRow(proposalId: string): Promise<ProposalRow> {

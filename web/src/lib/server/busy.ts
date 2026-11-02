@@ -101,3 +101,9 @@ export async function myBusy(userId: string, from: number, to: number): Promise<
 		blockId: b.blockId
 	}));
 }
+
+/** Which of `userIds` have any busy time overlapping [start, end). Only ids, never labels. */
+export async function busyDuring(userIds: string[], start: number, end: number): Promise<string[]> {
+	const busy = await loadBusy(userIds, start, end);
+	return userIds.filter((id) => busy.get(id)?.some((b) => b.start < end && b.end > start));
+}
