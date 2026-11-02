@@ -1,12 +1,20 @@
 import SwiftUI
 
-/// My time: a week of morning / afternoon / evening slots. Calendar busy is faded,
-/// blocks you made are striped; tap a free slot to block it.
+/// My time: a week calendar of your busy time at exact times. Calendar busy is faded,
+/// blocks you made are striped; tap empty time to block it.
 struct MyTimeView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var model: MyTimeViewModel
-    @State private var showsBlockSheet = false
+    @State private var draft: BlockDraft?
+
+    /// What the block sheet opens on.
+    private struct BlockDraft: Identifiable {
+        let id = UUID()
+        var day: CalendarDay
+        var range: (from: Int, to: Int)?
+        var editing: ManualBlock?
+    }
 
     init(api: APIClient) {
         _model = State(initialValue: MyTimeViewModel(api: api))
@@ -19,12 +27,18 @@ struct MyTimeView: View {
                     IconButton(icon: .asset("CalendarSync"), label: "Connected calendars") { app.router.push(.calendars) }
                 }
                 weekSwitcher
-                WeekSlotGrid(model: model)
+                WeekPanel(model: model) { day, from, to in
+                    draft = BlockDraft(day: day, range: (from, to))
+                }
                 ForEach(model.recurringBlocks) { block in
-                    RecurringBlockRow(block: block) { model.pendingRemoval = block }
+                    RecurringBlockRow(block: block) {
+                        draft = BlockDraft(day: CalendarDay(block.start), editing: block)
+                    } onRemove: {
+                        model.pendingRemoval = block
+                    }
                 }
                 Button {
-                    showsBlockSheet = true
+                    draft = BlockDraft(day: max(CalendarDay.today(), model.weekStart))
                 } label: {
                     LoadingLabel(title: "Block a specific time", systemImage: "plus")
                 }
@@ -45,9 +59,9 @@ struct MyTimeView: View {
                 if event.payload(as: [String: String].self)?["userId"] == app.session.user?.id { await model.load() }
             }
         }
-        .sheet(isPresented: $showsBlockSheet) {
-            BlockTimeSheet(initialDay: max(CalendarDay.today(), model.weekStart)) { block in
-                await model.create(block)
+        .sheet(item: $draft) { draft in
+            BlockTimeSheet(initialDay: draft.day, range: draft.range, editing: draft.editing) { block in
+                if let editing = draft.editing { await model.update(editing.id, block) } else { await model.create(block) }
             }
         }
         .confirmationDialog(
@@ -98,39 +112,15 @@ private struct WeekArrow: View {
     }
 }
 
-/// The glass week grid.
-private struct WeekSlotGrid: View {
+/// The glass panel: the week grid and its legend.
+private struct WeekPanel: View {
     let model: MyTimeViewModel
+    let onSelect: (CalendarDay, Int, Int) -> Void
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(spacing: 6) {
-            Grid(horizontalSpacing: 6, verticalSpacing: 6) {
-                GridRow {
-                    Color.clear.frame(width: 44, height: 1)
-                    ForEach(DayPart.allCases) { part in
-                        Text(part.label).frame(maxWidth: .infinity)
-                    }
-                }
-                .bodyFont(11, .semibold, relativeTo: .caption)
-                .foregroundStyle(theme.muted)
-
-                ForEach(model.days, id: \.self) { day in
-                    GridRow {
-                        DayLabel(day: day)
-                        ForEach(DayPart.allCases) { part in
-                            SlotCell(
-                                day: day,
-                                part: part,
-                                state: model.state(day, part),
-                                isWorking: model.togglingKey == model.key(day, part)
-                            ) {
-                                Task { await model.toggle(day, part) }
-                            }
-                        }
-                    }
-                }
-            }
+        VStack(spacing: 0) {
+            WeekTimeGrid(layout: model.layout, scrollKey: model.loadedWeek, onSelect: onSelect)
             legend
         }
         .padding(12)
@@ -152,106 +142,14 @@ private struct WeekSlotGrid: View {
         }
         .bodyFont(11, relativeTo: .caption2)
         .foregroundStyle(theme.muted)
-        .padding(.top, 6)
-    }
-}
-
-private struct DayLabel: View {
-    let day: CalendarDay
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(Weekday.short(day.weekday())).bodyFont(12, .semibold, relativeTo: .caption)
-            Text("\(day.day)").bodyFont(11, relativeTo: .caption2).foregroundStyle(theme.muted)
-        }
-        .frame(width: 44, alignment: .leading)
-        .foregroundStyle(day == .today() ? theme.accentInk : theme.ink)
-    }
-}
-
-private struct SlotCell: View {
-    let day: CalendarDay
-    let part: DayPart
-    let state: SlotState
-    let isWorking: Bool
-    let action: () -> Void
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                if case .calendar = state {
-                    Circle().fill(theme.accent).frame(width: 6, height: 6)
-                }
-                if isWorking {
-                    ProgressView().controlSize(.mini)
-                } else {
-                    Text(label).lineLimit(1).truncationMode(.tail)
-                }
-            }
-            .bodyFont(11, .semibold, relativeTo: .caption2)
-            .foregroundStyle(foreground)
-            .padding(.horizontal, 6)
-            .frame(maxWidth: .infinity, minHeight: 46)
-            .background(background)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PressableButtonStyle(scale: 0.96))
-        .disabled(isCalendar)
-        .accessibilityLabel(accessibilityText)
-        .accessibilityAddTraits(isBlocked ? .isSelected : [])
-        .accessibilityHint(isCalendar ? "" : (isBlocked ? "Double-tap to unblock" : "Double-tap to block"))
-    }
-
-    private var isCalendar: Bool { if case .calendar = state { true } else { false } }
-    private var isBlocked: Bool { if case .manual = state { true } else { false } }
-
-    private var label: String {
-        switch state {
-        case .free: ""
-        case .calendar(let label), .manual(let label, _): label
-        }
-    }
-
-    private var foreground: Color {
-        switch state {
-        case .free: theme.muted
-        case .calendar: theme.ink
-        case .manual: theme.accentInk
-        }
-    }
-
-    @ViewBuilder
-    private var background: some View {
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        switch state {
-        case .free:
-            shape.fill(theme.surface).overlay(shape.strokeBorder(theme.glassBorder, lineWidth: 1))
-        case .calendar:
-            shape.fill(theme.busyBg).overlay(shape.strokeBorder(theme.busyLine, lineWidth: 1)).opacity(0.5)
-        case .manual:
-            ZStack {
-                shape.fill(theme.surface)
-                Stripes(color: theme.accentSoft, lineWidth: 6, spacing: 6).clipShape(shape)
-                shape.strokeBorder(theme.accent, lineWidth: 1.5)
-            }
-        }
-    }
-
-    private var accessibilityText: String {
-        let base = "\(Weekday.full(day.weekday())) \(day.day) \(part.label.lowercased())"
-        switch state {
-        case .free: return "\(base), free"
-        case .calendar(let label): return "\(base), busy from calendar: \(label)"
-        case .manual(let label, _): return "\(base), blocked by you: \(label)"
-        }
+        .padding(.top, 10)
     }
 }
 
 /// "Choir · Every Tuesday · 19:00 – 21:30 · Private"
 private struct RecurringBlockRow: View {
     let block: ManualBlock
+    let onEdit: () -> Void
     let onRemove: () -> Void
     @Environment(\.theme) private var theme
 
@@ -273,10 +171,15 @@ private struct RecurringBlockRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .glass(cornerRadius: 20)
+        .contentShape(RoundedRectangle(cornerRadius: 20))
+        .onTapGesture(perform: onEdit)
         .contextMenu {
+            Button(action: onEdit) { Label("Edit", systemImage: "pencil") }
             Button(role: .destructive, action: onRemove) { Label("Remove", systemImage: "trash") }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Double-tap to edit")
         .accessibilityAction(named: "Remove", onRemove)
     }
 }

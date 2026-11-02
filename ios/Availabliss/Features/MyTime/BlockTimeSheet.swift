@@ -1,63 +1,77 @@
 import SwiftUI
 
-/// "Block a time": date, all day / morning / evening / custom, repeat, private note.
+/// "Block a time": date, all day or exact times, repeat, private note.
 struct BlockTimeSheet: View {
-    enum When: String, CaseIterable, Identifiable {
-        case allDay, morning, evening, custom
-        var id: String { rawValue }
-        var label: String {
-            switch self {
-            case .allDay: "All day"
-            case .morning: "Morning"
-            case .evening: "Evening"
-            case .custom: "Custom"
-            }
-        }
-    }
+    enum When: Hashable { case times, allDay }
 
+    let editing: ManualBlock?
     let save: (NewManualBlock) async -> Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
     @State private var date: Date
-    @State private var when: When = .allDay
-    @State private var customStart: Date
-    @State private var customEnd: Date
-    @State private var repeatMode: ManualBlock.Repeat = .none
-    @State private var note = ""
-    @State private var editing: Field?
+    @State private var when: When
+    @State private var start: Date
+    @State private var end: Date
+    @State private var repeatMode: ManualBlock.Repeat
+    @State private var note: String
+    @State private var editingDate = false
     @State private var isSaving = false
 
-    private enum Field { case date, time }
-
-    init(initialDay: CalendarDay, save: @escaping (NewManualBlock) async -> Bool) {
+    /// - Parameters:
+    ///   - range: Exact times to prefill, in minutes since midnight on `initialDay` (e.g. from a tap
+    ///     on the week grid). 1440 means midnight at the end of the day. Defaults to 09:00–10:00.
+    ///   - editing: Edit this block instead of creating one; its day, times, repeat and note win.
+    init(initialDay: CalendarDay, range: (from: Int, to: Int)? = nil, editing: ManualBlock? = nil, save: @escaping (NewManualBlock) async -> Bool) {
+        self.editing = editing
         self.save = save
-        _date = State(initialValue: initialDay.startDate())
-        _customStart = State(initialValue: WallTime(hour: 14, minute: 0).date())
-        _customEnd = State(initialValue: WallTime(hour: 18, minute: 0).date())
+        let wall = { (minutes: Int) in WallTime(hour: (minutes / 60) % 24, minute: minutes % 60).date() }
+        if let block = editing {
+            _date = State(initialValue: CalendarDay(block.start).startDate())
+            _when = State(initialValue: block.allDay ? .allDay : .times)
+            _start = State(initialValue: block.allDay ? wall(9 * 60) : WallTime(block.start).date())
+            _end = State(initialValue: block.allDay ? wall(10 * 60) : WallTime(block.end).date())
+            _repeatMode = State(initialValue: block.repeat)
+            _note = State(initialValue: block.note ?? "")
+        } else {
+            _date = State(initialValue: initialDay.startDate())
+            _when = State(initialValue: .times)
+            // 24:00 becomes 00:00, which reads as "runs to midnight".
+            _start = State(initialValue: wall(range?.from ?? 9 * 60))
+            _end = State(initialValue: wall(range?.to ?? 10 * 60))
+            _repeatMode = State(initialValue: .none)
+            _note = State(initialValue: "")
+        }
     }
 
     var body: some View {
-        BottomSheet(title: "Block a time") {
+        BottomSheet(title: editing == nil ? "Block a time" : "Edit block") {
             HStack(spacing: 8) {
-                FieldTile(label: "Date", value: Formatting.shortDay(date), isActive: editing == .date) { toggle(.date) }
-                FieldTile(label: "Time", value: timeLabel, isActive: editing == .time) { toggle(.time) }
+                FieldTile(label: "Date", value: Formatting.shortDay(date), isActive: editingDate) { editingDate.toggle() }
+                FieldTile(label: "Time", value: timeLabel, isActive: false) {
+                    editingDate = false
+                    when = .times
+                }
             }
-            if editing == .date {
-                DatePicker("Date", selection: $date, in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date)
+            if editingDate {
+                DatePicker("Date", selection: $date, in: earliestDate..., displayedComponents: .date)
                     .datePickerStyle(.graphical)
                     .tint(theme.accent)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            whenChips
-            if when == .custom {
-                HStack {
-                    DatePicker("From", selection: $customStart, displayedComponents: .hourAndMinute)
-                    DatePicker("Until", selection: $customEnd, displayedComponents: .hourAndMinute)
+            SegmentedControl(
+                selection: $when,
+                options: [
+                    SegmentOption(value: .times, label: "Set times"),
+                    SegmentOption(value: .allDay, label: "All day"),
+                ],
+                accessibilityLabel: "All day or set times"
+            )
+            if when == .times {
+                HStack(spacing: 8) {
+                    timePicker("From", selection: $start)
+                    timePicker("To", selection: $end)
                 }
-                .bodyFont(14, .semibold)
-                .labelsHidden()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .contain)
+                .transition(.opacity)
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text("Repeat").sectionLabelStyle()
@@ -78,50 +92,51 @@ struct BlockTimeSheet: View {
             Button {
                 Task { await submit() }
             } label: {
-                LoadingLabel(title: "Block this time", isLoading: isSaving)
+                LoadingLabel(title: editing == nil ? "Block this time" : "Save changes", isLoading: isSaving)
             }
             .buttonStyle(.filled(.accent, height: 52))
-            .disabled(isSaving || !isValid)
+            .disabled(isSaving)
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: editing)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: editingDate)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: when)
     }
 
-    private var whenChips: some View {
-        HStack(spacing: 8) {
-            ForEach(When.allCases) { option in
-                Chip(label: option.label, isOn: when == option) { when = option }
-            }
+    private func timePicker(_ label: String, selection: Binding<Date>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).sectionLabelStyle()
+            DatePicker(label, selection: selection, displayedComponents: .hourAndMinute)
+                .labelsHidden()
+                .bodyFont(14, .semibold)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    /// Today, or the prefilled day if that's earlier (a tap on a past day this week).
+    private var earliestDate: Date { min(Calendar.current.startOfDay(for: Date()), Calendar.current.startOfDay(for: date)) }
 
     private var timeLabel: String {
         switch when {
-        case .custom: "\(Formatting.time(customStart)) – \(Formatting.time(customEnd))"
-        default: when.label
+        case .times: "\(Formatting.time(start)) – \(Formatting.time(end))"
+        case .allDay: "All day"
         }
     }
 
-    private var isValid: Bool { when != .custom || WallTime(customEnd) > WallTime(customStart) }
-
-    private func toggle(_ field: Field) {
-        editing = editing == field ? nil : field
-        if field == .time, editing == .time { when = .custom }
-    }
-
-    /// Builds the block's start/end on the chosen day.
+    /// Builds the block's start/end on the chosen day. An end at or before the start runs past midnight.
     private var block: NewManualBlock {
         let day = CalendarDay(date)
-        let midnight = day.startDate()
         let range: (Date, Date)
         switch when {
-        case .allDay: range = (midnight, day.adding(days: 1).startDate())
-        case .morning: range = DayPart.morning.interval(on: day)
-        case .evening: range = DayPart.evening.interval(on: day)
-        case .custom: range = (WallTime(customStart).date(on: day), WallTime(customEnd).date(on: day))
+        case .allDay:
+            range = (day.startDate(), day.adding(days: 1).startDate())
+        case .times:
+            let from = WallTime(start), to = WallTime(end)
+            range = (from.date(on: day), to.date(on: to <= from ? day.adding(days: 1) : day))
         }
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        return NewManualBlock(start: range.0, end: range.1, allDay: when == .allDay, repeat: repeatMode, until: nil, note: trimmed.isEmpty ? nil : trimmed)
+        return NewManualBlock(
+            start: range.0, end: range.1, allDay: when == .allDay, repeat: repeatMode,
+            until: repeatMode == .none ? nil : editing?.until, note: trimmed.isEmpty ? nil : trimmed
+        )
     }
 
     private func submit() async {

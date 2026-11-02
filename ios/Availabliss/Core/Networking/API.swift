@@ -51,6 +51,7 @@ enum API {
     enum Blocks {
         static func list() -> Endpoint<BlocksResponse> { .init(.get, "/blocks") }
         static func create(_ block: NewManualBlock) -> Endpoint<ManualBlock> { .init(.post, "/blocks", body: block) }
+        static func update(id: String, _ block: NewManualBlock) -> Endpoint<ManualBlock> { .init(.patch, "/blocks/\(id.pathEncoded)", body: block) }
         static func delete(id: String) -> Endpoint<EmptyResponse> { .init(.delete, "/blocks/\(id.pathEncoded)") }
     }
 
