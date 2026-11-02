@@ -5,14 +5,14 @@
 		n: number;
 		title: string;
 		text: string;
-		/** Small illustration above the copy. */
+		/** Small, playable illustration above the copy. */
 		art: Snippet;
 	}
 	let { n, title, text, art }: Props = $props();
 </script>
 
 <li class="step glass">
-	<div class="art" aria-hidden="true">{@render art()}</div>
+	<div class="art" role="group" aria-label="Try it: {title}">{@render art()}</div>
 	<span class="n" aria-hidden="true">{n}</span>
 	<h3>{title}</h3>
 	<p>{text}</p>

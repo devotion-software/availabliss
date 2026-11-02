@@ -7,8 +7,75 @@
 	import SyncRing from '#lib/components/ui/SyncRing.svelte';
 	import HeroDemo from '#lib/components/landing/HeroDemo.svelte';
 	import StepCard from '#lib/components/landing/StepCard.svelte';
+	import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
+	import { applyAppearance, MODE_OPTIONS, THEME_SWATCHES } from '#lib/client/appearance';
+	import type { ColorTheme, ThemeMode } from '#lib/types';
 
 	const year = new Date().getFullYear();
+
+	// ── Hero tilt: the calendar leans towards the pointer ──
+	const REST = { x: 4, y: -6 };
+	let tilt = $state({ x: REST.x, y: REST.y });
+	let canTilt = $state(false);
+	let stage: HTMLElement | undefined = $state();
+
+	$effect(() => {
+		const query = window.matchMedia('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)');
+		const update = () => (canTilt = query.matches);
+		update();
+		query.addEventListener('change', update);
+		return () => query.removeEventListener('change', update);
+	});
+
+	$effect(() => {
+		if (!canTilt || !stage) return;
+		const el = stage;
+		let frame = 0;
+		function onMove(e: PointerEvent) {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => {
+				const box = el.getBoundingClientRect();
+				// -1 … 1 from the calendar's centre, eased off beyond its edges.
+				const dx = Math.max(-1, Math.min(1, (e.clientX - (box.left + box.width / 2)) / (box.width * 0.75)));
+				const dy = Math.max(-1, Math.min(1, (e.clientY - (box.top + box.height / 2)) / (box.height * 0.75)));
+				tilt = { x: REST.x - dy * 7, y: REST.y + dx * 10 };
+			});
+		}
+		function onLeave() {
+			cancelAnimationFrame(frame);
+			tilt = { x: REST.x, y: REST.y };
+		}
+		window.addEventListener('pointermove', onMove, { passive: true });
+		document.documentElement.addEventListener('pointerleave', onLeave);
+		return () => {
+			cancelAnimationFrame(frame);
+			window.removeEventListener('pointermove', onMove);
+			document.documentElement.removeEventListener('pointerleave', onLeave);
+		};
+	});
+
+	// ── Theme: try the colour themes and modes (just for this visit) ──
+	let mode = $state<ThemeMode>('system');
+	let theme = $state<ColorTheme>('dawn');
+	function pickTheme(value: ColorTheme) {
+		theme = value;
+		applyAppearance({ colorTheme: value });
+	}
+
+	// ── How it works: the little illustrations are playable ──
+	let calendars = $state([
+		{ name: 'Personal', color: 'var(--warn)', on: true },
+		{ name: 'Work', color: '#5B8DEF', on: true },
+		{ name: 'Birthdays', color: '#C9A6F5', on: false }
+	]);
+	const PLANS = [
+		{ label: '2 hours', sub: 'Any 2 hours, 09:00 – 21:00 · Nov – Jan' },
+		{ label: 'An evening', sub: 'An evening from 18:00 · Nov – Jan' },
+		{ label: 'A weekend', sub: 'Fri from 18:00 → Sun · Nov – Jan' },
+		{ label: 'A week', sub: '7 days in a row · Nov – Jan' }
+	];
+	let plan = $state(2);
+	let accepted = $state(false);
 </script>
 
 <svelte:head>
@@ -41,8 +108,33 @@
 				<p class="trust"><Icon name="shield" size={16} />Your group only ever sees when you're busy, never what you're doing.</p>
 			</div>
 
-			<div class="stage" role="region" aria-label="Try it: an example group calendar">
-				<div class="tilt"><HeroDemo /></div>
+			<div class="stage" role="region" aria-label="Try it: an example group calendar" bind:this={stage}>
+				<div class="tilt" class:live={canTilt} style:--rx="{tilt.x}deg" style:--ry="{tilt.y}deg"><HeroDemo /></div>
+				<div class="try-theme glass" role="group" aria-label="Try a theme">
+					<span class="try-label">Try a theme</span>
+					<div class="dots" role="radiogroup" aria-label="Colour theme">
+						{#each THEME_SWATCHES as sw (sw.value)}
+							<button
+								type="button"
+								role="radio"
+								aria-checked={theme === sw.value}
+								aria-label={sw.label}
+								title={sw.label}
+								class:on={theme === sw.value}
+								style:--dot={sw.accent}
+								onclick={() => pickTheme(sw.value)}
+							></button>
+						{/each}
+					</div>
+					<SegmentedControl
+						options={MODE_OPTIONS}
+						bind:value={mode}
+						label="Light or dark"
+						variant="soft"
+						size="sm"
+						onchange={(v) => applyAppearance({ themeMode: v })}
+					/>
+				</div>
 			</div>
 		</section>
 
@@ -51,31 +143,41 @@
 			<ol class="steps">
 				<StepCard n={1} title="Connect your calendar once" text="Google, Outlook or iCloud. Pick which calendars mean busy. No calendar? Tap to block times yourself.">
 					{#snippet art()}
-						{#each [['Personal', 'var(--warn)', true], ['Work', '#5B8DEF', true], ['Birthdays', '#C9A6F5', false]] as [name, color, on] (name)}
+						{#each calendars as cal (cal.name)}
 							<div class="art-row">
-								<i style:background={color as string}></i><span>{name}</span>
-								<Toggle checked={on as boolean} label="{name} counts as busy" disabled />
+								<i style:background={cal.color}></i><span>{cal.name}</span>
+								<Toggle bind:checked={cal.on} label="{cal.name} counts as busy" />
 							</div>
 						{/each}
 					{/snippet}
 				</StepCard>
 				<StepCard n={2} title="Make a group, say what you're planning" text="Two hours, an evening, a whole weekend, a week away. Bank holidays and school holidays understood.">
 					{#snippet art()}
-						<div class="art-chips">
-							<span>2 hours</span><span>An evening</span><span class="on">A weekend</span><span>A week</span>
+						<div class="art-chips" role="radiogroup" aria-label="What are you planning?">
+							{#each PLANS as p, i (p.label)}
+								<button type="button" role="radio" aria-checked={plan === i} class:on={plan === i} onclick={() => (plan = i)}>{p.label}</button>
+							{/each}
 						</div>
-						<span class="art-sub">Fri from 18:00 → Sun · Nov – Jan</span>
+						<span class="art-sub" aria-live="polite">{PLANS[plan].sub}</span>
 					{/snippet}
 				</StepCard>
 				<StepCard n={3} title="Pick a time. Everyone's in." text="Only the times that work for everyone show up. Propose one, people tap accept, and it lands in every calendar.">
 					{#snippet art()}
 						<div class="art-accept">
-							<SyncRing value={6} total={6} size={58} stroke={6} tone="ok">
-								<b>6/6</b>
+							<SyncRing value={accepted ? 6 : 5} total={6} size={58} stroke={6} tone={accepted ? 'ok' : 'accent'}>
+								<b>{accepted ? 6 : 5}/6</b>
 							</SyncRing>
 							<div>
 								<b class="art-when">Fri 13 – Sun 15 Nov</b>
-								<span class="art-ok"><Icon name="check" size={12} strokeWidth={3} />Everyone's in</span>
+								<span aria-live="polite">
+									{#if accepted}
+										<button type="button" class="art-ok" onclick={() => (accepted = false)} aria-label="Everyone's in. Undo your accept">
+											<Icon name="check" size={12} strokeWidth={3} />Everyone's in
+										</button>
+									{:else}
+										<button type="button" class="art-accept-btn" onclick={() => (accepted = true)}>Accept</button>
+									{/if}
+								</span>
 							</div>
 						</div>
 					{/snippet}
@@ -245,9 +347,62 @@
 		padding: 64px 0 40px;
 	}
 	.tilt {
-		transform: perspective(1600px) rotateX(4deg) rotateY(-6deg) rotateZ(0.6deg);
+		--rx: 4deg;
+		--ry: -6deg;
+		transform: perspective(1600px) rotateX(var(--rx)) rotateY(var(--ry)) rotateZ(0.6deg);
 		transform-origin: center;
-		animation: settle 1s var(--ease-out) both;
+		/* backwards, not both: after settling, the live --rx/--ry take over. */
+		animation: settle 1s var(--ease-out) backwards;
+	}
+	.tilt.live {
+		transition: transform 0.5s var(--ease-out);
+	}
+	.try-theme {
+		margin: 28px auto 0;
+		width: fit-content;
+		max-width: 100%;
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		align-items: center;
+		gap: 10px 14px;
+		padding: 8px 10px 8px 16px;
+		border-radius: 28px;
+	}
+	.try-label {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--muted);
+	}
+	.dots {
+		display: flex;
+		gap: 4px;
+	}
+	.dots button {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+	}
+	.dots button::before {
+		content: '';
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		background: var(--dot);
+		box-shadow: 0 0 0 0 var(--ink);
+		transition:
+			transform 0.15s ease,
+			box-shadow 0.15s ease;
+	}
+	.dots button:hover::before {
+		transform: scale(1.12);
+	}
+	.dots button.on::before {
+		box-shadow:
+			0 0 0 2px var(--bg),
+			0 0 0 4px var(--ink);
 	}
 	/* How it works */
 	.how {
@@ -293,7 +448,7 @@
 		flex-wrap: wrap;
 		gap: 6px;
 	}
-	.art-chips span {
+	.art-chips button {
 		height: 34px;
 		padding: 0 12px;
 		border-radius: 999px;
@@ -303,6 +458,11 @@
 		font-weight: 600;
 		background: var(--surface);
 		border: 1px solid var(--glass-border);
+		color: var(--ink);
+		transition: transform 0.15s ease;
+	}
+	.art-chips button:hover {
+		transform: translateY(-1px);
 	}
 	.art-chips .on {
 		background: var(--solid);
@@ -342,6 +502,20 @@
 		color: var(--ok-ink);
 		font-size: 12px;
 		font-weight: 600;
+	}
+	.art-accept-btn {
+		align-self: flex-start;
+		height: 30px;
+		padding: 0 14px;
+		border-radius: 999px;
+		background: var(--accent);
+		color: var(--on-accent);
+		font-size: 13px;
+		font-weight: 650;
+		transition: transform 0.15s ease;
+	}
+	.art-accept-btn:hover {
+		transform: translateY(-1px);
 	}
 
 	/* Privacy */
@@ -470,6 +644,7 @@
 	@media (prefers-reduced-motion: reduce) {
 		.tilt {
 			transform: none;
+			transition: none;
 		}
 	}
 </style>
