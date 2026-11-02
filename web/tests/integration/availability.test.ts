@@ -152,6 +152,13 @@ describe('upcomingSlotCount', () => {
 		expect(await upcomingSlotCount(row)).toBe(5);
 		expect(await upcomingSlotCount({ ...row, requirement: everyDay('2020-01-01', '2020-01-31') })).toBe(0);
 	});
+
+	test('counts a range that starts months from now', async () => {
+		const owner = await fx.user();
+		const start = addDays(today('UTC'), 200);
+		const group = await createGroup(owner, { name: 'Later', requirement: everyDay(start, addDays(start, 2)) }, 'UTC');
+		expect(await upcomingSlotCount(await getGroupRow(group.id))).toBe(3);
+	});
 });
 
 describe('previewRequirement', () => {

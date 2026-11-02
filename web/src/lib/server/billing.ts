@@ -15,8 +15,6 @@ import { env } from './env';
 import { FREE_GROUP_LIMIT } from '#lib/plans';
 
 export { FREE_GROUP_LIMIT };
-/** Lifetime purchases have no expiry; store a far-future date so comparisons stay simple. */
-const LIFETIME = new Date('2999-01-01T00:00:00Z');
 
 export interface Entitlement {
 	proUntil: Date | null;
@@ -81,7 +79,9 @@ export async function requireCanCreateGroup(userId: string): Promise<void> {
 }
 
 export async function saveEntitlement(userId: string, e: Entitlement): Promise<void> {
-	const values = { ...e, proUntil: e.lifetime ? LIFETIME : e.proUntil };
+	// Lifetime has no expiry: proUntil stays null and the flag carries it (a far-future
+	// date would overflow MariaDB's TIMESTAMP range).
+	const values = { ...e, proUntil: e.lifetime ? null : e.proUntil };
 	await db.insert(userPlans).values({ userId, ...values }).onDuplicateKeyUpdate({ set: values });
 }
 
@@ -107,7 +107,8 @@ export function entitlementFromSubscriber(subscriber: RcSubscriber, entitlementI
 	return { proUntil, lifetime: false, store, productId: product, willRenew: !sub?.unsubscribe_detected_at };
 }
 
-const GRANTING = new Set(['INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'PRODUCT_CHANGE', 'NON_RENEWING_PURCHASE', 'SUBSCRIPTION_EXTENDED', 'TEMPORARY_ENTITLEMENT_GRANT']);
+// TRANSFER grants the receiving account; the giving one is downgraded separately.
+const GRANTING = new Set(['INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'PRODUCT_CHANGE', 'NON_RENEWING_PURCHASE', 'SUBSCRIPTION_EXTENDED', 'TEMPORARY_ENTITLEMENT_GRANT', 'TRANSFER']);
 
 export interface RcEvent {
 	type: string;

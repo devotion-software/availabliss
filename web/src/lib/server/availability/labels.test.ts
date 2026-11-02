@@ -78,7 +78,7 @@ describe('requirementSummary', () => {
 
 	test('the same month in different years is a span', () => {
 		expect(requirementSummary(req({ type: 'duration', minutes: 120 }, { range: { from: '2026-11-01', to: '2027-11-01' } }))).toBe(
-			'2 hours · any day · Nov – Nov'
+			'2 hours · any day · Nov 2026 – Nov 2027'
 		);
 	});
 });

@@ -131,7 +131,9 @@ export async function schoolAuthorities(country: string): Promise<{ id: string; 
 export function detectRegion(headers: Headers): { country: string | null; subdivision: string | null; timezone: string | null } {
 	const fromCdn = headers.get('cf-ipcountry') ?? headers.get('x-vercel-ip-country') ?? headers.get('x-country-code');
 	const fromLanguage = headers.get('accept-language')?.match(/^[a-z]{2,3}-([A-Z]{2})/)?.[1] ?? null;
-	const country = (fromCdn && /^[A-Z]{2}$/i.test(fromCdn) ? fromCdn.toUpperCase() : null) ?? fromLanguage;
+	// Cloudflare reports XX for unknown and T1 for Tor; neither is a country.
+	const cdn = fromCdn && /^[A-Z]{2}$/i.test(fromCdn) && !['XX', 'T1'].includes(fromCdn.toUpperCase()) ? fromCdn.toUpperCase() : null;
+	const country = cdn ?? fromLanguage;
 	return { country, subdivision: country === 'GB' ? 'GB-ENG' : null, timezone: headers.get('x-timezone') };
 }
 

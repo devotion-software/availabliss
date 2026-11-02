@@ -21,6 +21,8 @@ describe('detectRegion', () => {
 			timezone: null
 		});
 		expect(detectRegion(headers({ 'cf-ipcountry': 'T1', 'accept-language': 'de-AT' })).country).toBe('AT');
+		// Cloudflare's "unknown" isn't a country either.
+		expect(detectRegion(headers({ 'cf-ipcountry': 'XX', 'accept-language': 'fr-BE' })).country).toBe('BE');
 	});
 
 	test('nothing known', () => {

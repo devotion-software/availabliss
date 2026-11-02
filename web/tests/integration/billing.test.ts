@@ -50,7 +50,7 @@ describe('getPlan', () => {
 	 * which MariaDB caps at 2038 (2106 on 11.5+), so the insert fails with
 	 * ER_TRUNCATED_WRONG_VALUE. Marked `failing` until that's fixed; flip it to `test` then.
 	 */
-	test.failing('lifetime Pro (currently fails: 2999 is out of TIMESTAMP range)', async () => {
+	test('lifetime Pro', async () => {
 		const life = await fx.user();
 		await saveEntitlement(life, { proUntil: null, lifetime: true, store: 'stripe', productId: 'pro_lifetime', willRenew: false });
 		expect(await getPlan(life)).toMatchObject({ tier: 'pro', proUntil: null, lifetime: true });
@@ -82,7 +82,7 @@ describe('handleRevenueCatEvent without a REST key', () => {
 	});
 
 	// BUG: see 'lifetime Pro' above; the webhook throws for lifetime purchases.
-	test.failing('a lifetime (non-expiring) purchase (currently fails)', async () => {
+	test('a lifetime (non-expiring) purchase', async () => {
 		const me = await fx.user();
 		await handleRevenueCatEvent(purchase(me, { type: 'NON_RENEWING_PURCHASE', expiration_at_ms: null, product_id: 'pro_lifetime', store: 'PLAY_STORE' }));
 		expect(await getPlan(me)).toMatchObject({ tier: 'pro', lifetime: true, willRenew: false, store: 'play_store' });
@@ -126,9 +126,8 @@ describe('handleRevenueCatEvent without a REST key', () => {
 		});
 		expect((await getPlan(from)).tier).toBe('free');
 		expect(await planRow(from)).toMatchObject({ proUntil: null, lifetime: false });
-		// Without a REST key the receiving account can't be granted from a TRANSFER body
-		// (TRANSFER isn't a granting event type); it gets Pro on the next sync or event.
-		expect((await getPlan(to)).tier).toBe('free');
+		// The receiving account gets Pro from the event itself.
+		expect(await getPlan(to)).toMatchObject({ tier: 'pro', store: 'app_store' });
 	});
 });
 

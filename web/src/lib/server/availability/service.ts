@@ -71,7 +71,8 @@ export async function groupDay(groupId: string, userId: string, date: string): P
 
 /** How many slots work from today to the end of the group's search range (capped). */
 export async function upcomingSlotCount(group: GroupRow): Promise<number> {
-	const from = today(group.requirement.timezone);
+	// From the later of today and the range start, so far-off ranges still count.
+	const from = [today(group.requirement.timezone), group.requirement.range.from].sort()[1];
 	if (group.requirement.range.to < from) return 0;
 	const to = [group.requirement.range.to, addDays(from, MAX_RANGE_DAYS)].sort()[0];
 	return computeAvailability(await engineInput(group, from, to)).slots.length;

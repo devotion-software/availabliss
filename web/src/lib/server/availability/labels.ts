@@ -58,7 +58,9 @@ function daysLabel(days: readonly Weekday[]): string {
 
 function monthSpan(from: string, to: string): string {
 	const m = (date: string) => MONTHS[Number(date.slice(5, 7)) - 1];
-	return m(from) === m(to) && from.slice(0, 4) === to.slice(0, 4) ? m(from) : `${m(from)} – ${m(to)}`;
+	const sameYear = from.slice(0, 4) === to.slice(0, 4);
+	if (m(from) === m(to)) return sameYear ? m(from) : `${m(from)} ${from.slice(0, 4)} – ${m(to)} ${to.slice(0, 4)}`;
+	return `${m(from)} – ${m(to)}`;
 }
 
 /** The one-line summary shown on group cards: "A weekend · Fri 18:00 → Sun · Nov – Jan". */
