@@ -40,10 +40,9 @@ struct GroupsHomeView: View {
             }
         }
         .sheet(isPresented: $showsNewGroup) {
-            NewGroupSheet { name, color in
-                guard let group = await model.create(name: name, color: color) else { return false }
+            NewGroupSheet(api: model.api, timezone: app.session.user?.timezone ?? TimeZone.current.identifier) { group in
+                Task { await model.load() }
                 app.router.push(.group(id: group.id, tab: .calendar))
-                return true
             }
         }
         .errorAlert($model.error)

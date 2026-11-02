@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Draft of a group's `Requirement`, edited by admins.
+/// Draft of a group's `Requirement`, edited by admins, or of a new group's timing before it exists.
 @MainActor
 @Observable
 final class TimingEditorViewModel {
@@ -14,15 +14,36 @@ final class TimingEditorViewModel {
     var error: String?
     var toast: String?
 
-    private let original: Requirement
-    private let groupId: String
-    private let api: APIClient
+    private var original: Requirement
+    private let groupId: String?
+    let api: APIClient
 
     init(group: Group, api: APIClient) {
         self.draft = group.requirement
         self.original = group.requirement
         self.groupId = group.id
         self.api = api
+    }
+
+    /// A timing for a group that doesn't exist yet (New group, step 2).
+    init(draft: Requirement, api: APIClient) {
+        self.draft = draft
+        self.original = draft
+        self.groupId = nil
+        self.api = api
+    }
+
+    /// Replaces the whole draft (a new preset or template picked before editing).
+    func reset(to requirement: Requirement) {
+        draft = requirement
+        original = requirement
+    }
+
+    /// A fresh timing for a new group: "A week" needs every day, "A weekend" Fri–Sun, and so on.
+    static func fresh(_ preset: TimingPreset, today: CalendarDay = .today(), timezone: String) -> Requirement {
+        var requirement = Requirement.defaultValue(today: today, timezone: timezone)
+        requirement.apply(preset)
+        return requirement
     }
 
     var hasChanges: Bool { draft != original }
@@ -35,14 +56,12 @@ final class TimingEditorViewModel {
     // MARK: Length
 
     func choose(_ preset: TimingPreset) {
-        guard let shape = preset.shape else {
+        guard preset.shape != nil else {
             // Custom: keep the current shape, just mark it as custom by nudging to a non-preset value.
             if TimingPreset.detect(draft.length, window: draft.window) != .custom { chooseCustom(.hours) }
             return
         }
-        draft.length = shape.length
-        draft.window = shape.window
-        if case .span(let span) = shape.length { draft.days = Self.days(in: span) }
+        draft.apply(preset)
     }
 
     func chooseCustom(_ kind: CustomLengthKind) {
@@ -165,6 +184,7 @@ final class TimingEditorViewModel {
     // MARK: Save
 
     func save() async -> Group? {
+        guard let groupId else { return nil }
         if draft.schoolHolidaysOnly && draft.schoolAuthority == nil && draft.customSchoolHolidays.isEmpty {
             error = "Choose whose school holidays to use."
             return nil
@@ -185,7 +205,7 @@ final class TimingEditorViewModel {
         }
     }
 
-    private static func days(in span: RequirementLength.Span) -> [Int] {
+    nonisolated static func days(in span: RequirementLength.Span) -> [Int] {
         if span.weeksLater == 1 { return [] }
         var days: [Int] = []
         var day = span.startDay

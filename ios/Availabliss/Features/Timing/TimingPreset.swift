@@ -69,6 +69,23 @@ enum CustomLengthKind: String, CaseIterable, Identifiable {
 }
 
 extension Requirement {
+    /// Applies a preset's length and window. A run of days longer than the days allowed
+    /// ("A week" with Fri–Sun) could never fit, so it opens up every day.
+    mutating func apply(_ preset: TimingPreset) {
+        guard let shape = preset.shape else { return }
+        length = shape.length
+        window = shape.window
+        switch shape.length {
+        case .span(let span):
+            days = TimingEditorViewModel.days(in: span)
+        case .days(let count):
+            // Empty `days` means any weekday.
+            if !days.isEmpty && count > days.count { days = [] }
+        case .duration:
+            break
+        }
+    }
+
     /// A short, human description of the draft: "A weekend · Fri 18:00 → Sun".
     var draftSummary: String {
         let preset = TimingPreset.detect(length, window: window)

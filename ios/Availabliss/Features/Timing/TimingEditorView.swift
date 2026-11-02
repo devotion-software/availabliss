@@ -8,9 +8,6 @@ struct TimingEditorView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var model: TimingEditorViewModel
-    @State private var editingEnds: TimingEndsSheet.Target?
-    @State private var showsAddRange = false
-    @State private var showsAuthorities = false
 
     init(detail: GroupDetailModel, group: Group, onDone: @escaping () -> Void) {
         self.detail = detail
@@ -25,12 +22,9 @@ struct TimingEditorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 header
-                lengthSection
-                startsSection
-                extrasSection
-                rangeSection
+                TimingForm(model: model)
+                    .disabled(!canEdit)
             }
-            .disabled(!canEdit)
             .padding(.horizontal, 20)
             .padding(.top, 20)
             .padding(.bottom, 16)
@@ -39,13 +33,6 @@ struct TimingEditorView: View {
         .screenBackground(OrbLayout.timing)
         .task { await model.loadAuthorities(country: app.session.user?.country) }
         .task(id: model.draft) { await model.refreshPreview() }
-        .sheet(item: $editingEnds) { target in TimingEndsSheet(model: model, target: target) }
-        .sheet(isPresented: $showsAddRange) { DateRangeSheet { model.addDateRange($0) } }
-        .sheet(isPresented: $showsAuthorities) {
-            SearchablePicker(title: "School holidays", items: model.authorities.map { ($0.id, $0.name) }, selection: model.draft.schoolAuthority) {
-                model.draft.schoolAuthority = $0
-            }
-        }
         .errorAlert($model.error)
         .toast($model.toast)
     }
@@ -53,6 +40,79 @@ struct TimingEditorView: View {
     private var header: some View {
         ScreenHeader(title: "Timing", subtitle: group.name, backLabel: "Back to calendar", onBack: onDone) {
             StatusPill(text: canEdit ? "Admins only" : "View only", tone: .indigo, systemImage: canEdit ? "shield" : "eye")
+        }
+    }
+
+    private var saveBar: some View {
+        HStack(spacing: 12) {
+            FitSummary(model: model)
+            Spacer(minLength: 0)
+            if canEdit {
+                Button {
+                    Task {
+                        if let updated = await model.save() {
+                            detail.update(updated)
+                            onDone()
+                        }
+                    }
+                } label: {
+                    LoadingLabel(title: "Save timing", isLoading: model.isSaving)
+                }
+                .buttonStyle(.filled(.primary, height: 48, cornerRadius: 16, fontSize: 15, fullWidth: false))
+                .disabled(!model.hasChanges || model.isSaving)
+            }
+        }
+        .padding(.leading, 16)
+        .padding([.trailing, .vertical], 12)
+        .glass(cornerRadius: 26)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+    }
+}
+
+/// "13 weekends" / "fit this timing between 2 Nov and 1 Feb · …", from the model's live preview.
+struct FitSummary: View {
+    let model: TimingEditorViewModel
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(model.previewTitle)
+                .displayFont(20, .bold)
+                .contentTransition(.numericText())
+                .opacity(model.isPreviewing ? 0.6 : 1)
+                .animation(.easeOut(duration: 0.2), value: model.previewTitle)
+            Text(model.previewSubtitle)
+                .bodyFont(12, relativeTo: .caption)
+                .foregroundStyle(theme.muted)
+                .lineLimit(2)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The timing editor's sections: length, starts/ends and days, holidays, search range and dates.
+/// Used by a group's Timing screen and by New group (step 2).
+struct TimingForm: View {
+    @Bindable var model: TimingEditorViewModel
+    @Environment(\.theme) private var theme
+    @State private var editingEnds: TimingEndsSheet.Target?
+    @State private var showsAddRange = false
+    @State private var showsAuthorities = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            lengthSection
+            startsSection
+            extrasSection
+            rangeSection
+        }
+        .sheet(item: $editingEnds) { target in TimingEndsSheet(model: model, target: target) }
+        .sheet(isPresented: $showsAddRange) { DateRangeSheet { model.addDateRange($0) } }
+        .sheet(isPresented: $showsAuthorities) {
+            SearchablePicker(title: "School holidays", items: model.authorities.map { ($0.id, $0.name) }, selection: model.draft.schoolAuthority) {
+                model.draft.schoolAuthority = $0
+            }
         }
     }
 
@@ -141,42 +201,6 @@ struct TimingEditorView: View {
                     .frame(minHeight: 44)
             }
         }
-    }
-
-    private var saveBar: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(model.previewTitle)
-                    .displayFont(20, .bold)
-                    .contentTransition(.numericText())
-                    .opacity(model.isPreviewing ? 0.6 : 1)
-                    .animation(.easeOut(duration: 0.2), value: model.previewTitle)
-                Text(model.previewSubtitle)
-                    .bodyFont(12, relativeTo: .caption)
-                    .foregroundStyle(theme.muted)
-                    .lineLimit(2)
-            }
-            Spacer(minLength: 0)
-            if canEdit {
-                Button {
-                    Task {
-                        if let updated = await model.save() {
-                            detail.update(updated)
-                            onDone()
-                        }
-                    }
-                } label: {
-                    LoadingLabel(title: "Save timing", isLoading: model.isSaving)
-                }
-                .buttonStyle(.filled(.primary, height: 48, cornerRadius: 16, fontSize: 15, fullWidth: false))
-                .disabled(!model.hasChanges || model.isSaving)
-            }
-        }
-        .padding(.leading, 16)
-        .padding([.trailing, .vertical], 12)
-        .glass(cornerRadius: 26)
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
     }
 }
 

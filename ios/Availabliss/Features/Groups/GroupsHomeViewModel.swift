@@ -10,7 +10,7 @@ final class GroupsHomeViewModel {
     private(set) var loadError: String?
     var error: String?
 
-    private let api: APIClient
+    let api: APIClient
 
     init(api: APIClient) {
         self.api = api
@@ -28,17 +28,6 @@ final class GroupsHomeViewModel {
         } catch where !error.isCancellation {
             loadError = error.userMessage
         } catch {}
-    }
-
-    func create(name: String, color: String) async -> Group? {
-        do {
-            let group = try await api.send(API.Groups.create(CreateGroupBody(name: name, color: color, requirement: .defaultValue())))
-            await load()
-            return group
-        } catch {
-            self.error = error.userMessage
-            return nil
-        }
     }
 
     func memberCount(forGroupNamed name: String?) -> Int? {
