@@ -35,9 +35,10 @@ final class AppTourUITests: XCTestCase {
         snapshot("03-groups-home")
 
         // Group availability: month, week, day.
-        let group = app.staticTexts["Lake District crew"].firstMatch
-        if group.waitForExistence(timeout: 5) {
-            group.tap()
+        // The name can also appear on the "up next" card above the list, so tap the group row (the last match).
+        let groupNames = app.staticTexts.matching(identifier: "Lake District crew")
+        if groupNames.firstMatch.waitForExistence(timeout: 5) {
+            groupNames.element(boundBy: groupNames.count - 1).tap()
             settle(2)
             snapshot("04-group-month")
             tapIfPresent(app.buttons["Week"]) { snapshot("05-group-week") }
