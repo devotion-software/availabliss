@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# On commits to main, offers to bump the version of each app the commit touches
+# (web/, ios/, android/) and folds the bump into the commit being made.
+#   web      web/package.json "version" (shown in the web app and /api/v1/health)
+#   ios      ios/project.yml MARKETING_VERSION, plus CURRENT_PROJECT_VERSION + 1
+#   android  android/app/build.gradle.kts versionName, plus versionCode + 1
+# Installed by `make hooks` (also run by `make setup` and `bun install` in web/).
+set -e
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+[ "$branch" = "main" ] || exit 0
+# Only ask when someone is at a terminal (not from IDEs, scripts or agents).
+{ [ -t 1 ] && [ -e /dev/tty ]; } || exit 0
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+staged=$(git diff --cached --name-only)
+
+# bump <x.y.z> <patch|minor|major>
+bump() {
+	local major minor patch
+	IFS=. read -r major minor patch <<<"$1"
+	case "$2" in
+		major) echo "$((major + 1)).0.0" ;;
+		minor) echo "$major.$((minor + 1)).0" ;;
+		patch) echo "$major.$minor.$((patch + 1))" ;;
+	esac
+}
+
+# ask <label> <current version> → sets $level (empty = no bump)
+ask() {
+	echo "Committing to main: $1 is at $2." > /dev/tty
+	printf "Bump %s? [p]atch / [m]inor / [M]ajor / [n]one (default: n): " "$1" > /dev/tty
+	read -r choice < /dev/tty
+	case "$choice" in
+		p | P) level=patch ;;
+		m) level=minor ;;
+		M) level=major ;;
+		*) level= ;;
+	esac
+}
+
+if grep -q '^web/' <<<"$staged"; then
+	file=web/package.json
+	current=$(sed -nE 's/^[[:space:]]*"version": "([0-9]+\.[0-9]+\.[0-9]+)".*/\1/p' "$file" | head -1)
+	ask "web" "$current"
+	if [ -n "$level" ]; then
+		new=$(bump "$current" "$level")
+		sed -i.bak -E "s/^([[:space:]]*\"version\": )\"$current\"/\1\"$new\"/" "$file"
+		rm -f "$file.bak"
+		git add "$file"
+		echo "web → $new (included in this commit)." > /dev/tty
+	fi
+fi
+
+if grep -q '^ios/' <<<"$staged"; then
+	file=ios/project.yml
+	current=$(sed -nE 's/^[[:space:]]*MARKETING_VERSION: "([^"]+)".*/\1/p' "$file" | head -1)
+	build=$(sed -nE 's/^[[:space:]]*CURRENT_PROJECT_VERSION: "([0-9]+)".*/\1/p' "$file" | head -1)
+	ask "iOS" "$current ($build)"
+	if [ -n "$level" ]; then
+		new=$(bump "$current" "$level")
+		next=$((build + 1))
+		sed -i.bak -E \
+			-e "s/(MARKETING_VERSION: )\"$current\"/\1\"$new\"/" \
+			-e "s/(CURRENT_PROJECT_VERSION: )\"$build\"/\1\"$next\"/" "$file"
+		rm -f "$file.bak"
+		git add "$file"
+		echo "iOS → $new ($next) (included in this commit; run make ios-project to regenerate)." > /dev/tty
+	fi
+fi
+
+if grep -q '^android/' <<<"$staged"; then
+	file=android/app/build.gradle.kts
+	current=$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)".*/\1/p' "$file" | head -1)
+	build=$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+).*/\1/p' "$file" | head -1)
+	ask "Android" "$current ($build)"
+	if [ -n "$level" ]; then
+		new=$(bump "$current" "$level")
+		next=$((build + 1))
+		sed -i.bak -E \
+			-e "s/(versionName = )\"$current\"/\1\"$new\"/" \
+			-e "s/(versionCode = )$build\$/\1$next/" "$file"
+		rm -f "$file.bak"
+		git add "$file"
+		echo "Android → $new ($next) (included in this commit)." > /dev/tty
+	fi
+fi

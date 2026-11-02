@@ -4,7 +4,7 @@ WEB := web
 IMAGE ?= availabliss-web
 
 .DEFAULT_GOAL := help
-.PHONY: help setup env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test test-integration smoke \
+.PHONY: help setup hooks env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test test-integration smoke \
 	seed-demo clean-demo set-plan school-holidays \
 	docker-build docker-run ios-project ios-open ios-build ios-uitest android-build android-test android-tour clean
 
@@ -12,10 +12,13 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 # ── Setup ────────────────────────────────────────────────────────────────────
-setup: env ## Install deps, start services, apply migrations
+setup: env hooks ## Install deps, start services, apply migrations
 	cd $(WEB) && bun install
 	$(MAKE) db-up
 	$(MAKE) db-migrate
+
+hooks: ## Use .githooks (offers a version bump on commits to main)
+	git config core.hooksPath .githooks
 
 env: ## Create web/.env from the example (won't overwrite)
 	@test -f $(WEB)/.env || (cp $(WEB)/.env.example $(WEB)/.env && echo "Created $(WEB)/.env")
