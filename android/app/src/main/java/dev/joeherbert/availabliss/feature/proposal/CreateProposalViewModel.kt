@@ -25,6 +25,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** What to prefill when proposing: a time, and optionally a title and note (the AI planner drafts them). */
+data class ProposalPrefill(
+    val start: String,
+    val end: String,
+    val allDay: Boolean,
+    val title: String? = null,
+    val note: String? = null,
+)
+
 data class CreateProposalUiState(
     val groupName: String = "",
     val range: TimeRangeDraft = TimeRangeDraft.default(),
@@ -50,7 +59,11 @@ class CreateProposalViewModel @Inject constructor(
 
     private val route = savedStateHandle.toRoute<CreateProposalRoute>()
     private val _state = MutableStateFlow(
-        CreateProposalUiState(range = TimeRangeDraft.fromIso(route.start, route.end, route.allDay) ?: TimeRangeDraft.default()),
+        CreateProposalUiState(
+            range = TimeRangeDraft.fromIso(route.start, route.end, route.allDay) ?: TimeRangeDraft.default(),
+            title = route.title.orEmpty().take(120),
+            note = route.note.orEmpty().take(1000),
+        ),
     )
     val state: StateFlow<CreateProposalUiState> = _state.asStateFlow()
 

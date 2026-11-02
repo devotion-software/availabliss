@@ -89,7 +89,7 @@ fun MainNavHost(root: RootViewModel) {
                     onBack = { nav.popBackStack() },
                     onOpenMembers = { nav.navigate(MembersRoute(route.groupId)) },
                     onOpenProposal = { nav.navigate(ProposalRoute(it)) },
-                    onCreateProposal = { start, end, allDay -> nav.navigate(CreateProposalRoute(route.groupId, start, end, allDay)) },
+                    onCreateProposal = { p -> nav.navigate(CreateProposalRoute(route.groupId, p.start, p.end, p.allDay, p.title, p.note)) },
                     onOpenEvents = { nav.navigate(EventsRoute(route.groupId)) },
                     onOpenEvent = { nav.navigate(EventEditorRoute(route.groupId, eventId = it)) },
                     onAddEvent = { start, end -> nav.navigate(EventEditorRoute(route.groupId, start, end)) },

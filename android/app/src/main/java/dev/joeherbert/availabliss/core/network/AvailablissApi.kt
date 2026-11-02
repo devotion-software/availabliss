@@ -2,6 +2,8 @@ package dev.joeherbert.availabliss.core.network
 
 import dev.joeherbert.availabliss.core.network.model.Availability
 import dev.joeherbert.availabliss.core.network.model.Plan
+import dev.joeherbert.availabliss.core.network.model.PlannerRequest
+import dev.joeherbert.availabliss.core.network.model.PlannerResult
 import dev.joeherbert.availabliss.core.network.model.CreateTemplateRequest
 import dev.joeherbert.availabliss.core.network.model.RenameTemplateRequest
 import dev.joeherbert.availabliss.core.network.model.RequirementTemplate
@@ -215,6 +217,10 @@ interface AvailablissApi {
     // region Proposals
     @GET("api/v1/groups/{id}/proposals")
     suspend fun getProposals(@Path("id") groupId: String, @Query("status") status: String? = null): ProposalsResponse
+
+    /** The optional AI planner (Pro). Slow: NetworkModule gives this call a longer read timeout. */
+    @POST("api/v1/groups/{id}/planner")
+    suspend fun planWithAi(@Path("id") groupId: String, @Body body: PlannerRequest): PlannerResult
 
     // region Plan (Pro)
     @GET("api/v1/me/plan")

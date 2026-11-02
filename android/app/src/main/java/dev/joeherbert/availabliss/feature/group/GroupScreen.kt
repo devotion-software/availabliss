@@ -23,6 +23,7 @@ import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.feature.availability.GroupCalendarTab
 import dev.joeherbert.availabliss.feature.chat.GroupChatTab
 import dev.joeherbert.availabliss.feature.proposal.GroupProposalsTab
+import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
 import dev.joeherbert.availabliss.feature.timing.GroupTimingTab
 import dev.joeherbert.availabliss.navigation.GroupTab
 
@@ -36,7 +37,7 @@ fun GroupScreen(
     onBack: () -> Unit,
     onOpenMembers: () -> Unit,
     onOpenProposal: (String) -> Unit,
-    onCreateProposal: (start: String, end: String, allDay: Boolean) -> Unit,
+    onCreateProposal: (ProposalPrefill) -> Unit,
     onOpenEvents: () -> Unit,
     onOpenEvent: (eventId: String) -> Unit,
     onAddEvent: (start: String?, end: String?) -> Unit,

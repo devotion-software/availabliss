@@ -26,6 +26,9 @@ annotation class StreamingClient
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
+    private const val PLANNER_PATH_SUFFIX = "/planner"
+    private const val PLANNER_TIMEOUT_SECONDS = 90
+
 
     /**
      * Shared JSON config. `encodeDefaults = false` omits optional request fields left at
@@ -57,6 +60,11 @@ object NetworkModule {
         .readTimeout(30, TimeUnit.SECONDS)
         .cookieJar(cookieJar)
         .addInterceptor(authInterceptor)
+        // The AI planner can take 20-60s to think; everything else keeps the 30s timeout.
+        .addInterceptor { chain ->
+            val slow = chain.request().url.encodedPath.endsWith(PLANNER_PATH_SUFFIX)
+            if (slow) chain.withReadTimeout(PLANNER_TIMEOUT_SECONDS, TimeUnit.SECONDS).proceed(chain.request()) else chain.proceed(chain.request())
+        }
         .apply {
             if (BuildConfig.DEBUG) {
                 addInterceptor(

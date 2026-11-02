@@ -150,6 +150,11 @@ The paywall is our own (`feature/plan/UpgradeSheet.kt`), not RevenueCat's UI lib
 
 Test Pro without a purchase: `make set-plan EMAIL=… PLAN=pro DAYS=1` (and `PLAN=free`).
 
+The optional **AI planner** ("Plan with AI" on a group's calendar) only appears when the
+server has `ANTHROPIC_API_KEY` set (`Plan.aiPlanner.available`); without Pro it opens the
+upgrade sheet. Its request gets a 90 s read timeout (`NetworkModule`). The result UI is
+previewed from `feature/planner/PlannerFixtures.kt`, as the dev server has no key.
+
 ## Release signing
 
 Create `android/keystore.properties` (git-ignored):

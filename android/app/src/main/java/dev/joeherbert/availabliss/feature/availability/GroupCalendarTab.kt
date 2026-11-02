@@ -20,11 +20,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -63,7 +68,14 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
+import dev.joeherbert.availabliss.feature.plan.UpgradeSheet
+import dev.joeherbert.availabliss.feature.planner.PlannerSheet
+import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
 import java.time.LocalDate
+import kotlinx.coroutines.launch
+
+/** Why the upgrade sheet opens from "Plan with AI". */
+private const val PLANNER_UPGRADE_REASON = "AI planning is part of Pro: it picks the best time, suggests things to do and drafts the plan."
 
 /** Group availability: month / week / day (GroupCalendar.dc.html). */
 @Composable
@@ -71,12 +83,32 @@ fun GroupCalendarTab(
     onBack: () -> Unit,
     onOpenMembers: () -> Unit,
     onOpenTiming: () -> Unit,
-    onCreateProposal: (start: String, end: String, allDay: Boolean) -> Unit,
+    onCreateProposal: (ProposalPrefill) -> Unit,
     viewModel: GroupCalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::messageShown)
+    var planning by rememberSaveable { mutableStateOf(false) }
+    var upgradeReason by rememberSaveable { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    if (planning) {
+        PlannerSheet(
+            onDismiss = { planning = false },
+            onPropose = { p ->
+                val (start, end, allDay) = viewModel.proposalFor(p.slot)
+                onCreateProposal(ProposalPrefill(start, end, allDay, p.title.ifBlank { null }, p.note.ifBlank { null }))
+            },
+            onNeedsPro = { upgradeReason = PLANNER_UPGRADE_REASON },
+        )
+    }
+    upgradeReason?.let { reason ->
+        UpgradeSheet(
+            onDismiss = { upgradeReason = null },
+            onUpgraded = { message -> scope.launch { snackbar.showSnackbar(message) } },
+            reason = reason,
+        )
+    }
     GroupCalendarContent(
         state = state,
         onBack = onBack,
@@ -90,11 +122,17 @@ fun GroupCalendarTab(
         onRetry = viewModel::refresh,
         onPropose = { slot ->
             val (start, end, allDay) = viewModel.proposalFor(slot)
-            onCreateProposal(start, end, allDay)
+            onCreateProposal(ProposalPrefill(start, end, allDay))
         },
         onProposeDay = { date ->
             val (start, end) = viewModel.eveningOn(date)
-            onCreateProposal(start, end, false)
+            onCreateProposal(ProposalPrefill(start, end, false))
+        },
+        // Offered only when the server has the AI planner set up; without Pro it explains Pro first.
+        onPlanWithAi = if (state.aiPlanner.available && state.hasSlots) {
+            { if (state.aiPlanner.included) planning = true else upgradeReason = PLANNER_UPGRADE_REASON }
+        } else {
+            null
         },
         onSeeWhosFree = viewModel::showDay,
         snackbar = { AvSnackbarHost(snackbar) },
@@ -118,6 +156,8 @@ fun GroupCalendarContent(
     snackbar: @Composable () -> Unit = {},
     /** "Propose anyway" on a day that doesn't work for everyone. */
     onProposeDay: (LocalDate) -> Unit = {},
+    /** "Plan with AI"; null hides it (not set up on this server, or nothing works yet). */
+    onPlanWithAi: (() -> Unit)? = null,
 ) {
     AvailablissBackground(OrbLayout.GroupCalendar) {
         Box(Modifier.fillMaxSize()) {
@@ -136,7 +176,7 @@ fun GroupCalendarContent(
                 state.error?.let { ErrorBanner(it, onRetry = onRetry) }
                 AnimatedContent(targetState = state.view, label = "calendar-view") { view ->
                     when (view) {
-                        CalendarView.Month -> MonthSection(state, onSelectDate, onPropose, onProposeDay, onSeeWhosFree)
+                        CalendarView.Month -> MonthSection(state, onSelectDate, onPropose, onProposeDay, onSeeWhosFree, onPlanWithAi)
                         CalendarView.Week -> if (state.weekLoading && state.weekColumns.isEmpty()) LoadingIndicator() else WeekGrid(state.weekColumns)
                         CalendarView.Day -> if (state.dayLoading && state.timelineRows.isEmpty()) LoadingIndicator()
                         else DayTimeline(state.dayTitle, state.dayNote, state.everyone, state.timelineRows)
@@ -259,6 +299,7 @@ private fun MonthSection(
     onPropose: (Slot) -> Unit,
     onProposeDay: (LocalDate) -> Unit,
     onSeeWhosFree: () -> Unit,
+    onPlanWithAi: (() -> Unit)?,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
         if (state.loading && state.monthRows.all { row -> row.all { it == null } }) {
@@ -269,7 +310,28 @@ private fun MonthSection(
                 MonthLegend(state.daysNote)
             }
         }
+        onPlanWithAi?.let { PlanWithAiRow(it) }
         state.detail?.let { DetailCard(it, onPropose, onProposeDay, onSeeWhosFree) }
+    }
+}
+
+/** "Best options · Plan with AI" above the selected day (mirrors web's Best options header). */
+@Composable
+private fun PlanWithAiRow(onClick: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Best options", style = AvailablissTheme.type.cardTitle, color = colors.ink, modifier = Modifier.weight(1f).semantics { heading() })
+        Row(
+            Modifier
+                .clip(Shapes.pill)
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(AvIcons.Sparkle, null, tint = colors.accentInk, modifier = Modifier.size(16.dp))
+            Text("Plan with AI", style = AvailablissTheme.type.bodySmallStrong, color = colors.accentInk)
+        }
     }
 }
 

@@ -24,7 +24,15 @@ enum class GroupTab { Calendar, Chat, Proposals, Timing }
 @Serializable data class ProposalRoute(val proposalId: String)
 
 /** Propose a slot: ISO [start] / [end]. */
-@Serializable data class CreateProposalRoute(val groupId: String, val start: String, val end: String, val allDay: Boolean)
+/** Propose a time; [title] / [note] prefill the form (e.g. from the AI planner). */
+@Serializable data class CreateProposalRoute(
+    val groupId: String,
+    val start: String,
+    val end: String,
+    val allDay: Boolean,
+    val title: String? = null,
+    val note: String? = null,
+)
 
 @Serializable data class EventsRoute(val groupId: String)
 

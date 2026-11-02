@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.joeherbert.availabliss.core.billing.PlanRepository
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.GroupsRepository
@@ -16,6 +17,7 @@ import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.getOrNull
 import dev.joeherbert.availabliss.core.network.model.Availability
 import dev.joeherbert.availabliss.core.network.model.DayAvailability
+import dev.joeherbert.availabliss.core.network.model.AiPlannerAccess
 import dev.joeherbert.availabliss.core.network.model.DayStatus
 import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.Role
@@ -65,6 +67,10 @@ data class GroupCalendarUiState(
     val dayLoading: Boolean = false,
     val error: String? = null,
     val message: UserMessage? = null,
+    /** The optional AI planner: set up on the server / included in your plan. */
+    val aiPlanner: AiPlannerAccess = AiPlannerAccess(),
+    /** Some time works for everyone (the planner only picks from those). */
+    val hasSlots: Boolean = false,
 )
 
 private data class RawState(
@@ -88,6 +94,7 @@ private data class RawState(
 class GroupCalendarViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val groups: GroupsRepository,
+    plans: PlanRepository,
     users: UserRepository,
     liveEvents: LiveEvents,
 ) : ViewModel() {
@@ -97,12 +104,17 @@ class GroupCalendarViewModel @Inject constructor(
     private var monthJob: Job? = null
     private var detailJob: Job? = null
 
-    val uiState: StateFlow<GroupCalendarUiState> = combine(raw, groups.group(groupId), users.user) { r, group, user ->
-        toUi(r, group, user?.id)
+    val uiState: StateFlow<GroupCalendarUiState> = combine(raw, groups.group(groupId), users.user, plans.plan) { r, group, user, plan ->
+        toUi(r, group, user?.id).copy(
+            aiPlanner = plan?.aiPlanner ?: AiPlannerAccess(),
+            hasSlots = r.availability?.slots.orEmpty().isNotEmpty(),
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GroupCalendarUiState())
 
     init {
         viewModelScope.launch { groups.refreshGroup(groupId) }
+        // Only to know whether to offer "Plan with AI".
+        viewModelScope.launch { plans.refresh() }
         loadMonth()
         viewModelScope.launch {
             liveEvents.payloadsFor(groupId).collect { payload ->
