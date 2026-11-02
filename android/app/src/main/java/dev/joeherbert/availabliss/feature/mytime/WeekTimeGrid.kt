@@ -77,6 +77,9 @@ private val DayHeight = HourHeight * 24
 
 /** Boxes narrower than this stack their start and end times. */
 private val CompactBoxWidth = 72.dp
+
+/** Boxes narrower than this (e.g. overlapping lanes) are just colour, no text. */
+private val TextlessBoxWidth = 28.dp
 private val Tabular = TextStyle(fontFeatureSettings = "tnum")
 
 /**
@@ -303,6 +306,7 @@ private fun DayColumn(
             IntervalBox(
                 p = p,
                 compact = boxWidth < CompactBoxWidth,
+                showText = boxWidth >= TextlessBoxWidth,
                 modifier = Modifier
                     .offset(x = laneWidth * p.lane / p.lanes + 2.dp, y = DayHeight * (p.from / DAY_MINUTES))
                     .width(boxWidth)
@@ -315,7 +319,7 @@ private fun DayColumn(
 
 /** One busy box. Taps on it never fall through to the empty-time tap underneath. */
 @Composable
-private fun IntervalBox(p: PlacedInterval, compact: Boolean, modifier: Modifier, onClick: (() -> Unit)?) {
+private fun IntervalBox(p: PlacedInterval, compact: Boolean, showText: Boolean, modifier: Modifier, onClick: (() -> Unit)?) {
     val colors = AvailablissTheme.colors
     val manual = p.interval.source == BusySource.Manual
     val ink = if (manual) colors.accentInk else colors.ink
@@ -338,6 +342,8 @@ private fun IntervalBox(p: PlacedInterval, compact: Boolean, modifier: Modifier,
             },
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
+        // Too narrow to read anything: the box's colour (and its accessibility label) say it all.
+        if (!showText) return@Column
         Text(
             p.interval.displayLabel,
             fontSize = 11.sp,
