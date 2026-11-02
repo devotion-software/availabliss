@@ -118,9 +118,9 @@ object DateTimes {
      * proposals and events. The end is exclusive, so a range ending at midnight belongs to
      * the day before (matching the server's labels).
      */
-    fun rangeLabel(startIso: String, endIso: String, allDay: Boolean): String {
-        val start = localDateTime(startIso) ?: return ""
-        val end = localDateTime(endIso) ?: return shortDay(start.toLocalDate())
+    fun rangeLabel(startIso: String, endIso: String, allDay: Boolean, zone: ZoneId = this.zone): String {
+        val start = localDateTime(startIso, zone) ?: return ""
+        val end = localDateTime(endIso, zone) ?: return shortDay(start.toLocalDate())
         val endsAtMidnight = end.toLocalTime() == LocalTime.MIDNIGHT
         val lastDay = if (endsAtMidnight) end.toLocalDate().minusDays(1) else end.toLocalDate()
         val firstDay = start.toLocalDate()

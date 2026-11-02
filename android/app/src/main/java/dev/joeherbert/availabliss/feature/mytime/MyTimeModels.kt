@@ -2,6 +2,8 @@ package dev.joeherbert.availabliss.feature.mytime
 
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.UserMessage
+import dev.joeherbert.availabliss.core.network.model.BusyInterval
+import dev.joeherbert.availabliss.core.network.model.BusySource
 import dev.joeherbert.availabliss.core.network.model.CreateBlockRequest
 import dev.joeherbert.availabliss.core.network.model.ManualBlock
 import dev.joeherbert.availabliss.core.network.model.Repeat
@@ -13,6 +15,42 @@ import java.time.ZoneId
 
 /** A repeating manual block listed under the grid ("Choir · Every Tuesday · 19:00 – 21:30"). */
 data class RecurringBlockUi(val id: String, val title: String, val schedule: String)
+
+/** What a tap on busy time in the grid opens. */
+sealed interface IntervalTap {
+    /** Your own block: edit it (a repeating block edits the whole series). */
+    data class EditBlock(val block: ManualBlock) : IntervalTap
+
+    /** Synced calendar time: explain it can only be changed in the calendar. */
+    data class CalendarBusy(val info: CalendarBusyUi) : IntervalTap
+
+    /** The block isn't loaded (e.g. it was just removed). */
+    data object MissingBlock : IntervalTap
+}
+
+/** The "Busy from your calendar" sheet. */
+data class CalendarBusyUi(val calendarName: String, val timeLabel: String)
+
+/** Resolves a tapped busy [interval] against the loaded [blocks]. */
+fun resolveIntervalTap(interval: BusyInterval, blocks: List<ManualBlock>, zone: ZoneId = DateTimes.zone): IntervalTap =
+    when (interval.source) {
+        BusySource.Calendar -> IntervalTap.CalendarBusy(
+            CalendarBusyUi(
+                calendarName = interval.label?.takeIf { it.isNotBlank() } ?: "A connected calendar",
+                timeLabel = calendarTimeLabel(interval, zone),
+            ),
+        )
+        else -> blocks.firstOrNull { it.id == interval.blockId }?.let(IntervalTap::EditBlock) ?: IntervalTap.MissingBlock
+    }
+
+/** "Tue 10 Nov · 09:00 – 10:00"; midnight-to-midnight spans read as whole days. */
+private fun calendarTimeLabel(interval: BusyInterval, zone: ZoneId): String {
+    val start = DateTimes.localDateTime(interval.start, zone)
+    val end = DateTimes.localDateTime(interval.end, zone)
+    val allDay = start != null && end != null && start != end &&
+        start.toLocalTime() == LocalTime.MIDNIGHT && end.toLocalTime() == LocalTime.MIDNIGHT
+    return DateTimes.rangeLabel(interval.start, interval.end, allDay, zone)
+}
 
 /** The sheet's "Set times" / "All day" choice. */
 enum class BlockWhen(val label: String) { Times("Set times"), AllDay("All day") }
@@ -109,6 +147,8 @@ data class MyTimeUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val draft: BlockDraft? = null,
+    /** Set while the "Busy from your calendar" sheet is open. */
+    val calendarBusy: CalendarBusyUi? = null,
     val savingDraft: Boolean = false,
     val message: UserMessage? = null,
 )

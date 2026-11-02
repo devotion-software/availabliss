@@ -92,6 +92,17 @@ class MyTimeViewModel @Inject constructor(
         _state.update { it.copy(draft = BlockDraft.forRange(date, range), savingDraft = false) }
     }
 
+    /** A tap on busy time: edit your own block, or explain synced calendar time. */
+    fun onIntervalTapped(interval: BusyInterval) {
+        when (val tap = resolveIntervalTap(interval, blocks)) {
+            is IntervalTap.EditBlock -> openEditor(tap.block)
+            is IntervalTap.CalendarBusy -> _state.update { it.copy(calendarBusy = tap.info) }
+            IntervalTap.MissingBlock -> showMessage("That block was just removed.")
+        }
+    }
+
+    fun closeCalendarBusy() = _state.update { it.copy(calendarBusy = null) }
+
     /** Optimistically removes [block] (every occurrence), restoring it on failure. */
     fun deleteBlock(block: ManualBlock) {
         val removedIntervals = intervals.filter { it.blockId == block.id }

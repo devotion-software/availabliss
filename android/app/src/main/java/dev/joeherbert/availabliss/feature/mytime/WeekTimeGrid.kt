@@ -84,7 +84,7 @@ private val Tabular = TextStyle(fontFeatureSettings = "tnum")
  * interval at its exact times. Tapping empty time calls [onEmptyTap] with the
  * hour tapped; the vertical scroll is left alone.
  *
- * [onIntervalClick] makes the boxes tappable (null = display only).
+ * [onIntervalClick] makes busy boxes and all-day chips tappable (null = display only).
  */
 @Composable
 fun WeekTimeGrid(
@@ -95,7 +95,7 @@ fun WeekTimeGrid(
     modifier: Modifier = Modifier,
     /** False while the week is loading, so the first scroll waits for its intervals. */
     ready: Boolean = true,
-    onIntervalClick: ((PlacedInterval) -> Unit)? = null,
+    onIntervalClick: ((BusyInterval) -> Unit)? = null,
 ) {
     val colors = AvailablissTheme.colors
     val scroll = rememberScrollState()
@@ -123,7 +123,7 @@ fun WeekTimeGrid(
         DayHeaderRow(layout.days, today)
         HorizontalDivider(thickness = 1.dp, color = colors.line)
         if (layout.hasAllDay) {
-            AllDayRow(layout)
+            AllDayRow(layout, onIntervalClick)
             HorizontalDivider(thickness = 1.dp, color = colors.line)
         }
         Box(
@@ -190,7 +190,7 @@ private fun DayHeaderRow(days: List<LocalDate>, today: LocalDate) {
 }
 
 @Composable
-private fun AllDayRow(layout: WeekLayout) {
+private fun AllDayRow(layout: WeekLayout, onIntervalClick: ((BusyInterval) -> Unit)?) {
     val colors = AvailablissTheme.colors
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -216,8 +216,12 @@ private fun AllDayRow(layout: WeekLayout) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .intervalStyle(interval.source, shape)
+                            .tapOnly(onIntervalClick?.let { { it(interval) } })
                             .padding(horizontal = 5.dp, vertical = 3.dp)
-                            .semantics { contentDescription = "${interval.describe()}, all day ${DateTimes.longDay(day)}" },
+                            .clearAndSetSemantics {
+                                contentDescription = "${interval.describe()}, all day ${DateTimes.longDay(day)}"
+                                onIntervalClick?.let { open -> onClick(label = interval.clickLabel) { open(interval); true } }
+                            },
                     )
                 }
             }
@@ -253,7 +257,7 @@ private fun DayColumn(
     isToday: Boolean,
     nowMinutes: Float?,
     onEmptyTap: (LocalDate, MinuteRange) -> Unit,
-    onIntervalClick: ((PlacedInterval) -> Unit)?,
+    onIntervalClick: ((BusyInterval) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val colors = AvailablissTheme.colors
@@ -303,7 +307,7 @@ private fun DayColumn(
                     .offset(x = laneWidth * p.lane / p.lanes + 2.dp, y = DayHeight * (p.from / DAY_MINUTES))
                     .width(boxWidth)
                     .height((DayHeight * (p.minutes / DAY_MINUTES)).coerceAtLeast(14.dp)),
-                onClick = onIntervalClick?.let { { it(p) } },
+                onClick = onIntervalClick?.let { { it(p.interval) } },
             )
         }
     }
@@ -326,11 +330,11 @@ private fun IntervalBox(p: PlacedInterval, compact: Boolean, modifier: Modifier,
     Column(
         modifier
             .intervalStyle(p.interval.source, shape)
-            .pointerInput(onClick) { detectTapGestures { onClick?.invoke() } }
+            .tapOnly(onClick)
             .padding(start = if (manual) 5.dp else 6.dp, end = 4.dp, top = 3.dp, bottom = 3.dp)
             .clearAndSetSemantics {
                 contentDescription = "${p.interval.describe()}, ${DateTimes.longDay(p.day)} ${clock(p.from)} to ${clock(p.to)}"
-                if (onClick != null) onClick { onClick(); true }
+                if (onClick != null) onClick(label = p.interval.clickLabel) { onClick(); true }
             },
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
@@ -374,6 +378,20 @@ private fun Modifier.intervalStyle(source: BusySource, shape: RoundedCornerShape
             .border(1.dp, colors.busyLine, shape)
     }
 }
+
+/**
+ * Handles taps on a busy box or chip. Always consumes them (even with no [onClick]) so a tap on
+ * busy time never falls through to "block this time" underneath.
+ */
+@Composable
+private fun Modifier.tapOnly(onClick: (() -> Unit)?): Modifier {
+    val current by rememberUpdatedState(onClick)
+    return pointerInput(Unit) { detectTapGestures { current?.invoke() } }
+}
+
+/** Accessibility action label: edit your own block, or see what calendar busy time is. */
+private val BusyInterval.clickLabel: String
+    get() = if (source == BusySource.Calendar) "Details" else "Edit $displayLabel"
 
 private val BusyInterval.displayLabel: String get() = label?.takeIf { it.isNotBlank() } ?: "Busy"
 

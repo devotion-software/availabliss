@@ -1,5 +1,15 @@
 package dev.joeherbert.availabliss.feature.mytime
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
+import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -158,5 +168,57 @@ fun BlockTimeSheet(
             onDismiss = { if (picker == PickerTarget.End) picker = null },
         )
         null -> Unit
+    }
+}
+
+/**
+ * "Busy from your calendar": synced busy time can't be edited here (only the busy range is
+ * ever read), so point at the calendar itself or the calendar settings.
+ */
+@Composable
+fun CalendarBusySheet(info: CalendarBusyUi, onDismiss: () -> Unit, onOpenCalendars: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    AvBottomSheet(title = "Busy from your calendar", onDismissRequest = onDismiss) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(Shapes.control)
+                .background(colors.surface)
+                .border(1.dp, colors.glassBorder, Shapes.control)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colors.busyBg)
+                    .border(1.dp, colors.busyLine, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(AvIcons.CalendarSync, null, tint = colors.ink, modifier = Modifier.size(20.dp))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(info.calendarName, style = type.bodyMedium, color = colors.ink)
+                Text(info.timeLabel, style = type.label.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+            }
+        }
+        Text(
+            "Availabliss only reads when you're busy, never what the event is, so it can't be edited here. " +
+                "Change it in your calendar and it updates here automatically, or choose which calendars count as busy.",
+            style = type.label.copy(fontWeight = FontWeight.Normal, lineHeight = 19.sp),
+            color = colors.muted,
+        )
+        SecondaryButton(
+            text = "Calendar settings",
+            onClick = {
+                onDismiss()
+                onOpenCalendars()
+            },
+            icon = AvIcons.CalendarSync,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

@@ -76,12 +76,17 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
             onPreviousWeek = viewModel::previousWeek,
             onNextWeek = viewModel::nextWeek,
             onEmptyTapped = viewModel::onEmptyTapped,
+            onIntervalTapped = viewModel::onIntervalTapped,
             onOpenRecurring = viewModel::openEditor,
             onDeleteRecurring = viewModel::deleteBlock,
             onBlockSpecificTime = viewModel::openBlockSheet,
             onRetry = viewModel::refresh,
         ),
     )
+
+    state.calendarBusy?.let { info ->
+        CalendarBusySheet(info, onDismiss = viewModel::closeCalendarBusy, onOpenCalendars = onOpenCalendars)
+    }
 
     state.draft?.let { draft ->
         BlockTimeSheet(
@@ -108,6 +113,8 @@ data class MyTimeActions(
     val onNextWeek: () -> Unit = {},
     /** A tap on empty time in the week grid: that day and the hour tapped. */
     val onEmptyTapped: (LocalDate, MinuteRange) -> Unit = { _, _ -> },
+    /** A tap on a busy box or all-day chip. */
+    val onIntervalTapped: (BusyInterval) -> Unit = {},
     val onOpenRecurring: (String) -> Unit = {},
     val onDeleteRecurring: (String) -> Unit = {},
     val onBlockSpecificTime: () -> Unit = {},
@@ -131,7 +138,7 @@ fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: My
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
                 Column(Modifier.weight(1f)) {
                     Text("My time", style = type.headlineMedium, color = colors.ink)
-                    Text("Tap a time to block it", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                    Text("Tap to block time or edit a block", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
                 }
                 GlassIconButton(AvIcons.CalendarSync, "Connected calendars", actions.onOpenCalendars)
             }
@@ -153,7 +160,7 @@ fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: My
                     verticalArrangement = Arrangement.spacedBy(Spacing.xl),
                 ) {
                     state.error?.let { ErrorBanner(it, onRetry = actions.onRetry) }
-                    WeekGridCard(state, gridHeight, actions.onEmptyTapped)
+                    WeekGridCard(state, gridHeight, actions.onEmptyTapped, actions.onIntervalTapped)
                     state.recurring.forEach { block ->
                         RecurringBlockRow(block, onClick = { actions.onOpenRecurring(block.id) }, onDelete = { actions.onDeleteRecurring(block.id) })
                     }
@@ -176,7 +183,12 @@ private val GridCardChrome = 112.dp
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WeekGridCard(state: MyTimeUiState, scrollHeight: Dp, onEmptyTapped: (LocalDate, MinuteRange) -> Unit) {
+private fun WeekGridCard(
+    state: MyTimeUiState,
+    scrollHeight: Dp,
+    onEmptyTapped: (LocalDate, MinuteRange) -> Unit,
+    onIntervalTapped: (BusyInterval) -> Unit,
+) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
     GlassPanel(
@@ -190,6 +202,7 @@ private fun WeekGridCard(state: MyTimeUiState, scrollHeight: Dp, onEmptyTapped: 
             scrollHeight = if (state.layout.hasAllDay) scrollHeight - 32.dp else scrollHeight,
             onEmptyTap = onEmptyTapped,
             ready = !state.loading,
+            onIntervalClick = onIntervalTapped,
         )
         FlowRow(
             modifier = Modifier.padding(top = Spacing.xs),
