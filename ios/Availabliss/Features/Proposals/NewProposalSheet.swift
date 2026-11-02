@@ -8,12 +8,17 @@ struct ProposalDraft: Identifiable {
     var allDay: Bool
     /// For duration requirements the slot is a maximal free stretch; the proposal can be any part of it.
     var bounds: ClosedRange<Date>?
+    /// Prefilled title and note (from the AI planner).
+    var title = ""
+    var note = ""
 
-    init(start: Date, end: Date, allDay: Bool, bounds: ClosedRange<Date>? = nil) {
+    init(start: Date, end: Date, allDay: Bool, bounds: ClosedRange<Date>? = nil, title: String = "", note: String = "") {
         self.start = start
         self.end = end
         self.allDay = allDay
         self.bounds = bounds
+        self.title = title
+        self.note = note
     }
 
     init(slot: Slot, requirement: Requirement) {
@@ -65,6 +70,8 @@ struct NewProposalSheet: View {
         self.api = api
         self.onCreated = onCreated
         _draft = State(initialValue: draft)
+        _title = State(initialValue: draft.title)
+        _note = State(initialValue: draft.note)
     }
 
     var body: some View {

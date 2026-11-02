@@ -80,6 +80,10 @@ enum API {
         static func removeMember(groupId: String, userId: String) -> Endpoint<EmptyResponse> {
             .init(.delete, "/groups/\(groupId.pathEncoded)/members/\(userId.pathEncoded)")
         }
+        /// The optional AI planner (Pro). Can take up to a minute.
+        static func planner(groupId: String, notes: String?) -> Endpoint<PlannerResult> {
+            .init(.post, "/groups/\(groupId.pathEncoded)/planner", body: PlannerBody(notes: notes), timeout: 90)
+        }
         /// Members whose calendars or blocked time clash with `start`–`end`.
         static func conflicts(groupId: String, start: Date, end: Date) -> Endpoint<ConflictsResponse> {
             .init(.get, "/groups/\(groupId.pathEncoded)/conflicts", query: ["start": iso(start), "end": iso(end)])

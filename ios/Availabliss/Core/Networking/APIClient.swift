@@ -62,6 +62,7 @@ final class APIClient: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = endpoint.method.rawValue
+        if let timeout = endpoint.timeout { request.timeoutInterval = timeout }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let token = tokenStore.token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

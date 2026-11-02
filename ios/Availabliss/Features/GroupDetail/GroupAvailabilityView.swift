@@ -9,6 +9,12 @@ struct GroupAvailabilityView: View {
     @Environment(\.theme) private var theme
     @State private var model: GroupAvailabilityViewModel
     @State private var proposalDraft: ProposalDraft?
+    /// The optional AI planner: offered only when the server has it set up; Pro to use.
+    @State private var aiPlanner: Plan.AIPlanner?
+    @State private var showsPlanner = false
+    @State private var showsUpgrade = false
+    /// Picked in the planner; opened as a proposal once the planner sheet has gone.
+    @State private var plannedDraft: ProposalDraft?
 
     init(detail: GroupDetailModel, group: Group, onOpenTiming: @escaping () -> Void) {
         self.detail = detail
@@ -36,6 +42,7 @@ struct GroupAvailabilityView: View {
         }
         .screenBackground(OrbLayout.groupCalendar)
         .task { await model.load() }
+        .task { aiPlanner = (try? await detail.api.send(API.Me.plan()))?.aiPlanner }
         .refreshable { await model.invalidate() }
         .onChange(of: model.mode) { _, _ in Task { await model.load() } }
         .onChange(of: group.requirement) { _, _ in Task { await model.invalidate() } }
@@ -52,8 +59,61 @@ struct GroupAvailabilityView: View {
                 app.router.push(.proposal(id: proposal.id))
             }
         }
+        .sheet(isPresented: $showsPlanner, onDismiss: {
+            if let draft = plannedDraft {
+                plannedDraft = nil
+                proposalDraft = draft
+            }
+        }) {
+            PlannerSheet { notes in
+                try await detail.api.send(API.Groups.planner(groupId: group.id, notes: notes))
+            } propose: { slot, title, note in
+                var draft = ProposalDraft(slot: slot, requirement: group.requirement)
+                draft.title = title
+                draft.note = note
+                plannedDraft = draft
+            }
+        }
+        .sheet(isPresented: $showsUpgrade, onDismiss: { Task { aiPlanner = (try? await detail.api.send(API.Me.plan()))?.aiPlanner } }) {
+            UpgradeSheet(reason: "AI planning is part of Pro: it picks the best time, suggests things to do and drafts the plan.") { _ in
+                model.toast = "Welcome to Pro"
+            }
+        }
         .errorAlert($model.error)
         .toast($model.toast)
+    }
+
+    /// "Plan with AI", when the planner is set up and some times already work for everyone.
+    @ViewBuilder
+    private var planWithAI: some View {
+        if aiPlanner?.available == true, !(model.availability?.slots.isEmpty ?? true) {
+            Button {
+                if aiPlanner?.included == true { showsPlanner = true } else { showsUpgrade = true }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(theme.accentInk)
+                        .frame(width: 34, height: 34)
+                        .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(theme.accentSoft))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Plan with AI").bodyFont(15, .semibold)
+                        Text("The best of the times that work, with ideas and next steps")
+                            .bodyFont(12, relativeTo: .caption)
+                            .foregroundStyle(theme.muted)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 4)
+                    if aiPlanner?.included != true { StatusPill(text: "Pro", tone: .indigo) }
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.muted)
+                }
+                .foregroundStyle(theme.ink)
+                .padding(12)
+                .glass(cornerRadius: 22)
+                .contentShape(RoundedRectangle(cornerRadius: 22))
+            }
+            .buttonStyle(.pressable)
+        }
     }
 
     private var headingRow: some View {
@@ -102,6 +162,7 @@ struct GroupAvailabilityView: View {
                 DayDetailCard(model: model, group: group, me: app.session.user?.id) { draft in
                     proposalDraft = draft
                 }
+                planWithAI
             case .week:
                 WeekGrid(model: model, group: group)
             case .day:

@@ -19,13 +19,16 @@ struct Endpoint<Response: Decodable & Sendable>: Sendable {
     var path: String
     var query: [URLQueryItem]
     var body: (any Encodable & Sendable)?
+    /// Overrides the session's 30s request timeout for slow calls (the AI planner).
+    var timeout: TimeInterval?
 
     init(
         _ method: HTTPMethod,
         _ path: String,
         mount: Mount = .v1,
         query: [String: String?] = [:],
-        body: (any Encodable & Sendable)? = nil
+        body: (any Encodable & Sendable)? = nil,
+        timeout: TimeInterval? = nil
     ) {
         self.method = method
         self.mount = mount
@@ -34,6 +37,7 @@ struct Endpoint<Response: Decodable & Sendable>: Sendable {
             .compactMap { key, value in value.map { URLQueryItem(name: key, value: $0) } }
             .sorted { $0.name < $1.name }
         self.body = body
+        self.timeout = timeout
     }
 }
 
