@@ -110,7 +110,7 @@
 			</GlassPanel>
 
 			<a class="glass link-row" href="/app/calendars">
-				<span class="tile"><Icon name="link" size={18} /></span>
+				<span class="tile"><Icon name="calendar-sync" size={18} /></span>
 				<span class="text">
 					<span class="title">Calendars</span>
 					<span class="sub">Choose which calendars mean you're busy</span>
@@ -118,7 +118,7 @@
 				<Icon name="chevron-right" size={18} />
 			</a>
 			<a class="glass link-row" href="/app/my-time">
-				<span class="tile"><Icon name="calendar-sync" size={18} /></span>
+				<span class="tile"><Icon name="calendar" size={18} /></span>
 				<span class="text">
 					<span class="title">My time</span>
 					<span class="sub">Block busy times by hand</span>
