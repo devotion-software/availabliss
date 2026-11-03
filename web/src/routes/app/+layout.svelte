@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { page } from '$app/state';
 	import { invalidate } from '$app/navigation';
 	import { live, type LivePayloads } from '#lib/client/live.svelte';
@@ -8,10 +9,26 @@
 	import Orbs from '#lib/components/ui/Orbs.svelte';
 	import TabBar from '#lib/components/ui/TabBar.svelte';
 	import AppHeader from '#lib/components/app/AppHeader.svelte';
-	import NewGroupSheet from '#lib/components/groups/NewGroupSheet.svelte';
+	import { toasts } from '#lib/client/toast.svelte';
 	import UpgradeSheet from '#lib/components/plan/UpgradeSheet.svelte';
 
 	let { data, children } = $props();
+
+	// The new-group sheet validates with #lib/schemas (zod), so it's loaded the first
+	// time it opens rather than with every /app page, then stays mounted. It mounts
+	// closed and opens a tick later so the first open animates like the rest.
+	let NewGroupSheet = $state<typeof import('#lib/components/groups/NewGroupSheet.svelte').default>();
+	$effect(() => {
+		if (!newGroupSheet.open || NewGroupSheet) return;
+		newGroupSheet.open = false;
+		import('#lib/components/groups/NewGroupSheet.svelte')
+			.then(async (m) => {
+				NewGroupSheet = m.default;
+				await tick();
+				newGroupSheet.open = true;
+			})
+			.catch(toasts.error);
+	});
 
 	$effect.pre(() => {
 		activity.seed(data.notifications);
@@ -75,7 +92,9 @@
 {#if mainTabs}
 	<TabBar label="Main" {tabs} />
 {/if}
-<NewGroupSheet bind:open={newGroupSheet.open} user={data.user} />
+{#if NewGroupSheet}
+	<NewGroupSheet bind:open={newGroupSheet.open} user={data.user} />
+{/if}
 <UpgradeSheet bind:open={upgradeSheet.open} user={data.user} reason={upgradeSheet.reason} />
 
 <style>

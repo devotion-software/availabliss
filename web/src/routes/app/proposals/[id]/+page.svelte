@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
-	import type { Member, ResponseKind } from '#lib/types';
-	import { cancelProposal, overrideResponse, respondToProposal } from '#lib/client/proposals';
+	import type { Member, Proposal, ResponseKind } from '#lib/types';
+	import { cancelProposal, getProposal, overrideResponse, respondToProposal } from '#lib/client/proposals';
 	import { live, proposalOf } from '#lib/client/live.svelte';
 	import { useFormat } from '#lib/client/format';
 	import { isAdminRole, memberMap, memberLabel } from '#lib/client/members';
@@ -58,11 +58,21 @@
 		return 'Synced';
 	}
 
+	// A live payload can be older than a reply we just got back (it was sent before
+	// ours but lands after it), so live events trigger a fresh read, and only the
+	// newest request started gets to apply its result.
+	let latest = 0;
+	async function apply(request: () => Promise<Proposal>): Promise<Proposal> {
+		const ticket = ++latest;
+		const next = await request();
+		if (ticket === latest) proposal = next;
+		return next;
+	}
+
 	$effect(() => {
 		const id = proposal.id;
 		const off = live.on(['proposal.updated', 'proposal.confirmed'], (e) => {
-			const next = proposalOf(e);
-			if (next.id === id) proposal = next;
+			if (proposalOf(e).id === id) apply(() => getProposal(id)).catch(() => {});
 		});
 		const offReconnect = live.onReconnect(() => invalidate('app:proposal'));
 		return () => {
@@ -75,8 +85,8 @@
 	async function respond(response: 'accepted' | 'declined') {
 		busy = response;
 		try {
-			proposal = await respondToProposal(proposal.id, response);
-			if (proposal.status !== 'confirmed') toasts.success(response === 'accepted' ? "You're in" : 'Thanks for letting everyone know');
+			const next = await apply(() => respondToProposal(proposal.id, response));
+			if (next.status !== 'confirmed') toasts.success(response === 'accepted' ? "You're in" : 'Thanks for letting everyone know');
 			invalidate('app:groups');
 		} catch (err) {
 			toasts.error(err);
@@ -94,7 +104,8 @@
 	async function applyOverride(response: ResponseKind) {
 		if (!overrideFor) return;
 		try {
-			proposal = await overrideResponse(proposal.id, overrideFor.userId, response);
+			const { userId } = overrideFor;
+			await apply(() => overrideResponse(proposal.id, userId, response));
 		} catch (err) {
 			toasts.error(err);
 		}

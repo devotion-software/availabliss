@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { AppNotification } from '#lib/types';
 	import { activity } from '#lib/client/activity.svelte';
 	import { notificationHref } from '#lib/client/notifications';
@@ -22,10 +23,15 @@
 		'event.created': 'calendar-plus'
 	};
 
-	// Opening Activity marks everything read; unread rows keep their highlight for this visit.
-	const unreadIds = new Set(untrack(() => items).filter((n) => !n.readAt).map((n) => n.id));
+	// Opening Activity marks everything read, and so does anything new arriving while
+	// it's open; unread rows keep their highlight for this visit.
+	const unreadIds = new SvelteSet(untrack(() => items).filter((n) => !n.readAt).map((n) => n.id));
 	$effect(() => {
-		untrack(() => activity.markAllRead());
+		if (!activity.unread) return;
+		untrack(() => {
+			for (const n of activity.items) if (!n.readAt) unreadIds.add(n.id);
+			activity.markAllRead();
+		});
 	});
 </script>
 
