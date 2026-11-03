@@ -73,6 +73,7 @@ clean-demo: ## Delete the demo data created by seed-demo
 	cd $(WEB) && bun scripts/clean-demo.ts
 
 set-plan: ## Give an account Pro or free without a purchase: make set-plan EMAIL=… PLAN=pro|free [DAYS=30|lifetime]
+	@test -n "$(EMAIL)" || { echo "EMAIL is required: make set-plan EMAIL=you@example.com PLAN=pro"; exit 1; }
 	cd $(WEB) && bun scripts/set-plan.ts $(EMAIL) $(PLAN) $(DAYS)
 
 school-holidays: ## Import school holidays from a CSV: make school-holidays FILE=path.csv
@@ -82,12 +83,23 @@ school-holidays: ## Import school holidays from a CSV: make school-holidays FILE
 docker-build: ## Build the production image
 	docker build -t $(IMAGE) .
 
-docker-run: ## Run the production image against web/.env
-	docker run --rm -p 3000:3000 --env-file $(WEB)/.env --add-host=host.docker.internal:host-gateway $(IMAGE)
+# web/.env points at localhost, which inside the container is the container itself:
+# reach the compose services on the host instead, and serve on the container's port.
+# There's no reverse proxy locally, so don't trust the X-Forwarded-* headers the image expects.
+DOCKER_HOST_URL = $(shell sed -n 's/^$(1)=//p' $(WEB)/.env | sed -E 's/(localhost|127\.0\.0\.1)/host.docker.internal/')
+docker-run: ## Run the production image against web/.env (services via host.docker.internal)
+	docker run --rm -p 3000:3000 --env-file $(WEB)/.env --add-host=host.docker.internal:host-gateway \
+		-e DATABASE_URL='$(call DOCKER_HOST_URL,DATABASE_URL)' \
+		-e REDIS_URL='$(call DOCKER_HOST_URL,REDIS_URL)' \
+		-e SMTP_HOST=host.docker.internal \
+		-e BETTER_AUTH_URL=http://localhost:3000 \
+		-e ADDRESS_HEADER= -e PROTOCOL_HEADER= -e HOST_HEADER= \
+		$(IMAGE)
 
 # ── Native apps ──────────────────────────────────────────────────────────────
 # The UI tours sign in as the demo user from `make seed-demo` unless EMAIL is given.
-EMAIL ?= $(shell test -f web/.demo.json && python3 -c "import json;print(json.load(open('web/.demo.json'))['users']['sam']['email'])")
+# (Target-specific, so other targets such as set-plan never default to the demo user.)
+ios-uitest android-tour: EMAIL ?= $(shell test -f web/.demo.json && python3 -c "import json;print(json.load(open('web/.demo.json'))['users']['sam']['email'])")
 
 # Use Xcode even if xcode-select still points at the Command Line Tools.
 XCODE_ENV := $(shell xcode-select -p 2>/dev/null | grep -q CommandLineTools && echo DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer)

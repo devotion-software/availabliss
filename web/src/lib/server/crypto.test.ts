@@ -15,7 +15,7 @@ describe('encryptJson / decryptJson', () => {
 		const stored = encryptJson(value, 'calendar:1');
 		expect(stored.split('.')).toHaveLength(3);
 		expect(stored).not.toContain('accessToken');
-		expect(decryptJson(stored, 'calendar:1')).toEqual(value);
+		expect(decryptJson<typeof value>(stored, 'calendar:1')).toEqual(value);
 	});
 
 	test('uses a fresh IV each time', async () => {

@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './dotenv';
 
 /** Typed access to runtime configuration. Optional integrations return null when unset. */
 function optional(name: string): string | null {

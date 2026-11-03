@@ -28,6 +28,19 @@ bump() {
 	esac
 }
 
+# edit <file> <sed -E args…>: applies the edit to the working tree and, separately,
+# to the staged copy, so only the version lines get staged. Anything else in the
+# file that was deliberately left unstaged stays unstaged.
+edit() {
+	local file=$1 mode blob
+	shift
+	sed -i.bak -E "$@" "$file"
+	rm -f "$file.bak"
+	mode=$(git ls-files -s -- "$file" | cut -d' ' -f1)
+	blob=$(git show ":$file" | sed -E "$@" | git hash-object -w --stdin)
+	git update-index --cacheinfo "$mode,$blob,$file"
+}
+
 # ask <label> <current version> → sets $level (empty = no bump)
 ask() {
 	echo "Committing to main: $1 is at $2." > /dev/tty
@@ -43,47 +56,41 @@ ask() {
 
 if grep -q '^web/' <<<"$staged"; then
 	file=web/package.json
-	current=$(sed -nE 's/^[[:space:]]*"version": "([0-9]+\.[0-9]+\.[0-9]+)".*/\1/p' "$file" | head -1)
+	current=$(sed -nE 's/^[[:space:]]*"version": "([0-9]+\.[0-9]+\.[0-9]+)".*/\1/p' <(git show ":$file") | head -1)
 	ask "web" "$current"
 	if [ -n "$level" ]; then
 		new=$(bump "$current" "$level")
-		sed -i.bak -E "s/^([[:space:]]*\"version\": )\"$current\"/\1\"$new\"/" "$file"
-		rm -f "$file.bak"
-		git add "$file"
+		edit "$file" "s/^([[:space:]]*\"version\": )\"$current\"/\1\"$new\"/"
 		echo "web → $new (included in this commit)." > /dev/tty
 	fi
 fi
 
 if grep -q '^ios/' <<<"$staged"; then
 	file=ios/project.yml
-	current=$(sed -nE 's/^[[:space:]]*MARKETING_VERSION: "([^"]+)".*/\1/p' "$file" | head -1)
-	build=$(sed -nE 's/^[[:space:]]*CURRENT_PROJECT_VERSION: "([0-9]+)".*/\1/p' "$file" | head -1)
+	current=$(sed -nE 's/^[[:space:]]*MARKETING_VERSION: "([^"]+)".*/\1/p' <(git show ":$file") | head -1)
+	build=$(sed -nE 's/^[[:space:]]*CURRENT_PROJECT_VERSION: "([0-9]+)".*/\1/p' <(git show ":$file") | head -1)
 	ask "iOS" "$current ($build)"
 	if [ -n "$level" ]; then
 		new=$(bump "$current" "$level")
 		next=$((build + 1))
-		sed -i.bak -E \
+		edit "$file" \
 			-e "s/(MARKETING_VERSION: )\"$current\"/\1\"$new\"/" \
-			-e "s/(CURRENT_PROJECT_VERSION: )\"$build\"/\1\"$next\"/" "$file"
-		rm -f "$file.bak"
-		git add "$file"
+			-e "s/(CURRENT_PROJECT_VERSION: )\"$build\"/\1\"$next\"/"
 		echo "iOS → $new ($next) (included in this commit; run make ios-project to regenerate)." > /dev/tty
 	fi
 fi
 
 if grep -q '^android/' <<<"$staged"; then
 	file=android/app/build.gradle.kts
-	current=$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)".*/\1/p' "$file" | head -1)
-	build=$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+).*/\1/p' "$file" | head -1)
+	current=$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)".*/\1/p' <(git show ":$file") | head -1)
+	build=$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+).*/\1/p' <(git show ":$file") | head -1)
 	ask "Android" "$current ($build)"
 	if [ -n "$level" ]; then
 		new=$(bump "$current" "$level")
 		next=$((build + 1))
-		sed -i.bak -E \
+		edit "$file" \
 			-e "s/(versionName = )\"$current\"/\1\"$new\"/" \
-			-e "s/(versionCode = )$build\$/\1$next/" "$file"
-		rm -f "$file.bak"
-		git add "$file"
+			-e "s/(versionCode = )$build\$/\1$next/"
 		echo "Android → $new ($next) (included in this commit)." > /dev/tty
 	fi
 fi
