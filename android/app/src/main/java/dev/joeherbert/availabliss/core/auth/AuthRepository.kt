@@ -57,59 +57,82 @@ class AuthRepository @Inject constructor(
     // endregion
 
     // region Google (Credential Manager → ID token → POST /api/auth/sign-in/social)
-    suspend fun signInWithGoogle(activity: Context): SignInResult =
-        when (val outcome = credentials.googleIdToken(activity)) {
+    //
+    // Each flow is split in two: the system sheet (needs an Activity, so callers run it in a
+    // UI-scoped coroutine) and the network step that completes it (safe in viewModelScope).
+
+    /** Shows the Google sheet anchored to [activity] (not retained). */
+    suspend fun googleCredential(activity: Context): CredentialOutcome<String> = credentials.googleIdToken(activity)
+
+    suspend fun completeGoogleSignIn(outcome: CredentialOutcome<String>): SignInResult = when (outcome) {
+        is CredentialOutcome.Success -> completeSignIn {
+            authApi.signInWithIdToken(SocialIdTokenSignInRequest("google", SocialIdToken(outcome.value)))
+        }
+        CredentialOutcome.Cancelled -> SignInResult.Cancelled
+        is CredentialOutcome.Failed -> SignInResult.Failed(outcome.message)
+    }
+    // endregion
+
+    // region Passkeys
+    /**
+     * Fetches the server's challenge and shows the passkey sheet anchored to [activity]
+     * (not retained). The challenge cookie is kept for [completePasskeySignIn].
+     */
+    suspend fun passkeyAssertion(activity: Context): CredentialOutcome<String> {
+        cookieJar.clear()
+        val options = when (val result = authCall { authApi.passkeyAuthenticateOptions() }) {
+            is ApiResult.Success -> result.value.body()
+            is ApiResult.Failure -> return CredentialOutcome.Failed(result.error.message)
+        } ?: return CredentialOutcome.Failed("Couldn't start passkey sign in.")
+        return keepCookiesOnSuccess { credentials.passkeyAssertion(activity, options.toString()) }
+    }
+
+    suspend fun completePasskeySignIn(outcome: CredentialOutcome<String>): SignInResult = try {
+        when (outcome) {
             is CredentialOutcome.Success -> completeSignIn {
-                authApi.signInWithIdToken(SocialIdTokenSignInRequest("google", SocialIdToken(outcome.value)))
+                authApi.passkeyVerifyAuthentication(PasskeyVerifyRequest(json.parseToJsonElement(outcome.value).jsonObject))
             }
             CredentialOutcome.Cancelled -> SignInResult.Cancelled
             is CredentialOutcome.Failed -> SignInResult.Failed(outcome.message)
         }
-    // endregion
-
-    // region Passkeys
-    suspend fun signInWithPasskey(activity: Context): SignInResult {
+    } finally {
         cookieJar.clear()
-        val options = when (val result = authCall { authApi.passkeyAuthenticateOptions() }) {
-            is ApiResult.Success -> result.value.body()
-            is ApiResult.Failure -> return SignInResult.Failed(result.error.message)
-        } ?: return SignInResult.Failed("Couldn't start passkey sign in.")
-
-        return try {
-            when (val outcome = credentials.passkeyAssertion(activity, options.toString())) {
-                is CredentialOutcome.Success -> completeSignIn {
-                    authApi.passkeyVerifyAuthentication(PasskeyVerifyRequest(json.parseToJsonElement(outcome.value).jsonObject))
-                }
-                CredentialOutcome.Cancelled -> SignInResult.Cancelled
-                is CredentialOutcome.Failed -> SignInResult.Failed(outcome.message)
-            }
-        } finally {
-            cookieJar.clear()
-        }
     }
 
-    /** Adds a passkey to the signed-in account. Returns null on success, else a message (or "" if cancelled). */
-    suspend fun registerPasskey(activity: Context, name: String?): String? {
+    /** Fetches registration options and shows the create-passkey sheet anchored to [activity] (not retained). */
+    suspend fun passkeyRegistration(activity: Context): CredentialOutcome<String> {
         cookieJar.clear()
         val options = when (val result = authCall { authApi.passkeyRegisterOptions() }) {
             is ApiResult.Success -> result.value.body()
-            is ApiResult.Failure -> return result.error.message
-        } ?: return "Couldn't start creating a passkey."
+            is ApiResult.Failure -> return CredentialOutcome.Failed(result.error.message)
+        } ?: return CredentialOutcome.Failed("Couldn't start creating a passkey.")
+        return keepCookiesOnSuccess { credentials.passkeyRegistration(activity, options.toString()) }
+    }
 
-        return try {
-            when (val outcome = credentials.passkeyRegistration(activity, options.toString())) {
-                is CredentialOutcome.Success -> {
-                    val body = PasskeyRegisterRequest(json.parseToJsonElement(outcome.value).jsonObject, name)
-                    when (val result = authCall { authApi.passkeyVerifyRegistration(body) }) {
-                        is ApiResult.Success -> null
-                        is ApiResult.Failure -> result.error.message
-                    }
+    /** Adds the passkey to the signed-in account. Returns null on success, else a message (or "" if cancelled). */
+    suspend fun completePasskeyRegistration(outcome: CredentialOutcome<String>, name: String?): String? = try {
+        when (outcome) {
+            is CredentialOutcome.Success -> {
+                val body = PasskeyRegisterRequest(json.parseToJsonElement(outcome.value).jsonObject, name)
+                when (val result = authCall { authApi.passkeyVerifyRegistration(body) }) {
+                    is ApiResult.Success -> null
+                    is ApiResult.Failure -> result.error.message
                 }
-                CredentialOutcome.Cancelled -> ""
-                is CredentialOutcome.Failed -> outcome.message
             }
+            CredentialOutcome.Cancelled -> ""
+            is CredentialOutcome.Failed -> outcome.message
+        }
+    } finally {
+        cookieJar.clear()
+    }
+
+    /** Clears the challenge cookie unless the sheet produced a credential to verify. */
+    private suspend fun keepCookiesOnSuccess(block: suspend () -> CredentialOutcome<String>): CredentialOutcome<String> {
+        var outcome: CredentialOutcome<String>? = null
+        try {
+            return block().also { outcome = it }
         } finally {
-            cookieJar.clear()
+            if (outcome !is CredentialOutcome.Success) cookieJar.clear()
         }
     }
     // endregion

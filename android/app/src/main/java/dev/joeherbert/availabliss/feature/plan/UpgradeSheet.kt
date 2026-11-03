@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.feature.plan
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -59,6 +61,8 @@ fun UpgradeSheet(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // Play's purchase sheet runs in this scope so the ViewModel never holds the Activity.
+    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(state.finished) {
         val message = state.finished ?: return@LaunchedEffect
@@ -70,7 +74,7 @@ fun UpgradeSheet(
         state = state,
         reason = reason,
         onDismiss = onDismiss,
-        onBuy = { pkg -> context.findActivity()?.let { viewModel.buy(it, pkg) } },
+        onBuy = { pkg -> context.findActivity()?.let { scope.launch { viewModel.buy(it, pkg) } } },
         onRestore = viewModel::restore,
         onManageInPlay = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(UpgradeViewModel.PLAY_SUBSCRIPTIONS_URL))) },
     )

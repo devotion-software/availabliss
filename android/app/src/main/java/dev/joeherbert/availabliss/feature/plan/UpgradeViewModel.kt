@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.feature.plan
 
+import kotlinx.coroutines.CancellationException
 import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -84,17 +85,30 @@ class UpgradeViewModel @Inject constructor(
         return try {
             billing.ensureConfigured(key, userId)
             billing.packages().let { if (it.isEmpty()) PurchaseUi.NotOnSale else PurchaseUi.Packages(it) }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             PurchaseUi.Failed("Couldn't load prices: ${e.message ?: "Google Play didn't answer."}")
         }
     }
 
-    /** [activity] hosts Google Play's purchase sheet; it isn't retained. */
-    fun buy(activity: Activity, pkg: StorePackage) {
+    /**
+     * Call from a UI-scoped coroutine (rememberCoroutineScope): Google Play's sheet runs
+     * there, anchored to [activity], so viewModelScope never holds the Activity. If the
+     * screen goes away mid-purchase, RevenueCat still finishes it (it's configured for
+     * the whole session) and the plan refreshes the next time the sheet opens.
+     */
+    suspend fun buy(activity: Activity, pkg: StorePackage) {
         if (_state.value.busy) return
         _state.update { it.copy(buying = pkg.id, note = null) }
+        val outcome = try {
+            billing.purchase(activity, pkg)
+        } catch (e: CancellationException) {
+            _state.update { it.copy(buying = null) }
+            throw e
+        }
         viewModelScope.launch {
-            when (val outcome = billing.purchase(activity, pkg)) {
+            when (outcome) {
                 PurchaseOutcome.Cancelled -> _state.update { it.copy(buying = null) }
                 is PurchaseOutcome.Failed -> _state.update { it.copy(buying = null, note = outcome.message) }
                 PurchaseOutcome.Purchased -> {

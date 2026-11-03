@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.core.auth
 
+import kotlinx.coroutines.CancellationException
+import android.util.Log
 import dev.joeherbert.availabliss.core.billing.PlanRepository
 import dev.joeherbert.availabliss.core.billing.StoreBilling
 import dev.joeherbert.availabliss.core.calendar.CalendarChangeObserver
@@ -105,10 +107,28 @@ class SessionManager @Inject constructor(
         scope.launch {
             users.restore()
             if (users.refresh() is ApiResult.Success) {
+                launch { configureBilling() }
                 push.register()
             }
         }
         syncScheduler.syncSoon()
+    }
+
+    /**
+     * Sets RevenueCat up for this user as soon as the session starts (not only when the
+     * upgrade sheet opens), so a purchase interrupted by the process dying is finished
+     * and acknowledged on the next launch instead of being refunded by Play.
+     */
+    private suspend fun configureBilling() {
+        val userId = users.user.value?.id ?: return
+        val key = (plans.refresh() as? ApiResult.Success)?.value?.purchase?.android ?: return
+        try {
+            billing.ensureConfigured(key, userId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't configure RevenueCat", e)
+        }
     }
 
     suspend fun signOut() {
@@ -138,5 +158,9 @@ class SessionManager @Inject constructor(
         calendars.clear()
         notifications.clear()
         prefs.clearSession()
+    }
+
+    private companion object {
+        const val TAG = "SessionManager"
     }
 }

@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.core.billing
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import android.app.Activity
 import android.content.Context
 import com.revenuecat.purchases.Package
@@ -38,9 +40,11 @@ sealed interface PurchaseOutcome {
 }
 
 /**
- * Google Play purchases through RevenueCat. Configured lazily, only when the upgrade
- * sheet needs it and the server hands out an Android key, always with the signed-in
- * user's id as the app user id so Pro follows the account to iOS and the web.
+ * Google Play purchases through RevenueCat. Configured once per signed-in session (see
+ * SessionManager) when the server hands out an Android key, so a purchase interrupted
+ * by the process dying is finished and acknowledged on the next launch rather than
+ * refunded by Play after 3 days. Always uses the signed-in user's id as the app user id
+ * so Pro follows the account to iOS and the web.
  */
 @Singleton
 class StoreBilling @Inject constructor(@ApplicationContext private val context: Context) {
@@ -48,10 +52,12 @@ class StoreBilling @Inject constructor(@ApplicationContext private val context: 
 
     /** Configures (or switches to) [userId]. Safe to call repeatedly. */
     suspend fun ensureConfigured(apiKey: String, userId: String) = mutex.withLock {
-        if (!Purchases.isConfigured) {
-            Purchases.configure(PurchasesConfiguration.Builder(context, apiKey).appUserID(userId).build())
-        } else if (Purchases.sharedInstance.appUserID != userId) {
-            Purchases.sharedInstance.awaitLogIn(userId)
+        withContext(Dispatchers.Main) {
+            if (!Purchases.isConfigured) {
+                Purchases.configure(PurchasesConfiguration.Builder(context, apiKey).appUserID(userId).build())
+            } else if (Purchases.sharedInstance.appUserID != userId) {
+                Purchases.sharedInstance.awaitLogIn(userId)
+            }
         }
     }
 

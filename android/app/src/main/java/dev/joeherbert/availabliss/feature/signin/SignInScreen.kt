@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.feature.signin
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -72,6 +74,8 @@ import androidx.compose.ui.text.font.FontWeight
 fun SignInScreen(viewModel: SignInViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // Credential Manager sheets run in this scope so the ViewModel never holds the Activity.
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(state.appleUrl) {
         val url = state.appleUrl ?: return@LaunchedEffect
@@ -86,8 +90,8 @@ fun SignInScreen(viewModel: SignInViewModel = hiltViewModel()) {
         onCodeChange = viewModel::onCodeChange,
         onUseDifferentEmail = viewModel::useDifferentEmail,
         onApple = viewModel::signInWithApple,
-        onGoogle = { viewModel.signInWithGoogle(context) },
-        onPasskey = { viewModel.signInWithPasskey(context) },
+        onGoogle = { scope.launch { viewModel.signInWithGoogle(context) } },
+        onPasskey = { scope.launch { viewModel.signInWithPasskey(context) } },
     )
 }
 

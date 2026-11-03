@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.feature.you
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -81,6 +83,8 @@ fun YouScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // Credential Manager sheets run in this scope so the ViewModel never holds the Activity.
+    val scope = rememberCoroutineScope()
     val snackbar = rememberSnackbarHostState()
 
     LaunchedEffect(state.deleted) { if (state.deleted) onSignOut() }
@@ -100,8 +104,8 @@ fun YouScreen(
             onOpenCalendars = onOpenCalendars,
             onOpenAppearance = onOpenAppearance,
             onOpenRegion = onOpenRegion,
-            onAddPasskey = { viewModel.addPasskey(context) },
-            onLink = { provider -> viewModel.link(provider, context) },
+            onAddPasskey = { scope.launch { viewModel.addPasskey(context) } },
+            onLink = { provider -> scope.launch { viewModel.link(provider, context) } },
             onSignOut = onSignOut,
             onDelete = viewModel::requestDelete,
             onOpenPro = { upgrading = true },

@@ -44,13 +44,15 @@ class AccountsRepository @Inject constructor(
 
     suspend fun list(): ApiResult<LinkedAccounts> = call { api.getLinkedAccounts() }
 
-    /** Shows the Google sheet (anchored to [activity], not retained), then links that sign-in. */
-    suspend fun linkGoogle(activity: Context): LinkResult =
-        when (val outcome = credentials.googleIdToken(activity)) {
-            is CredentialOutcome.Success -> link(LinkAccountRequest(LinkProviders.GOOGLE, outcome.value))
-            CredentialOutcome.Cancelled -> LinkResult.Cancelled
-            is CredentialOutcome.Failed -> LinkResult.Failed(outcome.message)
-        }
+    /** Shows the Google sheet anchored to [activity] (not retained; run it in a UI-scoped coroutine). */
+    suspend fun googleCredential(activity: Context): CredentialOutcome<String> = credentials.googleIdToken(activity)
+
+    /** Links the Google sign-in from [googleCredential]. */
+    suspend fun linkGoogle(outcome: CredentialOutcome<String>): LinkResult = when (outcome) {
+        is CredentialOutcome.Success -> link(LinkAccountRequest(LinkProviders.GOOGLE, outcome.value))
+        CredentialOutcome.Cancelled -> LinkResult.Cancelled
+        is CredentialOutcome.Failed -> LinkResult.Failed(outcome.message)
+    }
 
     /** Sends [request] as is (after a [LinkResult.NeedsMerge], pass it back with `merge = true`). */
     suspend fun link(request: LinkAccountRequest): LinkResult =

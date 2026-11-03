@@ -21,6 +21,7 @@ import dev.joeherbert.availabliss.core.network.model.MergeCandidate
 import dev.joeherbert.availabliss.core.network.model.Plan
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.feature.timing.Templates
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -182,12 +183,21 @@ class YouViewModel @Inject constructor(
         }
     }
 
-    /** [activity] anchors the Credential Manager sheet; it is not retained. */
-    fun addPasskey(activity: Context) {
+    /**
+     * Call from a UI-scoped coroutine (rememberCoroutineScope): the Credential Manager sheet
+     * runs there, anchored to [activity], so viewModelScope never holds the Activity.
+     */
+    suspend fun addPasskey(activity: Context) {
         if (_state.value.addingPasskey) return
+        _state.update { it.copy(addingPasskey = true) }
+        val outcome = try {
+            auth.passkeyRegistration(activity)
+        } catch (e: CancellationException) {
+            _state.update { it.copy(addingPasskey = false) }
+            throw e
+        }
         viewModelScope.launch {
-            _state.update { it.copy(addingPasskey = true) }
-            val error = auth.registerPasskey(activity, name = android.os.Build.MODEL)
+            val error = auth.completePasskeyRegistration(outcome, name = android.os.Build.MODEL)
             _state.update {
                 it.copy(
                     addingPasskey = false,
@@ -212,11 +222,18 @@ class YouViewModel @Inject constructor(
         }
     }
 
-    /** [activity] anchors the Credential Manager sheet; it is not retained. */
-    fun link(provider: String, activity: Context) {
+    /** As [addPasskey]: call from a UI-scoped coroutine. */
+    suspend fun link(provider: String, activity: Context) {
         val s = _state.value
         if (s.linkingProvider != null || provider !in s.linkableProviders) return
-        runLink(provider) { accounts.linkGoogle(activity) }
+        _state.update { it.copy(linkingProvider = provider) }
+        val outcome = try {
+            accounts.googleCredential(activity)
+        } catch (e: CancellationException) {
+            _state.update { it.copy(linkingProvider = null) }
+            throw e
+        }
+        runLink(provider) { accounts.linkGoogle(outcome) }
     }
 
     fun confirmMerge() {

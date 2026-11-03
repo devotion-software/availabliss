@@ -9,6 +9,7 @@ import dev.joeherbert.availabliss.core.auth.SignInResult
 import dev.joeherbert.availabliss.core.deeplink.DeepLink
 import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
 import dev.joeherbert.availabliss.core.network.ApiResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -94,10 +95,17 @@ class SignInViewModel @Inject constructor(
 
     fun useDifferentEmail() = _state.update { it.copy(step = SignInStep.Email, code = "", error = null) }
 
-    /** [activity] anchors the Credential Manager sheet; it is not retained. */
-    fun signInWithGoogle(activity: Context) = run(SignInBusy.Google) { auth.signInWithGoogle(activity) }
+    /**
+     * Call from a UI-scoped coroutine (rememberCoroutineScope): the Credential Manager sheet
+     * runs there, anchored to [activity], so viewModelScope never holds the Activity. The
+     * server step then finishes in viewModelScope.
+     */
+    suspend fun signInWithGoogle(activity: Context) =
+        runSheet(SignInBusy.Google, { auth.googleCredential(activity) }) { auth.completeGoogleSignIn(it) }
 
-    fun signInWithPasskey(activity: Context) = run(SignInBusy.Passkey) { auth.signInWithPasskey(activity) }
+    /** As [signInWithGoogle]. */
+    suspend fun signInWithPasskey(activity: Context) =
+        runSheet(SignInBusy.Passkey, { auth.passkeyAssertion(activity) }) { auth.completePasskeySignIn(it) }
 
     fun signInWithApple() {
         if (_state.value.busy != null) return
@@ -114,13 +122,28 @@ class SignInViewModel @Inject constructor(
         if (_state.value.busy != null) return
         viewModelScope.launch {
             _state.update { it.copy(busy = busy, error = null) }
-            when (val result = block()) {
-                // The root switches screens once the session exists; just clear the spinner.
-                is SignInResult.Success -> _state.update { it.copy(busy = null) }
-                SignInResult.Cancelled -> _state.update { it.copy(busy = null) }
-                is SignInResult.Failed -> _state.update { onFailure(it).copy(busy = null, error = result.message) }
-            }
+            show(block(), onFailure)
         }
+    }
+
+    private suspend fun <T> runSheet(busy: SignInBusy, sheet: suspend () -> T, complete: suspend (T) -> SignInResult) {
+        if (_state.value.busy != null) return
+        _state.update { it.copy(busy = busy, error = null) }
+        val outcome = try {
+            sheet()
+        } catch (e: CancellationException) {
+            // The screen went away while the sheet was up.
+            _state.update { it.copy(busy = null) }
+            throw e
+        }
+        viewModelScope.launch { show(complete(outcome)) }
+    }
+
+    private fun show(result: SignInResult, onFailure: (SignInUiState) -> SignInUiState = { it }) = when (result) {
+        // The root switches screens once the session exists; just clear the spinner.
+        is SignInResult.Success -> _state.update { it.copy(busy = null) }
+        SignInResult.Cancelled -> _state.update { it.copy(busy = null) }
+        is SignInResult.Failed -> _state.update { onFailure(it).copy(busy = null, error = result.message) }
     }
 
     companion object {
