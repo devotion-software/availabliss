@@ -16,10 +16,8 @@
 
 	let { data } = $props();
 
-	let connections = $state<CalendarConnection[]>([]);
-	$effect.pre(() => {
-		connections = data.connections;
-	});
+	// Follows data.connections (also in SSR), and can be patched locally.
+	let connections = $derived<CalendarConnection[]>(data.connections);
 	let sheetOpen = $state(false);
 	let finishing = $state<'continue' | 'manual' | null>(null);
 

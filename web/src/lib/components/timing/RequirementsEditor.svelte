@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Requirement, RequirementLength, Weekday } from '#lib/types';
 	import {
 		PRESETS,
@@ -29,7 +30,8 @@
 
 	const uid = $props.id();
 	const detected = $derived(presetOf(requirement));
-	let customMode = $state(false);
+	// Set from the start too, so SSR renders the right mode.
+	let customMode = $state(untrack(() => presetOf(requirement) === 'custom'));
 	$effect.pre(() => {
 		// Start in custom mode when the saved timing matches no preset.
 		if (detected === 'custom') customMode = true;

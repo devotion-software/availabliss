@@ -9,10 +9,17 @@ import { markNotificationsRead } from './notifications';
 class Activity {
 	items = $state<AppNotification[]>([]);
 	unread = $state(0);
+	/**
+	 * False in SSR and until the app layout seeds it on the client. This is a
+	 * module-level singleton, so it must never be seeded on the server (it would be
+	 * shared between requests): until then, read the layout's data instead.
+	 */
+	seeded = $state(false);
 
 	seed(data: { notifications: AppNotification[]; unread: number }) {
 		this.items = data.notifications;
 		this.unread = data.unread;
+		this.seeded = true;
 	}
 
 	/** Starts listening for new notifications; returns the unsubscribe function. */

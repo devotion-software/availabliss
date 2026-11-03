@@ -8,7 +8,10 @@
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
 
+	let { data } = $props();
 	const fmt = useFormat();
+	// The layout's data until the shared store is seeded (SSR and first render).
+	const items = $derived(activity.seeded ? activity.items : data.notifications.notifications);
 
 	const ICON: Record<AppNotification['kind'], IconName> = {
 		'proposal.created': 'check-circle',
@@ -20,7 +23,7 @@
 	};
 
 	// Opening Activity marks everything read; unread rows keep their highlight for this visit.
-	const unreadIds = new Set(activity.items.filter((n) => !n.readAt).map((n) => n.id));
+	const unreadIds = new Set(untrack(() => items).filter((n) => !n.readAt).map((n) => n.id));
 	$effect(() => {
 		untrack(() => activity.markAllRead());
 	});
@@ -31,9 +34,9 @@
 <div class="activity">
 	<PageHeader title="Activity" subtitle="Proposals, replies and nudges from your groups" backHref="/app" backLabel="Back to groups" backOnPhoneOnly />
 
-	{#if activity.items.length}
+	{#if items.length}
 		<ul class="list glass" aria-live="polite">
-			{#each activity.items as n (n.id)}
+			{#each items as n (n.id)}
 				<li>
 					<a href={notificationHref(n)} class:unread={unreadIds.has(n.id) || !n.readAt}>
 						<span class="icon"><Icon name={ICON[n.kind] ?? 'bell'} size={18} /></span>
