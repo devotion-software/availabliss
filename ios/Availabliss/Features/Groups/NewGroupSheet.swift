@@ -185,8 +185,8 @@ struct NewGroupSheet: View {
             onCreated(group)
         } catch let failure as APIError {
             switch failure {
-            case .http(status: 402, _):
-                // `upgrade_required`: a free account at its group limit.
+            case .upgradeRequired:
+                // A free account at its group limit.
                 limit = (try? await api.send(API.Me.plan()))?.groupLimit ?? 3
             case .validation(_, let issues) where issues.contains(where: { $0.path == "name" }):
                 step = 1

@@ -66,7 +66,6 @@ struct ActivityView: View {
                 } else if let notification = event.payload(as: AppNotification.self) {
                     model.prepend(notification)
                 }
-                if app.router.tab == .activity { await app.markNotificationsRead() }
             }
         }
     }

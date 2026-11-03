@@ -52,11 +52,19 @@ struct KeychainStore: Sendable {
 /// (After-first-unlock accessibility lets background refresh use the token.)
 final class TokenStore: Sendable {
     private static let tokenKey = "auth.bearer"
+    /// Set in UserDefaults on first launch. UserDefaults goes with an uninstall but the
+    /// Keychain doesn't, so a missing flag means a fresh install and any token is stale.
+    private static let installedKey = "auth.installed"
     private let keychain: KeychainStore
     private let cache: OSAllocatedUnfairLock<String?>
 
     init(keychain: KeychainStore = KeychainStore()) {
         self.keychain = keychain
+        let defaults = UserDefaults.standard
+        if !defaults.bool(forKey: Self.installedKey) {
+            keychain.set(nil, for: Self.tokenKey)
+            defaults.set(true, forKey: Self.installedKey)
+        }
         self.cache = OSAllocatedUnfairLock(initialState: keychain.string(for: Self.tokenKey))
     }
 

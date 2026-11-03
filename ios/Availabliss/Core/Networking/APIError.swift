@@ -15,6 +15,8 @@ struct APIErrorBody: Decodable, Sendable, Equatable {
 
 enum APIError: LocalizedError, Sendable, Equatable {
     case unauthorized(String)
+    /// `upgrade_required` (402): the action needs Pro.
+    case upgradeRequired(String)
     case forbidden(String)
     case notFound(String)
     case validation(String, issues: [APIErrorBody.Issue])
@@ -32,6 +34,7 @@ enum APIError: LocalizedError, Sendable, Equatable {
         let message = body?.message ?? HTTPURLResponse.localizedString(forStatusCode: status).capitalized
         switch (body?.code, status) {
         case ("unauthorized", _), (_, 401): self = .unauthorized(message)
+        case ("upgrade_required", _), (_, 402): self = .upgradeRequired(message)
         case ("forbidden", _), (_, 403): self = .forbidden(message)
         case ("not_found", _), (_, 404): self = .notFound(message)
         case ("validation_error", _), (_, 400): self = .validation(message, issues: body?.issues ?? [])
@@ -45,7 +48,7 @@ enum APIError: LocalizedError, Sendable, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .unauthorized(let m), .forbidden(let m), .notFound(let m), .conflict(let m),
+        case .unauthorized(let m), .upgradeRequired(let m), .forbidden(let m), .notFound(let m), .conflict(let m),
              .rateLimited(let m), .server(let m), .http(_, let m), .mergeCandidate(_, let m):
             m
         case .validation(let m, let issues):

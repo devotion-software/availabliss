@@ -21,6 +21,8 @@ final class DeviceCalendarService {
     private(set) var isSyncing = false
     private(set) var lastSyncedAt: Date?
     private(set) var lastError: String?
+    /// Asked to upgrade write-only access to full and didn't get it; iOS won't ask again.
+    private(set) var fullAccessDeclined: Bool
 
     @ObservationIgnored let store = EKEventStore()
     @ObservationIgnored private let api: APIClient
@@ -33,16 +35,22 @@ final class DeviceCalendarService {
     private static let addedKey = "calendar.addedEvents"
     private static let uploadedHashKey = "calendar.uploadedHash"
     private static let uploadedAtKey = "calendar.uploadedAt"
+    private static let fullAccessDeclinedKey = "calendar.fullAccessDeclined"
 
     init(api: APIClient) {
         self.api = api
         self.authorization = EKEventStore.authorizationStatus(for: .event)
         self.busyCalendarIds = Set(UserDefaults.standard.stringArray(forKey: Self.busyKey) ?? [])
+        self.fullAccessDeclined = UserDefaults.standard.bool(forKey: Self.fullAccessDeclinedKey)
         if hasFullAccess { reloadCalendars() }
     }
 
     var hasFullAccess: Bool { authorization == .fullAccess }
     var canWrite: Bool { authorization == .fullAccess || authorization == .writeOnly }
+    /// Full access can only be turned on in Settings now.
+    var needsSettingsForFullAccess: Bool {
+        authorization == .denied || authorization == .restricted || (authorization == .writeOnly && fullAccessDeclined)
+    }
 
     // MARK: Permission
 
@@ -50,6 +58,10 @@ final class DeviceCalendarService {
     func requestFullAccess() async -> Bool {
         let granted = (try? await store.requestFullAccessToEvents()) ?? false
         authorization = EKEventStore.authorizationStatus(for: .event)
+        if authorization == .writeOnly {
+            fullAccessDeclined = true
+            UserDefaults.standard.set(true, forKey: Self.fullAccessDeclinedKey)
+        }
         if granted {
             reloadCalendars()
             startObservingChanges()
@@ -231,7 +243,9 @@ final class DeviceCalendarService {
         let item = EKEvent(eventStore: store)
         item.title = event.title
         item.startDate = event.start
-        item.endDate = event.end
+        // The API's all-day end is the exclusive midnight after the last day; EventKit
+        // treats an all-day endDate as inclusive, so that midnight would add a day.
+        item.endDate = event.allDay ? max(event.start, event.end.addingTimeInterval(-1)) : event.end
         item.isAllDay = event.allDay
         item.location = event.location
         item.notes = event.note

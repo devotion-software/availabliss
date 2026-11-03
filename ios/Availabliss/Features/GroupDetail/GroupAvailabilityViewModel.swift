@@ -111,8 +111,10 @@ final class GroupAvailabilityViewModel {
     private func loadMonth() async {
         isLoading = availability == nil
         defer { isLoading = false }
+        let requested = month
         do {
-            let loaded: Availability = try await api.send(API.GroupAvailability.range(groupId: groupId, from: month, to: month.lastOfMonth()))
+            let loaded: Availability = try await api.send(API.GroupAvailability.range(groupId: groupId, from: requested, to: requested.lastOfMonth()))
+            guard requested == month else { return }
             availability = loaded
             // Start on a day that works rather than one outside the group's timing.
             if !userPickedDay, let firstMatch = loaded.days.first(where: { $0.status == .match }) {

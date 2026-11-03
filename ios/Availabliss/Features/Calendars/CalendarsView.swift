@@ -154,7 +154,7 @@ private struct DeviceCalendarsSection: View {
             }
             DeviceSyncStatus(service: service)
         } else {
-            AccessPrompt(denied: service.authorization == .denied || service.authorization == .restricted) {
+            AccessPrompt(denied: service.needsSettingsForFullAccess) {
                 Task { await service.requestFullAccess() }
             }
         }

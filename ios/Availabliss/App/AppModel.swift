@@ -156,7 +156,12 @@ final class AppModel {
                     }
                 case .notificationCreated:
                     self.unreadNotifications += 1
-                    self.push.setBadge(self.unreadNotifications)
+                    // Decided here, not in ActivityView, so the two subscribers can't race.
+                    if self.router.tab == .activity {
+                        await self.markNotificationsRead()
+                    } else {
+                        self.push.setBadge(self.unreadNotifications)
+                    }
                 case .reconnected:
                     await self.refreshUnread()
                 default:
