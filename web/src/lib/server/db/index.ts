@@ -27,3 +27,17 @@ if (process.env.NODE_ENV !== 'production') globalForDb.__availablissPool = pool;
 export const db = drizzle(pool, { schema, mode: 'default' });
 export type DB = typeof db;
 export type Tx = Parameters<Parameters<DB['transaction']>[0]>[0];
+
+/** For the health check: the database answers SELECT 1 within the timeout. */
+export async function dbHealth(timeoutMs = 2000): Promise<'ok' | 'down'> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timeout = new Promise<'down'>((resolve) => (timer = setTimeout(() => resolve('down'), timeoutMs)));
+	try {
+		return await Promise.race([
+			pool.query('SELECT 1').then(() => 'ok' as const, () => 'down' as const),
+			timeout
+		]);
+	} finally {
+		clearTimeout(timer);
+	}
+}

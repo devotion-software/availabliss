@@ -4,6 +4,11 @@ web/.svelte-kit
 **/.env
 **/.env.*
 !web/.env.example
+# Bearer tokens for each demo user (make seed-demo).
+web/.demo.json
+web/tests
+.claude
+**/.claude
 .git
 ios
 android

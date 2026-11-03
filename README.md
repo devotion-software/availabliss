@@ -88,7 +88,8 @@ builds, a slim Node image runs `scripts/migrate.js` and then the server on port
 4. Set the environment variables from `web/.env.example`, at minimum
    `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (the public URL), `SECRETS_KEY`,
    `RESEND_API_KEY` and `EMAIL_FROM`.
-5. Health check: `GET /api/v1/health` (it also reports `redis: ok | down | off`).
+5. Health check: `GET /api/v1/health`. It's 503 when the database doesn't answer and
+   also reports `db: ok | down` and `redis: ok | down | off`.
 
 Shared state lives in Redis ([`web/src/lib/server/redis.ts`](web/src/lib/server/redis.ts)):
 live updates fan out over pub/sub, native sign-in hand-off codes and rate-limit

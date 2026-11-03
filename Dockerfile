@@ -2,7 +2,8 @@
 # Production image for the web app + API (deployed on Coolify).
 
 # ── build: full deps + vite build (adapter-node → ./build) ──────────────────
-FROM oven/bun:1 AS build
+# Pinned to match CI (bun-version in .github/workflows/ci.yml).
+FROM oven/bun:1.3.14 AS build
 WORKDIR /app
 COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
@@ -15,13 +16,13 @@ ENV DATABASE_URL=mysql://build:build@localhost:3306/build \
 RUN bun run build
 
 # ── deps: production-only node_modules for the externalised runtime imports ──
-FROM oven/bun:1 AS deps
+FROM oven/bun:1.3.14 AS deps
 WORKDIR /app
 COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile --production
 
 # ── runtime: slim node, migrate-then-serve ──────────────────────────────────
-FROM node:22-slim AS runtime
+FROM node:22.22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -31,11 +32,14 @@ ENV HOST_HEADER=x-forwarded-host
 ENV ADDRESS_HEADER=x-forwarded-for
 ENV BODY_SIZE_LIMIT=10M
 
-COPY --from=deps  /app/node_modules ./node_modules
-COPY --from=build /app/build        ./build
-COPY web/package.json ./
-COPY web/drizzle ./drizzle
-COPY web/scripts ./scripts
+# Run as the image's unprivileged node user, not root.
+COPY --chown=node:node --from=deps  /app/node_modules ./node_modules
+COPY --chown=node:node --from=build /app/build        ./build
+COPY --chown=node:node web/package.json ./
+COPY --chown=node:node web/drizzle ./drizzle
+# Only the migration runner: the other scripts are Bun / TypeScript dev tools.
+COPY --chown=node:node web/scripts/migrate.js ./scripts/migrate.js
+USER node
 
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD node -e "fetch('http://localhost:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
