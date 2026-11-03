@@ -16,7 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -36,11 +37,20 @@ class UserRepository @Inject constructor(
     private val _user = MutableStateFlow<User?>(null)
     val user: StateFlow<User?> = _user.asStateFlow()
 
+    /**
+     * Bumped by [clear]. A response for a session that has since been cleared is
+     * dropped instead of re-publishing (and re-caching) the signed-out user.
+     */
+    @Volatile private var session = 0
+    private val storeLock = Mutex()
+
     /** Loads the cached user (if any) into [user]. */
     suspend fun restore() {
         if (_user.value != null) return
+        val started = session
         prefs.cachedUserJson.first()?.let { cached ->
-            runCatching { json.decodeFromString(User.serializer(), cached) }.getOrNull()?.let(::publish)
+            val user = runCatching { json.decodeFromString(User.serializer(), cached) }.getOrNull() ?: return
+            storeLock.withLock { if (session == started && _user.value == null) publish(user) }
         }
     }
 
@@ -52,15 +62,20 @@ class UserRepository @Inject constructor(
      */
     suspend fun refresh(): ApiResult<User> {
         val request = synchronized(this) {
-            inFlight?.takeIf { it.isActive }
-                ?: scope.async { call { api.getMe() }.onSuccess(::store) }.also { inFlight = it }
+            inFlight?.takeIf { it.isActive } ?: run {
+                val started = session
+                scope.async { call { api.getMe() }.onSuccess { store(it, started) } }
+                    .also { inFlight = it }
+            }
         }
         return request.await()
     }
 
     /** `PATCH /me` with only the fields set in [block]. */
-    suspend fun update(block: JsonPatchBuilder.() -> Unit): ApiResult<User> =
-        call { api.updateMe(jsonPatch(block)) }.onSuccess(::store)
+    suspend fun update(block: JsonPatchBuilder.() -> Unit): ApiResult<User> {
+        val started = session
+        return call { api.updateMe(jsonPatch(block)) }.onSuccess { store(it, started) }
+    }
 
     suspend fun setAppearance(mode: ThemeMode, theme: ColorTheme): ApiResult<User> {
         // Apply locally first so the change is instant, then persist to the account.
@@ -74,15 +89,22 @@ class UserRepository @Inject constructor(
 
     suspend fun deleteAccount(): ApiResult<Unit> = call { api.deleteAccount() }
 
-    fun store(user: User) {
+    suspend fun store(user: User) = store(user, session)
+
+    /** Publishes and caches [user], unless the session changed since [started]. */
+    private suspend fun store(user: User, started: Int) = storeLock.withLock {
+        if (session != started) return@withLock
         publish(user)
-        scope.launch {
-            prefs.setCachedUserJson(json.encodeToString(User.serializer(), user))
-            prefs.setAppearance(Appearance(user.themeMode, user.colorTheme))
-        }
+        prefs.setCachedUserJson(json.encodeToString(User.serializer(), user))
+        prefs.setAppearance(Appearance(user.themeMode, user.colorTheme))
     }
 
-    suspend fun clear() {
+    suspend fun clear() = storeLock.withLock {
+        // Together, so a refresh() starting now can't join the old session's request.
+        synchronized(this) {
+            session++
+            inFlight = null
+        }
         _user.value = null
         prefs.setCachedUserJson(null)
     }
