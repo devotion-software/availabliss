@@ -53,8 +53,12 @@ struct ChatView: View {
         .screenBackground(OrbLayout.chat)
         .task { await model.load(me: me) }
         .task(id: group.id) {
-            for await event in app.live.events(forGroup: group.id) { await model.apply(event) }
+            for await event in app.live.events(forGroup: group.id) {
+                if event.kind == .reconnected { await model.catchUp() } else { await model.apply(event) }
+            }
         }
+        .onAppear { app.router.visibleChatGroupId = group.id }
+        .onDisappear { if app.router.visibleChatGroupId == group.id { app.router.visibleChatGroupId = nil } }
         .sheet(item: $sheet) { sheet in sheetContent(sheet) }
         .errorAlert($model.error)
     }

@@ -33,7 +33,7 @@ struct GroupsHomeView: View {
         .task {
             for await event in app.live.events() {
                 switch event.kind {
-                case .groupUpdated, .memberChanged, .proposalCreated, .proposalConfirmed, .eventChanged, .messageCreated, .availabilityChanged:
+                case .groupUpdated, .memberChanged, .proposalCreated, .proposalConfirmed, .eventChanged, .messageCreated, .availabilityChanged, .reconnected:
                     await model.load()
                 default: break
                 }

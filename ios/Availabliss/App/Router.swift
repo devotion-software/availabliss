@@ -33,6 +33,10 @@ final class Router {
     /// Invite token waiting to be shown (survives sign-in).
     var pendingInvite: InviteToken?
 
+    /// The group whose chat is on screen, so its message pushes don't also show a banner.
+    /// Not observed: nothing on screen depends on it.
+    @ObservationIgnored var visibleChatGroupId: String?
+
     struct InviteToken: Identifiable, Hashable {
         let token: String
         var id: String { token }
@@ -88,6 +92,7 @@ final class Router {
     }
 
     func reset() {
+        visibleChatGroupId = nil
         tab = .groups
         groupsPath = []
         myTimePath = []

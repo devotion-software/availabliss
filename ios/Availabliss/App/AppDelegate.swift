@@ -20,7 +20,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     // Show banners while the app is open, except for chat messages in the group you're looking at.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        let data = DeepLink.data(fromPush: notification.request.content.userInfo)
+        let isChatMessage = data["kind"] == "message" || data["messageId"] != nil
+        let visibleChat = await MainActor.run { app.router.visibleChatGroupId }
+        // The message is already arriving in the open chat over the live stream.
+        if isChatMessage, let groupId = data["groupId"], groupId == visibleChat { return [] }
+        return [.banner, .list, .sound]
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {

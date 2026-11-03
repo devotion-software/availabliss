@@ -43,6 +43,22 @@ final class ChatViewModel {
         } catch {}
     }
 
+    /// Refetches the newest page after the live stream reconnects. Keeps older pages already
+    /// scrolled in when the new page overlaps them; otherwise the gap is too big to stitch, so
+    /// the list restarts from the newest page. Silent on failure: this runs in the background.
+    func catchUp() async {
+        guard let page = try? await api.send(API.Chat.messages(groupId: groupId)) else { return }
+        if let oldestNew = page.messages.first, let overlap = messages.firstIndex(where: { $0.id == oldestNew.id }) {
+            messages = Array(messages[..<overlap]) + page.messages
+        } else {
+            messages = page.messages
+            hasMore = page.hasMore
+        }
+        // Proposals and events on the cards may have changed while we were away too.
+        await hydrate(page.messages, refreshing: true)
+        await markSeen()
+    }
+
     func loadOlder() async {
         guard hasMore, !isLoadingOlder, let oldest = messages.first else { return }
         isLoadingOlder = true
@@ -174,14 +190,16 @@ final class ChatViewModel {
         messages[index].poll = poll
     }
 
-    /// Loads the proposals and events that cards in `batch` refer to.
-    private func hydrate(_ batch: [Message]) async {
+    /// Loads the proposals and events that cards in `batch` refer to (`refreshing` refetches ones already loaded).
+    private func hydrate(_ batch: [Message], refreshing: Bool = false) async {
         let api = self.api
-        let proposalIds = Set(batch.compactMap(\.proposalId)).subtracting(proposals.keys)
+        var proposalIds = Set(batch.compactMap(\.proposalId))
+        if !refreshing { proposalIds.subtract(proposals.keys) }
         let fetchedProposals = await Self.fetchAll(proposalIds) { try await api.send(API.Proposals.get(id: $0)) }
         for proposal in fetchedProposals { proposals[proposal.id] = proposal }
 
-        let eventIds = Set(batch.compactMap(\.eventId)).subtracting(events.keys)
+        var eventIds = Set(batch.compactMap(\.eventId))
+        if !refreshing { eventIds.subtract(events.keys) }
         let fetchedEvents = await Self.fetchAll(eventIds) { try await api.send(API.Events.get(id: $0)) }
         for event in fetchedEvents { events[event.id] = event }
     }

@@ -39,6 +39,13 @@ struct Endpoint<Response: Decodable & Sendable>: Sendable {
         self.body = body
         self.timeout = timeout
     }
+
+    /// Whether a 401 here means our session has ended. Better Auth routes and account linking
+    /// answer 401 for a bad credential in the body (e.g. an Apple / Google id token that expired
+    /// while the merge dialog was open), which is an ordinary error, not a reason to sign out.
+    var unauthorizedEndsSession: Bool {
+        mount != .auth && path != "/me/accounts/link"
+    }
 }
 
 /// For `204 No Content` responses, and responses whose body we don't need.

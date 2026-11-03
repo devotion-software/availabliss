@@ -6,8 +6,9 @@ enum DeepLink: Equatable, Sendable {
     case group(id: String)
     case groupChat(id: String)
     case proposal(id: String)
-    /// `availabliss://calendars` — OAuth return / calendar settings.
-    case calendars(connected: String?, error: String?)
+    /// `availabliss://calendars` — OAuth return / calendar settings. `complete` is the
+    /// one-time code to finish a Google / Microsoft connection with.
+    case calendars(complete: String?, error: String?)
 
     /// Parses `availabliss://…` and `https://<host>/…` links.
     init?(url: URL, associatedHost: String? = nil) {
@@ -23,7 +24,7 @@ enum DeepLink: Equatable, Sendable {
 
         switch segments.count {
         case 1 where segments[0] == "calendars":
-            self = .calendars(connected: param("connected"), error: param("error"))
+            self = .calendars(complete: param("complete"), error: param("error"))
         case 2 where segments[0] == "invite":
             self = .invite(token: segments[1])
         case 3 where segments[0] == "app" && segments[1] == "groups":

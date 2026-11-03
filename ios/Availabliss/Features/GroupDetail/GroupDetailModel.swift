@@ -35,9 +35,11 @@ final class GroupDetailModel {
         return group?.member(userId)?.firstName ?? "Someone"
     }
 
-    /// Applies `group.updated` / `member.changed` live events.
+    /// Applies `group.updated` / `member.changed` live events, and refetches after a reconnect.
     func apply(_ event: LiveEvent) async {
         switch event.kind {
+        case .reconnected:
+            await load()
         case .groupUpdated:
             if let updated = event.payload(as: Group.self) { group = updated }
         case .memberChanged:

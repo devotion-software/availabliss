@@ -19,11 +19,12 @@ final class ProposalViewModel {
         self.api = api
     }
 
-    func load() async {
+    /// `refreshingGroup` refetches the group even when it's already loaded (members may have changed).
+    func load(refreshingGroup: Bool = false) async {
         do {
             let proposal = try await api.send(API.Proposals.get(id: proposalId))
             self.proposal = proposal
-            if group?.id != proposal.groupId {
+            if refreshingGroup || group?.id != proposal.groupId {
                 group = try await api.send(API.Groups.get(id: proposal.groupId))
             }
             await loadEventIfConfirmed()
@@ -129,6 +130,8 @@ final class ProposalViewModel {
             }
         case .memberChanged, .groupUpdated:
             if let groupId = proposal?.groupId { group = try? await api.send(API.Groups.get(id: groupId)) }
+        case .reconnected:
+            await load(refreshingGroup: true)
         default:
             break
         }

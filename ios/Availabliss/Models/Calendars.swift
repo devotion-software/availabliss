@@ -41,6 +41,7 @@ struct CalDAVBody: Encodable, Sendable {
 
 struct OAuthURLBody: Encodable, Sendable { let redirect: String }
 struct OAuthURLResponse: Decodable, Sendable { let url: URL }
+struct OAuthCompleteBody: Encodable, Sendable { let code: String }
 
 struct CalendarBusyBody: Encodable, Sendable { let busy: Bool }
 

@@ -60,8 +60,12 @@ struct ActivityView: View {
         }
         .refreshable { await model.load() }
         .task {
-            for await event in app.live.events() where event.kind == .notificationCreated {
-                if let notification = event.payload(as: AppNotification.self) { model.prepend(notification) }
+            for await event in app.live.events() where event.kind == .notificationCreated || event.kind == .reconnected {
+                if event.kind == .reconnected {
+                    await model.load()
+                } else if let notification = event.payload(as: AppNotification.self) {
+                    model.prepend(notification)
+                }
                 if app.router.tab == .activity { await app.markNotificationsRead() }
             }
         }

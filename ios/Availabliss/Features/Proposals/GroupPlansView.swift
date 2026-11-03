@@ -39,7 +39,7 @@ struct GroupPlansView: View {
         .task(id: group.id) {
             for await event in app.live.events(forGroup: group.id) {
                 switch event.kind {
-                case .proposalCreated, .proposalUpdated, .proposalConfirmed, .eventChanged: await load()
+                case .proposalCreated, .proposalUpdated, .proposalConfirmed, .eventChanged, .reconnected: await load()
                 default: break
                 }
             }

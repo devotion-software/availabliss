@@ -51,10 +51,17 @@ final class CalendarsViewModel {
         do {
             let url = try await api.send(API.Calendars.oauthURL(provider: provider, redirect: "\(AppConfig.urlScheme)://calendars")).url
             let callback = try await WebAuthenticator().authenticate(url: url, callbackScheme: AppConfig.urlScheme)
-            if case .calendars(_, let failure)? = DeepLink(url: callback), let failure {
-                error = "Couldn't connect: \(failure)"
+            // The server returns a one-time code; finishing with our bearer token proves
+            // the signed-in user is the one who started the flow.
+            guard case .calendars(let complete, _)? = DeepLink(url: callback), let complete else {
+                if case .calendars(_, let failure?)? = DeepLink(url: callback) {
+                    error = "Couldn't connect: \(failure)"
+                } else {
+                    error = "Couldn't connect that calendar"
+                }
                 return
             }
+            _ = try await api.send(API.Calendars.completeOAuth(provider: provider, code: complete))
             await load()
             toast = "\(provider.displayName) connected"
         } catch where error.isCancellation {

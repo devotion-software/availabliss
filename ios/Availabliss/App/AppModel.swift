@@ -26,14 +26,15 @@ final class AppModel {
         self.config = config
         let tokenStore = TokenStore()
         let unauthorized = UnauthorizedRelay()
-        let api = APIClient(baseURL: config.apiBaseURL, tokenStore: tokenStore) { unauthorized.fire() }
+        let api = APIClient(baseURL: config.apiBaseURL, tokenStore: tokenStore) { token in unauthorized.fire(token: token) }
         self.api = api
-        self.session = SessionStore(api: api, tokenStore: tokenStore)
+        let session = SessionStore(api: api, tokenStore: tokenStore)
+        self.session = session
         self.appearance = AppearanceStore(api: api)
         self.live = LiveEventsClient(api: api)
-        self.push = PushManager(api: api)
         self.deviceCalendar = DeviceCalendarService(api: api)
-        unauthorized.handler = { [weak self] in self?.session.handleUnauthorized() }
+        self.push = PushManager(api: api, currentUserId: { session.user?.id })
+        unauthorized.handler = { [weak self] token in self?.session.handleUnauthorized(token: token) }
     }
 
     var auth: AuthService { AuthService(api: api, config: config) }
@@ -130,10 +131,11 @@ final class AppModel {
     }
 
     private func didSignOut() {
-        live.stop()
+        live.stop(endingSession: true)
         liveTask?.cancel()
         liveTask = nil
         unreadNotifications = 0
+        push.forget()
         push.setBadge(0)
         router.reset()
     }
@@ -153,6 +155,8 @@ final class AppModel {
                 case .notificationCreated:
                     self.unreadNotifications += 1
                     self.push.setBadge(self.unreadNotifications)
+                case .reconnected:
+                    await self.refreshUnread()
                 default:
                     break
                 }
@@ -164,10 +168,10 @@ final class AppModel {
 /// Lets the API client (created first) call back into the session (created after it).
 @MainActor
 private final class UnauthorizedRelay {
-    var handler: (() -> Void)?
+    var handler: ((String) -> Void)?
 
-    nonisolated func fire() {
-        Task { @MainActor in self.handler?() }
+    nonisolated func fire(token: String) {
+        Task { @MainActor in self.handler?(token) }
     }
 }
 

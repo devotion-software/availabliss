@@ -54,6 +54,8 @@ struct LiveEvent: Sendable {
         case memberChanged = "member.changed"
         case availabilityChanged = "availability.changed"
         case notificationCreated = "notification.created"
+        /// Not from the server: the stream reconnected and events may have been missed, so refetch.
+        case reconnected = "client.reconnected"
     }
 
     let kind: Kind

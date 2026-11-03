@@ -66,7 +66,7 @@ final class RegionViewModel {
         isSaving = true
         defer { isSaving = false }
         do {
-            try await session.update(UserPatch(country: country, subdivision: subdivision, schoolAuthority: schoolAuthority, timezone: timezone))
+            try await session.update(.region(country: country, subdivision: subdivision, schoolAuthority: schoolAuthority, timezone: timezone))
             return true
         } catch {
             self.error = error.userMessage

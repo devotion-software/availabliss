@@ -84,9 +84,10 @@ final class SessionStore {
         clearLocalSession()
     }
 
-    /// Called when any request comes back 401.
-    func handleUnauthorized() {
-        guard state == .signedIn || state == .restoring else { return }
+    /// Called when a request sent with `token` comes back 401. The relay hops to the main actor,
+    /// so the user may have signed in again by now; only end the session the 401 was about.
+    func handleUnauthorized(token: String) {
+        guard state == .signedIn || state == .restoring, tokenStore.token == token else { return }
         clearLocalSession()
     }
 

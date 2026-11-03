@@ -49,7 +49,7 @@ struct GroupAvailabilityView: View {
         .task(id: group.id) {
             for await event in app.live.events(forGroup: group.id) {
                 switch event.kind {
-                case .availabilityChanged, .groupUpdated, .memberChanged: await model.invalidate()
+                case .availabilityChanged, .groupUpdated, .memberChanged, .reconnected: await model.invalidate()
                 default: break
                 }
             }

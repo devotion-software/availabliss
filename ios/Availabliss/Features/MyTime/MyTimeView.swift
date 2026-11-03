@@ -65,8 +65,15 @@ struct MyTimeView: View {
         .task { await model.load() }
         .refreshable { await model.load() }
         .task {
-            for await event in app.live.events() where event.kind == .availabilityChanged {
-                if event.payload(as: [String: String].self)?["userId"] == app.session.user?.id { await model.load() }
+            for await event in app.live.events() {
+                switch event.kind {
+                case .availabilityChanged:
+                    if event.payload(as: [String: String].self)?["userId"] == app.session.user?.id { await model.load() }
+                case .reconnected:
+                    await model.load()
+                default:
+                    break
+                }
             }
         }
         .sheet(item: $draft) { draft in

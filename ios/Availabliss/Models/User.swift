@@ -42,7 +42,7 @@ struct User: Codable, Sendable, Identifiable, Equatable {
     }
 }
 
-/// Body for `PATCH /me`. Only non-nil fields are sent.
+/// Body for `PATCH /me`. Only non-nil fields are sent, except in a region update (see `region`).
 struct UserPatch: Encodable, Sendable {
     var name: String?
     var themeMode: ThemeMode?
@@ -52,6 +52,58 @@ struct UserPatch: Encodable, Sendable {
     var schoolAuthority: String?
     var timezone: String?
     var onboarded: Bool?
+    /// Sends nil region fields as `null`. Omitting them would keep the old values, so moving from
+    /// GB-ENG to Ireland would leave the subdivision (and its holidays) behind.
+    private var replacesRegion = false
+
+    init(
+        name: String? = nil,
+        themeMode: ThemeMode? = nil,
+        colorTheme: ColorTheme? = nil,
+        country: String? = nil,
+        subdivision: String? = nil,
+        schoolAuthority: String? = nil,
+        timezone: String? = nil,
+        onboarded: Bool? = nil
+    ) {
+        self.name = name
+        self.themeMode = themeMode
+        self.colorTheme = colorTheme
+        self.country = country
+        self.subdivision = subdivision
+        self.schoolAuthority = schoolAuthority
+        self.timezone = timezone
+        self.onboarded = onboarded
+    }
+
+    /// Replaces the whole region: a nil subdivision or school authority clears it on the server.
+    static func region(country: String?, subdivision: String?, schoolAuthority: String?, timezone: String?) -> UserPatch {
+        var patch = UserPatch(country: country, subdivision: subdivision, schoolAuthority: schoolAuthority, timezone: timezone)
+        patch.replacesRegion = true
+        return patch
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(name, forKey: .name)
+        try container.encodeIfPresent(themeMode, forKey: .themeMode)
+        try container.encodeIfPresent(colorTheme, forKey: .colorTheme)
+        if replacesRegion {
+            try container.encode(country, forKey: .country)
+            try container.encode(subdivision, forKey: .subdivision)
+            try container.encode(schoolAuthority, forKey: .schoolAuthority)
+        } else {
+            try container.encodeIfPresent(country, forKey: .country)
+            try container.encodeIfPresent(subdivision, forKey: .subdivision)
+            try container.encodeIfPresent(schoolAuthority, forKey: .schoolAuthority)
+        }
+        try container.encodeIfPresent(timezone, forKey: .timezone)
+        try container.encodeIfPresent(onboarded, forKey: .onboarded)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, themeMode, colorTheme, country, subdivision, schoolAuthority, timezone, onboarded
+    }
 }
 
 struct BusyInterval: Codable, Sendable, Hashable {

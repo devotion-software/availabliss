@@ -8,9 +8,10 @@ final class APIClient: Sendable {
     let baseURL: URL
     private let session: URLSession
     private let tokenStore: TokenStore
-    private let onUnauthorized: @Sendable () -> Void
+    /// Called with the bearer token a request was rejected for.
+    private let onUnauthorized: @Sendable (String) -> Void
 
-    init(baseURL: URL, tokenStore: TokenStore, session: URLSession = .availabliss, onUnauthorized: @escaping @Sendable () -> Void = {}) {
+    init(baseURL: URL, tokenStore: TokenStore, session: URLSession = .availabliss, onUnauthorized: @escaping @Sendable (String) -> Void = { _ in }) {
         self.baseURL = baseURL
         self.tokenStore = tokenStore
         self.session = session
@@ -26,7 +27,7 @@ final class APIClient: Sendable {
     /// Performs `endpoint` and also returns the HTTP response (for reading headers like `set-auth-token`).
     func sendReturningHeaders<Response>(_ endpoint: Endpoint<Response>) async throws -> (value: Response, response: HTTPURLResponse) {
         let request = try makeRequest(for: endpoint)
-        let (data, response) = try await perform(request)
+        let (data, response) = try await perform(request, unauthorizedEndsSession: endpoint.unauthorizedEndsSession)
 
         if Response.self == EmptyResponse.self || data.isEmpty, let empty = EmptyResponse() as? Response {
             return (empty, response)
@@ -53,6 +54,15 @@ final class APIClient: Sendable {
 
     var bearerToken: String? { tokenStore.token }
 
+    /// Reports a 401 for `request` as the session ending, but only when it was sent with the token
+    /// we hold now: a slow request from before a re-sign-in must not sign the new session out.
+    func reportUnauthorized(for request: URLRequest) {
+        guard let header = request.value(forHTTPHeaderField: "Authorization"), header.hasPrefix("Bearer ") else { return }
+        let sentToken = String(header.dropFirst("Bearer ".count))
+        guard sentToken == tokenStore.token else { return }
+        onUnauthorized(sentToken)
+    }
+
     // MARK: - Private
 
     private func makeRequest<Response>(for endpoint: Endpoint<Response>) throws -> URLRequest {
@@ -78,7 +88,7 @@ final class APIClient: Sendable {
         return request
     }
 
-    private func perform(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+    private func perform(_ request: URLRequest, unauthorizedEndsSession: Bool) async throws -> (Data, HTTPURLResponse) {
         let data: Data
         let response: URLResponse
         do {
@@ -93,7 +103,7 @@ final class APIClient: Sendable {
         guard (200..<300).contains(http.statusCode) else {
             let body = try? JSONCoding.decoder.decode(APIErrorBody.self, from: data)
             let error = APIError(status: http.statusCode, body: body)
-            if error.isUnauthorized, tokenStore.token != nil { onUnauthorized() }
+            if error.isUnauthorized, unauthorizedEndsSession { reportUnauthorized(for: request) }
             throw error
         }
         return (data, http)

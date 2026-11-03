@@ -60,6 +60,10 @@ enum API {
         static func oauthURL(provider: CalendarProvider, redirect: String) -> Endpoint<OAuthURLResponse> {
             .init(.post, "/calendars/oauth/\(provider.rawValue)/url", body: OAuthURLBody(redirect: redirect))
         }
+        /// Finishes a connection with the one-time code from `availabliss://calendars?complete=`.
+        static func completeOAuth(provider: CalendarProvider, code: String) -> Endpoint<CalendarConnection> {
+            .init(.post, "/calendars/oauth/\(provider.rawValue)/complete", body: OAuthCompleteBody(code: code))
+        }
     }
 
     // MARK: Manual blocks
