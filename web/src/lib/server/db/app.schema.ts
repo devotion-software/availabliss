@@ -4,6 +4,7 @@ import {
 	varchar,
 	text,
 	timestamp,
+	datetime,
 	boolean,
 	int,
 	json,
@@ -29,6 +30,11 @@ const userRef = (name = 'user_id') =>
 		.notNull()
 		.references(() => user.id, { onDelete: 'cascade' });
 const instant = (name: string) => timestamp(name, { fsp: 3 });
+/**
+ * For times that can be years ahead: TIMESTAMP stops at 2038-01-19. Read and
+ * written as UTC (the pool sets `timezone: 'Z'`).
+ */
+const farInstant = (name: string) => datetime(name, { fsp: 3, mode: 'date' });
 const createdAt = () => instant('created_at').defaultNow().notNull();
 const updatedAt = () =>
 	instant('updated_at')
@@ -56,6 +62,10 @@ export const calendarConnections = mysqlTable(
 		// Background sync: when it's next due (null = now) and failures in a row, for back-off.
 		nextSyncAt: instant('next_sync_at'),
 		failures: int('failures').default(0).notNull(),
+		// How far ahead busy time is stored (null = never synced), and when the far
+		// tier (past six months) was last fetched for calendars without change tracking.
+		coveredUntil: farInstant('covered_until'),
+		farSyncedAt: instant('far_synced_at'),
 		// The label for server-side accounts and null for devices (two phones can share
 		// a name), so the unique key below only covers server connections.
 		accountLabel: varchar('account_label', { length: 255 }).generatedAlwaysAs(sql`if(provider = 'device', null, label)`, {
@@ -83,7 +93,10 @@ export const calendars = mysqlTable(
 		name: varchar('name', { length: 160 }).notNull(),
 		color: varchar('color', { length: 32 }),
 		// Whether events in this calendar make the user busy.
-		busy: boolean('busy').default(true).notNull()
+		busy: boolean('busy').default(true).notNull(),
+		// Where the next sync carries on from: the provider's change tag, or when
+		// changes were last fetched. Null until the first full fetch.
+		syncCursor: varchar('sync_cursor', { length: 255 })
 	},
 	(t) => [uniqueIndex('calendars_external_uq').on(t.connectionId, t.externalId)]
 );
@@ -97,12 +110,16 @@ export const busyIntervals = mysqlTable(
 		calendarId: varchar('calendar_id', { length: 36 })
 			.notNull()
 			.references(() => calendars.id, { onDelete: 'cascade' }),
-		start: instant('start').notNull(),
-		end: instant('end').notNull()
+		// Opaque hash of the provider's event (or recurring series) id, so a changed
+		// event's rows can be replaced on their own. Empty when the source has no ids.
+		eventKey: varchar('event_key', { length: 32 }).default('').notNull(),
+		start: farInstant('start').notNull(),
+		end: farInstant('end').notNull()
 	},
 	(t) => [
 		index('busy_intervals_user_range_idx').on(t.userId, t.start, t.end),
-		index('busy_intervals_calendar_idx').on(t.calendarId, t.start)
+		index('busy_intervals_calendar_idx').on(t.calendarId, t.start),
+		index('busy_intervals_event_idx').on(t.calendarId, t.eventKey)
 	]
 );
 

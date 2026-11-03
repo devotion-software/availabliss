@@ -1,4 +1,8 @@
-/** Outlook / Microsoft 365 via Microsoft Graph calendarView (only start, end and show-as are read). */
+/**
+ * Outlook / Microsoft 365 via Microsoft Graph calendarView (only start, end and
+ * show-as are read). Graph's change feed only covers the primary calendar, so
+ * these calendars are re-read on a schedule (`changes: 'none'`).
+ */
 import { bearerFetch, refreshIfNeeded } from './oauth';
 import type { CalendarAdapter, OAuthCredentials, RemoteBusy } from './types';
 
@@ -19,7 +23,7 @@ const utc = (dateTime: string) => new Date(/[zZ]|[+-]\d\d:\d\d$/.test(dateTime) 
 export const microsoft: CalendarAdapter<OAuthCredentials> = {
 	async listCalendars(creds) {
 		const data = await bearerFetch<CalendarsResponse>(`${GRAPH}/me/calendars?$select=id,name,hexColor`, creds.accessToken);
-		return data.value.map((c) => ({ externalId: c.id, name: c.name, color: c.hexColor || null }));
+		return data.value.map((c) => ({ externalId: c.id, name: c.name, color: c.hexColor || null, changes: 'none' as const }));
 	},
 
 	async busy(creds, calendars, from, to) {

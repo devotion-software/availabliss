@@ -1,11 +1,18 @@
 /**
  * Calendar connections: linking providers, choosing which calendars mean busy,
  * and keeping `busy_intervals` up to date. Only start/end times are stored.
+ *
+ * Busy time is kept from a week back to a horizon at least three years ahead,
+ * further when one of the user's groups plans past that (up to ten years).
+ * Syncs only move what changed: Google lists changed events, CalDAV calendars
+ * whose change tag hasn't moved are skipped, and calendars with no way to see
+ * changes (Outlook, some CalDAV servers) re-read the next six months every sync
+ * and the rest daily. Writes are diffs against what's stored.
  */
-import { and, asc, eq, gte, inArray, isNull, lt, lte, ne, notInArray, or } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, inArray, isNull, lt, lte, ne, notInArray, or, type SQL } from 'drizzle-orm';
 import type { CalendarConnection, CalendarProvider } from '#lib/types';
 import { db, isDuplicateKey } from '../db';
-import { busyIntervals, calendarConnections, calendars, user } from '../db/schema';
+import { busyIntervals, calendarConnections, calendars, groupMembers, groups, user } from '../db/schema';
 import { notFound } from '../http';
 import { newId } from '../ids';
 import { decryptJson, encryptJson } from '../crypto';
@@ -18,14 +25,31 @@ import {
 	ReauthRequired,
 	type CaldavCredentials,
 	type CalendarAdapter,
+	type ChangedEvents,
 	type OAuthCredentials,
 	type RemoteBusy,
 	type RemoteCalendar
 } from './types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Window kept in sync: a week back (for today's view) to six months ahead. */
-const syncWindow = () => ({ from: new Date(Date.now() - 7 * DAY_MS), to: new Date(Date.now() + 183 * DAY_MS) });
+/** Busy time is kept from this far back (for today's view). */
+const HISTORY_DAYS = 7;
+/** Everyone's calendars are covered at least this far ahead… */
+const DEFAULT_HORIZON_DAYS = 3 * 365;
+/** …and as far as their groups plan, up to this. */
+const MAX_HORIZON_DAYS = 10 * 365;
+/** Slots near the end of a group's range still look at busy time a little past it. */
+const RANGE_SLACK_DAYS = 15;
+/** Coverage grows in steps, so the rolling horizon costs one extra fetch a month, not one a day. */
+const EXTEND_STEP_DAYS = 30;
+/** Calendars without change tracking: re-read this far ahead on every sync… */
+const NEAR_DAYS = 183;
+/** …and the rest of their range this often. */
+const FAR_EVERY_MS = DAY_MS;
+/** Change cursors start a little before the sync did, in case our clock and the provider's disagree. */
+const CURSOR_SKEW_MS = 5 * 60 * 1000;
+/** Stored as the cursor of calendars re-read on a schedule, once their first full read is done. */
+const SCHEDULED = 'scheduled';
 /** Server-side connections are refreshed in the background this often. */
 const STALE_AFTER_MS = 30 * 60 * 1000;
 /** Failing connections back off: 30 min, 1 h, 2 h … up to a day. */
@@ -39,7 +63,8 @@ const NOT_BUSY_BY_DEFAULT = /birthday|holiday|contacts|week numbers|siri suggest
 type ConnectionRow = typeof calendarConnections.$inferSelect;
 type ServerProvider = Exclude<CalendarProvider, 'device'>;
 
-const ADAPTERS: Record<ServerProvider, CalendarAdapter<OAuthCredentials | CaldavCredentials>> = {
+/** Exported so tests can stand in for a provider. */
+export const adapters: Record<ServerProvider, CalendarAdapter<OAuthCredentials | CaldavCredentials>> = {
 	google: google as CalendarAdapter<OAuthCredentials | CaldavCredentials>,
 	microsoft: microsoft as CalendarAdapter<OAuthCredentials | CaldavCredentials>,
 	caldav: caldav as CalendarAdapter<OAuthCredentials | CaldavCredentials>
@@ -87,16 +112,99 @@ export async function getConnection(userId: string, connectionId: string): Promi
 	return (await toConnections([await ownedRow(userId, connectionId)]))[0];
 }
 
+// ─── Horizon ──────────────────────────────────────────────────────────────
+
+/**
+ * How far ahead a user's busy time should be known: three years, or the end of
+ * the furthest-off range any of their groups is searching, up to ten years.
+ */
+export async function horizonFor(userId: string, now = Date.now()): Promise<Date> {
+	const rows = await db
+		.select({ requirement: groups.requirement })
+		.from(groupMembers)
+		.innerJoin(groups, eq(groups.id, groupMembers.groupId))
+		.where(eq(groupMembers.userId, userId));
+	const ends = rows.map((r) => Date.parse(`${r.requirement.range.to}T00:00:00Z`) + RANGE_SLACK_DAYS * DAY_MS).filter(Number.isFinite);
+	const wanted = Math.max(now + DEFAULT_HORIZON_DAYS * DAY_MS, ...ends);
+	return new Date(Math.min(wanted, now + MAX_HORIZON_DAYS * DAY_MS));
+}
+
+/**
+ * Call when groups may now plan further ahead (a group's range changed, or
+ * someone joined one): server connections that don't reach the users' new
+ * horizon are made due, so the next background run extends them.
+ */
+export async function refreshCoverage(userIds: string[]): Promise<void> {
+	try {
+		for (const userId of new Set(userIds)) {
+			const horizon = await horizonFor(userId);
+			await db
+				.update(calendarConnections)
+				.set({ nextSyncAt: null })
+				.where(
+					and(
+						eq(calendarConnections.userId, userId),
+						ne(calendarConnections.provider, 'device'),
+						eq(calendarConnections.status, 'ok'),
+						or(isNull(calendarConnections.coveredUntil), lt(calendarConnections.coveredUntil, horizon))
+					)
+				);
+		}
+	} catch (err) {
+		// Only hurries a sync along: the regular one still extends coverage.
+		console.warn('[calendars] refreshCoverage failed', err);
+	}
+}
+
+/** What one sync of a connection reads, given what's stored and the user's horizon. */
+export interface Coverage {
+	now: Date;
+	/** Start of the stored range. */
+	from: Date;
+	/** How far ahead busy time is stored now (null = never synced). */
+	covered: Date | null;
+	/** How far ahead it will be stored after this sync. */
+	until: Date;
+	/** End of the near tier for calendars without change tracking. */
+	nearEnd: Date;
+	/** Whether those calendars' far tier is re-read this sync. */
+	farDue: boolean;
+}
+
+export function planCoverage(
+	row: { coveredUntil: Date | null; farSyncedAt: Date | null },
+	horizon: Date,
+	now = Date.now()
+): Coverage {
+	const covered = row.coveredUntil;
+	const step = EXTEND_STEP_DAYS * DAY_MS;
+	const stepped = new Date(horizon.getTime() + step);
+	// Grow past the horizon by a step; shrink back once a far-off group has gone.
+	const resize = !covered || covered < horizon || covered.getTime() > stepped.getTime() + step;
+	const until = resize ? stepped : covered;
+	return {
+		now: new Date(now),
+		from: new Date(now - HISTORY_DAYS * DAY_MS),
+		covered,
+		until,
+		nearEnd: new Date(Math.min(now + NEAR_DAYS * DAY_MS, until.getTime())),
+		farDue: resize || !row.farSyncedAt || now - row.farSyncedAt.getTime() >= FAR_EVERY_MS
+	};
+}
+
 // ─── Shared persistence ───────────────────────────────────────────────────
+
+type CalendarInfo = Pick<RemoteCalendar, 'externalId' | 'name' | 'color'> & { busy?: boolean };
 
 /**
  * Upserts calendars by external id (keeping the user's busy choice) and removes
- * vanished ones. `changed` is false when nothing was written.
+ * vanished ones. `changed` is false when nothing was written. `cursors` holds
+ * each kept calendar's sync cursor (null for new ones).
  */
 async function saveCalendars(
 	connectionId: string,
-	remote: (RemoteCalendar & { busy?: boolean })[]
-): Promise<{ ids: Map<string, string>; changed: boolean }> {
+	remote: CalendarInfo[]
+): Promise<{ ids: Map<string, string>; cursors: Map<string, string | null>; changed: boolean }> {
 	let changed = false;
 	const existing = await db.select().from(calendars).where(eq(calendars.connectionId, connectionId));
 	const byExternal = new Map(existing.map((c) => [c.externalId, c]));
@@ -115,15 +223,9 @@ async function saveCalendars(
 		} else {
 			changed = true;
 			const id = newId();
-			byExternal.set(cal.externalId, { id, connectionId, externalId: cal.externalId, name: cal.name, color: cal.color, busy: true });
-			await db.insert(calendars).values({
-				id,
-				connectionId,
-				externalId: cal.externalId,
-				name: cal.name,
-				color: cal.color,
-				busy: cal.busy ?? !NOT_BUSY_BY_DEFAULT.test(cal.name)
-			});
+			const busy = cal.busy ?? !NOT_BUSY_BY_DEFAULT.test(cal.name);
+			byExternal.set(cal.externalId, { id, connectionId, externalId: cal.externalId, name: cal.name, color: cal.color, busy, syncCursor: null });
+			await db.insert(calendars).values({ id, connectionId, externalId: cal.externalId, name: cal.name, color: cal.color, busy });
 		}
 	}
 
@@ -135,35 +237,66 @@ async function saveCalendars(
 			.where(and(eq(calendars.connectionId, connectionId), keep.length ? notInArray(calendars.externalId, keep) : undefined));
 	}
 
-	return { ids: new Map([...byExternal].filter(([ext]) => keep.includes(ext)).map(([ext, c]) => [ext, c.id])), changed };
+	const kept = [...byExternal].filter(([ext]) => keep.includes(ext));
+	return {
+		ids: new Map(kept.map(([ext, c]) => [ext, c.id])),
+		cursors: new Map(kept.map(([, c]) => [c.id, c.syncCursor])),
+		changed
+	};
 }
 
-/**
- * Replaces stored busy time for these calendars inside the window. Returns false,
- * writing nothing, when the stored intervals are already exactly these.
- */
-async function replaceBusy(userId: string, calendarIds: Map<string, string>, busy: RemoteBusy[], from: Date, to: Date): Promise<boolean> {
-	const ids = [...calendarIds.values()];
-	if (!ids.length) return false;
-	const inWindow = and(inArray(busyIntervals.calendarId, ids), lt(busyIntervals.start, to), gte(busyIntervals.end, from));
-	const rows = busy.flatMap((b) => {
+interface BusyRow {
+	calendarId: string;
+	eventKey: string;
+	start: Date;
+	end: Date;
+}
+
+const rowKey = (r: BusyRow) => `${r.calendarId}|${r.eventKey}|${r.start.getTime()}|${r.end.getTime()}`;
+const overlapping = (from: Date, to: Date) => and(lt(busyIntervals.start, to), gt(busyIntervals.end, from));
+const inCalendars = (ids: string[]) => inArray(busyIntervals.calendarId, ids);
+
+/** Busy time from a provider as rows, keeping only what overlaps [from, to) so it stays inside the scope it's written to. */
+function toRows(calendarIds: Map<string, string>, busy: RemoteBusy[], from: Date, to: Date): BusyRow[] {
+	return busy.flatMap((b) => {
 		const calendarId = calendarIds.get(b.calendarExternalId);
-		return calendarId && b.end > b.start ? [{ id: newId(), userId, calendarId, start: b.start, end: b.end }] : [];
+		return calendarId && b.end > b.start && b.start < to && b.end > from
+			? [{ calendarId, eventKey: b.eventKey ?? '', start: b.start, end: b.end }]
+			: [];
 	});
-	const key = (r: { calendarId: string; start: Date; end: Date }) => `${r.calendarId}|${r.start.getTime()}|${r.end.getTime()}`;
+}
+
+const CHUNK = 1000;
+
+/**
+ * Makes the stored rows matching `scope` exactly `rows`, deleting and inserting
+ * only the difference. Returns false, writing nothing, when they already match.
+ */
+async function writeBusy(userId: string, scope: SQL | undefined, rows: BusyRow[]): Promise<boolean> {
+	const wanted = new Map(rows.map((r) => [rowKey(r), r]));
 	return db.transaction(async (tx) => {
 		const stored = await tx
-			.select({ calendarId: busyIntervals.calendarId, start: busyIntervals.start, end: busyIntervals.end })
+			.select({ id: busyIntervals.id, calendarId: busyIntervals.calendarId, eventKey: busyIntervals.eventKey, start: busyIntervals.start, end: busyIntervals.end })
 			.from(busyIntervals)
-			.where(inWindow);
-		const before = stored.map(key).sort();
-		const after = rows.map(key).sort();
-		if (before.length === after.length && before.every((k, i) => k === after[i])) return false;
+			.where(scope);
+		// Whatever is stored and still wanted stays; the rest of `stored` goes.
+		const stale = stored.filter((r) => !wanted.delete(rowKey(r))).map((r) => r.id);
+		if (!stale.length && !wanted.size) return false;
 
-		await tx.delete(busyIntervals).where(inWindow);
-		for (let i = 0; i < rows.length; i += 1000) await tx.insert(busyIntervals).values(rows.slice(i, i + 1000));
+		for (let i = 0; i < stale.length; i += CHUNK) await tx.delete(busyIntervals).where(inArray(busyIntervals.id, stale.slice(i, i + CHUNK)));
+		const fresh = [...wanted.values()].map((r) => ({ id: newId(), userId, ...r }));
+		for (let i = 0; i < fresh.length; i += CHUNK) await tx.insert(busyIntervals).values(fresh.slice(i, i + CHUNK));
 		return true;
 	});
+}
+
+/** Replaces the stored busy time of just these events (by key) within [from, to). */
+async function writeEvents(userId: string, calendarId: string, events: ChangedEvents, from: Date, to: Date): Promise<boolean> {
+	if (!events.size) return false;
+	const busy = [...events.values()].flat();
+	const rows = toRows(new Map(busy.map((b) => [b.calendarExternalId, calendarId])), busy, from, to);
+	const scope = and(eq(busyIntervals.calendarId, calendarId), inArray(busyIntervals.eventKey, [...events.keys()]), overlapping(from, to));
+	return writeBusy(userId, scope, rows);
 }
 
 // ─── Server-side providers ────────────────────────────────────────────────
@@ -175,11 +308,86 @@ async function timezoneOf(userId: string): Promise<string> {
 	return row?.timezone ?? 'UTC';
 }
 
+/**
+ * Brings one connection's stored busy time up to date for `c`, reading as
+ * little as each calendar's change tracking allows. Cursors are saved last, so
+ * a sync that fails part-way simply re-reads next time.
+ */
+async function syncBusy<Creds extends OAuthCredentials | CaldavCredentials>(
+	adapter: CalendarAdapter<Creds>,
+	creds: Creds,
+	userId: string,
+	remote: RemoteCalendar[],
+	saved: { ids: Map<string, string>; cursors: Map<string, string | null> },
+	c: Coverage,
+	timeZone: string
+): Promise<{ changed: boolean; farSynced: boolean }> {
+	let changed = false;
+	let farSynced = false;
+	const cursorAt = new Date(c.now.getTime() - CURSOR_SKEW_MS).toISOString();
+	const newCursors = new Map<string, string>();
+	// Ranges to read, each shared by every calendar that needs it so providers can batch.
+	const reads = new Map<string, { from: Date; to: Date; calendars: RemoteCalendar[] }>();
+	const read = (cal: RemoteCalendar, from: Date, to: Date) => {
+		if (to <= from) return;
+		const key = `${from.getTime()}|${to.getTime()}`;
+		if (!reads.has(key)) reads.set(key, { from, to, calendars: [] });
+		reads.get(key)!.calendars.push(cal);
+	};
+
+	// Coverage shrank (a far-off group went away): drop what's past the new end.
+	const allIds = [...saved.ids.values()];
+	if (c.covered && c.until < c.covered && allIds.length) {
+		changed = (await writeBusy(userId, and(inCalendars(allIds), gte(busyIntervals.start, c.until)), [])) || changed;
+	}
+
+	for (const cal of remote) {
+		const id = saved.ids.get(cal.externalId);
+		if (!id) continue;
+		const cursor = saved.cursors.get(id) ?? null;
+		// What's stored for this calendar is complete up to here; past it is read fresh.
+		const keptUntil = cursor !== null && c.covered ? new Date(Math.min(c.covered.getTime(), c.until.getTime())) : null;
+
+		if (keptUntil && cal.changes === 'cursor' && adapter.changes && Number.isFinite(Date.parse(cursor!))) {
+			const events = await adapter.changes(creds, cal, new Date(cursor!), c.from, keptUntil, timeZone);
+			if (events) {
+				changed = (await writeEvents(userId, id, events, c.from, keptUntil)) || changed;
+				read(cal, keptUntil, c.until);
+				newCursors.set(id, cursorAt);
+				continue;
+			}
+		} else if (keptUntil && cal.changes === 'version' && cal.version && cursor === cal.version) {
+			read(cal, keptUntil, c.until);
+			continue;
+		} else if (keptUntil && cal.changes === 'none' && cursor === SCHEDULED) {
+			read(cal, c.from, c.nearEnd);
+			if (c.farDue) {
+				read(cal, c.nearEnd, c.until);
+				farSynced = true;
+			}
+			continue;
+		}
+
+		// First sync of this calendar, a changed one, or a cursor the provider no longer accepts: read it all.
+		read(cal, c.from, c.until);
+		newCursors.set(id, cal.changes === 'cursor' ? cursorAt : cal.changes === 'version' && cal.version ? cal.version : SCHEDULED);
+		if (cal.changes === 'none') farSynced = true;
+	}
+
+	for (const r of reads.values()) {
+		const busy = await adapter.busy(creds, r.calendars, r.from, r.to, timeZone);
+		const ids = r.calendars.map((cal) => saved.ids.get(cal.externalId)!);
+		changed = (await writeBusy(userId, and(inCalendars(ids), overlapping(r.from, r.to)), toRows(saved.ids, busy, r.from, r.to))) || changed;
+	}
+	for (const [id, cursor] of newCursors) await db.update(calendars).set({ syncCursor: cursor }).where(eq(calendars.id, id));
+	return { changed, farSynced };
+}
+
 /** Pulls calendars and busy time for one server-side connection. */
 export async function syncConnection(connectionId: string): Promise<void> {
 	const row = await db.query.calendarConnections.findFirst({ where: eq(calendarConnections.id, connectionId) });
 	if (!row || row.provider === 'device' || !row.credentials) return;
-	const adapter = ADAPTERS[row.provider];
+	const adapter = adapters[row.provider];
 	const context = credentialContext(row.id);
 	let changed = false;
 
@@ -191,14 +399,22 @@ export async function syncConnection(connectionId: string): Promise<void> {
 			await db.update(calendarConnections).set({ credentials: encryptJson(creds, context) }).where(eq(calendarConnections.id, row.id));
 		}
 
-		const { from, to } = syncWindow();
+		const coverage = planCoverage(row, await horizonFor(row.userId));
 		const remote = await adapter.listCalendars(creds);
 		const saved = await saveCalendars(row.id, remote);
-		const busy = await adapter.busy(creds, remote, from, to, await timezoneOf(row.userId));
-		changed = (await replaceBusy(row.userId, saved.ids, busy, from, to)) || saved.changed;
+		const result = await syncBusy(adapter, creds, row.userId, remote, saved, coverage, await timezoneOf(row.userId));
+		changed = result.changed || saved.changed;
 		await db
 			.update(calendarConnections)
-			.set({ status: 'ok', lastError: null, lastSyncedAt: new Date(), failures: 0, nextSyncAt: new Date(Date.now() + STALE_AFTER_MS) })
+			.set({
+				status: 'ok',
+				lastError: null,
+				lastSyncedAt: new Date(),
+				failures: 0,
+				nextSyncAt: new Date(Date.now() + STALE_AFTER_MS),
+				coveredUntil: coverage.until,
+				...(result.farSynced && { farSyncedAt: coverage.now })
+			})
 			.where(eq(calendarConnections.id, row.id));
 	} catch (err) {
 		const status = err instanceof ReauthRequired ? 'reauth_required' : 'error';
@@ -313,7 +529,9 @@ export async function syncDevice(userId: string, input: DeviceSyncInput): Promis
 		db.query.calendarConnections.findFirst({
 			where: and(eq(calendarConnections.userId, userId), eq(calendarConnections.deviceId, input.deviceId))
 		});
-	const values = { label: input.deviceName, status: 'ok' as const, lastError: null, lastSyncedAt: new Date() };
+	const from = new Date(input.rangeStart);
+	const to = new Date(input.rangeEnd);
+	const values = { label: input.deviceName, status: 'ok' as const, lastError: null, lastSyncedAt: new Date(), coveredUntil: to };
 	let existing = await find();
 	let id = existing?.id ?? newId();
 	if (!existing) {
@@ -328,13 +546,10 @@ export async function syncDevice(userId: string, input: DeviceSyncInput): Promis
 	if (existing) await db.update(calendarConnections).set(values).where(eq(calendarConnections.id, existing.id));
 
 	const saved = await saveCalendars(id, input.calendars);
-	const busyChanged = await replaceBusy(
-		userId,
-		saved.ids,
-		input.busy.map((b) => ({ calendarExternalId: b.calendarExternalId, start: new Date(b.start), end: new Date(b.end) })),
-		new Date(input.rangeStart),
-		new Date(input.rangeEnd)
-	);
+	// The app sends everything in its range each time; only the difference is written.
+	const ids = [...saved.ids.values()];
+	const busy = input.busy.map((b) => ({ calendarExternalId: b.calendarExternalId, start: new Date(b.start), end: new Date(b.end) }));
+	const busyChanged = ids.length > 0 && (await writeBusy(userId, and(inCalendars(ids), overlapping(from, to)), toRows(saved.ids, busy, from, to)));
 	// The apps upload on every foreground: only make every group refresh when something changed.
 	if (busyChanged || saved.changed || !existing) await publishAvailabilityChanged(userId);
 	return getConnection(userId, id);

@@ -10,6 +10,7 @@ import { newId, newToken } from './ids';
 import { requirementSummary } from './availability/labels';
 import { defaultRequirement } from './requirements';
 import { syncedUserIds } from './busy';
+import { refreshCoverage } from './calendars';
 
 const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -139,6 +140,7 @@ export async function createGroup(
 		});
 		await tx.insert(groupMembers).values({ groupId: id, userId, role: 'owner' });
 	});
+	if (input.requirement) await refreshCoverage([userId]);
 	return getGroup(id, userId);
 }
 
@@ -149,6 +151,8 @@ export async function updateGroup(
 ): Promise<Group> {
 	await requireMember(groupId, userId, 'admin');
 	if (Object.keys(patch).length) await db.update(groups).set(patch).where(eq(groups.id, groupId));
+	// The search range may now reach past what members' calendars cover.
+	if (patch.requirement) await refreshCoverage(await memberIds(groupId));
 	return getGroup(groupId, userId);
 }
 
@@ -224,7 +228,9 @@ export async function previewInvite(token: string) {
 export async function acceptInvite(token: string, userId: string): Promise<{ groupId: string; joined: boolean }> {
 	const invite = await liveInvite(token);
 	const [result] = await db.insert(groupMembers).ignore().values({ groupId: invite.groupId, userId, role: 'member' });
-	return { groupId: invite.groupId, joined: result.affectedRows > 0 };
+	const joined = result.affectedRows > 0;
+	if (joined) await refreshCoverage([userId]);
+	return { groupId: invite.groupId, joined };
 }
 
 export async function usersByIds(ids: string[]) {
