@@ -1,7 +1,22 @@
 import Foundation
 
-enum Role: String, Codable, Sendable, CaseIterable {
+/// Enums from the server decode unknown values to a default instead of failing the
+/// whole response (the web can ship a new value before the app knows about it).
+protocol TolerantDecodable: RawRepresentable<String>, Decodable {
+    static var fallback: Self { get }
+}
+
+extension TolerantDecodable {
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? Self.fallback
+    }
+}
+
+enum Role: String, Codable, Sendable, CaseIterable, TolerantDecodable {
     case owner, admin, member
+
+    static let fallback = Role.member
 
     var isAdmin: Bool { self == .owner || self == .admin }
 
@@ -14,12 +29,16 @@ enum Role: String, Codable, Sendable, CaseIterable {
     }
 }
 
-enum ThemeMode: String, Codable, Sendable, CaseIterable {
+enum ThemeMode: String, Codable, Sendable, CaseIterable, TolerantDecodable {
     case light, dark, system
+
+    static let fallback = ThemeMode.system
 }
 
-enum ColorTheme: String, Codable, Sendable, CaseIterable {
+enum ColorTheme: String, Codable, Sendable, CaseIterable, TolerantDecodable {
     case dawn, lagoon, sunset, orchid, grove
+
+    static let fallback = ColorTheme.dawn
 
     var label: String { rawValue.capitalized }
 }
