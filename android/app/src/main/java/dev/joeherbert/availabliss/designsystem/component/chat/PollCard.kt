@@ -25,7 +25,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -131,7 +130,7 @@ private fun PollOptionRow(option: PollOptionUi, total: Int, multi: Boolean, enab
                     .then(if (option.mine) Modifier.background(colors.accent) else Modifier.border(2.dp, colors.line3, markShape)),
                 contentAlignment = Alignment.Center,
             ) {
-                if (option.mine) Icon(AvIcons.Check, null, tint = Color.White, modifier = Modifier.size(11.dp))
+                if (option.mine) Icon(AvIcons.Check, null, tint = colors.onAccent, modifier = Modifier.size(11.dp))
             }
             Text(option.label, style = AvailablissTheme.type.bodySmallStrong, color = colors.ink, modifier = Modifier.weight(1f))
             Text(option.count.toString(), style = AvailablissTheme.type.label, color = colors.neutralInk)

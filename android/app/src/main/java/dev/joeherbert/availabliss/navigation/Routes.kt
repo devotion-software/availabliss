@@ -23,8 +23,7 @@ enum class GroupTab { Calendar, Chat, Proposals, Timing }
 @Serializable data class MembersRoute(val groupId: String)
 @Serializable data class ProposalRoute(val proposalId: String)
 
-/** Propose a slot: ISO [start] / [end]. */
-/** Propose a time; [title] / [note] prefill the form (e.g. from the AI planner). */
+/** Propose a time at ISO [start] / [end]; [title] / [note] prefill the form (e.g. from the AI planner). */
 @Serializable data class CreateProposalRoute(
     val groupId: String,
     val start: String,
@@ -36,8 +35,7 @@ enum class GroupTab { Calendar, Chat, Proposals, Timing }
 
 @Serializable data class EventsRoute(val groupId: String)
 
-/** Add an event to a group, optionally prefilled with ISO [start] / [end]. */
-/** Adds an event (optionally prefilled with a time), or opens an existing one by [eventId]. */
+/** Adds an event (optionally prefilled with ISO [start] / [end]), or opens an existing one by [eventId]. */
 @Serializable data class EventEditorRoute(val groupId: String, val start: String? = null, val end: String? = null, val eventId: String? = null)
 
 @Serializable data class InviteRoute(val token: String)

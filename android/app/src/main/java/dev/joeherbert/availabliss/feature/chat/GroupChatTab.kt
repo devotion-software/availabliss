@@ -30,7 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.network.model.TileColor
@@ -53,6 +53,7 @@ import dev.joeherbert.availabliss.designsystem.component.chat.ReadReceipt
 import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
+import dev.joeherbert.availabliss.designsystem.theme.AvWeights
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
@@ -199,7 +200,7 @@ private fun ChatHeader(state: ChatUiState, onBack: () -> Unit) {
         PlainIconButton(AvIcons.Back, "Back to calendar", onBack)
         GroupTile(state.monogram, colors.tile(state.tileColor), size = 40.dp, radius = 14.dp)
         Column(Modifier.weight(1f)) {
-            Text(state.groupName, style = AvailablissTheme.type.bodyStrong.copy(fontWeight = FontWeight(650)), color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(state.groupName, style = AvailablissTheme.type.bodyStrong.copy(fontWeight = AvWeights.Display650), color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (state.membersSummary.isNotEmpty()) {
                 Text(state.membersSummary, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
