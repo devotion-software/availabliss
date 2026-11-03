@@ -1,14 +1,15 @@
 <script lang="ts">
 	import '#lib/styles/app.css';
 	import { provideFormat } from '#lib/client/format';
-	import { browserTimeZone } from '#lib/client/dates';
 	import { applyAppearance } from '#lib/client/appearance';
 	import { untrack } from 'svelte';
 	import Toaster from '#lib/components/ui/Toaster.svelte';
 
 	let { data, children } = $props();
 
-	provideFormat(() => data.user?.timezone ?? browserTimeZone());
+	// Signed-out visitors (the invite page) get UTC: the browser's zone isn't known
+	// during SSR, so using it would render a different day on the server near midnight.
+	provideFormat(() => data.user?.timezone ?? 'UTC');
 
 	// SSR renders the saved appearance into <html>. Signing in with a code or passkey,
 	// or signing out, is a client-side navigation, so apply it here when it changes.
