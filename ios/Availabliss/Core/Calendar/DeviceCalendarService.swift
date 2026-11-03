@@ -1,4 +1,5 @@
 import BackgroundTasks
+import CryptoKit
 import EventKit
 import Observation
 import UIKit
@@ -10,6 +11,9 @@ import UIKit
 final class DeviceCalendarService {
     /// Days ahead the device sync covers.
     static let syncWindowDays = 120
+    /// An unchanged payload is still re-sent after this long, so the server's copy
+    /// never goes stale for long (the window also rolls forward each day).
+    static let maxUploadAge: TimeInterval = 20 * 60 * 60
 
     private(set) var authorization: EKAuthorizationStatus
     private(set) var calendars: [EKCalendar] = []
@@ -22,9 +26,13 @@ final class DeviceCalendarService {
     @ObservationIgnored private let api: APIClient
     @ObservationIgnored private var changeObserver: NSObjectProtocol?
     @ObservationIgnored private var pendingSync: Task<Void, Never>?
+    /// A sync was asked for while one was running; run once more when it finishes.
+    @ObservationIgnored private var needsResync = false
 
     private static let busyKey = "calendar.busyIds"
     private static let addedKey = "calendar.addedEvents"
+    private static let uploadedHashKey = "calendar.uploadedHash"
+    private static let uploadedAtKey = "calendar.uploadedAt"
 
     init(api: APIClient) {
         self.api = api
@@ -51,8 +59,10 @@ final class DeviceCalendarService {
 
     // MARK: Calendars
 
-    func reloadCalendars() {
-        store.refreshSourcesIfNecessary()
+    /// Re-reads the phone's calendars. `refreshSources` also asks EventKit to refresh
+    /// accounts, which can itself post EKEventStoreChanged, so the sync path skips it.
+    func reloadCalendars(refreshSources: Bool = true) {
+        if refreshSources { store.refreshSourcesIfNecessary() }
         calendars = store.calendars(for: .event).sorted {
             ($0.source.title, $0.title) < ($1.source.title, $1.title)
         }
@@ -93,7 +103,11 @@ final class DeviceCalendarService {
     func startObservingChanges() {
         guard changeObserver == nil else { return }
         changeObserver = NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.scheduleSync() }
+            MainActor.assumeIsolated {
+                // Calendars or whole accounts may have been added or removed.
+                self?.reloadCalendars(refreshSources: false)
+                self?.scheduleSync()
+            }
         }
     }
 
@@ -108,22 +122,40 @@ final class DeviceCalendarService {
     }
 
     /// Uploads busy ranges if the user granted calendar access and is signed in.
-    func syncIfAuthorized() async {
+    /// Skips the upload when nothing changed since the last one (see `maxUploadAge`).
+    /// A call made while a sync is running makes that sync go round once more.
+    func syncIfAuthorized(force: Bool = false) async {
         authorization = EKEventStore.authorizationStatus(for: .event)
-        guard hasFullAccess, api.bearerToken != nil, !isSyncing else { return }
+        guard hasFullAccess, api.bearerToken != nil else { return }
+        guard !isSyncing else {
+            needsResync = true
+            return
+        }
         isSyncing = true
         defer { isSyncing = false }
-        do {
-            try await upload()
-            lastSyncedAt = Date()
-            lastError = nil
-        } catch {
-            lastError = error.userMessage
-        }
+        var force = force
+        repeat {
+            needsResync = false
+            do {
+                try await upload(force: force)
+                lastSyncedAt = Date()
+                lastError = nil
+            } catch {
+                lastError = error.userMessage
+            }
+            force = false
+        } while needsResync && hasFullAccess && api.bearerToken != nil
     }
 
-    private func upload() async throws {
-        if calendars.isEmpty { reloadCalendars() }
+    /// Forgets the last upload so the next sync sends everything (e.g. after an account merge).
+    func forgetLastUpload() {
+        UserDefaults.standard.removeObject(forKey: Self.uploadedHashKey)
+        UserDefaults.standard.removeObject(forKey: Self.uploadedAtKey)
+    }
+
+    private func upload(force: Bool) async throws {
+        // Picks up calendars and accounts added or removed since launch.
+        reloadCalendars(refreshSources: false)
         let start = Calendar.current.startOfDay(for: Date())
         let end = Calendar.current.date(byAdding: .day, value: Self.syncWindowDays, to: start) ?? start
         let selected = calendars.filter(isBusy)
@@ -132,6 +164,7 @@ final class DeviceCalendarService {
             .events(matching: store.predicateForEvents(withStart: start, end: end, calendars: selected))
             .filter { $0.availability != .free && $0.status != .canceled && !Self.isDeclined($0) }
             .map { DeviceSync.BusyRange(calendarExternalId: $0.calendar.calendarIdentifier, start: $0.startDate, end: $0.endDate) }
+            .sorted { ($0.start, $0.end, $0.calendarExternalId) < ($1.start, $1.end, $1.calendarExternalId) }
 
         let payload = DeviceSync(
             deviceId: DeviceIdentity.deviceId(),
@@ -143,7 +176,28 @@ final class DeviceCalendarService {
             },
             busy: busy
         )
+
+        let hash = Self.fingerprint(payload, token: api.bearerToken)
+        let defaults = UserDefaults.standard
+        if !force, let hash, hash == defaults.string(forKey: Self.uploadedHashKey),
+           let uploadedAt = defaults.object(forKey: Self.uploadedAtKey) as? Date,
+           Date().timeIntervalSince(uploadedAt) < Self.maxUploadAge {
+            return
+        }
         try await api.send(API.Calendars.uploadDevice(payload))
+        defaults.set(hash, forKey: Self.uploadedHashKey)
+        defaults.set(Date(), forKey: Self.uploadedAtKey)
+    }
+
+    /// SHA-256 of the payload plus the session, so another account on this phone
+    /// (or a new sign-in) always uploads.
+    private static func fingerprint(_ payload: DeviceSync, token: String?) -> String? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        encoder.dateEncodingStrategy = .secondsSince1970
+        guard var data = try? encoder.encode(payload) else { return nil }
+        data.append(Data((token ?? "").utf8))
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     private static func isDeclined(_ event: EKEvent) -> Bool {

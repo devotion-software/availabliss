@@ -102,6 +102,8 @@ final class AppModel {
         accountVersion += 1
         await session.refreshUser()
         await refreshUnread()
+        deviceCalendar.forgetLastUpload()
+        await deviceCalendar.syncIfAuthorized()
     }
 
     func refreshUnread() async {
