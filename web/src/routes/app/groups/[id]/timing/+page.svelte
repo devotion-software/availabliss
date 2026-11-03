@@ -3,10 +3,11 @@
 	import { invalidate } from '$app/navigation';
 	import type { Requirement } from '#lib/types';
 	import { requirementSchema } from '#lib/schemas';
+	import { createPreview } from '#lib/client/requirement-preview.svelte';
 	import { updateGroup } from '#lib/client/groups';
 	import { listSubdivisions } from '#lib/client/regions';
 	import { isAdminRole } from '#lib/client/members';
-	import { fitCountLabel, previewRequirement, summarize, type RequirementPreview } from '#lib/client/requirements';
+	import { fitCountLabel, summarize } from '#lib/client/requirements';
 	import { formatDayKey } from '#lib/client/format';
 	import { toasts } from '#lib/client/toast.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
@@ -19,13 +20,32 @@
 	let { data } = $props();
 
 	const admin = $derived(isAdminRole(data.group.role));
+	let busy = $state(false);
 	const saved = $derived(data.group.requirement);
-	// A working copy, reset whenever the saved timing changes underneath us.
+	// A working copy of the saved timing. The group reloads whenever anyone joins or
+	// changes role, so only reset it when the saved timing itself changed, and never
+	// over unsaved edits: say someone else changed it instead.
 	const clone = (r: Requirement) => structuredClone($state.snapshot(r)) as Requirement;
+	const json = (r: Requirement) => JSON.stringify($state.snapshot(r));
 	let draft = $state<Requirement>(untrack(() => clone(data.group.requirement)));
+	let seeded = untrack(() => json(data.group.requirement));
+	let changedElsewhere = $state(false);
 	$effect.pre(() => {
-		draft = clone(saved);
+		const next = json(saved);
+		if (next === seeded) return;
+		const unsaved = untrack(() => !busy && json(draft) !== seeded);
+		seeded = next;
+		if (unsaved && untrack(() => json(draft)) !== next) {
+			changedElsewhere = true;
+		} else {
+			draft = clone(saved);
+			changedElsewhere = false;
+		}
 	});
+	function loadSaved() {
+		draft = clone(saved);
+		changedElsewhere = false;
+	}
 	const dirty = $derived(JSON.stringify(draft) !== JSON.stringify(saved));
 	// "England", falling back to "United Kingdom", for the bank holiday hint.
 	let subdivisionName = $state<string | null>(null);
@@ -42,31 +62,10 @@
 	);
 	const regionLabel = $derived(subdivisionName ?? countryName);
 
-	let busy = $state(false);
-
 	// Live "13 weekends fit this timing", recomputed (debounced) as the form changes.
-	let preview = $state<RequirementPreview | null>(null);
-	let previewing = $state(false);
-	$effect(() => {
-		const snapshot = $state.snapshot(draft) as Requirement;
-		const requirement = { ...snapshot, timezone: snapshot.timezone || data.user.timezone };
-		if (!requirementSchema.safeParse(requirement).success) {
-			preview = null;
-			return;
-		}
-		previewing = true;
-		let cancelled = false;
-		const timer = setTimeout(() => {
-			previewRequirement(requirement)
-				.then((p) => !cancelled && (preview = p))
-				.catch(() => !cancelled && (preview = null))
-				.finally(() => !cancelled && (previewing = false));
-		}, 350);
-		return () => {
-			cancelled = true;
-			clearTimeout(timer);
-		};
-	});
+	const live = createPreview(() => draft, () => data.user.timezone);
+	const preview = $derived(live.preview);
+	const previewing = $derived(live.loading);
 	const fitBig = $derived(preview ? fitCountLabel(draft, preview.count) : summarize(draft).split(' · ')[0]);
 	const fitSmall = $derived(
 		preview
@@ -84,6 +83,7 @@
 		try {
 			await updateGroup(data.group.id, { requirement: { ...draft, timezone: parsed.data.timezone } });
 			await Promise.all([invalidate('app:group'), invalidate('app:groups')]);
+			changedElsewhere = false;
 			toasts.success('Timing saved. Finding new times…');
 		} catch (err) {
 			toasts.error(err);
@@ -113,6 +113,14 @@
 		<p class="note glass">
 			<Icon name="lock" size={16} />
 			Only admins can change the timing. This is what the group is looking for.
+		</p>
+	{/if}
+
+	{#if changedElsewhere}
+		<p class="note glass changed" role="status">
+			<Icon name="info" size={16} />
+			<span>Someone else changed the timing. Saving replaces it with yours.</span>
+			<Button size="sm" variant="secondary" onclick={loadSaved}>Load theirs</Button>
 		</p>
 	{/if}
 
@@ -148,6 +156,9 @@
 		gap: 10px;
 		font-size: 13px;
 		color: var(--muted);
+	}
+	.changed span {
+		flex: 1;
 	}
 	.savebar {
 		position: sticky;

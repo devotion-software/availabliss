@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Requirement } from '#lib/types';
-	import { requirementSchema } from '#lib/schemas';
-	import { fitCountLabel, previewRequirement, summarize, type RequirementPreview } from '#lib/client/requirements';
+	import { fitCountLabel, summarize } from '#lib/client/requirements';
+	import { createPreview } from '#lib/client/requirement-preview.svelte';
 	import { formatDayKey } from '#lib/client/format';
 	import Spinner from '#lib/components/ui/Spinner.svelte';
 
@@ -12,29 +12,8 @@
 	}
 	let { requirement, timeZone }: Props = $props();
 
-	let preview = $state<RequirementPreview | null>(null);
-	let loading = $state(false);
-
-	$effect(() => {
-		const snapshot = $state.snapshot(requirement) as Requirement;
-		const req = { ...snapshot, timezone: snapshot.timezone || timeZone };
-		if (!requirementSchema.safeParse(req).success) {
-			preview = null;
-			return;
-		}
-		loading = true;
-		let cancelled = false;
-		const timer = setTimeout(() => {
-			previewRequirement(req)
-				.then((p) => !cancelled && (preview = p))
-				.catch(() => !cancelled && (preview = null))
-				.finally(() => !cancelled && (loading = false));
-		}, 350);
-		return () => {
-			cancelled = true;
-			clearTimeout(timer);
-		};
-	});
+	const live = createPreview(() => requirement, () => timeZone);
+	const preview = $derived(live.preview);
 
 	const short = (key: string) => formatDayKey(key).replace(/^\w+ /, '');
 </script>
@@ -42,7 +21,7 @@
 <div class="fit" aria-live="polite">
 	<strong>{preview ? fitCountLabel(requirement, preview.count) : summarize(requirement).split(' · ')[0]}</strong>
 	<span>{preview ? `fit this timing between ${short(preview.from)} and ${short(preview.to)}` : summarize(requirement)}</span>
-	{#if loading}<span class="spin"><Spinner size={14} label="Counting" /></span>{/if}
+	{#if live.loading}<span class="spin"><Spinner size={14} label="Counting" /></span>{/if}
 </div>
 
 <style>
