@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
+import { kv } from './redis';
 import { challengeFor, decodeFlow, encodeFlow, isChallenge, issueCode, redeemCode, sessionFromFlow } from './native-auth';
 
 const verifier = 'a'.repeat(43);
@@ -30,6 +31,17 @@ describe('native sign-in binding', () => {
 		const code = await issueCode('session-token', challengeFor(verifier));
 		expect(await redeemCode(code, verifier)).toBe('session-token');
 		await expect(redeemCode(code, verifier)).rejects.toThrow('expired');
+	});
+
+	test('an unknown or expired code is refused', async () => {
+		await expect(redeemCode('x'.repeat(32), verifier)).rejects.toThrow('expired');
+	});
+
+	test('codes expire after their TTL', async () => {
+		const set = spyOn(kv, 'set');
+		await issueCode('session-token', challengeFor(verifier));
+		expect(set.mock.calls.at(-1)?.[2]).toBe(120);
+		set.mockRestore();
 	});
 
 	test('a wrong verifier is refused and burns the code', async () => {

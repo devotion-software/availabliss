@@ -198,3 +198,62 @@ describe('accounts merged into another', () => {
 	});
 });
 
+
+describe('RevenueCat webhook route', () => {
+	const SECRET = 'Bearer webhook-secret-for-tests';
+	const call = async (authorization: string | null, body: unknown) => {
+		const { POST } = await import('../../src/routes/api/v1/billing/revenuecat/+server');
+		const headers = new Headers({ 'content-type': 'application/json' });
+		if (authorization !== null) headers.set('authorization', authorization);
+		const request = new Request('http://localhost/api/v1/billing/revenuecat', { method: 'POST', headers, body: JSON.stringify(body) });
+		return (POST as (e: unknown) => Promise<Response>)({ request, params: {}, url: new URL(request.url) });
+	};
+	const withSecret = async (fn: () => Promise<void>) => {
+		const rc = env.revenuecat as { webhookAuth: string | null };
+		const saved = rc.webhookAuth;
+		rc.webhookAuth = SECRET;
+		try {
+			await fn();
+		} finally {
+			rc.webhookAuth = saved;
+		}
+	};
+
+	test('the right header applies the event', async () => {
+		const me = await fx.user();
+		await withSecret(async () => {
+			const res = await call(SECRET, { event: purchase(me) });
+			expect(res.status).toBe(200);
+			expect(await isPro(me)).toBe(true);
+		});
+	});
+
+	test('a missing, wrong-length or wrong header is 401 and changes nothing', async () => {
+		const me = await fx.user();
+		await withSecret(async () => {
+			for (const header of [null, 'Bearer short', `${SECRET}x`, SECRET.replace('secret', 'SECRET')]) {
+				const res = await call(header, { event: purchase(me) });
+				expect(res.status).toBe(401);
+			}
+			expect(await isPro(me)).toBe(false);
+		});
+	});
+
+	test('without a configured secret every call is refused', async () => {
+		const me = await fx.user();
+		const rc = env.revenuecat as { webhookAuth: string | null };
+		const saved = rc.webhookAuth;
+		rc.webhookAuth = null;
+		try {
+			expect((await call(SECRET, { event: purchase(me) })).status).toBe(401);
+		} finally {
+			rc.webhookAuth = saved;
+		}
+	});
+
+	test('a body without an event is a 400', async () => {
+		await withSecret(async () => {
+			expect((await call(SECRET, { nope: true })).status).toBe(400);
+		});
+	});
+});

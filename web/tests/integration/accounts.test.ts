@@ -103,6 +103,82 @@ describe('web merge (completeMerge)', () => {
 	});
 });
 
+/** Runs `fn` with Google configured and Better Auth's link call replaced by `link`. */
+async function withGoogleLink(link: () => Promise<unknown>, fn: () => Promise<void>) {
+	const google = env.google as { clientIds: string[]; clientSecret: string | null };
+	const saved = { clientIds: google.clientIds, clientSecret: google.clientSecret };
+	google.clientIds = saved.clientIds.length ? saved.clientIds : ['test-client'];
+	google.clientSecret = saved.clientSecret ?? 'test-secret';
+	const spy = spyOn(auth.api, 'linkSocialAccount').mockImplementation(link as never);
+	try {
+		await fn();
+	} finally {
+		spy.mockRestore();
+		Object.assign(google, saved);
+	}
+}
+
+/** An unsigned JWT-shaped token: Better Auth (mocked here) verifies; we only read `sub`. */
+const idTokenFor = (sub: string) => `x.${Buffer.from(JSON.stringify({ sub })).toString('base64url')}.y`;
+const alreadyLinked = async () => {
+	throw new APIError('CONFLICT', { message: 'Account already linked' });
+};
+
+describe('linkWithIdToken conflicts', () => {
+	test('a sign-in owned by another account offers a merge, and merges with merge: true', async () => {
+		const me = await fx.user();
+		const other = await fx.user();
+		const sub = `google-sub-${newId()}`;
+		await db.insert(account).values({ id: newId(), userId: other, providerId: 'google', accountId: sub, createdAt: new Date(), updatedAt: new Date() });
+
+		await withGoogleLink(alreadyLinked, async () => {
+			const offer = await linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor(sub) });
+			expect(offer).toMatchObject({ linked: false, candidate: expect.anything() });
+			expect(await db.query.user.findFirst({ where: eq(user.id, other) })).toBeDefined();
+
+			expect(await linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor(sub), merge: true })).toEqual({ linked: true, merged: true });
+			expect(await db.query.user.findFirst({ where: eq(user.id, other) })).toBeUndefined();
+			const moved = await db.query.account.findFirst({ where: and(eq(account.providerId, 'google'), eq(account.accountId, sub)) });
+			expect(moved?.userId).toBe(me);
+		});
+	});
+
+	test('already linked to me is fine; a token we can’t read is a conflict', async () => {
+		const me = await fx.user();
+		const sub = `google-sub-${newId()}`;
+		await db.insert(account).values({ id: newId(), userId: me, providerId: 'google', accountId: sub, createdAt: new Date(), updatedAt: new Date() });
+		await withGoogleLink(alreadyLinked, async () => {
+			expect(await linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor(sub) })).toEqual({ linked: true, merged: false });
+			await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: 'not-a-jwt' })).rejects.toMatchObject({ code: 'conflict' });
+			await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor('nobody-has-this') })).rejects.toMatchObject({ code: 'conflict' });
+		});
+	});
+
+	test('a fresh sign-in links straight away; other Better Auth errors pass through', async () => {
+		const me = await fx.user();
+		await withGoogleLink(async () => ({ status: true }), async () => {
+			expect(await linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor('new') })).toEqual({ linked: true, merged: false });
+		});
+		await withGoogleLink(async () => {
+			throw new APIError('INTERNAL_SERVER_ERROR', { message: 'boom' });
+		}, async () => {
+			await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor('x') })).rejects.toBeInstanceOf(APIError);
+		});
+	});
+
+	test('a provider that isn’t set up is refused', async () => {
+		const me = await fx.user();
+		const apple = env.apple as { clientId: string | null };
+		const saved = apple.clientId;
+		apple.clientId = null;
+		try {
+			await expect(linkWithIdToken(me, new Headers(), { provider: 'apple', idToken: idTokenFor('a') })).rejects.toMatchObject({ code: 'validation_error' });
+		} finally {
+			apple.clientId = saved;
+		}
+	});
+});
+
 describe('linkWithIdToken', () => {
 	test('an id token Better Auth rejects is a 400, not a 401 that would sign the app out', async () => {
 		const me = await fx.user();

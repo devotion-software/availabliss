@@ -1,6 +1,6 @@
 /** OAuth 2 authorization-code flow for Google Calendar and Microsoft Graph. */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { env } from '../env';
+import { env, signingSecret } from '../env';
 import { badRequest, forbidden } from '../http';
 import { kv } from '../redis';
 import { safeRedirectPath } from '#lib/client/safe-path';
@@ -59,7 +59,7 @@ interface State {
 	nonce: string;
 }
 
-const signature = (payload: string) => createHmac('sha256', env.authSecret ?? 'dev').update(payload).digest('base64url');
+const signature = (payload: string) => createHmac('sha256', signingSecret()).update(payload).digest('base64url');
 
 /** Only same-origin app paths and the native app scheme are valid return targets. */
 export function safeRedirect(redirect: string | null): string {

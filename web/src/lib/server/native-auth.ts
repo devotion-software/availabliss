@@ -17,7 +17,7 @@
  */
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { badRequest } from './http';
-import { env } from './env';
+import { signingSecret } from './env';
 import { kv } from './redis';
 
 const TTL_SECONDS = 2 * 60;
@@ -41,7 +41,7 @@ interface Flow {
 	startedAt: number;
 }
 
-const sign = (payload: string) => createHmac('sha256', env.authSecret ?? 'dev').update(`native-flow:${payload}`).digest('base64url');
+const sign = (payload: string) => createHmac('sha256', signingSecret()).update(`native-flow:${payload}`).digest('base64url');
 
 export function encodeFlow(challenge: string, now = Date.now()): string {
 	const payload = Buffer.from(JSON.stringify({ challenge, startedAt: now } satisfies Flow)).toString('base64url');

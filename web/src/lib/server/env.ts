@@ -84,6 +84,17 @@ export const env = {
 export const isProduction = process.env.NODE_ENV === 'production';
 
 /**
+ * The key for our own HMAC signatures (OAuth state, the native flow cookie).
+ * Development falls back to a fixed key; production refuses to sign with a key
+ * anyone could guess.
+ */
+export function signingSecret(): string {
+	if (env.authSecret) return env.authSecret;
+	if (process.env.NODE_ENV === 'production') throw new Error('BETTER_AUTH_SECRET is not set');
+	return 'dev';
+}
+
+/**
  * WebAuthn origins Android uses for passkeys created by the app: the base64url
  * SHA-256 of each signing certificate (configured as colon-separated hex).
  */
