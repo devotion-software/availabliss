@@ -173,6 +173,7 @@ fun GroupCalendarContent(
                 state.syncBanner?.let { SyncBanner(it, state.nudging, onNudge) }
                 if (state.requirementSummary.isNotBlank()) TimingChip(state.requirementSummary, state.isAdmin, onOpenTiming)
                 HeadingRow(state, onSelectView, onPrevious, onNext)
+                state.coverageNote?.let { CoverageNote(it) }
                 state.error?.let { ErrorBanner(it, onRetry = onRetry) }
                 AnimatedContent(targetState = state.view, label = "calendar-view") { view ->
                     when (view) {
@@ -235,6 +236,22 @@ private fun SyncBanner(banner: SyncBannerUi, nudging: Boolean, onNudge: () -> Un
                 Text(if (nudging) "Nudging…" else "Nudge", style = AvailablissTheme.type.label, color = colors.warnInk)
             }
         }
+    }
+}
+
+@Composable
+private fun CoverageNote(text: String) {
+    val colors = AvailablissTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.warnBg)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(AvIcons.Info, null, tint = colors.warnInk, modifier = Modifier.padding(top = 2.dp).size(15.dp))
+        Text(text, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.warnInk)
     }
 }
 

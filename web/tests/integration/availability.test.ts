@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import type { Requirement } from '#lib/types';
 import { db } from '#lib/server/db';
-import { holidayCache, schoolHolidays } from '#lib/server/db/schema';
+import { calendarConnections, holidayCache, schoolHolidays } from '#lib/server/db/schema';
 import { createGroup, getGroupRow } from '#lib/server/groups';
 import { createBlock } from '#lib/server/blocks';
 import { groupAvailability, groupDay, planningContext, previewRequirement, upcomingSlotCount } from '#lib/server/availability/service';
@@ -103,6 +103,21 @@ describe('groupAvailability', () => {
 		expect(day['2031-03-07'].holiday).toBe('Spring break');
 		expect(a.slots.length).toBe(6);
 		expect(a.slots.map((s) => s.start.slice(0, 10))).not.toContain('2031-03-04');
+	});
+
+	test("reports members whose calendars aren't checked to the end of the range", async () => {
+		expect((await groupAvailability(groupId, owner, '2031-03-03', '2031-03-09')).checkedUntil).toEqual([]);
+		// A phone that read a few months ahead limits a server calendar that read years.
+		const base = { userId: member, label: 'Test', status: 'ok' as const };
+		await db.insert(calendarConnections).values([
+			{ ...base, id: newId(), provider: 'caldav', label: `it-${newId()}`, coveredUntil: new Date('2033-01-01T00:00:00Z') },
+			{ ...base, id: newId(), provider: 'device', deviceId: newId(), coveredUntil: new Date('2031-03-06T00:00:00Z') },
+			{ ...base, id: newId(), provider: 'device', deviceId: newId(), coveredUntil: null }
+		]);
+		const a = await groupAvailability(groupId, owner, '2031-03-03', '2031-03-09');
+		expect(a.checkedUntil).toEqual([{ userId: member, until: '2031-03-06T00:00:00.000Z' }]);
+		expect((await groupAvailability(groupId, owner, '2031-02-01', '2031-03-05')).checkedUntil).toEqual([]);
+		await db.delete(calendarConnections).where(eq(calendarConnections.userId, member));
 	});
 
 	test('validates the range and membership', async () => {

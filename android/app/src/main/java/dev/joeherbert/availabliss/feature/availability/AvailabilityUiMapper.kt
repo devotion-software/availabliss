@@ -206,6 +206,23 @@ object AvailabilityUiMapper {
         )
     }
 
+    /** "Sam's calendar is only checked up to 4 Mar 2029, …": days past that may hide clashes. */
+    fun coverageNote(availability: Availability?, group: Group?, meId: String?): String? {
+        val gaps = availability?.checkedUntil.orEmpty()
+        if (gaps.isEmpty()) return null
+        val mine = gaps.any { it.userId == meId }
+        val others = gaps.filter { it.userId != meId }.map { gap ->
+            group?.members?.firstOrNull { it.userId == gap.userId }?.name?.firstName() ?: "Someone"
+        }
+        val whose = when {
+            others.isEmpty() -> "Your calendar is"
+            !mine && others.size == 1 -> "${others[0]}'s calendar is"
+            else -> "Calendars for ${((if (mine) listOf("you") else emptyList()) + others).joinNames()} are"
+        }
+        val earliest = gaps.mapNotNull { DateTimes.localDate(it.until) }.minOrNull() ?: return null
+        return "$whose only checked up to ${DateTimes.dayMonthYear(earliest)}, so later days may not show every clash yet."
+    }
+
     /** Whether a slot should be proposed as all-day (midnight to midnight). */
     fun isAllDay(slot: Slot): Boolean {
         val s = DateTimes.localDateTime(slot.start) ?: return false

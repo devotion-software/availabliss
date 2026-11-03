@@ -185,6 +185,11 @@ A slot "works" when every **synced** member is free for the whole slot. Members 
 haven't synced are ignored and reported in `pendingMemberIds`. A member counts as
 synced once they have connected any calendar or marked any busy time by hand.
 
+Calendars are kept at least three years ahead, and as far as any of the member's
+groups search (up to ten). Where a member's calendars stop short of the range,
+they're listed in `checkedUntil`; their busy time past that date is unknown, so
+they're treated as free there, like an unsynced member.
+
 - An empty `days` list means any day of the week.
 - Bank holidays follow the region (`country` / `subdivision`) of the group owner.
 - `duration` slots are reported as each maximal free stretch at least `minutes`
@@ -386,6 +391,8 @@ interface Availability {
   slots: Slot[];                          // every slot that works, sorted by start
   syncedCount: number; memberCount: number;
   pendingMemberIds: string[];             // not synced yet
+  checkedUntil: { userId: string; until: string }[]; // synced members whose calendars are only known up to `until`
+                                          // (ISO instant) before the end of this range: later days may hide clashes
 }
 interface AvailabilityDay {
   date: string;

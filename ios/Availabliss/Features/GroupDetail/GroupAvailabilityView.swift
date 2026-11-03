@@ -34,6 +34,9 @@ struct GroupAvailabilityView: View {
                 }
                 TimingChip(summary: group.requirementSummary, action: onOpenTiming)
                 headingRow
+                if let gaps = model.availability?.checkedUntil, !gaps.isEmpty {
+                    CoverageNote(gaps: gaps, group: group, me: app.session.user?.id)
+                }
                 content
             }
             .padding(.horizontal, 20)
@@ -212,6 +215,44 @@ private struct SyncBanner: View {
         .padding(.vertical, 10)
         .glass(cornerRadius: 20)
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// "Sam's calendar is only checked up to 4 Mar 2029": days past that may hide clashes.
+private struct CoverageNote: View {
+    let gaps: [Availability.CoverageGap]
+    let group: Group
+    let me: String?
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "info.circle").font(.system(size: 13, weight: .semibold))
+            Text(message).bodyFont(13, relativeTo: .footnote).fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(theme.warnInk)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(theme.warnBg))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var message: String {
+        let mine = gaps.contains { $0.userId == me }
+        let others = gaps.filter { $0.userId != me }.map { gap in
+            group.members.first { $0.userId == gap.userId }?.firstName ?? "Someone"
+        }
+        let whose: String
+        if others.isEmpty {
+            whose = "Your calendar is"
+        } else if !mine && others.count == 1 {
+            whose = "\(others[0])'s calendar is"
+        } else {
+            whose = "Calendars for \(Formatting.list((mine ? ["you"] : []) + others)) are"
+        }
+        let earliest = gaps.map(\.until).min() ?? Date()
+        return "\(whose) only checked up to \(Formatting.dayMonthYear(earliest)), so later days may not show every clash yet."
     }
 }
 

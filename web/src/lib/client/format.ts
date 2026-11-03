@@ -67,6 +67,8 @@ export interface Formatter {
 	day(iso: string): string;
 	/** "Sunday 1 November" */
 	dayLong(iso: string | Date): string;
+	/** "4 Mar 2029", for dates that may be years away. */
+	date(iso: string): string;
 	/** "Wed 11 Nov · 18:30" */
 	dateTime(iso: string): string;
 	/** "Wed 11 Nov · 18:30 – 21:00", "Fri 13 – Sun 15 Nov", "Sat 21 Nov" */
@@ -94,6 +96,7 @@ export function createFormatter(timeZone: string): Formatter {
 		time,
 		day,
 		dayLong: (iso) => tidy(fmt(timeZone, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(iso))),
+		date: (iso) => fmt(timeZone, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso)),
 		dateTime: (iso) => `${day(iso)} · ${time(iso)}`,
 		when(start, end, allDay = false) {
 			const first = dayKey(start);

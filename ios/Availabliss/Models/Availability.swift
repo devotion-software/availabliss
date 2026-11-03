@@ -9,6 +9,13 @@ struct Availability: Decodable, Sendable {
     let syncedCount: Int
     let memberCount: Int
     let pendingMemberIds: [String]
+    /// Synced members whose calendars are only known up to `until`, before the end of this range.
+    var checkedUntil: [CoverageGap]? = nil
+
+    struct CoverageGap: Decodable, Sendable, Hashable {
+        let userId: String
+        let until: Date
+    }
 
     func day(_ date: CalendarDay) -> AvailabilityDay? { days.first { $0.date == date } }
 

@@ -26,6 +26,11 @@ enum Formatting {
         day.startDate().formatted(.dateTime.month(.abbreviated).year())
     }
 
+    /// "4 Mar 2029", for dates that may be years away.
+    static func dayMonthYear(_ date: Date) -> String {
+        date.formatted(.dateTime.day().month(.abbreviated).year())
+    }
+
     static func dayMonth(_ day: CalendarDay) -> String {
         day.startDate().formatted(.dateTime.day().month(.abbreviated))
     }

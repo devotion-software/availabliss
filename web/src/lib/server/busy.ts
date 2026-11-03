@@ -3,7 +3,7 @@
  * merged with manual blocks. Calendar event titles are never stored, so the only
  * label available is the calendar's name, and that is only shown to its owner.
  */
-import { and, eq, gt, inArray, lt, ne, or } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, lt, min, ne, or } from 'drizzle-orm';
 import type { BusyInterval } from '#lib/types';
 import { db } from './db';
 import { busyIntervals, calendarConnections, calendars, manualBlocks, user } from './db/schema';
@@ -28,6 +28,21 @@ export async function syncedUserIds(userIds: string[]): Promise<Set<string>> {
 		db.selectDistinct({ userId: manualBlocks.userId }).from(manualBlocks).where(inArray(manualBlocks.userId, userIds))
 	]);
 	return new Set([...connected, ...blocked].map((r) => r.userId));
+}
+
+/**
+ * How far ahead each user's calendar busy time is known: the earliest end of
+ * their connections' coverage (a phone that reads a few months ahead limits a
+ * server calendar that reads years). Users without a synced connection are absent.
+ */
+export async function calendarCoverage(userIds: string[]): Promise<Map<string, number>> {
+	if (!userIds.length) return new Map();
+	const rows = await db
+		.select({ userId: calendarConnections.userId, until: min(calendarConnections.coveredUntil) })
+		.from(calendarConnections)
+		.where(and(inArray(calendarConnections.userId, userIds), isNotNull(calendarConnections.coveredUntil)))
+		.groupBy(calendarConnections.userId);
+	return new Map(rows.flatMap((r) => (r.until ? [[r.userId, new Date(r.until).getTime()] as const] : [])));
 }
 
 export async function loadBusy(userIds: string[], from: number, to: number): Promise<Map<string, LabelledBusy[]>> {

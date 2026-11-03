@@ -143,7 +143,12 @@ data class Availability(
     val syncedCount: Int,
     val memberCount: Int,
     val pendingMemberIds: List<String> = emptyList(),
+    /** Synced members whose calendars are only known up to `until`, before the end of this range. */
+    val checkedUntil: List<CoverageGap> = emptyList(),
 )
+
+@Serializable
+data class CoverageGap(val userId: String, val until: String)
 
 @Serializable
 data class AvailabilityDay(
