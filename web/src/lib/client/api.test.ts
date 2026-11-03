@@ -68,7 +68,7 @@ describe('api requests', () => {
 			used = true;
 			return new Response('[1]');
 		}) as unknown as typeof fetch;
-		expect(await api.get('/x', { fetch: custom })).toEqual([1]);
+		expect(await api.get<number[]>('/x', { fetch: custom })).toEqual([1]);
 		expect(used).toBe(true);
 		expect(seen).toHaveLength(0);
 	});
