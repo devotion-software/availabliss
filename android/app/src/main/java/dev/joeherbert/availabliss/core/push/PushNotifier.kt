@@ -1,12 +1,14 @@
 package dev.joeherbert.availabliss.core.push
 
 import android.Manifest
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.Person
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.joeherbert.availabliss.MainActivity
@@ -28,27 +30,37 @@ class PushNotifier @Inject constructor(
             this.data = link?.toUri()
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        val requestCode = (data["messageId"] ?: data["proposalId"] ?: data["eventId"] ?: data["groupId"] ?: title).hashCode()
+        val channel = Channel.forKind(data["kind"])
+        // Chat messages for a group share one notification (see [chatStyle]); everything else gets its own.
+        val chatGroupId = data["groupId"]?.takeIf { channel == Channel.Message && it.isNotBlank() }
+        val id = chatGroupId?.let { "message:$it".hashCode() }
+            ?: (data["messageId"] ?: data["proposalId"] ?: data["eventId"] ?: data["groupId"] ?: title).hashCode()
         val pending = PendingIntent.getActivity(
             context,
-            requestCode,
+            id,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val channel = Channel.forKind(data["kind"])
         val notification = NotificationCompat.Builder(context, channel.id)
             .setSmallIcon(R.drawable.ic_notification)
             .setColor(ContextCompat.getColor(context, R.color.av_accent))
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setStyle(if (chatGroupId != null) chatStyle(id, title, body) else NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(pending)
             .setCategory(if (channel == Channel.Message) NotificationCompat.CATEGORY_MESSAGE else NotificationCompat.CATEGORY_EVENT)
-            // Group chat notifications for the same group replace each other.
-            .apply { data["groupId"]?.let { setGroup(it) } }
             .build()
-        NotificationManagerCompat.from(context).notify(requestCode, notification)
+        NotificationManagerCompat.from(context).notify(id, notification)
+    }
+
+    /** The group's chat notification so far (if still showing) plus this message, newest last. */
+    private fun chatStyle(id: Int, author: String, body: String): NotificationCompat.MessagingStyle {
+        val showing = context.getSystemService(NotificationManager::class.java)?.activeNotifications?.firstOrNull { it.id == id }?.notification
+        val style = showing?.let { NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(it) }
+            ?: NotificationCompat.MessagingStyle(Person.Builder().setName(context.getString(R.string.notification_you)).build())
+                .setGroupConversation(true)
+        return style.addMessage(body, System.currentTimeMillis(), Person.Builder().setName(author).build())
     }
 
     private fun canPost(): Boolean =

@@ -173,14 +173,25 @@ private fun NavHostController.switchTab(route: Any) {
 /** Routes a [DeepLink] to its destination. */
 internal fun NavHostController.open(link: DeepLink) {
     when (link) {
-        is DeepLink.Invite -> navigate(InviteRoute(link.token))
-        is DeepLink.GroupCalendar -> navigate(GroupRoute(link.groupId))
-        is DeepLink.GroupChat -> navigate(GroupRoute(link.groupId, GroupTab.Chat.name))
-        is DeepLink.GroupEvents -> navigate(EventsRoute(link.groupId))
-        is DeepLink.Proposal -> navigate(ProposalRoute(link.proposalId))
+        is DeepLink.Invite -> navigateSingleTop(InviteRoute(link.token))
+        is DeepLink.GroupCalendar -> navigateSingleTop(GroupRoute(link.groupId))
+        is DeepLink.GroupChat -> navigateSingleTop(GroupRoute(link.groupId, GroupTab.Chat.name))
+        is DeepLink.GroupEvents -> navigateSingleTop(EventsRoute(link.groupId))
+        is DeepLink.Proposal -> navigateSingleTop(ProposalRoute(link.proposalId))
         is DeepLink.Calendars -> navigate(CalendarsRoute) { launchSingleTop = true }
         DeepLink.MyTime -> switchTab(MyTimeRoute)
         DeepLink.Activity -> switchTab(ActivityRoute)
         is DeepLink.AuthCallback -> Unit // Already signed in.
     }
+}
+
+/**
+ * Navigates to [route] unless it's already the top screen, so tapping a second
+ * notification for the same thing doesn't stack a duplicate. Only for an identical
+ * route: `launchSingleTop` onto the same destination with other arguments would keep
+ * the old screen's ViewModel, which reads its id once.
+ */
+private inline fun <reified T : Any> NavHostController.navigateSingleTop(route: T) {
+    val top = currentBackStackEntry
+    navigate(route) { launchSingleTop = top?.destination?.hasRoute<T>() == true && top.toRoute<T>() == route }
 }
