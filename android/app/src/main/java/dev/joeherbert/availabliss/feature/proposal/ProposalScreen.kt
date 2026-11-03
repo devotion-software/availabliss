@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.feature.proposal
 
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
@@ -97,18 +98,20 @@ fun ProposalScreen(onBack: () -> Unit, viewModel: ProposalViewModel = hiltViewMo
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
     AddToCalendarEffect(state.calendar, viewModel::onIntentHandled)
     LaunchedEffect(state.closed) { if (state.closed) onBack() }
-    ProposalContent(
-        state = state,
-        actions = ProposalActions(
-            onBack = onBack,
+    val currentOnBack by rememberUpdatedState(onBack)
+    // One instance for the screen's lifetime so unchanged parts skip recomposition.
+    val actions = remember(viewModel) {
+        ProposalActions(
+            onBack = { currentOnBack() },
             onRetry = viewModel::refresh,
             onRespond = viewModel::respond,
             onOverride = viewModel::override,
             onCancel = viewModel::cancel,
             onAddToCalendar = viewModel::addToCalendar,
             onSelectCalendar = viewModel::onSelectCalendar,
-        ),
-    )
+        )
+    }
+    ProposalContent(state = state, actions = actions)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) { AvSnackbarHost(snackbar, Modifier.navigationBarsPadding().padding(bottom = 120.dp)) }
 }
 

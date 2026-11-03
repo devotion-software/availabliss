@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.feature.members
 
+import androidx.compose.runtime.rememberUpdatedState
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,11 +84,11 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
     }
     LaunchedEffect(state.left) { if (state.left) onLeftGroup() }
 
-    MembersContent(
-        state = state,
-        snackbar = snackbar,
-        actions = MembersActions(
-            onBack = onBack,
+    val currentOnBack by rememberUpdatedState(onBack)
+    // One instance for the screen's lifetime so member rows skip recomposition.
+    val actions = remember(viewModel) {
+        MembersActions(
+            onBack = { currentOnBack() },
             onShareLink = viewModel::shareInviteLink,
             onEmailChange = viewModel::onInviteEmailChange,
             onSendEmail = viewModel::sendEmailInvite,
@@ -97,8 +98,9 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
             onLeave = viewModel::requestLeave,
             onDelete = viewModel::requestDelete,
             onRetry = viewModel::refresh,
-        ),
-    )
+        )
+    }
+    MembersContent(state = state, snackbar = snackbar, actions = actions)
 
     state.confirm?.let { action ->
         ConfirmDialog(

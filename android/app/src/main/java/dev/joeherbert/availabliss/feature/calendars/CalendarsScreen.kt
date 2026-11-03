@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.feature.calendars
 
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +43,21 @@ fun CalendarsScreen(onBack: () -> Unit, viewModel: CalendarSourcesViewModel = hi
     PendingUrlEffect(state.pendingUrl, viewModel::onUrlOpened)
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
 
+    val currentRequestPermission by rememberUpdatedState(requestPermission)
+    // One instance for the screen's lifetime so unchanged rows skip recomposition.
+    val actions = remember(viewModel) {
+        CalendarSourcesActions(
+            onRequestPermission = { currentRequestPermission() },
+            onToggleDevice = viewModel::toggleDeviceCalendar,
+            onToggleConnection = viewModel::toggleConnectionCalendar,
+            onConnect = viewModel::openConnectSheet,
+            onReconnect = viewModel::connectProvider,
+            onSyncConnection = viewModel::syncConnection,
+            onDisconnect = viewModel::disconnect,
+            onSyncDevice = { viewModel.syncDeviceNow() },
+        )
+    }
+
     AvailablissBackground(OrbLayout.Calendars) {
         Column(
             Modifier
@@ -58,16 +75,7 @@ fun CalendarsScreen(onBack: () -> Unit, viewModel: CalendarSourcesViewModel = hi
                 CalendarSourcesContent(
                     state = state,
                     manage = true,
-                    actions = CalendarSourcesActions(
-                        onRequestPermission = requestPermission,
-                        onToggleDevice = viewModel::toggleDeviceCalendar,
-                        onToggleConnection = viewModel::toggleConnectionCalendar,
-                        onConnect = viewModel::openConnectSheet,
-                        onReconnect = viewModel::connectProvider,
-                        onSyncConnection = viewModel::syncConnection,
-                        onDisconnect = viewModel::disconnect,
-                        onSyncDevice = { viewModel.syncDeviceNow() },
-                    ),
+                    actions = actions,
                 )
             }
         }

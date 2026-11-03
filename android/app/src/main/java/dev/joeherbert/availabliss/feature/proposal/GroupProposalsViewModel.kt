@@ -49,7 +49,7 @@ class GroupProposalsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val proposals: ProposalsRepository,
     private val groups: GroupsRepository,
-    users: UserRepository,
+    private val users: UserRepository,
     liveEvents: LiveEvents,
 ) : ViewModel() {
 
@@ -66,7 +66,10 @@ class GroupProposalsViewModel @Inject constructor(
                 when (payload) {
                     is LivePayload.ProposalChanged -> upsert(payload.proposal)
                     is LivePayload.ProposalConfirmed -> upsert(payload.proposal)
-                    is LivePayload.GroupUpdated -> data.update { it.copy(group = payload.group) }
+                    is LivePayload.GroupUpdated -> {
+                        val group = groups.applyLiveUpdate(payload.group, users.user.value?.id)
+                        data.update { it.copy(group = group) }
+                    }
                     else -> Unit
                 }
             }

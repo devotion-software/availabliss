@@ -1,5 +1,12 @@
 package dev.joeherbert.availabliss.feature.chat
 
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -78,7 +85,6 @@ data class ChatUiState(
     val loadingOlder: Boolean = false,
     val hasMore: Boolean = false,
     val error: String? = null,
-    val draft: String = "",
     val menuOpen: Boolean = false,
     val sending: Boolean = false,
     /** Non-null while the poll sheet is open. */
@@ -99,12 +105,19 @@ private data class ChatData(
     val loading: Boolean = true,
     val loadingOlder: Boolean = false,
     val error: String? = null,
-    val draft: String = "",
     val menuOpen: Boolean = false,
     val sending: Boolean = false,
     val pollDraft: PollDraft? = null,
     val infoSheet: InfoSheet? = null,
     val message: UserMessage? = null,
+)
+
+/** What the message list is built from; everything else in [ChatData] changes without rebuilding it. */
+private data class ItemInputs(
+    val group: Group?,
+    val messages: List<Message>,
+    val proposals: Map<String, Proposal>,
+    val events: Map<String, GroupEvent>,
 )
 
 @HiltViewModel
@@ -128,8 +141,28 @@ class ChatViewModel @Inject constructor(
     private var lastSeenSent: String? = null
     private var receiptJob: Job? = null
 
-    val state: StateFlow<ChatUiState> = combine(data, users.user) { d, me -> d.toUi(me?.id) }
+    private val meIds = users.user.map { it?.id }.distinctUntilChanged()
+
+    /**
+     * The message list (newest first), rebuilt off the main thread only when messages,
+     * referenced proposals / events, the group or the signed-in user change; not when
+     * the menu, a sheet or the sending flag does.
+     */
+    private val items = combine(
+        data.map { ItemInputs(it.group, it.messages, it.proposals, it.events) }.distinctUntilChanged(),
+        meIds,
+    ) { inputs, me -> inputs.toItems(me) }.flowOn(Dispatchers.Default)
+
+    val state: StateFlow<ChatUiState> = combine(data, items, meIds) { d, items, me -> d.toUi(items, me) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
+
+    /**
+     * The composer text. Plain Compose state, updated synchronously, rather than part of
+     * [state]: a keystroke neither goes through an async flow (which drops characters and
+     * moves the caret) nor rebuilds the message list.
+     */
+    var draft by mutableStateOf("")
+        private set
 
     init {
         load()
@@ -252,7 +285,10 @@ class ChatViewModel @Inject constructor(
             }
             is LivePayload.EventChanged -> putEvent(payload.event)
             is LivePayload.EventDeleted -> data.update { it.copy(events = it.events - payload.id) }
-            is LivePayload.GroupUpdated -> data.update { it.copy(group = payload.group) }
+            is LivePayload.GroupUpdated -> {
+                val group = groups.applyLiveUpdate(payload.group, meId)
+                data.update { it.copy(group = group) }
+            }
             is LivePayload.MemberChanged, is LivePayload.MemberRemoved -> refreshGroup()
             else -> Unit
         }
@@ -297,24 +333,28 @@ class ChatViewModel @Inject constructor(
     // endregion
 
     // region Composer
-    fun onDraftChange(value: String) = data.update { it.copy(draft = value.take(4000)) }
+    fun onDraftChange(value: String) {
+        draft = value.take(4000)
+    }
 
     fun onToggleMenu() = data.update { it.copy(menuOpen = !it.menuOpen) }
 
     fun closeMenu() = data.update { it.copy(menuOpen = false) }
 
     fun send() {
-        val text = data.value.draft.trim()
+        val text = draft.trim()
         if (text.isEmpty() || data.value.sending) return
-        data.update { it.copy(draft = "", sending = true, menuOpen = false) }
+        draft = ""
+        data.update { it.copy(sending = true, menuOpen = false) }
         viewModelScope.launch {
             when (val result = chat.sendText(groupId, text)) {
                 is ApiResult.Success -> {
                     appendMessage(result.value)
                     data.update { it.copy(sending = false) }
                 }
-                is ApiResult.Failure -> data.update {
-                    it.copy(sending = false, draft = if (it.draft.isEmpty()) text else it.draft, message = UserMessage(result.error.message))
+                is ApiResult.Failure -> {
+                    if (draft.isEmpty()) draft = text
+                    data.update { it.copy(sending = false, message = UserMessage(result.error.message)) }
                 }
             }
         }
@@ -414,33 +454,34 @@ class ChatViewModel @Inject constructor(
 
     fun onMessageShown(message: UserMessage) = data.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 
-    private fun ChatData.toUi(me: String?): ChatUiState {
+    private fun ItemInputs.toItems(me: String?): List<ChatItem> = buildChatItems(
+        messages = messages,
+        directory = MemberDirectory(group?.members.orEmpty(), me),
+        memberCount = group?.memberCount ?: 0,
+        proposals = proposals,
+        events = events,
+        isAdmin = group?.role?.isAdmin == true,
+    ).asReversed()
+
+    private fun ChatData.toUi(items: List<ChatItem>, me: String?): ChatUiState {
         val g = group
-        val directory = MemberDirectory(g?.members.orEmpty(), me)
         val others = g?.members.orEmpty().filter { it.userId != me }.map { it.name.firstName() }
-        val items = buildChatItems(
-            messages = messages,
-            directory = directory,
-            memberCount = g?.memberCount ?: 0,
-            proposals = proposals,
-            events = events,
-            isAdmin = g?.role?.isAdmin == true,
-        )
         return ChatUiState(
             groupName = g?.name.orEmpty(),
             monogram = g?.monogram.orEmpty(),
             tileColor = g?.color ?: TileColor.T1,
             membersSummary = others.joinNamesSummary(),
-            items = items.asReversed(),
+            items = items,
             loading = loading,
             loadingOlder = loadingOlder,
             hasMore = hasMore,
             error = error,
-            draft = draft,
             menuOpen = menuOpen,
             sending = sending,
             pollDraft = pollDraft,
-            info = infoSheet?.let { sheet -> sheet.toUi(messages.firstOrNull { it.id == sheet.messageId }, directory) },
+            info = infoSheet?.let { sheet ->
+                sheet.toUi(messages.firstOrNull { it.id == sheet.messageId }, MemberDirectory(g?.members.orEmpty(), me))
+            },
             message = message,
         )
     }

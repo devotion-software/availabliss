@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.feature.mytime
 
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -68,11 +70,11 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::messageShown)
 
-    MyTimeContent(
-        state = state,
-        snackbar = snackbar,
-        actions = MyTimeActions(
-            onOpenCalendars = onOpenCalendars,
+    val currentOnOpenCalendars by rememberUpdatedState(onOpenCalendars)
+    // One instance for the screen's lifetime so unchanged parts skip recomposition.
+    val actions = remember(viewModel) {
+        MyTimeActions(
+            onOpenCalendars = { currentOnOpenCalendars() },
             onPreviousWeek = viewModel::previousWeek,
             onNextWeek = viewModel::nextWeek,
             onEmptyTapped = viewModel::onEmptyTapped,
@@ -81,8 +83,9 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
             onDeleteRecurring = viewModel::deleteBlock,
             onBlockSpecificTime = viewModel::openBlockSheet,
             onRetry = viewModel::refresh,
-        ),
-    )
+        )
+    }
+    MyTimeContent(state = state, snackbar = snackbar, actions = actions)
 
     state.calendarBusy?.let { info ->
         CalendarBusySheet(info, onDismiss = viewModel::closeCalendarBusy, onOpenCalendars = onOpenCalendars)

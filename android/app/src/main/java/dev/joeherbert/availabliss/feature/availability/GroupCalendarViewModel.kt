@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.feature.availability
 
+import kotlinx.coroutines.delay
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -103,6 +104,7 @@ class GroupCalendarViewModel @Inject constructor(
     private val raw = MutableStateFlow(RawState())
     private var monthJob: Job? = null
     private var detailJob: Job? = null
+    private var liveRefreshJob: Job? = null
 
     val uiState: StateFlow<GroupCalendarUiState> = combine(raw, groups.group(groupId), users.user, plans.plan) { r, group, user, plan ->
         toUi(r, group, user?.id).copy(
@@ -112,19 +114,18 @@ class GroupCalendarViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GroupCalendarUiState())
 
     init {
-        viewModelScope.launch { groups.refreshGroup(groupId) }
+        // The group itself is fetched (and kept current) by GroupViewModel, the hosting screen.
         // Only to know whether to offer "Plan with AI".
         viewModelScope.launch { plans.refresh() }
         loadMonth()
         viewModelScope.launch {
             liveEvents.payloadsFor(groupId).collect { payload ->
                 when (payload) {
+                    // GroupUpdated: GroupViewModel caches the new group from the payload; the
+                    // timing may have changed, so availability is refetched.
                     is LivePayload.AvailabilityChanged, is LivePayload.MemberChanged, is LivePayload.MemberRemoved,
-                    is LivePayload.ProposalConfirmed, is LivePayload.EventChanged, is LivePayload.EventDeleted -> refresh()
-                    is LivePayload.GroupUpdated -> {
-                        groups.refreshGroup(groupId)
-                        refresh()
-                    }
+                    is LivePayload.ProposalConfirmed, is LivePayload.EventChanged, is LivePayload.EventDeleted,
+                    is LivePayload.GroupUpdated -> refreshSoon()
                     else -> Unit
                 }
             }
@@ -152,8 +153,21 @@ class GroupCalendarViewModel @Inject constructor(
     fun next() = step(1)
 
     fun refresh() {
+        liveRefreshJob?.cancel()
         loadMonth(silent = true)
         if (raw.value.view != CalendarView.Month) loadForView()
+    }
+
+    /**
+     * Live events come in bursts (a sync touches every group a member is in; week view
+     * costs up to 8 requests), so they're coalesced into one refresh.
+     */
+    private fun refreshSoon() {
+        liveRefreshJob?.cancel()
+        liveRefreshJob = viewModelScope.launch {
+            delay(LIVE_REFRESH_DEBOUNCE_MS)
+            refresh()
+        }
     }
 
     fun nudge() {
@@ -306,6 +320,10 @@ class GroupCalendarViewModel @Inject constructor(
             error = r.error,
             message = r.message,
         )
+    }
+
+    private companion object {
+        const val LIVE_REFRESH_DEBOUNCE_MS = 500L
     }
 
     /** "13 – 15 November" → "13 – 15 Nov" to fit beside the segmented control. */

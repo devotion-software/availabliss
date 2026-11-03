@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.feature.chat
 
+import androidx.compose.runtime.remember
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -95,10 +96,15 @@ fun GroupChatTab(
     }
     BackHandler(enabled = state.menuOpen) { viewModel.closeMenu() }
 
-    GroupChatContent(
-        state = state,
-        actions = ChatActions(
-            onBack = onBack,
+    val currentOnBack by rememberUpdatedState(onBack)
+    val currentOnOpenProposal by rememberUpdatedState(onOpenProposal)
+    val currentOnOpenEvent by rememberUpdatedState(onOpenEvent)
+    val currentOnProposeTime by rememberUpdatedState(onProposeTime)
+    val currentOnAddEvent by rememberUpdatedState(onAddEvent)
+    // One instance for the screen's lifetime, so rows skip recomposition while you type.
+    val actions = remember(viewModel) {
+        ChatActions(
+            onBack = { currentOnBack() },
             onRetry = viewModel::load,
             onLoadOlder = viewModel::loadOlder,
             onDraftChange = viewModel::onDraftChange,
@@ -107,19 +113,21 @@ fun GroupChatTab(
             onPoll = viewModel::openPollSheet,
             onProposeTime = {
                 viewModel.closeMenu()
-                onProposeTime()
+                currentOnProposeTime()
             },
             onAddEvent = {
                 viewModel.closeMenu()
-                onAddEvent()
+                currentOnAddEvent()
             },
-            onOpenProposal = onOpenProposal,
-            onOpenEvent = onOpenEvent,
+            onOpenProposal = { currentOnOpenProposal(it) },
+            onOpenEvent = { currentOnOpenEvent(it) },
             onVote = viewModel::onVote,
             onClosePoll = viewModel::onClosePoll,
             onOpenInfo = viewModel::openInfo,
-        ),
-    )
+        )
+    }
+
+    GroupChatContent(state = state, draft = viewModel.draft, actions = actions)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         AvSnackbarHost(snackbar, Modifier.statusBarsPadding().padding(top = 72.dp))
     }
@@ -142,7 +150,7 @@ fun GroupChatTab(
 }
 
 @Composable
-fun GroupChatContent(state: ChatUiState, actions: ChatActions) {
+fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
     val listState = rememberLazyListState()
     AvailablissBackground(OrbLayout.Chat) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
@@ -162,7 +170,7 @@ fun GroupChatContent(state: ChatUiState, actions: ChatActions) {
                 }
             }
             ChatComposer(
-                text = state.draft,
+                text = draft,
                 onTextChange = actions.onDraftChange,
                 onSend = actions.onSend,
                 menuOpen = state.menuOpen,
@@ -297,7 +305,8 @@ private fun GroupChatPreview() {
                     ChatItem.Day("Today", "2026-11-01"),
                 ),
             ),
-            ChatActions(),
+            draft = "",
+            actions = ChatActions(),
         )
     }
 }

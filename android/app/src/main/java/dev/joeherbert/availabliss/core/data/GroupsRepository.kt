@@ -112,6 +112,16 @@ class GroupsRepository @Inject constructor(
         details.value = emptyMap()
     }
 
+    /**
+     * Caches a `group.updated` live payload and returns it as this user sees it. The
+     * server builds it for whoever made the change, so [Group.role] is theirs: it's
+     * recomputed from the member list for [meId].
+     */
+    fun applyLiveUpdate(group: Group, meId: String?): Group {
+        val role = group.members.firstOrNull { it.userId == meId }?.role ?: details.value[group.id]?.role ?: group.role
+        return group.copy(role = role).also(::cache)
+    }
+
     private fun cache(group: Group) {
         details.update { it + (group.id to group) }
     }

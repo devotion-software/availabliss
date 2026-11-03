@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.feature.proposal
 
+import kotlinx.coroutines.flow.filter
+import dev.joeherbert.availabliss.core.network.model.LiveEvent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -108,9 +110,15 @@ class ProposalViewModel @Inject constructor(
                 when (payload) {
                     is LivePayload.ProposalChanged -> if (payload.proposal.id == proposalId) setProposal(payload.proposal)
                     is LivePayload.ProposalConfirmed -> if (payload.proposal.id == proposalId) setProposal(payload.proposal)
-                    is LivePayload.MemberChanged, is LivePayload.MemberRemoved -> data.value.proposal?.let { loadGroup(it.groupId, force = true) }
                     else -> Unit
                 }
+            }
+        }
+        // Member changes in this proposal's group only (payloads don't carry the group id).
+        viewModelScope.launch {
+            liveEvents.events.filter { it.type == LiveEvent.MEMBER_CHANGED }.collect { event ->
+                val groupId = data.value.proposal?.groupId ?: return@collect
+                if (event.groupId == groupId) loadGroup(groupId, force = true)
             }
         }
         viewModelScope.launch { liveEvents.reconnected.collect { refresh() } }

@@ -63,7 +63,8 @@ class GroupViewModel @Inject constructor(
                         val me = users.user.value?.id ?: users.user.filterNotNull().first().id
                         if (currentTab != GroupTab.Chat && payload.message.authorId != me) unread.update { it + 1 }
                     }
-                    is LivePayload.GroupUpdated -> groups.refreshGroup(groupId)
+                    // The payload is the whole group: no need to refetch it.
+                    is LivePayload.GroupUpdated -> groups.applyLiveUpdate(payload.group, users.user.value?.id)
                     else -> Unit
                 }
             }

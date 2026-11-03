@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.feature.onboarding
 
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.remember
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -71,6 +73,17 @@ fun OnboardingScreen(
         onResult = sourcesViewModel::onPermissionResult,
     )
 
+    val currentRequestPermission by rememberUpdatedState(requestPermission)
+    val sourceActions = remember(sourcesViewModel) {
+        CalendarSourcesActions(
+            onRequestPermission = { currentRequestPermission() },
+            onToggleDevice = sourcesViewModel::toggleDeviceCalendar,
+            onToggleConnection = sourcesViewModel::toggleConnectionCalendar,
+            onConnect = sourcesViewModel::openConnectSheet,
+            onReconnect = sourcesViewModel::connectProvider,
+        )
+    }
+
     LaunchedEffect(region.saved) {
         if (region.saved) {
             regionViewModel.onSaveHandled()
@@ -129,13 +142,7 @@ fun OnboardingScreen(
                 ) {
                     CalendarSourcesContent(
                         state = sources,
-                        actions = CalendarSourcesActions(
-                            onRequestPermission = requestPermission,
-                            onToggleDevice = sourcesViewModel::toggleDeviceCalendar,
-                            onToggleConnection = sourcesViewModel::toggleConnectionCalendar,
-                            onConnect = sourcesViewModel::openConnectSheet,
-                            onReconnect = sourcesViewModel::connectProvider,
-                        ),
+                        actions = sourceActions,
                     )
                     RegionSummaryCard(region.summaryTitle, region.summarySubtitle, onChange = viewModel::goToRegion)
                 }
