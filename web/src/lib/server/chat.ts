@@ -3,7 +3,7 @@ import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from 'drizz
 import type { Message, MessageInfo, MessageKind, Poll } from '#lib/types';
 import { db } from './db';
 import { messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
-import { badRequest, forbidden, notFound } from './http';
+import { badRequest, conflict, forbidden, notFound } from './http';
 import { alias } from 'drizzle-orm/mysql-core';
 import { newId } from './ids';
 import { memberIds, requireMember } from './groups';
@@ -61,7 +61,7 @@ export async function vote(pollId: string, userId: string, picked: string[]): Pr
 	const optionIds = [...new Set(picked)];
 	const row = await pollGroup(pollId);
 	await requireMember(row.groupId, userId);
-	if (row.closedAt) throw badRequest('This poll is closed');
+	if (row.closedAt) throw conflict('This poll is closed');
 	if (!row.multi && optionIds.length > 1) throw badRequest('Pick one option');
 	const poll = await getPoll(pollId);
 	if (!optionIds.every((id) => poll.options.some((o) => o.id === id))) throw badRequest('Unknown option');

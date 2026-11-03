@@ -1,6 +1,7 @@
 import { and, asc, eq, gt, inArray } from 'drizzle-orm';
 import type { Group, Member, Requirement, Role, TileColor } from '#lib/types';
 import { TILE_COLORS } from '#lib/types';
+import { monogram } from '#lib/monogram';
 import { db } from './db';
 import { requireCanCreateGroup } from './billing';
 import { groupInvites, groupMembers, groups, user } from './db/schema';
@@ -51,13 +52,6 @@ export async function memberIds(groupId: string): Promise<string[]> {
 }
 
 // ─── Reads ────────────────────────────────────────────────────────────────
-
-/** "Lake District crew" → "LD", "Book club" → "BC", "Five" → "F". */
-export function monogram(name: string): string {
-	const words = name.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
-	const letters = words.length > 1 ? words.slice(0, 2).map((w) => [...w][0]) : [...(words[0] ?? '?')].slice(0, 2);
-	return letters.join('').toUpperCase();
-}
 
 export async function listMembers(groupId: string): Promise<Member[]> {
 	const rows = await db

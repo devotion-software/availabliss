@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import { handler, json } from '#lib/server/http';
+import { ApiError, badRequest, handler, json } from '#lib/server/http';
 import { handleRevenueCatEvent, type RcEvent } from '#lib/server/billing';
 import { env } from '#lib/server/env';
 
@@ -16,9 +16,9 @@ function authorised(header: string | null): boolean {
  * Authorization header value to REVENUECAT_WEBHOOK_AUTH.
  */
 export const POST = handler(async ({ request }) => {
-	if (!authorised(request.headers.get('authorization'))) return json({ message: 'Unauthorized', code: 'unauthorized' }, { status: 401 });
+	if (!authorised(request.headers.get('authorization'))) throw new ApiError('unauthorized', 'Unauthorized');
 	const body = (await request.json().catch(() => null)) as { event?: RcEvent } | null;
-	if (!body?.event?.type) return json({ message: 'Expected a RevenueCat event', code: 'validation_error' }, { status: 400 });
+	if (!body?.event?.type) throw badRequest('Expected a RevenueCat event');
 	await handleRevenueCatEvent(body.event);
 	return json({ ok: true });
 });

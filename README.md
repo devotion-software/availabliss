@@ -51,8 +51,8 @@ and every pull request, and only builds the platforms a change touches:
 
 | Job | Runs |
 | --- | ---- |
-| Web | type-check, unit tests with coverage, production build |
-| Smoke | the production build against MariaDB + Mailpit, then `scripts/smoke.ts` end to end |
+| Web | type-check, unit tests with coverage |
+| Smoke | the production build (the only web build in CI); DB integration tests against MariaDB; the server in production mode with Redis + Mailpit; Redis integration tests; then `scripts/smoke.ts` end to end |
 | Docker | builds the Coolify image |
 | Android | unit tests and the debug APK |
 | iOS | XcodeGen + a simulator build |
@@ -78,7 +78,7 @@ and every pull request, and only builds the platforms a change touches:
 
 ## Deploying (Coolify)
 
-The root [`Dockerfile`](Dockerfile) builds the web app exactly like Duet: Bun
+The root [`Dockerfile`](Dockerfile) builds the web app in two stages: Bun
 builds, a slim Node image runs `scripts/migrate.js` and then the server on port
 3000. In Coolify:
 

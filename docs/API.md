@@ -59,7 +59,8 @@ Non-2xx responses have the body:
 
 `code` is one of `unauthorized` (401), `upgrade_required` (402), `forbidden` (403),
 `not_found` (404), `validation_error` (400), `conflict` (409), `rate_limited` (429),
-`server_error` (500). `upgrade_required` means the action needs Pro (see Plans): show
+`server_error` (500). `conflict` also covers acting on something no longer open:
+responding to or cancelling a confirmed or cancelled proposal, or voting in a closed poll. `upgrade_required` means the action needs Pro (see Plans): show
 the upgrade screen rather than a plain error.
 `issues` is only present for `validation_error`.
 
@@ -82,6 +83,7 @@ out. Some endpoints have tighter limits of their own:
 | `POST /groups/:id/messages` | 30 / minute |
 | `GET /groups/:id/availability[/day]` | 120 / minute |
 | `POST /requirements/preview` | 120 / minute |
+| `POST /groups/:id/planner` | 20 / hour |
 | `GET /regions/detect` | 30 / minute per IP |
 | `POST /api/auth/email-otp/send-verification-otp` | 5 / minute per IP and 5 / 15 minutes per email address |
 | `POST /api/auth/sign-in/email-otp` | 10 / minute per IP |
@@ -191,6 +193,12 @@ synced once they have connected any calendar or marked any busy time by hand.
 ## Endpoints
 
 Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
+
+### Health
+
+| Method | Path | Body | Response |
+| ------ | ---- | ---- | -------- |
+| GET | `/health` | | `{ ok: boolean; version: string; db: 'ok' \| 'down'; redis: 'ok' \| 'down' \| 'off' }` (`503` when the database doesn't answer; Redis being down still returns `200`) |
 
 ### Me
 

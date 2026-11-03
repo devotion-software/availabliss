@@ -21,6 +21,7 @@
 	import FitPreview from '#lib/components/timing/FitPreview.svelte';
 	import SaveTemplate from '#lib/components/timing/SaveTemplate.svelte';
 	import { listTemplates, requirementFromTemplate } from '#lib/client/templates';
+	import { monogram } from '#lib/monogram';
 
 	/**
 	 * New group in two steps: 1) name, colour and optionally a saved template;
@@ -91,15 +92,7 @@
 		};
 	});
 
-	const monogram = $derived(
-		name
-			.trim()
-			.split(/\s+/)
-			.filter(Boolean)
-			.slice(0, 2)
-			.map((w) => w[0]?.toUpperCase())
-			.join('') || '?'
-	);
+	const tileLetters = $derived(monogram(name));
 
 	function next(e: SubmitEvent) {
 		e.preventDefault();
@@ -162,7 +155,7 @@
 		<form class="form" onsubmit={next} novalidate>
 			<StepDots total={2} step={1} />
 			<div class="name-row">
-				<GroupTile {monogram} {color} size={50} />
+				<GroupTile monogram={tileLetters} {color} size={50} />
 				<TextField label="Group name" bind:value={name} placeholder="e.g. Lake District crew" maxlength={80} {error} autofocus />
 			</div>
 

@@ -105,8 +105,8 @@ describe('responding', () => {
 		expect(system.length).toBe(1);
 
 		// Confirmed proposals are closed to further changes.
-		expect((await apiError(respond(p.id, g.member, 'declined'))).code).toBe('forbidden');
-		expect((await apiError(cancelProposal(p.id, g.owner))).code).toBe('forbidden');
+		expect((await apiError(respond(p.id, g.member, 'declined'))).code).toBe('conflict');
+		expect((await apiError(cancelProposal(p.id, g.owner))).code).toBe('conflict');
 		expect(await listProposals(g.groupId, g.member, 'confirmed')).toEqual([expect.objectContaining({ id: p.id })]);
 		expect(await listProposals(g.groupId, g.member, 'open')).toEqual([]);
 	});
