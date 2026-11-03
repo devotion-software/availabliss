@@ -28,6 +28,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const syncWindow = () => ({ from: new Date(Date.now() - 7 * DAY_MS), to: new Date(Date.now() + 183 * DAY_MS) });
 /** Server-side connections are refreshed in the background this often. */
 const STALE_AFTER_MS = 30 * 60 * 1000;
+/** Failing connections back off: 30 min, 1 h, 2 h … up to a day. */
+const MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
+const backoff = (failures: number) => Math.min(STALE_AFTER_MS * 2 ** Math.max(0, failures - 1), MAX_BACKOFF_MS);
+/** Background syncs run this many connections at once. */
+const SYNC_CONCURRENCY = 5;
 /** Calendars that rarely mean "busy" start switched off. */
 const NOT_BUSY_BY_DEFAULT = /birthday|holiday|contacts|week numbers|siri suggestions|found in/i;
 
@@ -193,14 +198,21 @@ export async function syncConnection(connectionId: string): Promise<void> {
 		changed = (await replaceBusy(row.userId, saved.ids, busy, from, to)) || saved.changed;
 		await db
 			.update(calendarConnections)
-			.set({ status: 'ok', lastError: null, lastSyncedAt: new Date() })
+			.set({ status: 'ok', lastError: null, lastSyncedAt: new Date(), failures: 0, nextSyncAt: new Date(Date.now() + STALE_AFTER_MS) })
 			.where(eq(calendarConnections.id, row.id));
 	} catch (err) {
 		const status = err instanceof ReauthRequired ? 'reauth_required' : 'error';
 		console.warn('[calendars] sync failed', row.provider, row.id, err);
 		await db
 			.update(calendarConnections)
-			.set({ status, lastError: String(err instanceof Error ? err.message : err).slice(0, 255) })
+			.set({
+				status,
+				lastError: String(err instanceof Error ? err.message : err).slice(0, 255),
+				// Stamped on failure too, so a broken connection waits its turn instead of
+				// coming back first on every run.
+				failures: row.failures + 1,
+				nextSyncAt: new Date(Date.now() + backoff(row.failures + 1))
+			})
 			.where(eq(calendarConnections.id, row.id));
 	}
 	// Most syncs find nothing new: only make every group refresh when busy time changed.
@@ -240,21 +252,37 @@ export async function connectCaldav(userId: string, input: { username: string; a
 	return getConnection(userId, id);
 }
 
-/** Refreshes server-side connections that haven't synced recently. */
-export async function syncStaleConnections(): Promise<void> {
-	const cutoff = new Date(Date.now() - STALE_AFTER_MS);
-	const stale = await db
+/**
+ * Refreshes server-side connections that are due, longest-waiting first, a few
+ * at a time. Stops starting new syncs at `deadline` (ms since epoch) so a run
+ * ends inside the lock that keeps other instances from overlapping it.
+ */
+export async function syncStaleConnections(deadline = Infinity): Promise<number> {
+	const due = await db
 		.select({ id: calendarConnections.id })
 		.from(calendarConnections)
 		.where(
 			and(
 				ne(calendarConnections.provider, 'device'),
 				ne(calendarConnections.status, 'reauth_required'),
-				or(isNull(calendarConnections.lastSyncedAt), lte(calendarConnections.lastSyncedAt, cutoff))
+				or(isNull(calendarConnections.nextSyncAt), lte(calendarConnections.nextSyncAt, new Date()))
 			)
 		)
+		// NULL (never synced) sorts first.
+		.orderBy(asc(calendarConnections.nextSyncAt))
 		.limit(50);
-	for (const { id } of stale) await syncConnection(id);
+
+	let next = 0;
+	let synced = 0;
+	const worker = async () => {
+		while (next < due.length && Date.now() < deadline) {
+			const { id } = due[next++];
+			await syncConnection(id);
+			synced++;
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(SYNC_CONCURRENCY, due.length) }, worker));
+	return synced;
 }
 
 // ─── Device calendars ─────────────────────────────────────────────────────

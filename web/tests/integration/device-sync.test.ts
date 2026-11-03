@@ -1,7 +1,11 @@
 import './setup';
 import { afterAll, describe, expect, test } from 'bun:test';
 import { createGroup } from '#lib/server/groups';
-import { syncDevice, type DeviceSyncInput } from '#lib/server/calendars';
+import { eq } from 'drizzle-orm';
+import { db } from '#lib/server/db';
+import { calendarConnections } from '#lib/server/db/schema';
+import { newId } from '#lib/server/ids';
+import { syncConnection, syncDevice, syncStaleConnections, type DeviceSyncInput } from '#lib/server/calendars';
 import { loadBusy } from '#lib/server/busy';
 import { subscribe } from '#lib/server/realtime';
 import type { LiveEvent } from '#lib/types';
@@ -56,5 +60,30 @@ describe('syncDevice', () => {
 		} finally {
 			off();
 		}
+	});
+});
+
+describe('background sync', () => {
+	test('a failing connection is stamped and backs off instead of coming straight back', async () => {
+		const me = await fx.user();
+		const id = newId();
+		// Credentials that can't be decrypted: the sync fails before any network call.
+		await db.insert(calendarConnections).values({ id, userId: me, provider: 'caldav', label: 'Broken', credentials: 'not-encrypted' });
+		const row = async () => (await db.query.calendarConnections.findFirst({ where: eq(calendarConnections.id, id) }))!;
+
+		const t0 = Date.now();
+		await syncConnection(id);
+		let r = await row();
+		expect(r).toMatchObject({ status: 'error', failures: 1, lastSyncedAt: null });
+		expect(r.nextSyncAt!.getTime() - t0).toBeGreaterThanOrEqual(30 * 60 * 1000 - 1000);
+
+		await syncConnection(id);
+		r = await row();
+		expect(r.failures).toBe(2);
+		expect(r.nextSyncAt!.getTime() - t0).toBeGreaterThanOrEqual(60 * 60 * 1000 - 1000);
+	});
+
+	test('a run past its deadline starts nothing', async () => {
+		expect(await syncStaleConnections(0)).toBe(0);
 	});
 });

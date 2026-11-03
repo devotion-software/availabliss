@@ -25,7 +25,9 @@ export const init: ServerInit = () => {
 		try {
 			const lockSeconds = CALENDAR_SYNC_INTERVAL_MS / 1000 - 10;
 			if (!(await kv.setIfAbsent('lock:calendar-sync', String(process.pid), lockSeconds))) return;
-			await syncStaleConnections();
+			// Stop starting syncs well before the lock expires: one in flight can take
+			// a minute (several provider calls with 15–20 s timeouts each).
+			await syncStaleConnections(Date.now() + (lockSeconds - 90) * 1000);
 		} catch (err) {
 			console.warn('[calendars] background sync failed', err);
 		}

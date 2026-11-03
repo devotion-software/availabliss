@@ -53,11 +53,15 @@ export const calendarConnections = mysqlTable(
 		status: mysqlEnum('status', ['ok', 'error', 'reauth_required']).default('ok').notNull(),
 		lastError: varchar('last_error', { length: 255 }),
 		lastSyncedAt: instant('last_synced_at'),
+		// Background sync: when it's next due (null = now) and failures in a row, for back-off.
+		nextSyncAt: instant('next_sync_at'),
+		failures: int('failures').default(0).notNull(),
 		createdAt: createdAt(),
 		updatedAt: updatedAt()
 	},
 	(t) => [
 		index('calendar_connections_user_idx').on(t.userId),
+		index('calendar_connections_next_sync_idx').on(t.nextSyncAt),
 		uniqueIndex('calendar_connections_device_uq').on(t.userId, t.deviceId)
 	]
 );
