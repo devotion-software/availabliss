@@ -1,19 +1,25 @@
 package dev.joeherbert.availabliss.core.network.model
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 
-@Serializable
-enum class NotificationKind {
-    @SerialName("proposal.created") ProposalCreated,
-    @SerialName("proposal.confirmed") ProposalConfirmed,
-    @SerialName("nudge") Nudge,
-    @SerialName("invite.accepted") InviteAccepted,
-    @SerialName("message") Message,
-    @SerialName("event.created") EventCreated,
+/** [wire] matches the server's `kind` and the push payload. Unknown kinds decode as [Unknown]. */
+@Serializable(with = NotificationKindSerializer::class)
+enum class NotificationKind(override val wire: String) : WireEnum {
+    ProposalCreated("proposal.created"),
+    ProposalConfirmed("proposal.confirmed"),
+    Nudge("nudge"),
+    InviteAccepted("invite.accepted"),
+    Message("message"),
+    EventCreated("event.created"),
+
+    /** A kind added on the server after this build. */
+    Unknown(""),
 }
+
+object NotificationKindSerializer :
+    LenientEnumSerializer<NotificationKind>("NotificationKind", NotificationKind.entries.toTypedArray(), NotificationKind.Unknown)
 
 /** Named `AppNotification` to avoid clashing with `android.app.Notification`. */
 @Serializable

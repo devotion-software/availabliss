@@ -3,13 +3,20 @@ package dev.joeherbert.availabliss.core.network.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-@Serializable
-enum class CalendarProvider {
-    @SerialName("google") Google,
-    @SerialName("microsoft") Microsoft,
-    @SerialName("caldav") CalDav,
-    @SerialName("device") Device,
+/** Unknown providers decode as [Unknown]. */
+@Serializable(with = CalendarProviderSerializer::class)
+enum class CalendarProvider(override val wire: String) : WireEnum {
+    Google("google"),
+    Microsoft("microsoft"),
+    CalDav("caldav"),
+    Device("device"),
+
+    /** A provider added on the server after this build. */
+    Unknown(""),
 }
+
+object CalendarProviderSerializer :
+    LenientEnumSerializer<CalendarProvider>("CalendarProvider", CalendarProvider.entries.toTypedArray(), CalendarProvider.Unknown)
 
 @Serializable
 enum class ConnectionStatus {

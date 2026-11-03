@@ -122,20 +122,10 @@ class ActivityViewModel @Inject constructor(
         link = DeepLink.fromPushData(
             buildMap {
                 putAll(data)
-                put("kind", kind.wire)
+                if (kind != NotificationKind.Unknown) put("kind", kind.wire)
                 groupId?.let { put("groupId", it) }
             },
         ),
     )
 }
 
-/** Wire value of a [NotificationKind] (matches the push payload `kind`). */
-val NotificationKind.wire: String
-    get() = when (this) {
-        NotificationKind.ProposalCreated -> "proposal.created"
-        NotificationKind.ProposalConfirmed -> "proposal.confirmed"
-        NotificationKind.Nudge -> "nudge"
-        NotificationKind.InviteAccepted -> "invite.accepted"
-        NotificationKind.Message -> "message"
-        NotificationKind.EventCreated -> "event.created"
-    }

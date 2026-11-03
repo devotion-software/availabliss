@@ -393,6 +393,7 @@ val CalendarProvider.title: String
         CalendarProvider.Microsoft -> "Outlook"
         CalendarProvider.CalDav -> "iCloud"
         CalendarProvider.Device -> "Phone"
+        CalendarProvider.Unknown -> "Calendar"
     }
 
 /** The `:provider` path value for OAuth providers, else null. */

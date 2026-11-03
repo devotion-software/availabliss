@@ -226,6 +226,7 @@ private fun NotificationKind.icon(): ImageVector = when (this) {
     NotificationKind.InviteAccepted -> AvIcons.AddPerson
     NotificationKind.Message -> AvIcons.Chat
     NotificationKind.EventCreated -> AvIcons.CalendarAdd
+    NotificationKind.Unknown -> AvIcons.Bell
 }
 
 @Preview(widthDp = 390, heightDp = 844)
