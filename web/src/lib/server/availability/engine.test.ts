@@ -77,6 +77,23 @@ describe('weekend span', () => {
 		expect(result.pendingMemberIds).toEqual(['leo']);
 	});
 
+	test('reports synced members whose calendars stop before the end of the range', () => {
+		expect(result.checkedUntil).toEqual([]);
+		const gaps = computeAvailability(
+			input({
+				members: [
+					{ ...members[0], checkedUntil: at('2026-11-18T00:00:00Z') },
+					// Known to the last moment of the range (midnight after the 30th, London time): no gap.
+					{ ...members[1], checkedUntil: at('2026-12-01T00:00:00Z') },
+					{ ...members[2], checkedUntil: null },
+					// Not synced: already reported as pending.
+					{ ...members[3], checkedUntil: at('2026-11-02T00:00:00Z') }
+				]
+			})
+		);
+		expect(gaps.checkedUntil).toEqual([{ userId: 'sam', until: '2026-11-18T00:00:00.000Z' }]);
+	});
+
 	test('hides weekends that start before the search range', () => {
 		expect(dayOf(result, '2026-11-01').status).toBe('hidden');
 	});

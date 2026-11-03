@@ -5,7 +5,7 @@ import { db } from '../db';
 import { groupMembers, user } from '../db/schema';
 import { badRequest } from '../http';
 import { getGroupRow, memberIds, requireMember } from '../groups';
-import { loadBusy, syncedUserIds } from '../busy';
+import { calendarCoverage, loadBusy, syncedUserIds } from '../busy';
 import { bankHolidays, schoolHolidayRanges } from '../holidays';
 import { today } from '../requirements';
 import { computeAvailability, computeDay, type EngineInput } from './engine';
@@ -37,9 +37,10 @@ async function engineInput(group: GroupRow, from: string, to: string): Promise<E
 	const loadTo = addDays(to, LOOKBACK_DAYS);
 	const holidayRange = { from: loadFrom, to: loadTo };
 
-	const [busy, synced, region, school] = await Promise.all([
+	const [busy, synced, coverage, region, school] = await Promise.all([
 		loadBusy(ids, startOfDate(loadFrom, tz), startOfDate(loadTo, tz)),
 		syncedUserIds(ids),
+		calendarCoverage(ids),
 		ownerRegion(group.id),
 		schoolHolidayRanges(req, holidayRange)
 	]);
@@ -48,7 +49,12 @@ async function engineInput(group: GroupRow, from: string, to: string): Promise<E
 		requirement: req,
 		from,
 		to,
-		members: ids.map((userId) => ({ userId, synced: synced.has(userId), busy: busy.get(userId) ?? [] })),
+		members: ids.map((userId) => ({
+			userId,
+			synced: synced.has(userId),
+			busy: busy.get(userId) ?? [],
+			checkedUntil: coverage.get(userId) ?? null
+		})),
 		bankHolidays: await bankHolidays(region.country, region.subdivision, holidayRange),
 		schoolHolidays: school,
 		now: Date.now()

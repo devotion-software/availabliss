@@ -179,6 +179,8 @@ export interface Availability {
 	syncedCount: number;
 	memberCount: number;
 	pendingMemberIds: string[];
+	/** Synced members whose calendars are only checked up to `until` (ISO instant), before the end of this range. */
+	checkedUntil: { userId: string; until: string }[];
 }
 
 export interface Interval {

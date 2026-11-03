@@ -22,6 +22,8 @@ export interface MemberBusy {
 	userId: string;
 	synced: boolean;
 	busy: (Span & { manual: boolean })[];
+	/** Calendar busy time is only known before this instant (absent = no limit). */
+	checkedUntil?: number | null;
 }
 
 export interface EngineInput {
@@ -186,8 +188,17 @@ export function computeAvailability(input: EngineInput): Availability {
 		slots: dedupe(slots),
 		syncedCount: synced.length,
 		memberCount: input.members.length,
-		pendingMemberIds: input.members.filter((m) => !m.synced).map((m) => m.userId)
+		pendingMemberIds: input.members.filter((m) => !m.synced).map((m) => m.userId),
+		checkedUntil: coverageGaps(input)
 	};
+}
+
+/** Synced members whose calendars aren't known to the end of the reported range: times past that may clash. */
+function coverageGaps(input: EngineInput): { userId: string; until: string }[] {
+	const end = startOfDate(addDays(input.to, 1), input.requirement.timezone);
+	return input.members
+		.filter((m) => m.synced && m.checkedUntil != null && m.checkedUntil < end)
+		.map((m) => ({ userId: m.userId, until: new Date(m.checkedUntil!).toISOString() }));
 }
 
 /** Weekday columns worth drawing: the requirement's pattern plus any day that's actually in play. */

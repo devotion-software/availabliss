@@ -18,6 +18,7 @@
 	import DayDetailCard from '#lib/components/calendar/DayDetailCard.svelte';
 	import { dayMap, slotOn, visibleColumns, weekDates } from '#lib/components/calendar/grid';
 	import SyncBanner from '#lib/components/group/SyncBanner.svelte';
+	import CoverageNote from '#lib/components/group/CoverageNote.svelte';
 	import BestOptions from '#lib/components/group/BestOptions.svelte';
 	import PlannerSheet from '#lib/components/group/PlannerSheet.svelte';
 	import { getPlan } from '#lib/client/plan';
@@ -271,6 +272,8 @@
 					<SegmentedControl options={VIEWS} bind:value={view} label="Calendar view" size="sm" />
 				</span>
 			</div>
+
+			<CoverageNote gaps={availability.checkedUntil ?? []} {members} meId={data.user.id} />
 
 			<div class="cal-body" class:boxed={view !== 'month'}>
 			{#if view === 'month'}
