@@ -34,7 +34,7 @@ services:
 
   # Catches all outgoing dev email — view it at http://localhost:8027
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.33.0
     container_name: availabliss-mailpit
     restart: unless-stopped
     ports:
