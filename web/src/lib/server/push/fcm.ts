@@ -45,6 +45,14 @@ const accessToken = cachedToken(50 * 60 * 1000, async () => {
 	return ((await res.json()) as { access_token: string }).access_token;
 });
 
+/**
+ * In the background Android shows the notification itself: a group's chat messages
+ * share a tag so each replaces the last instead of stacking (as the app does in the
+ * foreground, see PushNotifier).
+ */
+export const androidTag = (message: PushMessage) =>
+	message.data.kind === 'message' && message.data.groupId ? `message:${message.data.groupId}` : undefined;
+
 export async function sendFcm(token: string, message: PushMessage): Promise<PushResult> {
 	const sa = serviceAccount()!;
 	const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
@@ -55,7 +63,7 @@ export async function sendFcm(token: string, message: PushMessage): Promise<Push
 				token,
 				notification: { title: message.title, body: message.body },
 				data: message.data,
-				android: { priority: 'high', notification: { channel_id: message.data.kind ?? 'general' } }
+				android: { priority: 'high', notification: { channel_id: message.data.kind ?? 'general', tag: androidTag(message) } }
 			}
 		})
 	});
