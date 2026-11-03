@@ -37,6 +37,9 @@ describe('events', () => {
 
 		const moved = await updateEvent(e.id, admin, { start: inDays(4), end: inDays(4, 21), title: 'Picnic (moved)' });
 		expect(moved).toMatchObject({ title: 'Picnic (moved)', start: inDays(4), end: inDays(4, 21), location: 'Park' });
+		// Only one end sent: checked against the stored other end.
+		expect((await apiError(updateEvent(e.id, admin, { start: inDays(4, 22) }))).code).toBe('validation_error');
+		expect((await apiError(updateEvent(e.id, admin, { end: inDays(4, 17) }))).code).toBe('validation_error');
 
 		const other = await createEvent(groupId, owner, { title: 'Owner’s', start: inDays(5), end: inDays(5, 19), allDay: false, location: null, note: null });
 		expect((await apiError(updateEvent(other.id, member, { title: 'Mine now' }))).code).toBe('forbidden');

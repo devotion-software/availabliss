@@ -105,6 +105,15 @@ describe('block schemas', () => {
 		expect(ok(createBlockSchema, { start: '2026-11-13T18:00:00+01:00', end: '2026-11-13T20:00:00+01:00' })).toBe(true);
 	});
 
+	test('order compares instants, not strings', () => {
+		// 10:30+02:00 is 08:30Z: before the start even though it sorts after it.
+		expect(ok(createBlockSchema, { start: '2026-11-13T10:00:00Z', end: '2026-11-13T10:30:00+02:00' })).toBe(false);
+		// 11:30Z is after 11:00Z (12:00+01:00) even though it sorts before it.
+		expect(ok(createBlockSchema, { start: '2026-11-13T12:00:00+01:00', end: '2026-11-13T11:30:00Z' })).toBe(true);
+		expect(ok(createBlockSchema, { start: '2026-11-13T10:00:00Z', end: '2026-11-13T10:00:00.500Z' })).toBe(true);
+		expect(ok(createBlockSchema, { start: '2026-11-13T10:00:00Z', end: '2026-11-13T12:00:00+02:00' })).toBe(false);
+	});
+
 	test('partial updates only check order when both ends are given', () => {
 		expect(ok(updateBlockSchema, {})).toBe(true);
 		expect(ok(updateBlockSchema, { end: '2020-01-01T00:00:00Z' })).toBe(true);

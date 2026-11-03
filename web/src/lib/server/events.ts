@@ -3,7 +3,7 @@ import { and, asc, eq, gt, gte, inArray, lt } from 'drizzle-orm';
 import type { GroupEvent } from '#lib/types';
 import { db, type Tx } from './db';
 import { events, groupMembers, groups } from './db/schema';
-import { forbidden, notFound } from './http';
+import { badRequest, forbidden, notFound } from './http';
 import { newId } from './ids';
 import { getGroupRow, memberIds, requireMember } from './groups';
 import { publishToGroup } from './realtime';
@@ -108,6 +108,7 @@ export async function createEvent(groupId: string, userId: string, input: EventI
 export async function updateEvent(eventId: string, userId: string, patch: Partial<EventInput>): Promise<GroupEvent> {
 	const row = await requireEditable(eventId, userId);
 	const { start, end, ...rest } = patch;
+	if (new Date(end ?? row.end) <= new Date(start ?? row.start)) throw badRequest('Ends before it starts');
 	await db
 		.update(events)
 		.set({ ...rest, ...(start && { start: new Date(start) }), ...(end && { end: new Date(end) }) })

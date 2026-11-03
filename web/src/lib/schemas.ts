@@ -98,7 +98,9 @@ const blockShape = {
 	until: dateString.nullish().transform((v) => v ?? null),
 	note: optionalText(120)
 };
-const endsAfterStart = (b: { start?: string; end?: string }) => !b.start || !b.end || b.start < b.end;
+/** Compares instants, not strings: offsets and fractional seconds make string order differ from time order. */
+const endsAfterStart = (b: { start?: string; end?: string }) =>
+	!b.start || !b.end || Date.parse(b.start) < Date.parse(b.end);
 
 export const createBlockSchema = z.object(blockShape).refine(endsAfterStart, { message: 'Ends before it starts' });
 export const updateBlockSchema = z
