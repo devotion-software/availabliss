@@ -51,8 +51,9 @@ class LiveEvents @Inject constructor(
     private val tokenStore: TokenStore,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
-    private val _events = MutableSharedFlow<LiveEvent>(extraBufferCapacity = 64)
-    val events: SharedFlow<LiveEvent> = _events.asSharedFlow()
+    /** Each frame with its payload decoded once, however many screens are subscribed. */
+    private val frames = MutableSharedFlow<Frame>(extraBufferCapacity = 64)
+    val events: Flow<LiveEvent> = frames.map { it.event }
 
     private val _reconnected = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
@@ -71,10 +72,11 @@ class LiveEvents @Inject constructor(
     fun eventsFor(groupId: String): Flow<LiveEvent> = events.filter { it.groupId == groupId }
 
     /** Typed payloads for one group (see [LivePayload]). */
-    fun payloadsFor(groupId: String): Flow<LivePayload> = eventsFor(groupId).map { it.decode(json) }
+    fun payloadsFor(groupId: String): Flow<LivePayload> =
+        frames.filter { it.event.groupId == groupId }.map { it.payload }
 
     /** Typed payloads for every group. */
-    val payloads: Flow<LivePayload> get() = events.map { it.decode(json) }
+    val payloads: Flow<LivePayload> = frames.map { it.payload }
 
     @Synchronized
     fun start() {
@@ -97,7 +99,7 @@ class LiveEvents @Inject constructor(
             try {
                 stream(token).collect { event ->
                     backoff = INITIAL_BACKOFF
-                    _events.emit(event)
+                    frames.emit(Frame(event, event.decode(json)))
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -142,6 +144,8 @@ class LiveEvents @Inject constructor(
         val source = EventSources.createFactory(client).newEventSource(request, listener)
         awaitClose { source.cancel() }
     }
+
+    private class Frame(val event: LiveEvent, val payload: LivePayload)
 
     private class Unauthorized : IOException("Live stream rejected the session (401)")
 

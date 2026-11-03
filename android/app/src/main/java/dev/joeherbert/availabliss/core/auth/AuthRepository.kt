@@ -209,7 +209,4 @@ class AuthRepository @Inject constructor(
             is ApiResult.Success ->
                 if (result.value.isSuccessful) result else ApiResult.Failure(result.value.toApiError(json))
         }
-
-    companion object {
-    }
 }

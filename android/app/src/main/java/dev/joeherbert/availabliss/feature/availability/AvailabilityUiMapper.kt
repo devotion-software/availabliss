@@ -67,8 +67,6 @@ object AvailabilityUiMapper {
         LocalSlot(slot, s, e)
     }
 
-    fun slotFor(availability: Availability, date: LocalDate): Slot? = localSlots(availability).firstOrNull { it.covers(date) }?.slot
-
     /** Visible weekday columns, Monday first. Falls back to all seven. */
     fun columns(availability: Availability?): List<Int> =
         availability?.visibleWeekdays?.filter { it in 0..6 }?.distinct()?.sorted()?.takeIf { it.isNotEmpty() } ?: (0..6).toList()

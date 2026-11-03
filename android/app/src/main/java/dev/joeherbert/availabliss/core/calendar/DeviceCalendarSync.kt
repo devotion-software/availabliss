@@ -16,7 +16,6 @@ import dev.joeherbert.availabliss.core.network.model.DeviceCalendar
 import dev.joeherbert.availabliss.core.network.model.DeviceSync
 import dev.joeherbert.availabliss.core.network.onSuccess
 import dev.joeherbert.availabliss.core.push.deviceName
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -83,8 +82,6 @@ class DeviceCalendarSync @Inject constructor(
     suspend fun busyCalendarIds(available: List<DeviceCalendarInfo>): Set<String> =
         prefs.busyDeviceCalendarIds.first()
             ?: available.filter { it.busyByDefault }.map { it.externalId }.toSet()
-
-    val selection: Flow<Set<String>?> get() = prefs.busyDeviceCalendarIds
 
     suspend fun setBusyCalendarIds(ids: Set<String>) = prefs.setBusyDeviceCalendarIds(ids)
 

@@ -63,9 +63,7 @@ data class CalendarSourcesUiState(
     /** OAuth start URL for the UI to open in a Custom Tab. */
     val pendingUrl: String? = null,
     val message: UserMessage? = null,
-) {
-    val hasAnySource: Boolean get() = deviceSources.any { s -> s.calendars.any { it.busy } } || connections.isNotEmpty()
-}
+)
 
 /**
  * Busy-calendar selection shared by onboarding step 2 and the Calendars settings
