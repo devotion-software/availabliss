@@ -28,6 +28,14 @@ export const db = drizzle(pool, { schema, mode: 'default' });
 export type DB = typeof db;
 export type Tx = Parameters<Parameters<DB['transaction']>[0]>[0];
 
+/** A unique-key violation (ER_DUP_ENTRY), however deeply Drizzle wrapped it. */
+export function isDuplicateKey(err: unknown): boolean {
+	for (let e = err as { code?: string; errno?: number; cause?: unknown } | undefined; e; e = e.cause as typeof e) {
+		if (e.code === 'ER_DUP_ENTRY' || e.errno === 1062) return true;
+	}
+	return false;
+}
+
 /** For the health check: the database answers SELECT 1 within the timeout. */
 export async function dbHealth(timeoutMs = 2000): Promise<'ok' | 'down'> {
 	let timer: ReturnType<typeof setTimeout> | undefined;

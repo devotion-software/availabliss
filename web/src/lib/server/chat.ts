@@ -4,6 +4,7 @@ import type { Message, MessageInfo, MessageKind, Poll } from '#lib/types';
 import { db } from './db';
 import { messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
 import { badRequest, forbidden, notFound } from './http';
+import { alias } from 'drizzle-orm/mysql-core';
 import { newId } from './ids';
 import { memberIds, requireMember } from './groups';
 import { publishToGroup } from './realtime';
@@ -55,7 +56,9 @@ async function pollGroup(pollId: string) {
 	return row;
 }
 
-export async function vote(pollId: string, userId: string, optionIds: string[]): Promise<Poll> {
+export async function vote(pollId: string, userId: string, picked: string[]): Promise<Poll> {
+	// A repeated id would hit the votes primary key.
+	const optionIds = [...new Set(picked)];
 	const row = await pollGroup(pollId);
 	await requireMember(row.groupId, userId);
 	if (row.closedAt) throw badRequest('This poll is closed');
@@ -107,6 +110,9 @@ async function receiptSummaries(rows: MessageRow[], groupSize: number): Promise<
 	return result;
 }
 
+/** Receipt summaries published per markReceipts call; clients only show recent messages. */
+const PUBLISHED_RECEIPTS = 500;
+
 /**
  * Marks every message up to and including `upTo` (that the user didn't write)
  * as delivered or seen, then tells the group which receipts changed.
@@ -116,31 +122,47 @@ export async function markReceipts(groupId: string, userId: string, upTo: string
 	const anchor = await db.query.messages.findFirst({ where: and(eq(messages.id, upTo), eq(messages.groupId, groupId)) });
 	if (!anchor) throw notFound('Message not found');
 
-	const pending = await db
-		.select({ id: messages.id, seenAt: messageReceipts.seenAt, deliveredAt: messageReceipts.deliveredAt })
+	// Aliased: the insert below targets message_receipts too, and its ON DUPLICATE
+	// KEY UPDATE must only see the target table.
+	const own = alias(messageReceipts, 'own');
+	const ownReceipt = and(eq(own.messageId, messages.id), eq(own.userId, userId));
+	const pending = and(
+		eq(messages.groupId, groupId),
+		lte(messages.seq, anchor.seq),
+		or(isNull(messages.authorId), ne(messages.authorId, userId)),
+		state === 'seen' ? isNull(own.seenAt) : isNull(own.deliveredAt)
+	);
+	// The newest ones are what the group gets told about.
+	const recent = await db
+		.select({ id: messages.id })
 		.from(messages)
-		.leftJoin(messageReceipts, and(eq(messageReceipts.messageId, messages.id), eq(messageReceipts.userId, userId)))
-		.where(
-			and(
-				eq(messages.groupId, groupId),
-				lte(messages.seq, anchor.seq),
-				or(isNull(messages.authorId), ne(messages.authorId, userId)),
-				state === 'seen' ? isNull(messageReceipts.seenAt) : isNull(messageReceipts.deliveredAt)
-			)
-		)
+		.leftJoin(own, ownReceipt)
+		.where(pending)
 		.orderBy(desc(messages.seq))
-		.limit(500);
-	if (!pending.length) return;
+		.limit(PUBLISHED_RECEIPTS);
+	if (!recent.length) return;
 
+	// Every pending message is marked in one statement, however far back it goes.
 	const now = new Date();
 	await db
 		.insert(messageReceipts)
-		.values(pending.map((p) => ({ messageId: p.id, userId, deliveredAt: now, seenAt: state === 'seen' ? now : null })))
+		.select(
+			db
+				.select({
+					messageId: messages.id,
+					userId: sql<string>`${userId}`.as('user_id'),
+					deliveredAt: sql<Date>`${now}`.as('delivered_at'),
+					seenAt: sql<Date | null>`${state === 'seen' ? now : null}`.as('seen_at')
+				})
+				.from(messages)
+				.leftJoin(own, ownReceipt)
+				.where(pending)
+		)
 		.onDuplicateKeyUpdate({
 			set: state === 'seen' ? { seenAt: sql`coalesce(${messageReceipts.seenAt}, values(${messageReceipts.seenAt}))` } : { userId }
 		});
 
-	const changed = await db.select().from(messages).where(inArray(messages.id, pending.map((p) => p.id)));
+	const changed = await db.select().from(messages).where(inArray(messages.id, recent.map((p) => p.id)));
 	const summaries = await receiptSummaries(changed, (await memberIds(groupId)).length);
 	await publishToGroup(groupId, 'message.receipts', { userId, state, receipts: [...summaries.values()] });
 }
@@ -216,6 +238,11 @@ interface PostInput {
 	eventId?: string | null;
 }
 
+/** Messages can be 4000 characters, but APNs and FCM reject payloads over 4 KB. */
+const PUSH_PREVIEW_CHARS = 200;
+export const pushPreview = (text: string) =>
+	text.length > PUSH_PREVIEW_CHARS ? `${[...text].slice(0, PUSH_PREVIEW_CHARS - 1).join('').trimEnd()}…` : text;
+
 /** Inserts a message, publishes it live and pushes it to everyone else. */
 export async function postMessage(groupId: string, authorId: string | null, input: PostInput): Promise<Message> {
 	const id = newId();
@@ -234,7 +261,7 @@ export async function postMessage(groupId: string, authorId: string | null, inpu
 				kind: 'message',
 				groupId,
 				title: author?.name ?? 'New message',
-				body: poll ?? input.body ?? '',
+				body: pushPreview(poll ?? input.body ?? ''),
 				data: { messageId: id },
 				record: false
 			}
@@ -260,20 +287,4 @@ export async function sendPoll(
 		await tx.insert(pollOptions).values(input.options.map((label, position) => ({ id: newId(), pollId, label, position })));
 	});
 	return postMessage(groupId, userId, { kind: 'poll', pollId });
-}
-
-/** Messages in a group the user hasn't seen yet. */
-export async function unreadCount(groupId: string, userId: string): Promise<number> {
-	const [row] = await db
-		.select({ count: sql<number>`count(*)` })
-		.from(messages)
-		.leftJoin(messageReceipts, and(eq(messageReceipts.messageId, messages.id), eq(messageReceipts.userId, userId)))
-		.where(
-			and(
-				eq(messages.groupId, groupId),
-				or(isNull(messages.authorId), ne(messages.authorId, userId)),
-				isNull(messageReceipts.seenAt)
-			)
-		);
-	return Number(row?.count ?? 0);
 }

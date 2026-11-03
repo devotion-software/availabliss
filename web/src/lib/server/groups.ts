@@ -129,10 +129,13 @@ export async function createGroup(
 	input: { name: string; color?: TileColor; requirement?: Requirement },
 	timeZone: string
 ): Promise<Group> {
-	await requireCanCreateGroup(userId);
 	const id = newId();
 	const color = input.color ?? TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)];
 	await db.transaction(async (tx) => {
+		// Locking the user's row queues their parallel creates, so each one counts
+		// the groups the others just made before checking the free-plan limit.
+		await tx.select({ id: user.id }).from(user).where(eq(user.id, userId)).for('update');
+		await requireCanCreateGroup(userId, tx);
 		await tx.insert(groups).values({
 			id,
 			name: input.name,
@@ -155,9 +158,12 @@ export async function updateGroup(
 	return getGroup(groupId, userId);
 }
 
-export async function deleteGroup(groupId: string, userId: string): Promise<void> {
+/** Deletes the group. Returns who was in it, so they can be told. */
+export async function deleteGroup(groupId: string, userId: string): Promise<string[]> {
 	await requireMember(groupId, userId, 'owner');
+	const members = await memberIds(groupId);
 	await db.delete(groups).where(eq(groups.id, groupId));
+	return members;
 }
 
 export async function setMemberRole(groupId: string, actorId: string, targetId: string, role: 'admin' | 'member') {
@@ -217,13 +223,14 @@ export async function previewInvite(token: string) {
 	};
 }
 
-/** Joins the group (idempotent). Returns the group id. */
-export async function acceptInvite(token: string, userId: string): Promise<string> {
+/**
+ * Joins the group. Idempotent, including two taps racing: `joined` is true only
+ * for the request that added the membership (an existing member keeps their role).
+ */
+export async function acceptInvite(token: string, userId: string): Promise<{ groupId: string; joined: boolean }> {
 	const invite = await liveInvite(token);
-	if (!(await roleIn(invite.groupId, userId))) {
-		await db.insert(groupMembers).values({ groupId: invite.groupId, userId, role: 'member' });
-	}
-	return invite.groupId;
+	const [result] = await db.insert(groupMembers).ignore().values({ groupId: invite.groupId, userId, role: 'member' });
+	return { groupId: invite.groupId, joined: result.affectedRows > 0 };
 }
 
 export async function usersByIds(ids: string[]) {

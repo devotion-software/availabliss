@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
 	mysqlTable,
 	varchar,
@@ -56,13 +56,19 @@ export const calendarConnections = mysqlTable(
 		// Background sync: when it's next due (null = now) and failures in a row, for back-off.
 		nextSyncAt: instant('next_sync_at'),
 		failures: int('failures').default(0).notNull(),
+		// The label for server-side accounts and null for devices (two phones can share
+		// a name), so the unique key below only covers server connections.
+		accountLabel: varchar('account_label', { length: 255 }).generatedAlwaysAs(sql`if(provider = 'device', null, label)`, {
+			mode: 'stored'
+		}),
 		createdAt: createdAt(),
 		updatedAt: updatedAt()
 	},
 	(t) => [
 		index('calendar_connections_user_idx').on(t.userId),
 		index('calendar_connections_next_sync_idx').on(t.nextSyncAt),
-		uniqueIndex('calendar_connections_device_uq').on(t.userId, t.deviceId)
+		uniqueIndex('calendar_connections_device_uq').on(t.userId, t.deviceId),
+		uniqueIndex('calendar_connections_account_uq').on(t.userId, t.provider, t.accountLabel)
 	]
 );
 

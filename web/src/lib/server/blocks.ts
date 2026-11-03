@@ -5,7 +5,7 @@ import { db } from './db';
 import { manualBlocks } from './db/schema';
 import { badRequest, notFound } from './http';
 import { newId } from './ids';
-import { addDays, DAY, dateOf, wallClock, zonedInstant } from './availability/time';
+import { addDays, DAY, dateOf, daysBetween, wallClock, zonedInstant } from './availability/time';
 import type { Span } from './availability/intervals';
 
 type BlockRow = typeof manualBlocks.$inferSelect;
@@ -40,6 +40,11 @@ export function expandBlock(
 	const firstDate = dateOf(start, timeZone);
 	const w = wallClock(start, timeZone);
 	const minutes = w.hour * 60 + w.minute;
+	// The end keeps its own local date and time too: a fixed duration would put it
+	// an hour out on an occurrence that spans a DST change.
+	const endDays = daysBetween(firstDate, dateOf(block.end.getTime(), timeZone));
+	const we = wallClock(block.end.getTime(), timeZone);
+	const endMinutes = we.hour * 60 + we.minute;
 	const out: Span[] = [];
 	// Jump close to the range instead of walking every occurrence since the first.
 	let k = Math.max(0, Math.floor((from - duration - start) / (step * DAY)) - 1);
@@ -48,7 +53,9 @@ export function expandBlock(
 		if (block.until && date > block.until) break;
 		const s = zonedInstant(date, minutes, timeZone);
 		if (s >= to) break;
-		if (s + duration > from) out.push({ start: s, end: s + duration });
+		const local = zonedInstant(addDays(date, endDays), endMinutes, timeZone);
+		const e = local > s ? local : s + duration;
+		if (e > from) out.push({ start: s, end: e });
 	}
 	return out;
 }

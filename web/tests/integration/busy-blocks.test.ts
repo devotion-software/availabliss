@@ -25,7 +25,7 @@ const block = (start: string, end: string, extra: Partial<Parameters<typeof crea
 async function calendarWith(userId: string, name: string, busy: boolean, spans: [string, string][]) {
 	const connectionId = newId();
 	const calendarId = newId();
-	await db.insert(calendarConnections).values({ id: connectionId, userId, provider: 'caldav', label: 'Test', credentials: null });
+	await db.insert(calendarConnections).values({ id: connectionId, userId, provider: 'caldav', label: `Test ${name}`, credentials: null });
 	await db.insert(calendars).values({ id: calendarId, connectionId, externalId: name, name, busy });
 	if (spans.length) {
 		await db.insert(busyIntervals).values(

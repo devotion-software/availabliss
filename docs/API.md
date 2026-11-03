@@ -508,7 +508,12 @@ Payloads by type: `message.created` → `Message`; `poll.updated` → `Poll`;
 `{ id, deleted: true }`); `group.updated` → `Group`; `member.changed` → `Member`
 (or `{ userId, removed: true }`); `availability.changed` → `{ userId }` (refetch
 availability); `notification.created` → `Notification`; `message.receipts` →
-`{ userId, state, receipts: { messageId, delivered, seen, recipients, seenBy }[] }`.
+`{ userId, state, receipts: { messageId, delivered, seen, recipients, seenBy }[] }`
+(the newest 500 changed messages; all of them are marked).
+
+When a group is deleted, each member gets `member.changed` with their own
+`{ userId, removed: true }`, as if they'd been removed. Deleting an account sends
+the remaining members of each of its groups `member.changed` `{ userId, removed: true }`.
 
 Native apps keep this open while foregrounded and rely on push otherwise.
 

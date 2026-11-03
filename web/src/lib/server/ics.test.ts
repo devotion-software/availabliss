@@ -47,6 +47,14 @@ describe('buildIcs', () => {
 		expect(lines(ics)).toContain('DTEND;VALUE=DATE:20260703');
 	});
 
+	test('a carriage return in text cannot start a new property', () => {
+		const ics = buildIcs(event({ title: 'Hi\rATTENDEE:mailto:x@example.com', note: 'a\r\nb' }), 'G', 'h', 'UTC');
+		expect(lines(ics)).toContain('SUMMARY:Hi\\nATTENDEE:mailto:x@example.com');
+		expect(lines(ics).some((l) => l.startsWith('ATTENDEE'))).toBe(false);
+		expect(ics).not.toMatch(/\r(?!\n)/);
+		expect(lines(ics)).toContain('DESCRIPTION:a\\nb\\n\\nPlanned with G on Availabliss');
+	});
+
 	test('escapes text values and joins note with the footer', () => {
 		const ics = buildIcs(event({ title: 'A, b; c\\d', location: 'Pub; upstairs', note: 'Bring\ncash' }), 'G', 'h', 'UTC');
 		expect(lines(ics)).toContain('SUMMARY:A\\, b\\; c\\\\d');

@@ -2,7 +2,7 @@ import './setup';
 import { afterAll, describe, expect, test } from 'bun:test';
 import { createGroup } from '#lib/server/groups';
 import { eq } from 'drizzle-orm';
-import { db } from '#lib/server/db';
+import { db, isDuplicateKey } from '#lib/server/db';
 import { calendarConnections } from '#lib/server/db/schema';
 import { newId } from '#lib/server/ids';
 import { syncConnection, syncDevice, syncStaleConnections, type DeviceSyncInput } from '#lib/server/calendars';
@@ -60,6 +60,36 @@ describe('syncDevice', () => {
 		} finally {
 			off();
 		}
+	});
+});
+
+describe('connection uniqueness', () => {
+	const input = (deviceId: string): DeviceSyncInput => ({
+		deviceId,
+		deviceName: 'iPhone',
+		rangeStart: '2031-05-01T00:00:00.000Z',
+		rangeEnd: '2031-06-01T00:00:00.000Z',
+		calendars: [{ externalId: 'home', name: 'Home', color: null, busy: true }],
+		busy: []
+	});
+
+	test('a fresh device uploading twice at once makes one connection', async () => {
+		const me = await fx.user();
+		const [a, b] = await Promise.all([syncDevice(me, input('race-1')), syncDevice(me, input('race-1'))]);
+		expect(a.id).toBe(b.id);
+		const rows = await db.select().from(calendarConnections).where(eq(calendarConnections.userId, me));
+		expect(rows).toHaveLength(1);
+	});
+
+	test('two devices may share a name, but a server account is one connection', async () => {
+		const me = await fx.user();
+		await syncDevice(me, input('phone-a'));
+		await syncDevice(me, input('phone-b'));
+		const caldav = { userId: me, provider: 'caldav' as const, label: 'iCloud · me@example.com' };
+		await db.insert(calendarConnections).values({ id: newId(), ...caldav });
+		const dup = await db.insert(calendarConnections).values({ id: newId(), ...caldav }).then(() => null, (err) => err);
+		expect(isDuplicateKey(dup)).toBe(true);
+		expect(await db.select().from(calendarConnections).where(eq(calendarConnections.userId, me))).toHaveLength(3);
 	});
 });
 

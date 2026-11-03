@@ -3,7 +3,7 @@
  * confirmed). Everything per group is loaded in a handful of grouped queries
  * across all the user's groups; only the slot count is per group, and cached.
  */
-import { and, asc, count, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gt, gte, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { GroupStatus, GroupSummary, Member } from '#lib/types';
 import { db } from './db';
 import { events, groupMembers, messageReceipts, messages, proposalResponses, proposals, user } from './db/schema';
@@ -75,15 +75,20 @@ async function nextEventByGroup(groupIds: string[]): Promise<Map<string, { id: s
 	return result;
 }
 
-/** Messages from others this user hasn't seen, per group. */
+/**
+ * Messages from others this user hasn't seen, per group. History from before
+ * they joined is readable but never counts as unread.
+ */
 async function unreadByGroup(groupIds: string[], userId: string): Promise<Map<string, number>> {
 	const rows = await db
 		.select({ groupId: messages.groupId, count: count() })
 		.from(messages)
+		.innerJoin(groupMembers, and(eq(groupMembers.groupId, messages.groupId), eq(groupMembers.userId, userId)))
 		.leftJoin(messageReceipts, and(eq(messageReceipts.messageId, messages.id), eq(messageReceipts.userId, userId)))
 		.where(
 			and(
 				inArray(messages.groupId, groupIds),
+				gte(messages.createdAt, groupMembers.joinedAt),
 				or(isNull(messages.authorId), ne(messages.authorId, userId)),
 				isNull(messageReceipts.seenAt)
 			)

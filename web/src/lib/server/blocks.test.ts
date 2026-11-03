@@ -83,6 +83,26 @@ describe('expandBlock (repeating)', () => {
 			['2026-11-02T18:00:00.000Z', '2026-11-02T19:00:00.000Z']
 		]);
 	});
+
+	test('an occurrence spanning the DST change keeps its local end time', () => {
+		// Weekly Sat 22:00 → Sun 10:00 London. On 24–25 Oct the clocks go back overnight,
+		// so that occurrence is 13 hours long, not 12.
+		const b = block('2026-10-17T21:00:00Z', '2026-10-18T09:00:00Z', 'weekly');
+		expect(isoSpans(expandBlock(b, at('2026-10-17T00:00:00Z'), at('2026-11-01T00:00:00Z'), TZ))).toEqual([
+			['2026-10-17T21:00:00.000Z', '2026-10-18T09:00:00.000Z'],
+			['2026-10-24T21:00:00.000Z', '2026-10-25T10:00:00.000Z'],
+			['2026-10-31T22:00:00.000Z', '2026-11-01T10:00:00.000Z']
+		]);
+	});
+
+	test('a repeating all-day block stays midnight to midnight across DST', () => {
+		// Sundays, all day, London: 25 Oct 2026 is 25 hours long.
+		const b = block('2026-10-17T23:00:00Z', '2026-10-18T23:00:00Z', 'weekly');
+		expect(isoSpans(expandBlock(b, at('2026-10-24T00:00:00Z'), at('2026-11-03T00:00:00Z'), TZ))).toEqual([
+			['2026-10-24T23:00:00.000Z', '2026-10-26T00:00:00.000Z'],
+			['2026-11-01T00:00:00.000Z', '2026-11-02T00:00:00.000Z']
+		]);
+	});
 });
 
 test('toManualBlock serialises dates', () => {

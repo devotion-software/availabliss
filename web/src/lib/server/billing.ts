@@ -7,7 +7,7 @@
  */
 import { and, count, eq } from 'drizzle-orm';
 import type { Plan } from '#lib/types';
-import { db } from './db';
+import { db, type DB, type Tx } from './db';
 import { groupMembers, user, userAliases, userPlans } from './db/schema';
 import { ApiError } from './http';
 import { env } from './env';
@@ -44,8 +44,8 @@ export async function isPro(userId: string): Promise<boolean> {
 	return isActive(await entitlementOf(userId));
 }
 
-async function groupsOwned(userId: string): Promise<number> {
-	const [row] = await db
+async function groupsOwned(userId: string, executor: DB | Tx = db): Promise<number> {
+	const [row] = await executor
 		.select({ n: count() })
 		.from(groupMembers)
 		.where(and(eq(groupMembers.userId, userId), eq(groupMembers.role, 'owner')));
@@ -75,10 +75,14 @@ export async function getPlan(userId: string): Promise<Plan> {
 	};
 }
 
-/** Throws 402 upgrade_required when a free account already owns its limit of groups. */
-export async function requireCanCreateGroup(userId: string): Promise<void> {
+/**
+ * Throws 402 upgrade_required when a free account already owns its limit of groups.
+ * Pass the transaction that creates the group (holding the user's row lock) so
+ * parallel requests can't both pass.
+ */
+export async function requireCanCreateGroup(userId: string, executor: DB | Tx = db): Promise<void> {
 	if (await isPro(userId)) return;
-	if ((await groupsOwned(userId)) < FREE_GROUP_LIMIT) return;
+	if ((await groupsOwned(userId, executor)) < FREE_GROUP_LIMIT) return;
 	throw new ApiError(
 		'upgrade_required',
 		`Free accounts can create up to ${FREE_GROUP_LIMIT} groups. Upgrade to Pro for unlimited groups, or delete one you no longer need.`
