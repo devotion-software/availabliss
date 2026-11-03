@@ -78,7 +78,9 @@ class LiveEvents @Inject constructor(
 
     @Synchronized
     fun start() {
-        if (job?.isActive == true || tokenStore.token() == null) return
+        // Called on the main thread (ON_START); before the token has been read this is a
+        // no-op, and SessionManager starts the stream once it has.
+        if (job?.isActive == true || tokenStore.currentToken() == null) return
         job = scope.launch { connectLoop() }
     }
 

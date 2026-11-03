@@ -28,7 +28,8 @@ import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
-enum class AuthState { SignedOut, SignedIn }
+/** [Loading] until [TokenStore] has read the stored token (off the main thread). */
+enum class AuthState { Loading, SignedOut, SignedIn }
 
 /**
  * Owns the session lifecycle: what happens after sign in (push registration, calendar
@@ -54,9 +55,14 @@ class SessionManager @Inject constructor(
     authInterceptor: AuthInterceptor,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
-    val authState: StateFlow<AuthState> = tokenStore.tokenFlow
-        .map { if (it == null) AuthState.SignedOut else AuthState.SignedIn }
-        .stateIn(scope, SharingStarted.Eagerly, if (tokenStore.token() == null) AuthState.SignedOut else AuthState.SignedIn)
+    val authState: StateFlow<AuthState> = tokenStore.state
+        .map { state ->
+            when (state) {
+                TokenState.Loading -> AuthState.Loading
+                is TokenState.Ready -> if (state.token == null) AuthState.SignedOut else AuthState.SignedIn
+            }
+        }
+        .stateIn(scope, SharingStarted.Eagerly, AuthState.Loading)
 
     private val clearMutex = Mutex()
 

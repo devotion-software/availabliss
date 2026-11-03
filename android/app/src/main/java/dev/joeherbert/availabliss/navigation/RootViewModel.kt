@@ -46,6 +46,7 @@ class RootViewModel @Inject constructor(
     val state: StateFlow<RootState> = combine(session.authState, users.user, loadFailed) { auth, user, failed ->
         when {
             auth == AuthState.SignedOut -> RootState.SignedOut
+            auth == AuthState.Loading -> RootState.Loading()
             user == null -> RootState.Loading(failed)
             !user.onboarded -> RootState.Onboarding
             else -> RootState.Main
