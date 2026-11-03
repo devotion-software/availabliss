@@ -96,12 +96,6 @@ export function minutesIntoDay(iso: string, dayKey: string, timeZone: string): n
 	return (new Date(iso).getTime() - new Date(zonedToIso(dayKey, '00:00', timeZone)).getTime()) / 60_000;
 }
 
-/** `HH:MM` → minutes since midnight. */
-export function timeToMinutes(time: string): number {
-	const [h, m] = time.split(':').map(Number);
-	return h * 60 + m;
-}
-
 export const minutesToTime = (minutes: number) => `${pad(Math.floor(minutes / 60) % 24)}:${pad(minutes % 60)}`;
 
 /** Whether two half-open intervals overlap. */

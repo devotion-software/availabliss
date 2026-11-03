@@ -6,7 +6,6 @@ import {
 	detailLabel,
 	fitCountLabel,
 	lengthLabel,
-	matchesLabel,
 	PRESETS,
 	presetOf,
 	previewRequirement,
@@ -98,12 +97,7 @@ describe('labels', () => {
 		).toBe('Fri–Sun · school holidays only · 1 date range');
 	});
 
-	test('matchesLabel and fitCountLabel', () => {
-		expect(matchesLabel(base(), 0)).toBe('No times work yet');
-		expect(matchesLabel(base(), 1)).toBe('1 weekend works');
-		expect(matchesLabel(base('evening'), 3)).toBe('3 evenings work');
-		expect(matchesLabel(null, 2)).toBe('2 times work');
-		expect(matchesLabel(base('tue-thu'), 2)).toBe('2 options work');
+	test('fitCountLabel', () => {
 		expect(fitCountLabel(base('week'), 1)).toBe('1 week');
 		expect(fitCountLabel(withLength({ type: 'days', count: 3 }), 4)).toBe('4 options');
 	});
