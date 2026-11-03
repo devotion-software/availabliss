@@ -28,7 +28,7 @@ class CalendarSyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result = when (val result = sync.sync()) {
-        is DeviceSyncResult.Synced, DeviceSyncResult.Skipped, DeviceSyncResult.Cleared -> Result.success()
+        is DeviceSyncResult.Synced, DeviceSyncResult.Unchanged, DeviceSyncResult.Skipped, DeviceSyncResult.Cleared -> Result.success()
         is DeviceSyncResult.Failed -> when (result.error) {
             is ApiError.Network, is ApiError.Server, is ApiError.RateLimited -> Result.retry()
             else -> Result.failure()

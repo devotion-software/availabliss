@@ -188,9 +188,10 @@ class CalendarSourcesViewModel @Inject constructor(
         if (_state.value.syncingDevice) return
         viewModelScope.launch {
             _state.update { it.copy(syncingDevice = true) }
-            val result = deviceSync.sync()
+            // A tap on Sync always uploads; the quiet sync after granting access skips an unchanged one.
+            val result = deviceSync.sync(force = !quiet)
             val text = when (result) {
-                is DeviceSyncResult.Synced -> if (quiet) null else "Synced this phone's busy times."
+                is DeviceSyncResult.Synced, DeviceSyncResult.Unchanged -> if (quiet) null else "Synced this phone's busy times."
                 DeviceSyncResult.Skipped, DeviceSyncResult.Cleared -> null
                 is DeviceSyncResult.Failed -> result.error.message
             }

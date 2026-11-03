@@ -76,12 +76,21 @@ class AppPreferences @Inject constructor(
 
     val lastDeviceSyncAt: Flow<Long?> = store.data.map { it[KEY_LAST_DEVICE_SYNC] }
 
-    suspend fun setLastDeviceSyncAt(epochMillis: Long) {
-        store.edit { it[KEY_LAST_DEVICE_SYNC] = epochMillis }
+    /** Fingerprint of the last device calendar upload, to skip re-sending an unchanged one. */
+    val lastDeviceSyncHash: Flow<String?> = store.data.map { it[KEY_LAST_DEVICE_SYNC_HASH] }
+
+    suspend fun setLastDeviceSyncAt(epochMillis: Long, hash: String) {
+        store.edit {
+            it[KEY_LAST_DEVICE_SYNC] = epochMillis
+            it[KEY_LAST_DEVICE_SYNC_HASH] = hash
+        }
     }
 
     suspend fun clearLastDeviceSyncAt() {
-        store.edit { it.remove(KEY_LAST_DEVICE_SYNC) }
+        store.edit {
+            it.remove(KEY_LAST_DEVICE_SYNC)
+            it.remove(KEY_LAST_DEVICE_SYNC_HASH)
+        }
     }
 
     suspend fun pushToken(): String? = store.data.first()[KEY_PUSH_TOKEN]
@@ -96,6 +105,7 @@ class AppPreferences @Inject constructor(
             it.remove(KEY_USER)
             it.remove(KEY_BUSY_CALENDARS)
             it.remove(KEY_LAST_DEVICE_SYNC)
+            it.remove(KEY_LAST_DEVICE_SYNC_HASH)
             it.remove(KEY_PUSH_TOKEN)
         }
     }
@@ -107,6 +117,7 @@ class AppPreferences @Inject constructor(
         val KEY_DEVICE_ID = stringPreferencesKey("device_id")
         val KEY_BUSY_CALENDARS = stringSetPreferencesKey("busy_device_calendars")
         val KEY_LAST_DEVICE_SYNC = longPreferencesKey("last_device_sync")
+        val KEY_LAST_DEVICE_SYNC_HASH = stringPreferencesKey("last_device_sync_hash")
         val KEY_PUSH_TOKEN = stringPreferencesKey("push_token")
     }
 }

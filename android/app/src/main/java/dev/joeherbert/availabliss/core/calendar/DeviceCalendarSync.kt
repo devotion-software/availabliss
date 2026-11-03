@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.core.calendar
 
+import java.security.MessageDigest
+import kotlinx.serialization.json.Json
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.joeherbert.availabliss.core.auth.TokenStore
@@ -27,6 +29,8 @@ import javax.inject.Singleton
 /** Outcome of a device calendar upload. */
 sealed interface DeviceSyncResult {
     data class Synced(val connection: CalendarConnection, val busyCount: Int) : DeviceSyncResult
+    /** Same calendars, busy flags, window and busy time as the last upload: nothing was sent. */
+    data object Unchanged : DeviceSyncResult
     /** Not signed in, or READ_CALENDAR not granted and nothing was uploaded before: nothing to do. */
     data object Skipped : DeviceSyncResult
     /** READ_CALENDAR was revoked: this phone's calendars and busy time were removed from the server. */
@@ -50,8 +54,19 @@ internal fun deviceSyncAction(signedIn: Boolean, hasPermission: Boolean, lastSyn
 }
 
 /**
+ * Whether an upload with fingerprint [hash] can be skipped: the last one sent exactly
+ * this, less than [DeviceCalendarSync.MAX_UNCHANGED_AGE_MS] ago. The window's dates are
+ * part of the payload, so it changes at least daily anyway; the age cap is a backstop.
+ */
+internal fun isUnchanged(hash: String, lastHash: String?, lastSyncAt: Long?, now: Long): Boolean =
+    lastHash == hash && lastSyncAt != null && now - lastSyncAt in 0 until DeviceCalendarSync.MAX_UNCHANGED_AGE_MS
+
+/**
  * Uploads busy time ranges (never titles) from the device calendars the user marked
  * as busy, for the next [WINDOW_DAYS] days, via `PUT /calendars/device`.
+ *
+ * Every upload makes the server tell each of the user's groups that availability
+ * changed, so an upload identical to the last one is skipped (see [isUnchanged]).
  */
 @Singleton
 class DeviceCalendarSync @Inject constructor(
@@ -60,6 +75,7 @@ class DeviceCalendarSync @Inject constructor(
     private val prefs: AppPreferences,
     private val calendars: CalendarsRepository,
     private val tokenStore: TokenStore,
+    private val json: Json,
 ) {
     private val mutex = Mutex()
 
@@ -72,13 +88,14 @@ class DeviceCalendarSync @Inject constructor(
 
     suspend fun setBusyCalendarIds(ids: Set<String>) = prefs.setBusyDeviceCalendarIds(ids)
 
-    suspend fun sync(): DeviceSyncResult = mutex.withLock { syncLocked() }
+    /** [force] uploads even when nothing changed (the user tapped Sync). */
+    suspend fun sync(force: Boolean = false): DeviceSyncResult = mutex.withLock { syncLocked(force) }
 
-    private suspend fun syncLocked(): DeviceSyncResult =
+    private suspend fun syncLocked(force: Boolean): DeviceSyncResult =
         when (deviceSyncAction(tokenStore.token() != null, reader.hasReadPermission(), prefs.lastDeviceSyncAt.first())) {
             DeviceSyncAction.Skip -> DeviceSyncResult.Skipped
             DeviceSyncAction.Clear -> clear()
-            DeviceSyncAction.Upload -> upload()
+            DeviceSyncAction.Upload -> upload(force)
         }
 
     /**
@@ -103,7 +120,7 @@ class DeviceCalendarSync @Inject constructor(
         }
     }
 
-    private suspend fun upload(): DeviceSyncResult {
+    private suspend fun upload(force: Boolean): DeviceSyncResult {
         val available = reader.calendars()
         val busyIds = busyCalendarIds(available)
         val now = Instant.now()
@@ -137,14 +154,26 @@ class DeviceCalendarSync @Inject constructor(
                 )
             },
         )
-        return when (val result = calendars.uploadDeviceBusy(payload).onSuccess { prefs.setLastDeviceSyncAt(System.currentTimeMillis()) }) {
+        val hash = fingerprint(payload)
+        val nowMs = System.currentTimeMillis()
+        if (!force && isUnchanged(hash, prefs.lastDeviceSyncHash.first(), prefs.lastDeviceSyncAt.first(), nowMs)) {
+            return DeviceSyncResult.Unchanged
+        }
+        return when (val result = calendars.uploadDeviceBusy(payload).onSuccess { prefs.setLastDeviceSyncAt(nowMs, hash) }) {
             is ApiResult.Success -> DeviceSyncResult.Synced(result.value, payload.busy.size)
             is ApiResult.Failure -> DeviceSyncResult.Failed(result.error)
         }
     }
 
+    private fun fingerprint(payload: DeviceSync): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest(json.encodeToString(DeviceSync.serializer(), payload).toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
     companion object {
         const val WINDOW_DAYS = 120L
+        /** Upload at least this often even when nothing changed. */
+        const val MAX_UNCHANGED_AGE_MS = 24L * 60 * 60 * 1000
         /** Server limit on `busy` entries per upload. */
         private const val MAX_RANGES = 20_000
     }

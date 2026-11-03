@@ -25,4 +25,16 @@ class DeviceSyncActionTest {
         assertEquals(DeviceSyncAction.Skip, deviceSyncAction(signedIn = false, hasPermission = true, lastSyncAt = 1L))
         assertEquals(DeviceSyncAction.Skip, deviceSyncAction(signedIn = false, hasPermission = false, lastSyncAt = 1L))
     }
+
+    @Test
+    fun `skips an upload identical to the last one within a day`() {
+        val day = DeviceCalendarSync.MAX_UNCHANGED_AGE_MS
+        assertEquals(true, isUnchanged("h", lastHash = "h", lastSyncAt = 1_000L, now = 1_000L + day - 1))
+        assertEquals(false, isUnchanged("h", lastHash = "other", lastSyncAt = 1_000L, now = 2_000L))
+        assertEquals(false, isUnchanged("h", lastHash = null, lastSyncAt = 1_000L, now = 2_000L))
+        assertEquals(false, isUnchanged("h", lastHash = "h", lastSyncAt = null, now = 2_000L))
+        // Forced roughly daily even when nothing changed, and after a clock change.
+        assertEquals(false, isUnchanged("h", lastHash = "h", lastSyncAt = 1_000L, now = 1_000L + day))
+        assertEquals(false, isUnchanged("h", lastHash = "h", lastSyncAt = 5_000L, now = 1_000L))
+    }
 }
