@@ -119,6 +119,9 @@ export const deviceSyncSchema = z.object({
 	deviceName: trimmed(80),
 	rangeStart: isoDateTime,
 	rangeEnd: isoDateTime,
+	// Uploads split into ranges: the end of the whole sync, and whether more ranges follow.
+	coveredUntil: isoDateTime.optional(),
+	more: z.boolean().optional(),
 	calendars: z
 		.array(
 			z.object({

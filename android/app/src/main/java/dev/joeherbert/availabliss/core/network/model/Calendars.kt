@@ -33,6 +33,8 @@ data class CalendarConnection(
     val status: ConnectionStatus = ConnectionStatus.Ok,
     val lastSyncedAt: String? = null,
     val calendars: List<ConnectedCalendar> = emptyList(),
+    /** Phone calendars: how far ahead to read (ISO instant). Null for server calendars. */
+    val syncUntil: String? = null,
 )
 
 @Serializable
@@ -76,6 +78,9 @@ data class DeviceSync(
     val rangeEnd: String,
     val calendars: List<DeviceCalendar>,
     val busy: List<DeviceBusy>,
+    /** A sync sent as several ranges: the end of the whole sync, and whether more ranges follow. */
+    val coveredUntil: String? = null,
+    val more: Boolean? = null,
 )
 
 @Serializable

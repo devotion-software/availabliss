@@ -63,6 +63,59 @@ describe('syncDevice', () => {
 	});
 });
 
+describe('multi-range uploads', () => {
+	const range = (from: string, to: string, more: boolean, busy: DeviceSyncInput['busy'] = []): DeviceSyncInput => ({
+		deviceId: 'phone-ranges',
+		deviceName: 'Phone',
+		rangeStart: from,
+		rangeEnd: to,
+		coveredUntil: '2034-01-01T00:00:00.000Z',
+		more,
+		calendars: [{ externalId: 'home', name: 'Home', color: null, busy: true }],
+		busy
+	});
+	const far = { calendarExternalId: 'home', start: '2033-05-10T09:00:00.000Z', end: '2033-05-10T10:00:00.000Z' };
+
+	test('each range replaces only itself, and the groups hear once, after the last', async () => {
+		const [me, friend] = await fx.users(2);
+		const groupId = (await createGroup(me, { name: 'Ranges', requirement: everyDay() }, 'UTC')).id;
+		await fx.join(groupId, friend);
+		const seen: LiveEvent[] = [];
+		const off = subscribe(friend, (e) => e.type === 'availability.changed' && seen.push(e));
+		try {
+			await syncDevice(me, range('2033-01-01T00:00:00.000Z', '2034-01-01T00:00:00.000Z', true, [far]));
+			await settle();
+			expect(seen.length).toBe(0);
+			// The near range, sent last: nothing changed in it, but an earlier range did.
+			const near = { calendarExternalId: 'home', start: '2031-05-10T09:00:00.000Z', end: '2031-05-10T10:00:00.000Z' };
+			const conn = await syncDevice(me, range('2031-05-01T00:00:00.000Z', '2033-01-01T00:00:00.000Z', false, [near]));
+			await settle();
+			expect(seen.length).toBe(1);
+
+			// Busy time in both ranges survives; coverage is the whole sync's end.
+			const stored = await loadBusy([me], Date.parse('2031-01-01T00:00:00Z'), Date.parse('2034-01-01T00:00:00Z'));
+			expect(stored.get(me)!.map((b) => new Date(b.start).toISOString())).toEqual([near.start, far.start]);
+			const row = await db.query.calendarConnections.findFirst({ where: eq(calendarConnections.id, conn.id) });
+			expect(row!.coveredUntil!.toISOString()).toBe('2034-01-01T00:00:00.000Z');
+
+			// Nothing changed anywhere: nobody hears.
+			await syncDevice(me, range('2033-01-01T00:00:00.000Z', '2034-01-01T00:00:00.000Z', true, [far]));
+			await syncDevice(me, range('2031-05-01T00:00:00.000Z', '2033-01-01T00:00:00.000Z', false, [near]));
+			await settle();
+			expect(seen.length).toBe(1);
+		} finally {
+			off();
+		}
+	});
+
+	test('tells the phone how far ahead to read', async () => {
+		const me = await fx.user();
+		const conn = await syncDevice(me, range('2031-05-01T00:00:00.000Z', '2031-06-01T00:00:00.000Z', false));
+		const horizon = Date.parse(conn.syncUntil!);
+		expect(horizon).toBeGreaterThanOrEqual(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000 - 60_000);
+	});
+});
+
 describe('connection uniqueness', () => {
 	const input = (deviceId: string): DeviceSyncInput => ({
 		deviceId,

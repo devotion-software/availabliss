@@ -141,6 +141,8 @@ export interface CalendarConnection {
 	status: 'ok' | 'error' | 'reauth_required';
 	lastSyncedAt: string | null;
 	calendars: { id: string; name: string; color: string | null; busy: boolean }[];
+	/** Phone calendars: how far ahead the app should read (ISO instant). Null for server calendars. */
+	syncUntil: string | null;
 }
 
 export interface ManualBlock {

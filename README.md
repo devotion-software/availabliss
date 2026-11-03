@@ -73,8 +73,10 @@ and every pull request, and only builds the platforms a change touches:
   last sync, CalDAV calendars whose change tag hasn't moved are skipped, and
   Outlook (no per-calendar change feed) re-reads the next six months every sync
   and the rest daily. Writes are diffs, so an unchanged calendar writes nothing.
-  When someone's calendars stop short of the dates on screen, the group calendar
-  says so ("Sam's calendar is only checked up to 4 Mar 2029").
+  Phones read as far ahead as the server asks and upload in fixed 180-day ranges,
+  re-sending only ranges that changed. When someone's calendars stop short of the
+  dates on screen, the group calendar says so ("Sam's calendar is only checked up
+  to 4 Mar 2029").
 - **Availability engine** (`web/src/lib/server/availability/`) is pure and unit
   tested: it expands a group's requirement into candidate slots, checks every
   synced member is free, and returns per-day states (hidden / busy / free /

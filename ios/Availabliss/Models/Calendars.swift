@@ -29,6 +29,8 @@ struct CalendarConnection: Codable, Sendable, Identifiable, Equatable {
     var status: Status
     var lastSyncedAt: Date?
     var calendars: [Calendar]
+    /// Phone calendars: how far ahead to read. Nil for server calendars.
+    var syncUntil: Date? = nil
 }
 
 struct ConnectionsResponse: Decodable, Sendable { let connections: [CalendarConnection] }
@@ -63,6 +65,9 @@ struct DeviceSync: Encodable, Sendable {
     let deviceName: String
     let rangeStart: Date
     let rangeEnd: Date
+    /// A sync sent as several ranges: the end of the whole sync, and whether more ranges follow.
+    var coveredUntil: Date? = nil
+    var more: Bool? = nil
     let calendars: [DeviceCalendar]
     let busy: [BusyRange]
 }
