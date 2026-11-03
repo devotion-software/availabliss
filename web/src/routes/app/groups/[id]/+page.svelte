@@ -22,6 +22,7 @@
 	import PlannerSheet from '#lib/components/group/PlannerSheet.svelte';
 	import { getPlan } from '#lib/client/plan';
 	import { upgradeSheet } from '#lib/client/ui-state.svelte';
+	import { DESKTOP, layoutQuery } from '#lib/client/media.svelte';
 	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
 	import Breadcrumbs from '#lib/components/ui/Breadcrumbs.svelte';
 	import ChatPanel from '#lib/components/chat/ChatPanel.svelte';
@@ -199,6 +200,11 @@
 		else upgradeSheet.showFor('AI planning is part of Pro: it picks the best time, suggests things to do and drafts the plan.');
 	}
 
+	// Mount one layout's pieces, not both. Until hydrated, both render and CSS picks.
+	const isDesktop = layoutQuery(DESKTOP);
+	const desk = $derived(isDesktop.matches !== false);
+	const phone = $derived(isDesktop.matches !== true);
+
 	function selectSlot(slot: Slot) {
 		select(fmt.current.dayKey(slot.start));
 		view = 'month';
@@ -209,6 +215,7 @@
 
 <div class="page">
 	<div class="main">
+		{#if phone}
 		<!-- Phone header (GroupCalendar.dc) -->
 		<header class="phone-head">
 			<IconButton href="/app" icon="chevron-left" label="Back to groups" />
@@ -218,7 +225,9 @@
 			</div>
 			<IconButton href="{base}/members" icon="user-plus" label="Members and invites" />
 		</header>
+		{/if}
 
+		{#if desk}
 		<!-- Desktop header (Web.dc) -->
 		<header class="desk-head">
 			<div class="titles">
@@ -232,7 +241,9 @@
 			</div>
 			<SegmentedControl options={VIEWS} bind:value={view} label="Calendar view" />
 		</header>
+		{/if}
 
+		{#if phone}
 		<div class="phone-only stack">
 			<SyncBanner groupId={group.id} members={group.members} canNudge={isAdmin} />
 			<a class="timing glass" href="{base}/timing">
@@ -241,12 +252,13 @@
 				<Icon name="pencil" size={15} class="muted" />
 			</a>
 		</div>
+		{/if}
 
 		<section class="cal" aria-labelledby="cal-heading">
 			<div class="cal-head">
 				<h2 id="cal-heading"><span class="desk-inline">{heading}</span><span class="phone-inline">{shortHeading}</span></h2>
 				{#if loadingMonth}<Spinner size={16} label="Loading month" />{/if}
-				<span class="desk-only"><SyncBanner groupId={group.id} members={group.members} canNudge={isAdmin} variant="pill" /></span>
+				{#if desk}<span class="desk-only"><SyncBanner groupId={group.id} members={group.members} canNudge={isAdmin} variant="pill" /></span>{/if}
 				<span class="nav desk-flex">
 					<IconButton icon="chevron-left" label="Previous {view}" variant="surface" shape="rounded" size={40} onclick={() => step(-1)} />
 					<IconButton icon="chevron-right" label="Next {view}" variant="surface" shape="rounded" size={40} onclick={() => step(1)} />
@@ -262,12 +274,16 @@
 
 			<div class="cal-body" class:boxed={view !== 'month'}>
 			{#if view === 'month'}
-				<span class="phone-only">
-					<MonthGrid {availability} {month} {members} {selected} onselect={select} compact />
-				</span>
-				<span class="desk-only">
-					<MonthGrid {availability} {month} {members} {selected} onselect={select} />
-				</span>
+				{#if phone}
+					<span class="phone-only">
+						<MonthGrid {availability} {month} {members} {selected} onselect={select} compact />
+					</span>
+				{/if}
+				{#if desk}
+					<span class="desk-only">
+						<MonthGrid {availability} {month} {members} {selected} onselect={select} />
+					</span>
+				{/if}
 			{:else if view === 'week'}
 				<WeekGrid
 					dates={week}
@@ -308,9 +324,12 @@
 			onselect={selectSlot}
 			onplan={aiPlanner?.available ? openPlanner : undefined}
 		/>
-		<div class="desk-only">
-			<ChatPanel {group} me={data.user} onpropose={() => propose(null)} />
-		</div>
+		<!-- Only mounted on desktop: it loads and subscribes to the chat. Phones use the Chat tab. -->
+		{#if isDesktop.matches}
+			<div class="desk-only">
+				<ChatPanel {group} me={data.user} onpropose={() => propose(null)} />
+			</div>
+		{/if}
 	</aside>
 </div>
 

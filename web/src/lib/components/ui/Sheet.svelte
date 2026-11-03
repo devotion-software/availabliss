@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { MediaQuery } from 'svelte/reactivity';
 	import type { Snippet } from 'svelte';
 	import { fade, fly, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
@@ -21,15 +22,8 @@
 	let { open = $bindable(), title, description, placement = 'auto', width = 480, onclose, children, footer }: Props = $props();
 
 	const uid = $props.id();
-	let isPhone = $state(false);
-
-	$effect(() => {
-		const media = window.matchMedia('(max-width: 639px)');
-		isPhone = media.matches;
-		const update = () => (isPhone = media.matches);
-		media.addEventListener('change', update);
-		return () => media.removeEventListener('change', update);
-	});
+	const phone = new MediaQuery('(max-width: 639px)');
+	const isPhone = $derived(phone.current);
 
 	// Lock page scroll while open.
 	$effect(() => {
