@@ -5,12 +5,15 @@ enum AuthFlowError: LocalizedError {
     case missingToken
     case invalidServerResponse
     case notConfigured(String)
+    /// The provider (e.g. Google's OAuth endpoints) returned an error.
+    case provider(String, message: String)
 
     var errorDescription: String? {
         switch self {
         case .missingToken: "Signed in, but the server didn't return a session token."
         case .invalidServerResponse: "The sign-in response wasn't what we expected."
         case .notConfigured(let what): "\(what) isn't set up for this build."
+        case .provider(let what, let message): "\(what) didn't work (\(message)). Please try again."
         }
     }
 }

@@ -16,7 +16,7 @@ struct GroupsHomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 header
                 if let event = model.upNext {
-                    UpNextCard(event: event, goingCount: model.memberCount(forGroupNamed: event.groupName))
+                    UpNextCard(event: event, goingCount: model.memberCount(forGroup: event.groupId))
                 }
                 groupsHeader
                 groupsList
@@ -31,10 +31,24 @@ struct GroupsHomeView: View {
         .task(id: app.accountVersion) { await model.load() }
         .refreshable { await model.load() }
         .task {
+            // A burst of live events refetches once, a second after the last one.
+            var reload: Task<Void, Never>?
+            defer { reload?.cancel() }
             for await event in app.live.events() {
                 switch event.kind {
-                case .groupUpdated, .memberChanged, .proposalCreated, .proposalConfirmed, .eventChanged, .messageCreated, .availabilityChanged, .reconnected:
-                    await model.load()
+                case .messageCreated:
+                    // Only the unread badge changes, so patch it rather than refetching.
+                    if let message = event.payload(as: Message.self), message.authorId != app.session.user?.id,
+                       message.groupId != app.router.visibleChatGroupId {
+                        model.addUnread(groupId: message.groupId)
+                    }
+                case .groupUpdated, .memberChanged, .proposalCreated, .proposalConfirmed, .eventChanged, .availabilityChanged, .reconnected:
+                    reload?.cancel()
+                    reload = Task {
+                        try? await Task.sleep(for: .seconds(1))
+                        guard !Task.isCancelled else { return }
+                        await model.load()
+                    }
                 default: break
                 }
             }

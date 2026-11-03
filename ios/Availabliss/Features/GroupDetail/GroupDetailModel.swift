@@ -52,6 +52,10 @@ final class GroupDetailModel {
                     group?.members.append(member)
                 }
             }
+            if let members = group?.members {
+                group?.memberCount = members.count
+                group?.syncedCount = members.filter(\.synced).count
+            }
         default:
             break
         }

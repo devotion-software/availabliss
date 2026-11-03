@@ -30,8 +30,13 @@ final class GroupsHomeViewModel {
         } catch {}
     }
 
-    func memberCount(forGroupNamed name: String?) -> Int? {
-        groups.first { $0.name == name }?.memberCount
+    func addUnread(groupId: String) {
+        guard let index = groups.firstIndex(where: { $0.id == groupId }) else { return }
+        groups[index].unreadCount += 1
+    }
+
+    func memberCount(forGroup id: String) -> Int? {
+        groups.first { $0.id == id }?.memberCount
     }
 }
 

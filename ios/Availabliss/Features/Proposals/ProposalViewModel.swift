@@ -65,7 +65,7 @@ final class ProposalViewModel {
         guard let proposal else { return "" }
         var parts: [String] = []
         if proposal.title != nil { parts.append(Formatting.span(start: proposal.start, end: proposal.end, allDay: proposal.allDay)) }
-        if !proposal.allDay { parts.append("From \(Formatting.shortDay(proposal.start).split(separator: " ").first ?? "") \(Formatting.time(proposal.start))") }
+        if !proposal.allDay { parts.append("From \(proposal.start.formatted(.dateTime.weekday(.abbreviated))) \(Formatting.time(proposal.start))") }
         if let location = proposal.location, !location.isEmpty { parts.append(location) }
         return parts.joined(separator: " · ")
     }
@@ -79,7 +79,8 @@ final class ProposalViewModel {
     /// One row per member, in the order: proposer, then group order.
     var rows: [Member] {
         guard let group else { return [] }
-        return group.members.sorted { lhs, _ in lhs.userId == proposal?.createdBy }
+        let proposer = proposal?.createdBy
+        return group.members.filter { $0.userId == proposer } + group.members.filter { $0.userId != proposer }
     }
 
     func note(for member: Member, me: String?) -> String {

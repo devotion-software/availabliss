@@ -63,9 +63,13 @@ struct GoogleSignIn {
 
         let callback = try await WebAuthenticator().authenticate(url: url, callbackScheme: redirectScheme)
         let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
-        guard items.first(where: { $0.name == "state" })?.value == state,
-              let code = items.first(where: { $0.name == "code" })?.value
-        else { throw AuthFlowError.invalidServerResponse }
+        guard items.first(where: { $0.name == "state" })?.value == state else { throw AuthFlowError.invalidServerResponse }
+        if let error = items.first(where: { $0.name == "error" })?.value {
+            // access_denied: the user backed out on Google's consent screen.
+            if error == "access_denied" { throw CancellationError() }
+            throw AuthFlowError.provider("Google sign-in", message: error)
+        }
+        guard let code = items.first(where: { $0.name == "code" })?.value else { throw AuthFlowError.invalidServerResponse }
 
         var request = URLRequest(url: tokenURL)
         request.httpMethod = "POST"
@@ -76,11 +80,14 @@ struct GoogleSignIn {
         ]
         request.httpBody = Data(form.map { "\($0)=\($1.formEncoded)" }.joined(separator: "&").utf8)
 
-        let (data, _) = try await URLSession.shared.data(for: request)
-        struct TokenResponse: Decodable { let id_token: String? }
-        guard let idToken = try JSONDecoder().decode(TokenResponse.self, from: data).id_token else {
-            throw AuthFlowError.invalidServerResponse
+        let (data, response) = try await URLSession.shared.data(for: request)
+        struct TokenResponse: Decodable { let id_token: String?; let error: String?; let error_description: String? }
+        let token = try? JSONDecoder().decode(TokenResponse.self, from: data)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(status) else {
+            throw AuthFlowError.provider("Google sign-in", message: token?.error_description ?? token?.error ?? "HTTP \(status)")
         }
+        guard let idToken = token?.id_token else { throw AuthFlowError.invalidServerResponse }
         return idToken
     }
 }

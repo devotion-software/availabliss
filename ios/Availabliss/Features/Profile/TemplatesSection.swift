@@ -5,6 +5,7 @@ struct TemplatesSection: View {
     let api: APIClient
     @Binding var toast: String?
     @Binding var error: String?
+    @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var templates: [RequirementTemplate]?
     @State private var renaming: String?
@@ -34,7 +35,7 @@ struct TemplatesSection: View {
         }
         .padding(16)
         .glass(cornerRadius: 24)
-        .task { await load() }
+        .task(id: app.accountVersion) { await load() }
         .confirmationDialog(
             "Delete this template?",
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
