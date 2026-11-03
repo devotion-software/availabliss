@@ -84,11 +84,15 @@ export async function getConnection(userId: string, connectionId: string): Promi
 
 // ─── Shared persistence ───────────────────────────────────────────────────
 
-/** Upserts calendars by external id (keeping the user's busy choice) and removes vanished ones. */
+/**
+ * Upserts calendars by external id (keeping the user's busy choice) and removes
+ * vanished ones. `changed` is false when nothing was written.
+ */
 async function saveCalendars(
 	connectionId: string,
 	remote: (RemoteCalendar & { busy?: boolean })[]
-): Promise<Map<string, string>> {
+): Promise<{ ids: Map<string, string>; changed: boolean }> {
+	let changed = false;
 	const existing = await db.select().from(calendars).where(eq(calendars.connectionId, connectionId));
 	const byExternal = new Map(existing.map((c) => [c.externalId, c]));
 
@@ -98,11 +102,13 @@ async function saveCalendars(
 			// Most syncs change nothing: skip the write.
 			const busyChanged = cal.busy !== undefined && cal.busy !== current.busy;
 			if (current.name === cal.name && current.color === cal.color && !busyChanged) continue;
+			changed = true;
 			await db
 				.update(calendars)
 				.set({ name: cal.name, color: cal.color, ...(cal.busy !== undefined && { busy: cal.busy }) })
 				.where(eq(calendars.id, current.id));
 		} else {
+			changed = true;
 			const id = newId();
 			byExternal.set(cal.externalId, { id, connectionId, externalId: cal.externalId, name: cal.name, color: cal.color, busy: true });
 			await db.insert(calendars).values({
@@ -117,26 +123,41 @@ async function saveCalendars(
 	}
 
 	const keep = remote.map((c) => c.externalId);
-	await db
-		.delete(calendars)
-		.where(and(eq(calendars.connectionId, connectionId), keep.length ? notInArray(calendars.externalId, keep) : undefined));
+	if (existing.some((c) => !keep.includes(c.externalId))) {
+		changed = true;
+		await db
+			.delete(calendars)
+			.where(and(eq(calendars.connectionId, connectionId), keep.length ? notInArray(calendars.externalId, keep) : undefined));
+	}
 
-	return new Map([...byExternal].filter(([ext]) => keep.includes(ext)).map(([ext, c]) => [ext, c.id]));
+	return { ids: new Map([...byExternal].filter(([ext]) => keep.includes(ext)).map(([ext, c]) => [ext, c.id])), changed };
 }
 
-/** Replaces stored busy time for these calendars inside the window. */
-async function replaceBusy(userId: string, calendarIds: Map<string, string>, busy: RemoteBusy[], from: Date, to: Date) {
+/**
+ * Replaces stored busy time for these calendars inside the window. Returns false,
+ * writing nothing, when the stored intervals are already exactly these.
+ */
+async function replaceBusy(userId: string, calendarIds: Map<string, string>, busy: RemoteBusy[], from: Date, to: Date): Promise<boolean> {
 	const ids = [...calendarIds.values()];
-	if (!ids.length) return;
-	await db.transaction(async (tx) => {
-		await tx
-			.delete(busyIntervals)
-			.where(and(inArray(busyIntervals.calendarId, ids), lt(busyIntervals.start, to), gte(busyIntervals.end, from)));
-		const rows = busy.flatMap((b) => {
-			const calendarId = calendarIds.get(b.calendarExternalId);
-			return calendarId && b.end > b.start ? [{ id: newId(), userId, calendarId, start: b.start, end: b.end }] : [];
-		});
+	if (!ids.length) return false;
+	const inWindow = and(inArray(busyIntervals.calendarId, ids), lt(busyIntervals.start, to), gte(busyIntervals.end, from));
+	const rows = busy.flatMap((b) => {
+		const calendarId = calendarIds.get(b.calendarExternalId);
+		return calendarId && b.end > b.start ? [{ id: newId(), userId, calendarId, start: b.start, end: b.end }] : [];
+	});
+	const key = (r: { calendarId: string; start: Date; end: Date }) => `${r.calendarId}|${r.start.getTime()}|${r.end.getTime()}`;
+	return db.transaction(async (tx) => {
+		const stored = await tx
+			.select({ calendarId: busyIntervals.calendarId, start: busyIntervals.start, end: busyIntervals.end })
+			.from(busyIntervals)
+			.where(inWindow);
+		const before = stored.map(key).sort();
+		const after = rows.map(key).sort();
+		if (before.length === after.length && before.every((k, i) => k === after[i])) return false;
+
+		await tx.delete(busyIntervals).where(inWindow);
 		for (let i = 0; i < rows.length; i += 1000) await tx.insert(busyIntervals).values(rows.slice(i, i + 1000));
+		return true;
 	});
 }
 
@@ -155,6 +176,7 @@ export async function syncConnection(connectionId: string): Promise<void> {
 	if (!row || row.provider === 'device' || !row.credentials) return;
 	const adapter = ADAPTERS[row.provider];
 	const context = credentialContext(row.id);
+	let changed = false;
 
 	try {
 		let creds = decryptJson<OAuthCredentials | CaldavCredentials>(row.credentials, context);
@@ -166,9 +188,9 @@ export async function syncConnection(connectionId: string): Promise<void> {
 
 		const { from, to } = syncWindow();
 		const remote = await adapter.listCalendars(creds);
-		const ids = await saveCalendars(row.id, remote);
+		const saved = await saveCalendars(row.id, remote);
 		const busy = await adapter.busy(creds, remote, from, to, await timezoneOf(row.userId));
-		await replaceBusy(row.userId, ids, busy, from, to);
+		changed = (await replaceBusy(row.userId, saved.ids, busy, from, to)) || saved.changed;
 		await db
 			.update(calendarConnections)
 			.set({ status: 'ok', lastError: null, lastSyncedAt: new Date() })
@@ -181,7 +203,8 @@ export async function syncConnection(connectionId: string): Promise<void> {
 			.set({ status, lastError: String(err instanceof Error ? err.message : err).slice(0, 255) })
 			.where(eq(calendarConnections.id, row.id));
 	}
-	await publishAvailabilityChanged(row.userId);
+	// Most syncs find nothing new: only make every group refresh when busy time changed.
+	if (changed) await publishAvailabilityChanged(row.userId);
 }
 
 async function createServerConnection(
@@ -254,15 +277,16 @@ export async function syncDevice(userId: string, input: DeviceSyncInput): Promis
 	if (existing) await db.update(calendarConnections).set(values).where(eq(calendarConnections.id, id));
 	else await db.insert(calendarConnections).values({ id, userId, provider: 'device', deviceId: input.deviceId, ...values });
 
-	const ids = await saveCalendars(id, input.calendars);
-	await replaceBusy(
+	const saved = await saveCalendars(id, input.calendars);
+	const busyChanged = await replaceBusy(
 		userId,
-		ids,
+		saved.ids,
 		input.busy.map((b) => ({ calendarExternalId: b.calendarExternalId, start: new Date(b.start), end: new Date(b.end) })),
 		new Date(input.rangeStart),
 		new Date(input.rangeEnd)
 	);
-	await publishAvailabilityChanged(userId);
+	// The apps upload on every foreground: only make every group refresh when something changed.
+	if (busyChanged || saved.changed || !existing) await publishAvailabilityChanged(userId);
 	return getConnection(userId, id);
 }
 
