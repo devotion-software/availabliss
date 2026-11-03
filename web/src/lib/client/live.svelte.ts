@@ -51,13 +51,33 @@ export interface TypedLiveEvent<T extends LiveEventType> {
 
 type Handler = (event: LiveEvent) => void;
 
+const MAX_BACKOFF_MS = 30_000;
+
 class LiveConnection {
 	/** True while the stream is open; drives "reconnecting" hints. */
 	connected = $state(false);
 
 	#source: EventSource | null = null;
 	#handlers = new Map<LiveEventType, Set<Handler>>();
+	#reconnectHandlers = new Set<() => void>();
 	#count = 0;
+	/** Whether the stream has been open before, so the next open is a reconnect. */
+	#everOpen = false;
+	#retryTimer: ReturnType<typeof setTimeout> | undefined;
+	#backoff = 1000;
+	#onVisible = () => {
+		if (document.visibilityState === 'visible' && this.#count > 0 && !this.#source) this.#retryNow();
+	};
+
+	/**
+	 * Runs `handler` each time the stream comes back after a drop. Events sent
+	 * while it was down are lost (the server keeps no history), so screens refetch
+	 * what they show. Doesn't open the stream by itself.
+	 */
+	onReconnect(handler: () => void): () => void {
+		this.#reconnectHandlers.add(handler);
+		return () => this.#reconnectHandlers.delete(handler);
+	}
 
 	/**
 	 * Listen for one or more event types. Returns the unsubscribe function, so it
@@ -81,18 +101,54 @@ class LiveConnection {
 
 	#open() {
 		if (this.#source || typeof EventSource === 'undefined') return;
+		clearTimeout(this.#retryTimer);
+		if (this.#count === 1) document.addEventListener('visibilitychange', this.#onVisible);
 		const source = new EventSource(`${API_BASE}/live`, { withCredentials: true });
-		source.onopen = () => (this.connected = true);
-		// EventSource reconnects on its own; we just reflect the state.
-		source.onerror = () => (this.connected = false);
+		source.onopen = () => {
+			this.connected = true;
+			this.#backoff = 1000;
+			if (this.#everOpen) this.#reconnected();
+			this.#everOpen = true;
+		};
+		source.onerror = () => {
+			this.connected = false;
+			// A network drop leaves it CONNECTING and the browser retries by itself. A
+			// non-200 answer (a 502 during a deploy, a 401 after the session expired)
+			// closes it for good, so reopen it ourselves, backing off.
+			if (source.readyState === EventSource.CLOSED && this.#source === source) {
+				this.#source = null;
+				this.#retryTimer = setTimeout(() => this.#open(), this.#backoff);
+				this.#backoff = Math.min(this.#backoff * 2, MAX_BACKOFF_MS);
+			}
+		};
 		source.onmessage = (e) => this.#dispatch(e.data);
 		this.#source = source;
 	}
 
+	#retryNow() {
+		clearTimeout(this.#retryTimer);
+		this.#backoff = 1000;
+		this.#open();
+	}
+
 	#close() {
+		clearTimeout(this.#retryTimer);
+		document.removeEventListener('visibilitychange', this.#onVisible);
 		this.#source?.close();
 		this.#source = null;
 		this.connected = false;
+		// The next subscriber starts fresh with its own load, so it isn't a reconnect.
+		this.#everOpen = false;
+	}
+
+	#reconnected() {
+		for (const handler of [...this.#reconnectHandlers]) {
+			try {
+				handler();
+			} catch (err) {
+				console.error('[live] reconnect handler failed', err);
+			}
+		}
 	}
 
 	#dispatch(raw: string) {

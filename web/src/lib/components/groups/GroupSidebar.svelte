@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { GroupSummary } from '#lib/types';
 	import { page } from '$app/state';
+	import { unread } from '#lib/client/unread.svelte';
 	import GroupTile from '#lib/components/ui/GroupTile.svelte';
 	import Icon, { type IconName } from '#lib/components/ui/Icon.svelte';
 	import { groupStatusText } from './status';
@@ -31,19 +32,19 @@
 				<span class="name">{g.name}</span>
 				<span class="sub">{groupStatusText(g)}</span>
 			</span>
-			{#if g.unreadCount && g.id !== currentId}
-				<span class="unread" aria-label="{g.unreadCount} unread">{g.unreadCount}</span>
+			{#if unread.count(g) && g.id !== currentId}
+				<span class="unread" aria-label="{unread.count(g)} unread">{unread.count(g)}</span>
 			{/if}
 		</a>
 		{#if g.id === currentId}
 			<ul class="sections" aria-label="{g.name} sections">
 				{#each SECTIONS as sec (sec.path)}
-					{@const unread = sec.path === '/chat' ? (g.unreadCount ?? 0) : 0}
+					{@const unreadHere = sec.path === '/chat' ? unread.count(g) : 0}
 					<li>
 						<a href="/app/groups/{g.id}{sec.path}" aria-current={sec.routes.includes(route) ? 'page' : undefined}>
 							<Icon name={sec.icon} size={16} />
 							<span>{sec.label}</span>
-							{#if unread}<span class="unread" aria-label="{unread} unread">{unread}</span>{/if}
+							{#if unreadHere}<span class="unread" aria-label="{unreadHere} unread">{unreadHere}</span>{/if}
 						</a>
 					</li>
 				{/each}

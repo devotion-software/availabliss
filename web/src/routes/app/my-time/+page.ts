@@ -4,9 +4,10 @@ import { addDays, startOfWeek, todayIn, zonedToIso } from '#lib/client/dates';
 import { toPageError } from '#lib/client/load';
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ fetch, url, parent, depends }) => {
+export const load: PageLoad = async ({ fetch, url, parent, depends, untrack }) => {
 	depends('app:my-time');
-	const { user } = await parent();
+	// Untracked: the layout's groups refetch on live events shouldn't refetch this week.
+	const { user } = await untrack(() => parent());
 	const today = todayIn(user.timezone);
 	const asked = url.searchParams.get('week');
 	const weekStart = startOfWeek(asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : today);

@@ -60,10 +60,15 @@
 
 	$effect(() => {
 		const id = proposal.id;
-		return live.on(['proposal.updated', 'proposal.confirmed'], (e) => {
+		const off = live.on(['proposal.updated', 'proposal.confirmed'], (e) => {
 			const next = proposalOf(e);
 			if (next.id === id) proposal = next;
 		});
+		const offReconnect = live.onReconnect(() => invalidate('app:proposal'));
+		return () => {
+			off();
+			offReconnect();
+		};
 	});
 
 	let busy = $state<'accepted' | 'declined' | null>(null);

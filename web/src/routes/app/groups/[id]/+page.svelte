@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { DayAvailability, Slot } from '#lib/types';
 	import { getAvailability, getDayAvailability } from '#lib/client/availability';
 	import { addDays, addMonths, endOfMonth, startOfMonth } from '#lib/client/dates';
@@ -42,10 +43,24 @@
 	const base = $derived(`/app/groups/${group.id}`);
 
 	let view = $state<View>('month');
-	// Seeded from the load (and reset when it reruns); navigation overrides them client-side.
-	let month = $derived(data.month);
-	let availability = $derived(data.availability);
-	let selected = $derived(defaultSelection(data.availability, data.month));
+	// Seeded from this page's load; navigation overrides them client-side. Not
+	// $derived from `data`: that object changes whenever a parent layout reloads
+	// (live events in any group refetch the groups list), which would snap the
+	// calendar back to this month. Only a rerun of this page's own load reseeds.
+	let month = $state(untrack(() => data.month));
+	let availability = $state(untrack(() => data.availability));
+	let selected = $state(untrack(() => defaultSelection(data.availability, data.month)));
+	let seededFrom = untrack(() => data.availability);
+	$effect.pre(() => {
+		const next = data.availability;
+		if (next === seededFrom) return;
+		seededFrom = next;
+		untrack(() => {
+			month = data.month;
+			availability = next;
+			selected = defaultSelection(next, data.month);
+		});
+	});
 	let loadingMonth = $state(false);
 	let weekDays = $state(new Map<string, DayAvailability | null>());
 	let dayDetail = $state<DayAvailability | null>(null);
@@ -112,22 +127,35 @@
 		}
 	}
 
-	// Week and day views fetch per-day detail for what's on screen.
+	// Week and day views fetch per-day detail for what's on screen. Only the view,
+	// the selected day and the group trigger it (loadDetails also reads the month's
+	// availability, which would otherwise refetch the week every time that reloads).
 	$effect(() => {
 		void view;
 		void selected;
 		void group.id;
-		if (view !== 'month') loadDetails();
-	});
-
-	// Someone's busy time changed: refresh what's visible.
-	$effect(() => {
-		const id = group.id;
-		return live.on('availability.changed', (e) => {
-			if (e.groupId !== null && e.groupId !== id) return;
-			loadMonth(month);
+		untrack(() => {
 			if (view !== 'month') loadDetails();
 		});
+	});
+
+	// Someone's busy time, or the group's timing, changed: refresh what's visible.
+	$effect(() => {
+		const id = group.id;
+		const refresh = () =>
+			untrack(() => {
+				loadMonth(month);
+				if (view !== 'month') loadDetails();
+			});
+		const off = live.on(['availability.changed', 'group.updated'], (e) => {
+			if (e.groupId === null || e.groupId === id) refresh();
+		});
+		// Changes made while the stream was down never arrived.
+		const offReconnect = live.onReconnect(refresh);
+		return () => {
+			off();
+			offReconnect();
+		};
 	});
 
 	function select(date: string) {

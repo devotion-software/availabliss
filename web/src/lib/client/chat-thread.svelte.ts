@@ -156,7 +156,9 @@ export class ChatThread {
 				const updates = new Map(receiptUpdates(payload).map((u) => [u.id, u.receipt]));
 				if (!updates.size) return;
 				this.messages = this.messages.map((m) => (updates.has(m.id) ? { ...m, receipt: updates.get(m.id)! } : m));
-			})
+			}),
+			// Messages sent while the stream was down never arrive live: merge the latest page.
+			live.onReconnect(() => this.#catchUp())
 		];
 		const onVisibility = () => this.#queueSeen();
 		document.addEventListener('visibilitychange', onVisibility);
@@ -169,6 +171,24 @@ export class ChatThread {
 	}
 
 	/** Adds a message, replacing a matching optimistic one or an existing copy. */
+	async #catchUp() {
+		try {
+			const page = await listMessages(this.groupId, { limit: PAGE });
+			const fresh = new Map(page.messages.map((m) => [m.id, m]));
+			// Refresh receipts and polls on messages we already have, then add the new ones.
+			this.messages = this.messages.map((m) => fresh.get(m.id) ?? m);
+			for (const message of page.messages) {
+				const known = this.messages.some((m) => m.id === message.id);
+				this.#insert(message);
+				if (!known && message.authorId !== this.meId) this.unseen++;
+			}
+			this.#queueDelivered();
+			this.#queueSeen();
+		} catch {
+			// Still offline; the next reconnect tries again.
+		}
+	}
+
 	#insert(message: Message) {
 		if (this.messages.some((m) => m.id === message.id)) return;
 		const temp =

@@ -24,10 +24,19 @@
 		getProposal(id)
 			.then((p) => (proposal = p))
 			.catch(() => (failed = true));
-		return live.on(['proposal.created', 'proposal.updated', 'proposal.confirmed'], (e) => {
+		const off = live.on(['proposal.created', 'proposal.updated', 'proposal.confirmed'], (e) => {
 			const p = proposalOf(e);
 			if (p.id === id) proposal = p;
 		});
+		const offReconnect = live.onReconnect(() => {
+			getProposal(id)
+				.then((p) => (proposal = p))
+				.catch(() => {});
+		});
+		return () => {
+			off();
+			offReconnect();
+		};
 	});
 
 	const startKey = $derived(proposal ? fmt.current.dayKey(proposal.start) : null);

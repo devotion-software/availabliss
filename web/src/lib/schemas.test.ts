@@ -9,7 +9,9 @@ import {
 	requirementSchema,
 	updateBlockSchema,
 	updateEventSchema,
-	updateMeSchema
+	updateMeSchema,
+	instantRangeSchema,
+	caldavSchema
 } from './schemas';
 
 const requirement = (over: Record<string, unknown> = {}) => ({
@@ -162,5 +164,43 @@ describe('other schemas', () => {
 		const sync = { deviceId: 'd', deviceName: 'Phone', rangeStart: '2026-11-01T00:00:00Z', rangeEnd: '2027-02-01T00:00:00Z', calendars: [], busy: [] };
 		expect(ok(deviceSyncSchema, sync)).toBe(true);
 		expect(ok(deviceSyncSchema, { ...sync, calendars: Array(201).fill({ externalId: 'x', name: 'n', color: null }) })).toBe(false);
+	});
+});
+
+describe('timezone validation', () => {
+	test('accepts IANA zones and rejects anything Intl would throw on', () => {
+		expect(updateMeSchema.parse({ timezone: 'Europe/London' })).toEqual({ timezone: 'Europe/London' });
+		expect(updateMeSchema.safeParse({ timezone: 'Foo' }).success).toBe(false);
+		expect(updateMeSchema.safeParse({ timezone: 'Mars/Olympus' }).success).toBe(false);
+	});
+});
+
+describe('instantRangeSchema', () => {
+	const range = instantRangeSchema('from', 'to');
+
+	test('parses to epoch milliseconds', () => {
+		expect(range.parse({ from: '2026-01-01T00:00:00Z', to: '2026-02-01T00:00:00Z' })).toEqual({
+			from: Date.parse('2026-01-01T00:00:00Z'),
+			to: Date.parse('2026-02-01T00:00:00Z')
+		});
+	});
+
+	test('requires the end after the start', () => {
+		expect(range.safeParse({ from: '2026-01-01T00:00:00Z', to: '2026-01-01T00:00:00Z' }).success).toBe(false);
+	});
+
+	test('caps the span at 120 days', () => {
+		expect(range.safeParse({ from: '2026-01-01T00:00:00Z', to: '2026-05-01T00:00:00Z' }).success).toBe(true);
+		expect(range.safeParse({ from: '1970-01-01T00:00:00Z', to: '9999-01-01T00:00:00Z' }).success).toBe(false);
+	});
+});
+
+describe('caldavSchema', () => {
+	const base = { username: 'sam', appPassword: 'x' };
+	test('server URLs must be https', () => {
+		expect(caldavSchema.safeParse({ ...base, serverUrl: 'https://dav.example.com' }).success).toBe(true);
+		for (const serverUrl of ['http://dav.example.com', 'file:///etc/passwd', 'ftp://x']) {
+			expect(caldavSchema.safeParse({ ...base, serverUrl }).success).toBe(false);
+		}
 	});
 });

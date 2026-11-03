@@ -110,6 +110,31 @@ describe('responding', () => {
 		expect(await listProposals(g.groupId, g.member, 'open')).toEqual([]);
 	});
 
+	test('the last two members accepting at once confirm it exactly once', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(11));
+		const results = await Promise.all([respond(p.id, g.admin, 'accepted'), respond(p.id, g.member, 'accepted')]);
+		expect(results.map((r) => r.status)).toEqual(['confirmed', 'confirmed']);
+
+		const made = await db.select().from(events).where(eq(events.proposalId, p.id));
+		expect(made.length).toBe(1);
+		expect(results.every((r) => r.eventId === made[0].id)).toBe(true);
+		const system = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		expect(system.length).toBe(1);
+		const confirmedPushes = await db.select().from(notifications).where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.confirmed')));
+		expect(confirmedPushes.length).toBe(3);
+	});
+
+	test('a cancel racing the last acceptance never leaves a cancelled proposal with an event', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(12));
+		await respond(p.id, g.admin, 'accepted');
+		await Promise.allSettled([respond(p.id, g.member, 'accepted'), cancelProposal(p.id, g.owner)]);
+		const final = await getProposal(p.id, g.owner);
+		const made = await db.select().from(events).where(eq(events.proposalId, p.id));
+		expect(made.length).toBe(final.status === 'confirmed' ? 1 : 0);
+	});
+
 	test('a decline keeps it open; changing your mind can still confirm', async () => {
 		const g = await setup();
 		const p = await createProposal(g.groupId, g.owner, slot(8));

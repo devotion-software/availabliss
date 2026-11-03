@@ -7,6 +7,7 @@
  *   bun scripts/smoke.ts            # BASE_URL defaults to http://localhost:5190
  */
 import { addDays, BASE, call, otpFor, signIn as signInWithCode, todayUtc } from './lib/api';
+import { challengeFor, encodeFlow, FLOW_COOKIE } from '#lib/server/native-auth';
 
 const run = Date.now().toString(36);
 const today = todayUtc();
@@ -184,22 +185,42 @@ check('toggle calendar busy', toggled.data.calendars.find((c: any) => c.id === c
 check('well-known AASA served', (await call(null, 'GET', '/.well-known/apple-app-site-association')).data.webcredentials !== undefined);
 
 // Native web-flow sign-in hand-off: a browser session becomes a one-time code, then a bearer token.
+// The real flow starts at /auth/native/:provider/start, which needs a configured provider, so the
+// flow cookie it would set is signed here with the same BETTER_AUTH_SECRET.
 {
 	const email = `web+${run}@example.com`;
+	const beforeSignIn = Date.now() - 1000;
 	await call(null, 'POST', '/api/auth/email-otp/send-verification-otp', { email, type: 'sign-in' });
 	const signedIn = await fetch(`${BASE}/api/auth/sign-in/email-otp`, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json', origin: BASE },
 		body: JSON.stringify({ email, otp: await otpFor(email) })
 	});
-	const cookie = signedIn.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
-	const callback = await fetch(`${BASE}/api/v1/auth/native/callback`, { headers: { cookie }, redirect: 'manual' });
-	const code = new URL(callback.headers.get('location') ?? 'x://x').searchParams.get('code');
-	check('native callback redirects to the app with a code', callback.status === 302 && Boolean(code), callback.headers.get('location'));
-	const exchanged = await call(null, 'POST', '/api/v1/auth/native/exchange', { code });
+	const session = signedIn.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+	const verifier = 'v'.repeat(20) + crypto.randomUUID().replaceAll('-', '');
+	const callbackWith = async (flow: string | null) => {
+		const cookie = flow ? `${session}; ${FLOW_COOKIE}=${flow}` : session;
+		const res = await fetch(`${BASE}/api/v1/auth/native/callback`, { headers: { cookie }, redirect: 'manual' });
+		return new URL(res.headers.get('location') ?? 'x://x').searchParams;
+	};
+
+	check('native callback refuses a browser that did not start the flow', (await callbackWith(null)).get('error') === 'sign_in_not_started_here');
+	const stale = await callbackWith(encodeFlow(challengeFor(verifier), Date.now() + 60_000));
+	check('native callback refuses a session older than the flow', stale.get('error') === 'sign_in_not_started_here');
+
+	const code = (await callbackWith(encodeFlow(challengeFor(verifier), beforeSignIn))).get('code');
+	check('native callback redirects to the app with a code', Boolean(code), code);
+	const wrong = await call(null, 'POST', '/api/v1/auth/native/exchange', { code, code_verifier: 'w'.repeat(43) });
+	check('exchange needs the matching verifier', wrong.status === 400, wrong.data);
+	check('a code is spent after a wrong verifier', (await call(null, 'POST', '/api/v1/auth/native/exchange', { code, code_verifier: verifier })).status === 400);
+
+	const code2 = (await callbackWith(encodeFlow(challengeFor(verifier), beforeSignIn))).get('code');
+	const exchanged = await call(null, 'POST', '/api/v1/auth/native/exchange', { code: code2, code_verifier: verifier });
 	check('code exchanges for a working bearer token', (await call(exchanged.data.token, 'GET', '/api/v1/me')).data.email === email, exchanged.data);
-	check('codes are single use', (await call(null, 'POST', '/api/v1/auth/native/exchange', { code })).status === 400);
-	const unconfigured = await call(null, 'GET', '/api/v1/auth/native/apple/start');
+	check('codes are single use', (await call(null, 'POST', '/api/v1/auth/native/exchange', { code: code2, code_verifier: verifier })).status === 400);
+	const noChallenge = await call(null, 'GET', '/api/v1/auth/native/apple/start');
+	check('start requires a code_challenge', noChallenge.status === 400, noChallenge);
+	const unconfigured = await call(null, 'GET', `/api/v1/auth/native/apple/start?code_challenge=${challengeFor(verifier)}`);
 	check('unconfigured provider returns a JSON error, not a crash', unconfigured.status !== 500 && Boolean(unconfigured.data?.code), unconfigured);
 }
 

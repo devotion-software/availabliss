@@ -1,11 +1,14 @@
 import './setup';
-import { afterAll, describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, spyOn, test } from 'bun:test';
+import { APIError } from 'better-auth';
+import { auth } from '#lib/auth';
+import { env } from '#lib/server/env';
 import { and, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db';
 import { account, groupMembers, groups, requirementTemplates, session, user, userAliases, userPlans } from '#lib/server/db/schema';
 import { createGroup } from '#lib/server/groups';
 import { createTemplate } from '#lib/server/templates';
-import { completeMerge, createMergeIntent, listLinkedAccounts, mergeCandidate, mergeUsers } from '#lib/server/accounts';
+import { completeMerge, createMergeIntent, linkWithIdToken, listLinkedAccounts, mergeCandidate, mergeUsers } from '#lib/server/accounts';
 import { newId } from '#lib/server/ids';
 import { everyDay, fixture } from './fixtures';
 
@@ -99,3 +102,23 @@ describe('web merge (completeMerge)', () => {
 		expect(await completeMerge(code, { userId: from, sessionCreatedAt: new Date() })).toEqual({ ok: false, reason: 'merge_wrong_account' });
 	});
 });
+
+describe('linkWithIdToken', () => {
+	test('an id token Better Auth rejects is a 400, not a 401 that would sign the app out', async () => {
+		const me = await fx.user();
+		const google = env.google as { clientIds: string[]; clientSecret: string | null };
+		const saved = { clientIds: google.clientIds, clientSecret: google.clientSecret };
+		google.clientIds = saved.clientIds.length ? saved.clientIds : ['test-client'];
+		google.clientSecret = saved.clientSecret ?? 'test-secret';
+		const link = spyOn(auth.api, 'linkSocialAccount').mockImplementation((async () => {
+			throw new APIError('UNAUTHORIZED', { message: 'Invalid id token' });
+		}) as never);
+		try {
+			await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: 'expired' })).rejects.toMatchObject({ status: 400, code: 'validation_error' });
+		} finally {
+			link.mockRestore();
+			Object.assign(google, saved);
+		}
+	});
+});
+

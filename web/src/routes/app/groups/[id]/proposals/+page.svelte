@@ -18,9 +18,14 @@
 
 	$effect(() => {
 		const id = data.group.id;
-		return live.on(['proposal.created', 'proposal.updated', 'proposal.confirmed'], (e) => {
+		const off = live.on(['proposal.created', 'proposal.updated', 'proposal.confirmed'], (e) => {
 			if (e.groupId === id) invalidate('app:proposals');
 		});
+		const offReconnect = live.onReconnect(() => invalidate('app:proposals'));
+		return () => {
+			off();
+			offReconnect();
+		};
 	});
 </script>
 

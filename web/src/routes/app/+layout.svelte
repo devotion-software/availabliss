@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { invalidate } from '$app/navigation';
-	import { live } from '#lib/client/live.svelte';
+	import { live, type LivePayloads } from '#lib/client/live.svelte';
 	import { activity } from '#lib/client/activity.svelte';
+	import { unread } from '#lib/client/unread.svelte';
 	import { newGroupSheet, upgradeSheet } from '#lib/client/ui-state.svelte';
 	import Orbs from '#lib/components/ui/Orbs.svelte';
 	import TabBar from '#lib/components/ui/TabBar.svelte';
@@ -17,8 +18,18 @@
 	});
 	$effect(() => activity.listen());
 
-	// Keep group badges (matches, replies needed, unread) fresh. Bursts of events
-	// collapse into one refetch.
+	// Unread chat counts: server counts from each groups load, patched by live chat events.
+	$effect.pre(() => unread.seed(data.groups));
+	$effect(() => {
+		const me = data.user.id;
+		return live.on(['message.created', 'message.receipts'], (e) => {
+			if (e.type === 'message.created') unread.onMessage(e.payload as LivePayloads['message.created'], me);
+			else unread.onReceipts(e.groupId, e.payload as LivePayloads['message.receipts'], me);
+		});
+	});
+
+	// Keep group badges (matches, replies needed) fresh. Bursts of events collapse
+	// into one refetch. Group pages don't rerun their own loads when this does.
 	$effect(() => {
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		const refresh = () => {
@@ -26,11 +37,14 @@
 			timer = setTimeout(() => invalidate('app:groups'), 600);
 		};
 		const off = live.on(
-			['group.updated', 'member.changed', 'proposal.created', 'proposal.updated', 'proposal.confirmed', 'availability.changed', 'message.created'],
+			['group.updated', 'member.changed', 'proposal.created', 'proposal.updated', 'proposal.confirmed', 'availability.changed'],
 			refresh
 		);
+		// Events sent while the stream was down are lost: refetch groups and activity.
+		const offReconnect = live.onReconnect(() => invalidate('app:groups'));
 		return () => {
 			off();
+			offReconnect();
 			clearTimeout(timer);
 		};
 	});

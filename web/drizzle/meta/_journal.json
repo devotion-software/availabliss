@@ -29,6 +29,13 @@
       "when": 1793647972097,
       "tag": "0003_ordinary_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1793711422418,
+      "tag": "0004_hesitant_the_renegades",
+      "breakpoints": true
     }
   ]
 }

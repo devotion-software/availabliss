@@ -27,7 +27,7 @@ All sign-in calls return `{ "user": User, ... }` plus the `set-auth-token` heade
 | Email one-time code | `POST /api/auth/email-otp/send-verification-otp` `{ "email", "type": "sign-in" }` → then `POST /api/auth/sign-in/email-otp` `{ "email", "otp" }` |
 | Google (native) | Get an ID token with Google Sign-In / Credential Manager, then `POST /api/auth/sign-in/social` `{ "provider": "google", "idToken": { "token": "<id token>" } }` |
 | Apple (native) | Get an identity token with `ASAuthorizationAppleIDProvider`, then `POST /api/auth/sign-in/social` `{ "provider": "apple", "idToken": { "token": "<identity token>", "nonce": "<raw nonce>" } }` |
-| Apple / Google (web flow from a native app, e.g. Apple on Android) | Open `GET /api/v1/auth/native/:provider/start` in a Custom Tab / browser sheet → the server redirects to `availabliss://auth/callback?code=<one-time code>` (or `?error=`) → `POST /api/v1/auth/native/exchange` `{ "code" }` → `{ "token" }`. Codes are single-use and expire after 2 minutes. |
+| Apple / Google (web flow from a native app, e.g. Apple on Android) | Make a random `code_verifier` (43–128 chars) and keep it in the app. Open `GET /api/v1/auth/native/:provider/start?code_challenge=<base64url(SHA-256(code_verifier))>` in a Custom Tab / browser sheet → the server redirects to `availabliss://auth/callback?code=<one-time code>` (or `?error=`) → `POST /api/v1/auth/native/exchange` `{ "code", "code_verifier" }` → `{ "token" }`. Codes are single-use (a wrong verifier also spends one) and expire after 2 minutes. The callback only issues a code to the browser that went through `start` (a signed httpOnly cookie), for the session that sign-in created. |
 | Google / Apple (web) | `POST /api/auth/sign-in/social` `{ "provider", "callbackURL": "/app" }` → redirect to the returned `url` |
 | Passkey | `GET /api/auth/passkey/generate-authenticate-options` → platform WebAuthn assertion → `POST /api/auth/passkey/verify-authentication` `{ "response": <AuthenticationResponseJSON> }` |
 | Add a passkey (signed in) | `GET /api/auth/passkey/generate-register-options` → platform attestation → `POST /api/auth/passkey/verify-registration` `{ "response": <RegistrationResponseJSON>, "name"? }` |
@@ -75,7 +75,7 @@ out. Some endpoints have tighter limits of their own:
 | `GET /invites/:token`, `POST /invites/:token/accept` | 30 / 10 minutes per IP |
 | `GET /live` | 20 connections / minute |
 | `POST /calendars/:id/sync` | 6 / minute |
-| `POST /calendars/caldav`, `POST /calendars/oauth/:provider/url` | 10 / 10 minutes |
+| `POST /calendars/caldav`, `POST /calendars/oauth/:provider/url`, `POST /calendars/oauth/:provider/complete` | 10 / 10 minutes |
 | `PUT /calendars/device` | 30 / minute |
 | `POST /groups` | 20 / hour |
 | `POST /groups/:id/invites` | 30 / hour |
@@ -198,10 +198,10 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/me` | | `User` |
 | PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded'>>` | `User` |
-| GET 🔒 | `/me/busy?from&to` (ISO instants) | | `{ intervals: BusyInterval[] }` (own merged busy time; `label` is only ever returned to the owner) |
+| GET 🔒 | `/me/busy?from&to` (ISO instants, `to` after `from`, at most 120 days apart) | | `{ intervals: BusyInterval[] }` (own merged busy time; `label` is only ever returned to the owner) |
 | DELETE 🔒 | `/me` | | `204` (deletes the account and all data) |
 | GET 🔒 | `/me/accounts` | | `{ linked: { provider: 'apple' \| 'google'; linkedAt }[]; available: ('apple' \| 'google')[] }` (Apple / Google sign-ins on the account, and which ones this server can link) |
-| POST 🔒 | `/me/accounts/link` | `{ provider: 'apple' \| 'google', idToken, nonce?, merge? }` | `{ linked: true, merged }`, or `409` `{ message, code: 'conflict', account: { name, email, groups } }` when that sign-in already has its own account. Show it, then send again with `merge: true` to merge it into this account (its groups, busy time, calendars, chats, templates and Pro move here; the other account is deleted). Native only: the id token comes from Sign in with Apple / Google. |
+| POST 🔒 | `/me/accounts/link` | `{ provider: 'apple' \| 'google', idToken, nonce?, merge? }` | `{ linked: true, merged }`, or `409` `{ message, code: 'conflict', account: { name, email, groups } }` when that sign-in already has its own account. Show it, then send again with `merge: true` to merge it into this account (its groups, busy time, calendars, chats, templates and Pro move here; the other account is deleted). Native only: the id token comes from Sign in with Apple / Google. An id token that can't be verified (e.g. expired while the merge prompt was open) is `400`, never `401`, so it can't be mistaken for the session ending. |
 | POST 🔒 | `/me/accounts/merge-intent` | `{ provider }` | `204` + a short-lived cookie (web only; see Linking on the web) |
 
 ```ts
@@ -285,7 +285,7 @@ interface RequirementTemplate { id: string; name: string; requirement: Requireme
 | GET | `/regions/subdivisions?country=GB` | `{ subdivisions: { code: string; name: string }[] }` |
 | GET | `/regions/school-authorities?country=GB` | `{ authorities: { id: string; name: string }[] }` |
 | GET | `/regions/detect` | `{ country: string \| null; subdivision: string \| null; timezone: string \| null }` (from request headers / IP; best-effort) |
-| GET | `/holidays?country&subdivision&from&to` | `{ holidays: { date: string; name: string }[] }` |
+| GET | `/holidays?country&subdivision&from&to` (dates, at most 400 days apart) | `{ holidays: { date: string; name: string }[] }` |
 
 ### Calendars
 
@@ -306,7 +306,8 @@ interface CalendarConnection {
 | GET 🔒 | `/calendars` | | `{ connections: CalendarConnection[] }` |
 | GET 🔒 | `/calendars/oauth/:provider/start?redirect=` | | `302` to Google / Microsoft consent. `provider` = `google` \| `microsoft`. `redirect` = where to land afterwards (web path, or `availabliss://calendars` for native, opened via ASWebAuthenticationSession / Custom Tabs). |
 | POST 🔒 | `/calendars/oauth/:provider/url` | `{ redirect? }` | `{ url }`: the provider consent URL with signed state embedded. **Native apps use this** and open `url` in ASWebAuthenticationSession / Custom Tabs (those can't send the bearer token). |
-| GET | `/calendars/oauth/:provider/callback` | | `302` to `redirect` with `?connected=<connectionId>` or `?error=` |
+| GET | `/calendars/oauth/:provider/callback` | | Web (`redirect` is a path): links the calendar only if the session cookie belongs to the user who started the flow, then `302` to `redirect` with `?connected=<connectionId>` or `?error=` (`wrong_account` when it doesn't). Native (`availabliss://…`): links nothing and `302`s to `redirect` with `?complete=<code>&provider=<provider>` (or `?error=`). Each state works once. |
+| POST 🔒 | `/calendars/oauth/:provider/complete` | `{ code }` | `CalendarConnection`. Native apps call this with the `complete` code from the callback. `403` if a different user started the flow, `400` if the code is used or older than 10 minutes. |
 | POST 🔒 | `/calendars/caldav` | `{ username, appPassword, serverUrl? }` (defaults to iCloud) | `CalendarConnection` |
 | PUT 🔒 | `/calendars/device` | `DeviceSync` | `CalendarConnection` |
 | PATCH 🔒 | `/calendars/:connectionId/calendars/:calendarId` | `{ busy: boolean }` | `CalendarConnection` |
@@ -418,7 +419,7 @@ A time doesn't have to work for everyone to be proposed. Clients warn first
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/groups/:id/proposals?status=` | | `{ proposals: Proposal[] }` |
 | POST 🔒 | `/groups/:id/proposals` | `{ start, end, allDay?, title?, location?, note? }` | `Proposal` (creator auto-accepts; posts a chat card) |
-| GET 🔒 | `/groups/:id/conflicts?start=&end=` | | `{ busyMemberIds: string[] }` (who's busy then; ISO instants) |
+| GET 🔒 | `/groups/:id/conflicts?start=&end=` | | `{ busyMemberIds: string[] }` (who's busy then; ISO instants, `end` after `start`, at most 120 days apart) |
 | GET 🔒 | `/proposals/:id` | | `Proposal` |
 | POST 🔒 | `/proposals/:id/respond` | `{ response: 'accepted' \| 'declined' }` | `Proposal` |
 | POST 👑 | `/proposals/:id/override` | `{ userId, response: ResponseKind }` | `Proposal` |
@@ -554,4 +555,4 @@ can deep link. On iOS these keys are **top-level** in the APNs payload, next to
 | `/app/groups/:id` | Group calendar |
 | `/app/groups/:id/chat` | Group chat |
 | `/app/proposals/:id` | Proposal |
-| `availabliss://calendars` | Calendar settings (OAuth return) |
+| `availabliss://calendars` | Calendar settings (OAuth return: `?complete=<code>` to finish with `POST /calendars/oauth/:provider/complete`, or `?error=`) |

@@ -210,7 +210,11 @@ export const events = mysqlTable(
 		createdAt: createdAt(),
 		updatedAt: updatedAt()
 	},
-	(t) => [index('events_group_idx').on(t.groupId, t.start)]
+	(t) => [
+		index('events_group_idx').on(t.groupId, t.start),
+		// One event per confirmed proposal (NULLs, i.e. events made directly, don't clash).
+		uniqueIndex('events_proposal_unique').on(t.proposalId)
+	]
 );
 
 // ─── Chat ─────────────────────────────────────────────────────────────────

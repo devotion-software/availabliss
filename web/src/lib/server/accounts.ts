@@ -157,6 +157,8 @@ export async function mergeUsers(fromId: string, intoId: string): Promise<void> 
 		if (!into.onboarded && from.onboarded) fill.onboarded = true;
 		if (Object.keys(fill).length) await tx.update(user).set(fill).where(eq(user.id, intoId));
 
+		// Earlier merges into `fromId` now resolve to `intoId` too.
+		await tx.update(userAliases).set({ userId: intoId }).where(eq(userAliases.userId, fromId));
 		await tx.insert(userAliases).values({ oldUserId: fromId, userId: intoId }).onDuplicateKeyUpdate({ set: { userId: intoId } });
 		await tx.delete(user).where(eq(user.id, fromId));
 	});
@@ -200,7 +202,14 @@ export async function linkWithIdToken(
 		return { linked: true, merged: false };
 	} catch (err) {
 		// Better Auth verifies the token before checking who owns it, so a conflict means it was valid.
-		if (!(err instanceof APIError) || err.statusCode !== 409) throw err;
+		if (err instanceof APIError && err.statusCode === 409) {
+			// fall through to the merge checks below
+		} else if (err instanceof APIError && err.statusCode === 401) {
+			// Better Auth answers 401 for an id token it can't verify (expired, wrong
+			// audience or nonce). Callers are already signed in (the route is authed), so
+			// a 401 would make the apps think their session ended and sign them out.
+			throw badRequest(`That ${input.provider === 'apple' ? 'Apple' : 'Google'} sign-in has expired. Please try again.`);
+		} else throw err;
 	}
 	const sub = subject(input.idToken);
 	const owner = sub

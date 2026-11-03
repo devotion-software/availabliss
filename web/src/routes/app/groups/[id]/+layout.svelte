@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { invalidate } from '$app/navigation';
 	import { live } from '#lib/client/live.svelte';
+	import { unread } from '#lib/client/unread.svelte';
 	import TabBar from '#lib/components/ui/TabBar.svelte';
 	import GroupSidebar from '#lib/components/groups/GroupSidebar.svelte';
 
@@ -9,7 +10,7 @@
 
 	const base = $derived(`/app/groups/${data.group.id}`);
 	const route = $derived(page.route.id ?? '');
-	const unread = $derived(data.groups.find((g) => g.id === data.group.id)?.unreadCount ?? 0);
+	const unreadChat = $derived(unread.count(data.groups.find((g) => g.id === data.group.id) ?? { id: data.group.id }));
 
 	// Screens with their own bottom bar (chat composer, timing save bar, editors) skip the tab bar.
 	const showTabs = $derived(
@@ -17,7 +18,7 @@
 	);
 	const tabs = $derived([
 		{ href: base, label: 'Calendar', icon: 'calendar' as const, current: route === '/app/groups/[id]' },
-		{ href: `${base}/chat`, label: 'Chat', icon: 'chat' as const, current: route.endsWith('/chat'), badge: unread },
+		{ href: `${base}/chat`, label: 'Chat', icon: 'chat' as const, current: route.endsWith('/chat'), badge: unreadChat },
 		{ href: `${base}/proposals`, label: 'Proposals', icon: 'check-circle' as const, current: route.endsWith('/proposals') },
 		{ href: `${base}/timing`, label: 'Timing', icon: 'sliders' as const, current: route.endsWith('/timing') }
 	]);
@@ -25,9 +26,14 @@
 	// Group details (name, members, roles, timing) change under us; refetch when they do.
 	$effect(() => {
 		const id = data.group.id;
-		return live.on(['group.updated', 'member.changed'], (e) => {
+		const off = live.on(['group.updated', 'member.changed'], (e) => {
 			if (e.groupId === id) invalidate('app:group');
 		});
+		const offReconnect = live.onReconnect(() => invalidate('app:group'));
+		return () => {
+			off();
+			offReconnect();
+		};
 	});
 </script>
 

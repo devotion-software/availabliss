@@ -28,7 +28,7 @@ export const RULES: Rule[] = [
 	{ name: 'invite', path: /^\/api\/v1\/invites\/[^/]+(\/accept)?$/, max: 30, windowSeconds: 10 * MINUTE, perIp: true },
 	{ name: 'live', method: 'GET', path: /^\/api\/v1\/live$/, max: 20, windowSeconds: MINUTE },
 	{ name: 'calendar-sync', method: 'POST', path: /^\/api\/v1\/calendars\/[^/]+\/sync$/, max: 6, windowSeconds: MINUTE },
-	{ name: 'calendar-connect', method: 'POST', path: /^\/api\/v1\/calendars\/(caldav|oauth\/[^/]+\/url)$/, max: 10, windowSeconds: 10 * MINUTE },
+	{ name: 'calendar-connect', method: 'POST', path: /^\/api\/v1\/calendars\/(caldav|oauth\/[^/]+\/(url|complete))$/, max: 10, windowSeconds: 10 * MINUTE },
 	{ name: 'device-busy', method: 'PUT', path: /^\/api\/v1\/calendars\/device$/, max: 30, windowSeconds: MINUTE },
 	{ name: 'group-create', method: 'POST', path: /^\/api\/v1\/groups$/, max: 20, windowSeconds: HOUR },
 	{ name: 'invite-create', method: 'POST', path: /^\/api\/v1\/groups\/[^/]+\/invites$/, max: 30, windowSeconds: HOUR },

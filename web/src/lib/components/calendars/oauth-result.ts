@@ -8,7 +8,9 @@ export function reportOAuthResult(current: { href: string }): boolean {
 	const error = url.searchParams.get('error');
 	if (!connected && !error) return false;
 	if (connected) toasts.success('Calendar connected');
-	else toasts.error(error === 'access_denied' ? 'Calendar access was not granted' : `Couldn't connect that calendar (${error})`);
+	else if (error === 'access_denied') toasts.error('Calendar access was not granted');
+	else if (error === 'wrong_account') toasts.error('That connection link was started from a different account. Connect your calendar from here instead.');
+	else toasts.error(`Couldn't connect that calendar (${error})`);
 	url.searchParams.delete('connected');
 	url.searchParams.delete('error');
 	goto(url.pathname + url.search, { replace: true, shallow: true });

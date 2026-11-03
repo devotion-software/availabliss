@@ -1,7 +1,9 @@
 /** OAuth 2 authorization-code flow for Google Calendar and Microsoft Graph. */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { env } from '../env';
-import { badRequest } from '../http';
+import { badRequest, forbidden } from '../http';
+import { kv } from '../redis';
+import { safeRedirectPath } from '#lib/client/safe-path';
 import { ReauthRequired, type OAuthCredentials } from './types';
 
 export type OAuthProvider = 'google' | 'microsoft';
@@ -59,10 +61,11 @@ interface State {
 
 const signature = (payload: string) => createHmac('sha256', env.authSecret ?? 'dev').update(payload).digest('base64url');
 
-/** Only app paths and the native app scheme are valid return targets. */
+/** Only same-origin app paths and the native app scheme are valid return targets. */
 export function safeRedirect(redirect: string | null): string {
-	if (redirect && (/^\/(?!\/)/.test(redirect) || redirect.startsWith('availabliss://'))) return redirect;
-	return '/app/calendars';
+	// eslint-disable-next-line no-control-regex
+	if (redirect?.startsWith('availabliss://') && !/[\\\u0000-\u001f\u007f]/.test(redirect)) return redirect;
+	return safeRedirectPath(redirect) ?? '/app/calendars';
 }
 
 export function encodeState(state: Omit<State, 'exp' | 'nonce'>): string {
@@ -81,6 +84,45 @@ export function decodeState(raw: string | null): State {
 	const state = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as State;
 	if (state.exp < Date.now()) throw badRequest('This connection attempt expired, please try again');
 	return state;
+}
+
+/** Marks the state's nonce used. A state can only finish one connection. */
+export async function consumeState(state: State): Promise<void> {
+	const fresh = await kv.setIfAbsent(`oauth:nonce:${state.nonce}`, '1', 15 * 60);
+	if (!fresh) throw badRequest('This connection attempt was already used, please try again');
+}
+
+// ─── Native hand-off ──────────────────────────────────────────────────────
+// A native app opens consent in a browser sheet that can't prove who is signed
+// in, so the callback never links the calendar itself. It parks the provider's
+// code under a one-time code and redirects to the app, which finishes with an
+// authenticated POST /calendars/oauth/:provider/complete. Only the user who
+// started the flow can complete it, so a consent link sent to someone else
+// can't attach their calendar to the sender's account.
+
+interface PendingLink {
+	userId: string;
+	provider: OAuthProvider;
+	code: string;
+}
+
+const pendingKey = (handoff: string) => `oauth:pending:${handoff}`;
+
+export async function parkPendingLink(link: PendingLink): Promise<string> {
+	const handoff = randomBytes(24).toString('base64url');
+	await kv.set(pendingKey(handoff), JSON.stringify(link), 10 * 60);
+	return handoff;
+}
+
+/** Takes (once) the parked provider code, checking it belongs to `userId` and `provider`. */
+export async function takePendingLink(handoff: string, userId: string, provider: OAuthProvider): Promise<string> {
+	const raw = await kv.take(pendingKey(handoff));
+	if (!raw) throw badRequest('This connection attempt expired, please try again');
+	const link = JSON.parse(raw) as PendingLink;
+	if (link.userId !== userId || link.provider !== provider) {
+		throw forbidden('This calendar connection was started by a different account');
+	}
+	return link.code;
 }
 
 // ─── Flow ─────────────────────────────────────────────────────────────────

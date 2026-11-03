@@ -5,6 +5,8 @@ import { db } from '#lib/server/db';
 import { userPlans } from '#lib/server/db/schema';
 import { getPlan, handleRevenueCatEvent, isPro, requireCanCreateGroup, saveEntitlement, syncFromRevenueCat, type RcEvent } from '#lib/server/billing';
 import { createGroup } from '#lib/server/groups';
+import { mergeUsers } from '#lib/server/accounts';
+import { env } from '#lib/server/env';
 import { apiError, fixture } from './fixtures';
 
 const fx = fixture('billing');
@@ -140,3 +142,59 @@ describe('requireCanCreateGroup', () => {
 		expect((await apiError(requireCanCreateGroup(me))).code).toBe('upgrade_required');
 	});
 });
+
+describe('accounts merged into another', () => {
+	const rcSubscriber = (expires: number | null) => ({
+		entitlements: { pro: { expires_date: expires === null ? null : new Date(expires).toISOString(), product_identifier: 'pro_monthly' } },
+		subscriptions: { pro_monthly: { store: 'stripe', unsubscribe_detected_at: null } }
+	});
+
+	test('syncFromRevenueCat keeps Pro bought on the merged-away account', async () => {
+		const [from, into] = await fx.users(2);
+		const proUntil = Date.now() + 30 * DAY;
+		await handleRevenueCatEvent(purchase(from, { expiration_at_ms: proUntil, store: 'STRIPE' }));
+		await mergeUsers(from, into);
+		expect((await getPlan(into)).tier).toBe('pro');
+
+		const realFetch = globalThis.fetch;
+		const realKey = env.revenuecat.secretKey;
+		const asked: string[] = [];
+		globalThis.fetch = (async (input: string | URL) => {
+			const id = decodeURIComponent(String(input).split('/subscribers/')[1]);
+			asked.push(id);
+			// RevenueCat knows the purchase under the old app user id only.
+			return Response.json({ subscriber: id === from ? rcSubscriber(proUntil) : {} });
+		}) as typeof fetch;
+		(env.revenuecat as { secretKey: string | null }).secretKey = 'sk_test';
+		try {
+			expect(await syncFromRevenueCat(into)).toBe(true);
+			// A webhook about the old id resolves to the merged account and syncs the same way.
+			await handleRevenueCatEvent({ type: 'RENEWAL', app_user_id: from, entitlement_ids: ['pro'] });
+		} finally {
+			globalThis.fetch = realFetch;
+			(env.revenuecat as { secretKey: string | null }).secretKey = realKey;
+		}
+		expect(asked.sort()).toEqual([from, from, into, into].sort());
+		expect(await getPlan(into)).toMatchObject({ tier: 'pro', store: 'stripe' });
+	});
+
+	test('without a REST key, an event about the merged-away account never downgrades', async () => {
+		const [from, into] = await fx.users(2);
+		await handleRevenueCatEvent(purchase(into, { expiration_at_ms: Date.now() + 60 * DAY }));
+		await mergeUsers(from, into);
+		await handleRevenueCatEvent({ type: 'EXPIRATION', app_user_id: from, entitlement_ids: ['pro'] });
+		expect((await getPlan(into)).tier).toBe('pro');
+		// …but it can still upgrade.
+		await handleRevenueCatEvent(purchase(from, { expiration_at_ms: null }));
+		expect((await getPlan(into)).lifetime).toBe(true);
+	});
+
+	test('chained merges keep resolving to the surviving account', async () => {
+		const [a, b, c] = await fx.users(3);
+		await mergeUsers(a, b);
+		await mergeUsers(b, c);
+		await handleRevenueCatEvent(purchase(a));
+		expect((await getPlan(c)).tier).toBe('pro');
+	});
+});
+

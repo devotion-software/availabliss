@@ -5,6 +5,8 @@
  */
 import { minutesOf, zonedInstant } from '../availability/time';
 import { ReauthRequired, type CaldavCredentials, type CalendarAdapter, type RemoteBusy, type RemoteCalendar } from './types';
+import { isValidZone } from '#lib/timezone';
+import { publicFetch } from './public-fetch';
 
 export const ICLOUD_CALDAV = 'https://caldav.icloud.com';
 
@@ -49,14 +51,6 @@ function parseIcsTime(value: string, params: string, timeZone: string): { at: nu
 	return { at: zonedInstant(date, minutesOf(`${m[4]}:${m[5]}`), zone) + Number(m[6]) * 1000, date: false };
 }
 
-function isValidZone(zone: string): boolean {
-	try {
-		new Intl.DateTimeFormat('en-GB', { timeZone: zone });
-		return true;
-	} catch {
-		return false;
-	}
-}
 
 /** ISO 8601 durations like PT1H30M or P1D. */
 function parseDuration(value: string): number {
@@ -98,7 +92,7 @@ export function parseBusyEvents(ics: string, timeZone: string): { start: number;
 // ─── HTTP ─────────────────────────────────────────────────────────────────
 
 async function dav(creds: CaldavCredentials, url: string, method: 'PROPFIND' | 'REPORT', depth: '0' | '1', body: string) {
-	const res = await fetch(new URL(url, creds.serverUrl), {
+	const { res, url: finalUrl } = await publicFetch(new URL(url, creds.serverUrl), {
 		method,
 		headers: {
 			authorization: `Basic ${Buffer.from(`${creds.username}:${creds.password}`).toString('base64')}`,
@@ -106,12 +100,11 @@ async function dav(creds: CaldavCredentials, url: string, method: 'PROPFIND' | '
 			'content-type': 'application/xml; charset=utf-8'
 		},
 		body,
-		redirect: 'follow',
 		signal: AbortSignal.timeout(20_000)
 	});
 	if (res.status === 401 || res.status === 403) throw new ReauthRequired('CalDAV credentials were rejected');
 	if (res.status !== 207 && !res.ok) throw new Error(`CalDAV ${method} ${url} → ${res.status}`);
-	return { xml: await res.text(), url: res.url };
+	return { xml: await res.text(), url: finalUrl.toString() };
 }
 
 const PROPFIND = (props: string) =>

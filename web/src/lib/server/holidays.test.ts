@@ -47,3 +47,13 @@ describe('without a database', () => {
 		expect(ranges).toEqual([{ from: '2026-10-26', to: '2026-10-30', name: 'School holidays' }]);
 	});
 });
+
+describe('bankHolidays range', () => {
+	test('refuses spans of more than two calendar years', async () => {
+		await expect(bankHolidays('GB', null, { from: '2020-01-01', to: '2026-01-01' })).rejects.toMatchObject({ status: 400 });
+	});
+
+	test('ignores invalid detected time zones', () => {
+		expect(detectRegion(new Headers({ 'x-timezone': 'Foo/Bar' })).timezone).toBeNull();
+	});
+});

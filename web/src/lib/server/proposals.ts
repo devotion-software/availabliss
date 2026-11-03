@@ -189,7 +189,12 @@ export async function cancelProposal(proposalId: string, userId: string): Promis
 	const row = await requireOpen(proposalId);
 	const role = await requireMember(row.groupId, userId);
 	if (row.createdBy !== userId && role === 'member') throw forbidden('Only the proposer or an admin can cancel this');
-	await db.update(proposals).set({ status: 'cancelled' }).where(eq(proposals.id, proposalId));
+	// Guarded so a cancel racing the last acceptance can't cancel a confirmed proposal.
+	const [result] = await db
+		.update(proposals)
+		.set({ status: 'cancelled' })
+		.where(and(eq(proposals.id, proposalId), eq(proposals.status, 'open')));
+	if (!result.affectedRows) throw forbidden(`This proposal is already ${(await getRow(proposalId)).status}`);
 	await publishToGroup(row.groupId, 'proposal.updated', await fetchProposal(proposalId));
 }
 
@@ -203,6 +208,14 @@ async function confirmIfEveryoneAccepted(proposalId: string): Promise<Proposal |
 
 	const group = await getGroupRow(proposal.groupId);
 	const eventId = await db.transaction(async (tx) => {
+		// Claim the confirmation first. When the last members accept at the same
+		// moment both requests get here; only the one that flips open → confirmed
+		// creates the event and sends the messages, pushes and emails.
+		const [claimed] = await tx
+			.update(proposals)
+			.set({ status: 'confirmed' })
+			.where(and(eq(proposals.id, proposalId), eq(proposals.status, 'open')));
+		if (!claimed.affectedRows) return null;
 		const id = await insertEvent(tx, proposal.groupId, proposal.createdBy, {
 			title: proposal.title ?? group.name,
 			start: proposal.start,
@@ -212,9 +225,11 @@ async function confirmIfEveryoneAccepted(proposalId: string): Promise<Proposal |
 			note: proposal.note,
 			proposalId
 		});
-		await tx.update(proposals).set({ status: 'confirmed', eventId: id }).where(eq(proposals.id, proposalId));
+		await tx.update(proposals).set({ eventId: id }).where(eq(proposals.id, proposalId));
 		return id;
 	});
+	// Lost the race: another request confirmed it (and sent everything) first.
+	if (!eventId) return fetchProposal(proposalId);
 
 	const confirmed = await fetchProposal(proposalId);
 	const when = slotLabel({ start: Date.parse(proposal.start), end: Date.parse(proposal.end) }, group.requirement);

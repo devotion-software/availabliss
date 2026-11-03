@@ -4,6 +4,7 @@
  */
 import { z } from 'zod';
 import { COLOR_THEMES, REPEATS, RESPONSE_KINDS, THEME_MODES, TILE_COLORS, type Weekday } from './types';
+import { isValidZone } from './timezone';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -11,6 +12,23 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const dateString = z.string().regex(DATE, 'Expected YYYY-MM-DD');
 export const timeString = z.string().regex(TIME, 'Expected HH:MM');
 export const isoDateTime = z.iso.datetime({ offset: true });
+/** An IANA zone such as `Europe/London`; an invalid one would make Intl throw everywhere it's used. */
+export const timezone = z.string().min(1).max(64).refine(isValidZone, { message: 'Unknown time zone' });
+
+/** Longest span the busy-time and conflict endpoints will expand (matches the availability cap). */
+export const MAX_INSTANT_RANGE_DAYS = 120;
+
+/** `{ [fromKey], [toKey] }` ISO instants with to > from and at most `maxDays` apart. */
+export function instantRangeSchema<F extends string, T extends string>(fromKey: F, toKey: T, maxDays = MAX_INSTANT_RANGE_DAYS) {
+	return z
+		.object({ [fromKey]: isoDateTime, [toKey]: isoDateTime } as Record<F | T, typeof isoDateTime>)
+		.transform((r) => {
+			const raw = r as Record<string, string>;
+			return { from: Date.parse(raw[fromKey]), to: Date.parse(raw[toKey]) };
+		})
+		.refine((r) => r.to > r.from, { message: 'The end must be after the start' })
+		.refine((r) => r.to - r.from <= maxDays * 86_400_000, { message: `Ask for at most ${maxDays} days at a time` });
+}
 const weekday = z.int().min(0).max(6).transform((d) => d as Weekday);
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 const optionalText = (max: number) => z.string().trim().max(max).nullish().transform((v) => v || null);
@@ -44,7 +62,7 @@ export const requirementSchema = z.object({
 	customSchoolHolidays: z.array(dateRangeSchema).max(50),
 	range: dateRangeSchema,
 	dates: z.array(dateRangeSchema).max(50),
-	timezone: z.string().min(1).max(64)
+	timezone
 });
 
 export const updateMeSchema = z
@@ -55,7 +73,7 @@ export const updateMeSchema = z
 		country: z.string().length(2).toUpperCase().nullable(),
 		subdivision: z.string().max(10).nullable(),
 		schoolAuthority: z.string().max(64).nullable(),
-		timezone: z.string().min(1).max(64),
+		timezone,
 		onboarded: z.boolean()
 	})
 	.partial();
@@ -91,7 +109,7 @@ export const updateBlockSchema = z
 export const caldavSchema = z.object({
 	username: trimmed(255),
 	appPassword: trimmed(255),
-	serverUrl: z.url().optional()
+	serverUrl: z.url({ protocol: /^https$/, error: 'Calendar servers must use https' }).optional()
 });
 
 export const deviceSyncSchema = z.object({

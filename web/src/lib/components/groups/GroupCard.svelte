@@ -5,6 +5,7 @@
 	import SyncRing from '#lib/components/ui/SyncRing.svelte';
 	import AvatarStack from '#lib/components/ui/AvatarStack.svelte';
 	import { groupBadge, syncText } from './status';
+	import { unread } from '#lib/client/unread.svelte';
 
 	/** A group on the home list (Main.dc): tile, name, status badge, timing, sync progress. */
 	interface Props {
@@ -36,8 +37,8 @@
 				<SyncRing value={group.syncedCount} total={group.memberCount} />
 				{syncText(group)}
 			</span>
-			{#if group.unreadCount}
-				<span class="unread" aria-label="{group.unreadCount} unread messages">{group.unreadCount}</span>
+			{#if unread.count(group)}
+				<span class="unread" aria-label="{unread.count(group)} unread messages">{unread.count(group)}</span>
 			{/if}
 		</span>
 	</span>

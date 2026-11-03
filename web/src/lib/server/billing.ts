@@ -29,6 +29,13 @@ const FREE: Entitlement = { proUntil: null, lifetime: false, store: null, produc
 export const isActive = (e: Pick<Entitlement, 'proUntil' | 'lifetime'> | null | undefined, now = Date.now()) =>
 	!!e && (e.lifetime || (e.proUntil !== null && e.proUntil.getTime() > now));
 
+const strength = (e: Entitlement | null, now: number) => (!e || !isActive(e, now) ? 0 : e.lifetime ? Infinity : e.proUntil!.getTime());
+
+/** The best of several entitlements: lifetime, then the latest expiry, else free. */
+export function bestEntitlement(list: (Entitlement | null)[], now = Date.now()): Entitlement {
+	return list.reduce<Entitlement>((best, e) => (e && strength(e, now) > strength(best, now) ? e : best), FREE);
+}
+
 async function entitlementOf(userId: string): Promise<Entitlement | null> {
 	return (await db.query.userPlans.findFirst({ where: eq(userPlans.userId, userId) })) ?? null;
 }
@@ -147,33 +154,50 @@ async function fetchSubscriber(appUserId: string): Promise<RcSubscriber> {
 	return ((await res.json()) as { subscriber: RcSubscriber }).subscriber;
 }
 
-/** Our users are RevenueCat app users with the same id; anonymous ids are ignored. */
-async function knownUser(id: string | undefined): Promise<string | null> {
+/**
+ * Our users are RevenueCat app users with the same id; anonymous ids are ignored.
+ * `viaAlias` is set when `id` belongs to an account that was merged into `userId`.
+ */
+async function knownUser(id: string | undefined): Promise<{ userId: string; viaAlias: boolean } | null> {
 	if (!id || id.startsWith('$RCAnonymousID')) return null;
 	const row = await db.query.user.findFirst({ where: eq(user.id, id), columns: { id: true } });
-	if (row) return row.id;
+	if (row) return { userId: row.id, viaAlias: false };
 	// An account merged into another one: its purchases now belong to that account.
 	const alias = await db.query.userAliases.findFirst({ where: eq(userAliases.oldUserId, id), columns: { userId: true } });
-	return alias?.userId ?? null;
+	return alias ? { userId: alias.userId, viaAlias: true } : null;
 }
 
-/** Re-reads a user's entitlement from RevenueCat. Returns false when billing isn't configured. */
+/**
+ * Re-reads a user's entitlement from RevenueCat. Returns false when billing isn't configured.
+ *
+ * Purchases made on accounts merged into this one stay with their old RevenueCat
+ * app user id, so those subscribers are read too and the best entitlement wins.
+ */
 export async function syncFromRevenueCat(userId: string): Promise<boolean> {
 	if (!env.revenuecat.secretKey) return false;
-	await saveEntitlement(userId, entitlementFromSubscriber(await fetchSubscriber(userId), env.revenuecat.entitlement));
+	const aliases = await db.select({ id: userAliases.oldUserId }).from(userAliases).where(eq(userAliases.userId, userId));
+	const subscribers = await Promise.all([userId, ...aliases.map((a) => a.id)].map(fetchSubscriber));
+	await saveEntitlement(userId, bestEntitlement(subscribers.map((s) => entitlementFromSubscriber(s, env.revenuecat.entitlement))));
 	return true;
 }
 
 export async function handleRevenueCatEvent(event: RcEvent): Promise<void> {
-	const ids = new Set<string>();
+	// userId → whether every id that led to it was an alias of a merged account.
+	const ids = new Map<string, boolean>();
 	for (const id of [event.app_user_id, event.original_app_user_id, ...(event.aliases ?? []), ...(event.transferred_from ?? []), ...(event.transferred_to ?? [])]) {
 		const known = await knownUser(id);
-		if (known) ids.add(known);
+		if (known) ids.set(known.userId, (ids.get(known.userId) ?? true) && known.viaAlias);
 	}
-	for (const userId of ids) {
+	for (const [userId, onlyViaAlias] of ids) {
 		if (await syncFromRevenueCat(userId)) continue;
-		const next = entitlementFromEvent(event, env.revenuecat.entitlement, await entitlementOf(userId));
-		if (event.type === 'TRANSFER' && (event.transferred_from ?? []).includes(userId)) await saveEntitlement(userId, FREE);
+		// Without the REST API we only see this event, not the user's other purchases.
+		// An event about a merged-away account can't tell whether the merged account
+		// has Pro of its own, so it may only ever improve the plan.
+		const current = await entitlementOf(userId);
+		const next = entitlementFromEvent(event, env.revenuecat.entitlement, current);
+		if (onlyViaAlias) {
+			if (next) await saveEntitlement(userId, bestEntitlement([current, next]));
+		} else if (event.type === 'TRANSFER' && (event.transferred_from ?? []).includes(userId)) await saveEntitlement(userId, FREE);
 		else if (next) await saveEntitlement(userId, next);
 	}
 }

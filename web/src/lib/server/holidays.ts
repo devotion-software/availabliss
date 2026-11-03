@@ -11,6 +11,8 @@ import type { DateRange, Requirement } from '#lib/types';
 import { db } from './db';
 import { holidayCache, schoolHolidays } from './db/schema';
 import { inRange } from './availability/time';
+import { badRequest } from './http';
+import { isValidZone } from '#lib/timezone';
 
 const NAGER = 'https://date.nager.at/api/v3';
 const CACHE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -52,6 +54,9 @@ async function holidaysForYear(country: string, year: number): Promise<CachedHol
 	}
 }
 
+/** The widest span of calendar years one request may cover (each year is a cached fetch). */
+const MAX_HOLIDAY_YEARS = 2;
+
 /** Bank holidays by date for a country (and optional ISO 3166-2 subdivision). */
 export async function bankHolidays(
 	country: string | null,
@@ -60,8 +65,10 @@ export async function bankHolidays(
 ): Promise<Map<string, string>> {
 	const result = new Map<string, string>();
 	if (!country) return result;
-	const years = new Set([Number(range.from.slice(0, 4)), Number(range.to.slice(0, 4))]);
-	for (const year of years) {
+	const first = Number(range.from.slice(0, 4));
+	const last = Number(range.to.slice(0, 4));
+	if (last - first > MAX_HOLIDAY_YEARS) throw badRequest(`Ask for at most ${MAX_HOLIDAY_YEARS} years of holidays at a time`);
+	for (let year = first; year <= last; year++) {
 		for (const h of await holidaysForYear(country, year)) {
 			const applies = !h.subdivisions || (subdivision !== null && h.subdivisions.includes(subdivision));
 			if (applies && inRange(h.date, range)) result.set(h.date, h.name);
@@ -134,6 +141,7 @@ export function detectRegion(headers: Headers): { country: string | null; subdiv
 	// Cloudflare reports XX for unknown and T1 for Tor; neither is a country.
 	const cdn = fromCdn && /^[A-Z]{2}$/i.test(fromCdn) && !['XX', 'T1'].includes(fromCdn.toUpperCase()) ? fromCdn.toUpperCase() : null;
 	const country = cdn ?? fromLanguage;
-	return { country, subdivision: country === 'GB' ? 'GB-ENG' : null, timezone: headers.get('x-timezone') };
+	const timezone = headers.get('x-timezone');
+	return { country, subdivision: country === 'GB' ? 'GB-ENG' : null, timezone: timezone && isValidZone(timezone) ? timezone : null };
 }
 

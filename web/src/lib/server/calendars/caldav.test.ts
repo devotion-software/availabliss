@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { caldav, parseBusyEvents, xmlBlocks, xmlText } from './caldav';
+import { resolver } from './public-fetch';
 import { ReauthRequired } from './types';
 
 const ics = (event: string) => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\n${event}\r\nEND:VEVENT\r\nEND:VCALENDAR`;
@@ -102,8 +103,13 @@ describe('xmlText', () => {
 
 describe('caldav adapter (stubbed fetch)', () => {
 	const realFetch = globalThis.fetch;
+	let dns: ReturnType<typeof spyOn>;
+	beforeEach(() => {
+		dns = spyOn(resolver, 'lookup').mockImplementation(async (host: string) => [host === 'internal.example.com' ? '10.0.0.5' : '93.184.215.14']);
+	});
 	afterEach(() => {
 		globalThis.fetch = realFetch;
+		dns.mockRestore();
 	});
 
 	type Call = { url: string; method: string; depth: string | null; auth: string | null; body: string };
@@ -172,5 +178,30 @@ describe('caldav adapter (stubbed fetch)', () => {
 		expect(busy).toEqual([{ calendarExternalId: cal.externalId, start: new Date('2026-11-13T18:00:00Z'), end: new Date('2026-11-13T20:00:00Z') }]);
 		expect(calls[0].method).toBe('REPORT');
 		expect(calls[0].body).toContain('start="20261101T000000Z" end="20261201T000000Z"');
+	});
+
+	test('refuses discovery hrefs that point at internal hosts', async () => {
+		const calls = stub((c) => {
+			if (c.body.includes('current-user-principal'))
+				return { body: '<multistatus><response><propstat><prop><current-user-principal><href>https://169.254.169.254/latest/</href></current-user-principal></prop></propstat></response></multistatus>' };
+			return { body: '' };
+		});
+		await expect(caldav.listCalendars(creds)).rejects.toThrow("isn't allowed");
+		expect(calls.length).toBe(1);
+	});
+
+	test('re-checks redirects and drops credentials across origins', async () => {
+		const calls = stub((c) => {
+			if (c.url === 'https://dav.example.com/') return { status: 302, body: '', url: c.url };
+			return { body: '' };
+		});
+		const realStub = globalThis.fetch;
+		globalThis.fetch = (async (input: URL | string, init?: RequestInit) => {
+			const res = await realStub(input, init);
+			if (res.status === 302) return new Response(null, { status: 302, headers: { location: 'https://internal.example.com/' } });
+			return res;
+		}) as typeof fetch;
+		await expect(caldav.listCalendars(creds)).rejects.toThrow("isn't allowed");
+		expect(calls.map((c) => c.url)).toEqual(['https://dav.example.com/']);
 	});
 });
