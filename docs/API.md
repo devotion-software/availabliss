@@ -185,10 +185,12 @@ A slot "works" when every **synced** member is free for the whole slot. Members 
 haven't synced are ignored and reported in `pendingMemberIds`. A member counts as
 synced once they have connected any calendar or marked any busy time by hand.
 
-Calendars are kept at least three years ahead, and as far as any of the member's
-groups search (up to ten). Where a member's calendars stop short of the range,
-they're listed in `checkedUntil`; their busy time past that date is unknown, so
-they're treated as free there, like an unsynced member.
+Server calendars are kept at least three years ahead, and as far as any of the
+member's groups search (up to ten). Phones upload as far ahead as the server asks
+(`CalendarConnection.syncUntil`), in fixed ranges so only changed ones are re-sent.
+Where a member's calendars stop short of the range, they're listed in
+`checkedUntil`; their busy time past that date is unknown, so they're treated as
+free there, like an unsynced member.
 
 - An empty `days` list means any day of the week.
 - Bank holidays follow the region (`country` / `subdivision`) of the group owner.
@@ -311,6 +313,7 @@ interface CalendarConnection {
   status: 'ok' | 'error' | 'reauth_required';
   lastSyncedAt: string | null;
   calendars: { id: string; name: string; color: string | null; busy: boolean }[];
+  syncUntil: string | null;     // phone calendars: how far ahead the app should read (null for server calendars)
 }
 ```
 
@@ -334,6 +337,8 @@ interface DeviceSync {
   deviceName: string;           // "Sam's iPhone"
   rangeStart: string;           // window the busy list covers; replaces previous data in it
   rangeEnd: string;             // (busy outside the window is ignored; only differences are written)
+  coveredUntil?: string;        // a sync sent as several ranges: the end of the whole sync (defaults to rangeEnd)
+  more?: boolean;               // more ranges of this sync follow: groups are refreshed once, after the last
   calendars: { externalId: string; name: string; color: string | null; busy?: boolean }[];
   busy: { calendarExternalId: string; start: string; end: string }[];
 }

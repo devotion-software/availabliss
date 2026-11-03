@@ -1,6 +1,9 @@
 package dev.joeherbert.availabliss.core.calendar
 
 import java.security.MessageDigest
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -21,14 +24,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Duration
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /** Outcome of a device calendar upload. */
 sealed interface DeviceSyncResult {
     data class Synced(val connection: CalendarConnection, val busyCount: Int) : DeviceSyncResult
-    /** Same calendars, busy flags, window and busy time as the last upload: nothing was sent. */
+    /** Every range is the same as the server already has: nothing was sent. */
     data object Unchanged : DeviceSyncResult
     /** Not signed in, or READ_CALENDAR not granted and nothing was uploaded before: nothing to do. */
     data object Skipped : DeviceSyncResult
@@ -41,9 +43,9 @@ sealed interface DeviceSyncResult {
 internal enum class DeviceSyncAction { Skip, Upload, Clear }
 
 /**
- * Without READ_CALENDAR there is nothing new to read, but the last upload (up to
- * [DeviceCalendarSync.WINDOW_DAYS] of busy time) would otherwise stay on the server and
- * keep the user busy to their groups, so a revoked permission clears it.
+ * Without READ_CALENDAR there is nothing new to read, but the last upload (years of
+ * busy time) would otherwise stay on the server and keep the user busy to their
+ * groups, so a revoked permission clears it.
  */
 internal fun deviceSyncAction(signedIn: Boolean, hasPermission: Boolean, lastSyncAt: Long?): DeviceSyncAction = when {
     !signedIn -> DeviceSyncAction.Skip
@@ -52,20 +54,42 @@ internal fun deviceSyncAction(signedIn: Boolean, hasPermission: Boolean, lastSyn
     else -> DeviceSyncAction.Skip
 }
 
+/** What one range of the last upload sent: its fingerprint and when (epoch ms). */
+@Serializable
+internal data class UploadedRange(val hash: String, val at: Long)
+
 /**
- * Whether an upload with fingerprint [hash] can be skipped: the last one sent exactly
- * this, less than [DeviceCalendarSync.MAX_UNCHANGED_AGE_MS] ago. The window's dates are
- * part of the payload, so it changes at least daily anyway; the age cap is a backstop.
+ * Whether a range with fingerprint [hash] can be skipped: the last upload of it sent
+ * exactly this, less than [maxAge] ago (a backstop in case the server's copy was lost).
  */
-internal fun isUnchanged(hash: String, lastHash: String?, lastSyncAt: Long?, now: Long): Boolean =
-    lastHash == hash && lastSyncAt != null && now - lastSyncAt in 0 until DeviceCalendarSync.MAX_UNCHANGED_AGE_MS
+internal fun isUnchanged(hash: String, last: UploadedRange?, now: Long, maxAge: Long): Boolean =
+    last != null && last.hash == hash && now - last.at in 0 until maxAge
+
+/**
+ * The ranges a sync from [start] to at least [horizon] is uploaded in: up to the first
+ * fixed boundary, then whole [DeviceCalendarSync.RANGE_DAYS]-day ranges between fixed
+ * boundaries until one reaches [horizon]. Fixed boundaries keep the later ranges (and
+ * so their fingerprints) the same from day to day.
+ */
+internal fun syncRanges(start: Instant, horizon: Instant): List<Pair<Instant, Instant>> {
+    val step = Duration.ofDays(DeviceCalendarSync.RANGE_DAYS).seconds
+    val bounds = mutableListOf(start)
+    var next = Math.floorDiv(start.epochSecond, step) * step + step
+    do {
+        bounds += Instant.ofEpochSecond(next)
+        next += step
+    } while (bounds.last() < horizon)
+    return bounds.zipWithNext()
+}
 
 /**
  * Uploads busy time ranges (never titles) from the device calendars the user marked
- * as busy, for the next [WINDOW_DAYS] days, via `PUT /calendars/device`.
+ * as busy, as far ahead as the server asks (`CalendarConnection.syncUntil`, three
+ * years at first), via `PUT /calendars/device`.
  *
- * Every upload makes the server tell each of the user's groups that availability
- * changed, so an upload identical to the last one is skipped (see [isUnchanged]).
+ * The window is sent in fixed ranges (see [syncRanges]) and only ranges that changed
+ * are re-sent (see [isUnchanged]); the near one goes last, marked as the end of the
+ * sync, so the server tells the user's groups once.
  */
 @Singleton
 class DeviceCalendarSync @Inject constructor(
@@ -107,7 +131,7 @@ class DeviceCalendarSync @Inject constructor(
             deviceId = prefs.deviceId(),
             deviceName = deviceName(context),
             rangeStart = DateTimes.toIso(today),
-            rangeEnd = DateTimes.toIso(today.plus(Duration.ofDays(WINDOW_DAYS))),
+            rangeEnd = DateTimes.toIso(today.plus(Duration.ofDays(1))),
             calendars = emptyList(),
             busy = emptyList(),
         )
@@ -117,50 +141,84 @@ class DeviceCalendarSync @Inject constructor(
         }
     }
 
-    private suspend fun upload(force: Boolean): DeviceSyncResult {
+    private suspend fun upload(force: Boolean, again: Boolean = true): DeviceSyncResult {
         val available = reader.calendars()
         val busyIds = busyCalendarIds(available)
-        val now = Instant.now()
-        // Start of today so events earlier today still count; end 120 days out.
-        val rangeStart = DateTimes.today().atStartOfDay(DateTimes.zone).toInstant()
-        val rangeEnd = now.plus(Duration.ofDays(WINDOW_DAYS)).truncatedTo(ChronoUnit.DAYS)
+        val busyCalendarIds = available.filter { it.externalId in busyIds }.map { it.id }
+        // Start of today so events earlier today still count.
+        val start = DateTimes.today().atStartOfDay(DateTimes.zone).toInstant()
+        val ranges = syncRanges(start, horizon(start))
+        val coveredUntil = DateTimes.toIso(ranges.last().second)
+        val deviceCalendars = available.map {
+            DeviceCalendar(externalId = it.externalId, name = it.name.take(120), color = it.color, busy = it.externalId in busyIds)
+        }
+        val uploaded = loadUploaded()
+        val now = System.currentTimeMillis()
 
-        val busy = reader.busyRanges(
-            calendarIds = available.filter { it.externalId in busyIds }.map { it.id },
-            from = rangeStart,
-            to = rangeEnd,
-        )
-        val payload = DeviceSync(
-            deviceId = prefs.deviceId(),
-            deviceName = deviceName(context),
-            rangeStart = DateTimes.toIso(rangeStart),
-            rangeEnd = DateTimes.toIso(rangeEnd),
-            calendars = available.map {
-                DeviceCalendar(
-                    externalId = it.externalId,
-                    name = it.name.take(120),
-                    color = it.color,
-                    busy = it.externalId in busyIds,
-                )
-            },
-            busy = busy.take(MAX_RANGES).map {
-                DeviceBusy(
-                    calendarExternalId = it.calendarId.toString(),
-                    start = DateTimes.toIso(it.start),
-                    end = DateTimes.toIso(it.end),
-                )
-            },
-        )
-        val hash = fingerprint(payload)
-        val nowMs = System.currentTimeMillis()
-        if (!force && isUnchanged(hash, prefs.lastDeviceSyncHash.first(), prefs.lastDeviceSyncAt.first(), nowMs)) {
-            return DeviceSyncResult.Unchanged
+        class Item(val key: String, val payload: DeviceSync, val hash: String, val current: Boolean)
+        val items = ranges.mapIndexed { index, (from, to) ->
+            val payload = DeviceSync(
+                deviceId = prefs.deviceId(),
+                deviceName = deviceName(context),
+                rangeStart = DateTimes.toIso(from),
+                rangeEnd = DateTimes.toIso(to),
+                calendars = deviceCalendars,
+                busy = reader.busyRanges(busyCalendarIds, from, to).take(MAX_RANGES).map {
+                    DeviceBusy(calendarExternalId = it.calendarId.toString(), start = DateTimes.toIso(it.start), end = DateTimes.toIso(it.end))
+                },
+            )
+            val key = from.epochSecond.toString()
+            val hash = fingerprint(payload)
+            val maxAge = if (index == 0) MAX_UNCHANGED_AGE_MS else MAX_FAR_UNCHANGED_AGE_MS
+            Item(key, payload, hash, current = !force && isUnchanged(hash, uploaded[key], now, maxAge))
         }
-        return when (val result = calendars.uploadDeviceBusy(payload).onSuccess { prefs.setLastDeviceSyncAt(nowMs, hash) }) {
-            is ApiResult.Success -> DeviceSyncResult.Synced(result.value, payload.busy.size)
-            is ApiResult.Failure -> DeviceSyncResult.Failed(result.error)
+        val far = items.drop(1).filterNot { it.current }
+        val near = items.first()
+        if (near.current && far.isEmpty()) return DeviceSyncResult.Unchanged
+
+        // Later ranges first; the near one goes last, even unchanged, so groups refresh once.
+        val keys = items.map { it.key }.toSet()
+        val sent = uploaded.filterKeys { it in keys }.toMutableMap()
+        var connection: CalendarConnection? = null
+        var busyCount = 0
+        for ((index, item) in (far + near).withIndex()) {
+            val payload = item.payload.copy(coveredUntil = coveredUntil, more = index < far.size)
+            when (val result = calendars.uploadDeviceBusy(payload)) {
+                is ApiResult.Success -> {
+                    connection = result.value
+                    busyCount += payload.busy.size
+                    sent[item.key] = UploadedRange(item.hash, System.currentTimeMillis())
+                    saveUploaded(sent)
+                }
+                is ApiResult.Failure -> return DeviceSyncResult.Failed(result.error)
+            }
         }
+        prefs.setLastDeviceSyncAt(now)
+
+        // The server wants more than this sync read (a group now plans further ahead): go again.
+        val asked = connection?.syncUntil?.let(DateTimes::parseInstant)
+        if (asked != null) {
+            prefs.setDeviceSyncHorizon(asked.toEpochMilli())
+            if (again && asked > ranges.last().second) return upload(force = false, again = false)
+        }
+        return DeviceSyncResult.Synced(connection!!, busyCount)
     }
+
+    /** How far ahead to read: what the server last asked for, within sensible bounds. */
+    private suspend fun horizon(start: Instant): Instant {
+        val asked = prefs.deviceSyncHorizon.first()?.let(Instant::ofEpochMilli)
+        val fallback = start.plus(Duration.ofDays(DEFAULT_HORIZON_DAYS))
+        val atMost = start.plus(Duration.ofDays(MAX_HORIZON_DAYS))
+        return minOf(asked?.let { maxOf(it, start.plus(Duration.ofDays(1))) } ?: fallback, atMost)
+    }
+
+    private val uploadedSerializer = MapSerializer(String.serializer(), UploadedRange.serializer())
+
+    private suspend fun loadUploaded(): Map<String, UploadedRange> =
+        prefs.deviceSyncRanges.first()?.let { runCatching { json.decodeFromString(uploadedSerializer, it) }.getOrNull() }.orEmpty()
+
+    private suspend fun saveUploaded(ranges: Map<String, UploadedRange>) =
+        prefs.setDeviceSyncRanges(json.encodeToString(uploadedSerializer, ranges))
 
     private fun fingerprint(payload: DeviceSync): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(json.encodeToString(DeviceSync.serializer(), payload).toByteArray())
@@ -168,9 +226,16 @@ class DeviceCalendarSync @Inject constructor(
     }
 
     companion object {
-        const val WINDOW_DAYS = 120L
-        /** Upload at least this often even when nothing changed. */
+        /** How far ahead to read until the server says. */
+        const val DEFAULT_HORIZON_DAYS = 3 * 365L
+        /** Never read further than this, whatever the server asks. */
+        const val MAX_HORIZON_DAYS = 11 * 365L
+        /** Uploads are split at fixed boundaries this many days apart. */
+        const val RANGE_DAYS = 180L
+        /** The near range is re-sent at least this often even when nothing changed… */
         const val MAX_UNCHANGED_AGE_MS = 24L * 60 * 60 * 1000
+        /** …and later ranges at least this often. */
+        const val MAX_FAR_UNCHANGED_AGE_MS = 7 * 24L * 60 * 60 * 1000
         /** Server limit on `busy` entries per upload. */
         private const val MAX_RANGES = 20_000
     }

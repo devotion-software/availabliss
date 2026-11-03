@@ -17,6 +17,7 @@ import { notFound } from '../http';
 import { newId } from '../ids';
 import { decryptJson, encryptJson } from '../crypto';
 import { publishAvailabilityChanged } from '../realtime';
+import { kv } from '../redis';
 import { caldav, ICLOUD_CALDAV } from './caldav';
 import { google, googleAccountLabel } from './google';
 import { microsoft, microsoftAccountLabel } from './microsoft';
@@ -74,6 +75,8 @@ export const adapters: Record<ServerProvider, CalendarAdapter<OAuthCredentials |
 
 async function toConnections(rows: ConnectionRow[]): Promise<CalendarConnection[]> {
 	if (!rows.length) return [];
+	// Phones are told how far ahead to read; every row here belongs to one user.
+	const deviceHorizon = rows.some((r) => r.provider === 'device') ? (await horizonFor(rows[0].userId)).toISOString() : null;
 	const cals = await db
 		.select()
 		.from(calendars)
@@ -87,7 +90,8 @@ async function toConnections(rows: ConnectionRow[]): Promise<CalendarConnection[
 		lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
 		calendars: cals
 			.filter((c) => c.connectionId === r.id)
-			.map((c) => ({ id: c.id, name: c.name, color: c.color, busy: c.busy }))
+			.map((c) => ({ id: c.id, name: c.name, color: c.color, busy: c.busy })),
+		syncUntil: r.provider === 'device' ? deviceHorizon : null
 	}));
 }
 
@@ -520,9 +524,15 @@ export interface DeviceSyncInput {
 	deviceName: string;
 	rangeStart: string;
 	rangeEnd: string;
+	/** End of the whole sync when it's uploaded in several ranges (defaults to `rangeEnd`). */
+	coveredUntil?: string;
+	/** More ranges of this sync follow: hold the group refresh until the last one. */
+	more?: boolean;
 	calendars: { externalId: string; name: string; color: string | null; busy?: boolean }[];
 	busy: { calendarExternalId: string; start: string; end: string }[];
 }
+
+const deviceRefreshKey = (userId: string, deviceId: string) => `device-sync-changed:${userId}:${deviceId}`;
 
 export async function syncDevice(userId: string, input: DeviceSyncInput): Promise<CalendarConnection> {
 	const find = () =>
@@ -531,7 +541,8 @@ export async function syncDevice(userId: string, input: DeviceSyncInput): Promis
 		});
 	const from = new Date(input.rangeStart);
 	const to = new Date(input.rangeEnd);
-	const values = { label: input.deviceName, status: 'ok' as const, lastError: null, lastSyncedAt: new Date(), coveredUntil: to };
+	const coveredUntil = new Date(Math.max(to.getTime(), input.coveredUntil ? Date.parse(input.coveredUntil) : 0));
+	const values = { label: input.deviceName, status: 'ok' as const, lastError: null, lastSyncedAt: new Date(), coveredUntil };
 	let existing = await find();
 	let id = existing?.id ?? newId();
 	if (!existing) {
@@ -550,8 +561,15 @@ export async function syncDevice(userId: string, input: DeviceSyncInput): Promis
 	const ids = [...saved.ids.values()];
 	const busy = input.busy.map((b) => ({ calendarExternalId: b.calendarExternalId, start: new Date(b.start), end: new Date(b.end) }));
 	const busyChanged = ids.length > 0 && (await writeBusy(userId, and(inCalendars(ids), overlapping(from, to)), toRows(saved.ids, busy, from, to)));
-	// The apps upload on every foreground: only make every group refresh when something changed.
-	if (busyChanged || saved.changed || !existing) await publishAvailabilityChanged(userId);
+	// The apps upload on every foreground: only make every group refresh when something
+	// changed, and once per multi-range sync rather than once per range.
+	const changed = busyChanged || saved.changed || !existing;
+	const held = deviceRefreshKey(userId, input.deviceId);
+	if (input.more) {
+		if (changed) await kv.set(held, '1', 10 * 60);
+	} else if ((await kv.take(held)) !== null || changed) {
+		await publishAvailabilityChanged(userId);
+	}
 	return getConnection(userId, id);
 }
 
