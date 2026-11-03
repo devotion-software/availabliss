@@ -182,10 +182,16 @@
 
 	// The optional AI planner: only offered when the server has it set up; Pro to use.
 	let aiPlanner = $state<{ available: boolean; included: boolean } | null>(null);
+	// Reload whenever the upgrade sheet closes, so buying Pro unlocks it straight away.
 	$effect(() => {
+		if (upgradeSheet.open) return;
+		let stale = false;
 		getPlan()
-			.then((p) => (aiPlanner = p.aiPlanner))
+			.then((p) => !stale && (aiPlanner = p.aiPlanner))
 			.catch(() => {});
+		return () => {
+			stale = true;
+		};
 	});
 	let plannerOpen = $state(false);
 	function openPlanner() {

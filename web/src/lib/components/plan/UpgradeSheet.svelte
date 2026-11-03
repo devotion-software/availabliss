@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { invalidate } from '$app/navigation';
 	import type { Plan, User } from '#lib/types';
 	import { buyOnWeb, getPlan, refreshPlan, storeName, webManagementUrl, webPackages, type WebPackage } from '#lib/client/plan';
 	import { FREE_GROUP_LIMIT } from '#lib/plans';
@@ -55,7 +54,6 @@
 		try {
 			if ((await buyOnWeb(plan.purchase.web, user.id, pkg, user.email)) === 'cancelled') return;
 			plan = await refreshPlan();
-			await invalidate('app:plan');
 			toasts.success(plan.tier === 'pro' ? 'Welcome to Pro' : 'Payment received. Pro will switch on in a moment.');
 			open = false;
 		} catch (err) {
