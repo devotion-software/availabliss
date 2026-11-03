@@ -11,6 +11,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.time.format.TextStyle
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Conversions between the API's wire formats and java.time, plus the display formats
@@ -70,7 +71,13 @@ object DateTimes {
     // endregion
 
     // region Display formats
-    private fun pattern(p: String) = DateTimeFormatter.ofPattern(p, locale)
+    /** Formatters are immutable and thread-safe, so build each (pattern, locale) once. */
+    private val formatters = ConcurrentHashMap<Pair<String, Locale>, DateTimeFormatter>()
+
+    private fun pattern(p: String): DateTimeFormatter {
+        val locale = locale
+        return formatters.getOrPut(p to locale) { DateTimeFormatter.ofPattern(p, locale) }
+    }
 
     /** "Sunday 1 November" */
     fun longDay(date: LocalDate): String = pattern("EEEE d MMMM").format(date)
@@ -86,9 +93,6 @@ object DateTimes {
 
     /** "1 Nov 2026" */
     fun dayMonthYear(date: LocalDate): String = pattern("d MMM yyyy").format(date)
-
-    /** "November 2026" */
-    fun monthYear(date: LocalDate): String = pattern("MMMM yyyy").format(date)
 
     /** "Nov 2026", for tight headers. */
     fun shortMonthYear(date: LocalDate): String = pattern("MMM yyyy").format(date)

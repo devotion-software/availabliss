@@ -23,14 +23,7 @@ inline fun <T> ApiResult<T>.onSuccess(action: (T) -> Unit): ApiResult<T> {
     return this
 }
 
-inline fun <T> ApiResult<T>.onFailure(action: (ApiError) -> Unit): ApiResult<T> {
-    if (this is ApiResult.Failure) action(error)
-    return this
-}
-
 fun <T> ApiResult<T>.getOrNull(): T? = (this as? ApiResult.Success)?.value
-
-fun <T> ApiResult<T>.errorOrNull(): ApiError? = (this as? ApiResult.Failure)?.error
 
 /**
  * Runs a Retrofit call and converts every failure mode (HTTP error body, I/O, bad JSON)

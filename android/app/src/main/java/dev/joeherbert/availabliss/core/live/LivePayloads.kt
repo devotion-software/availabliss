@@ -34,10 +34,6 @@ data class MessageReceipt(
     fun toReceipt() = dev.joeherbert.availabliss.core.network.model.Receipt(delivered, seen, recipients, seenBy)
 }
 
-/** `availability.changed` payload: just refetch. */
-@Serializable
-data class AvailabilityChangedPayload(val userId: String)
-
 /**
  * A [LiveEvent] with its payload decoded per API.md "Live updates". Unknown types or
  * payloads that fail to decode become [Unknown] so a bad frame never breaks the stream.
