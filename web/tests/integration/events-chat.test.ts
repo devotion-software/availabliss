@@ -147,7 +147,9 @@ describe('chat', () => {
 		expect((await vote(other.poll!.id, member, other.poll!.options.map((o) => o.id))).options.every((o) => o.voterIds.includes(member))).toBe(true);
 
 		expect((await closePoll(poll.id, member)).closed).toBe(true);
-		expect((await apiError(vote(poll.id, owner, [beach]))).message).toContain('closed');
+		const closed = await apiError(vote(poll.id, owner, [beach]));
+		expect(closed.code).toBe('conflict');
+		expect(closed.message).toContain('closed');
 	});
 });
 

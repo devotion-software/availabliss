@@ -7,7 +7,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Proposal, ResponseKind } from '#lib/types';
 import { db } from './db';
 import { events, proposalResponses, proposals, user } from './db/schema';
-import { forbidden, notFound } from './http';
+import { conflict, forbidden, notFound } from './http';
 import { newId } from './ids';
 import { getGroupRow, memberIds, requireMember } from './groups';
 import { publishToGroup } from './realtime';
@@ -184,7 +184,7 @@ async function setResponse(proposalId: string, targetId: string, response: Respo
 
 async function requireOpen(proposalId: string): Promise<ProposalRow> {
 	const row = await getRow(proposalId);
-	if (row.status !== 'open') throw forbidden(`This proposal is already ${row.status}`);
+	if (row.status !== 'open') throw conflict(`This proposal is already ${row.status}`);
 	return row;
 }
 
@@ -210,7 +210,7 @@ export async function cancelProposal(proposalId: string, userId: string): Promis
 		.update(proposals)
 		.set({ status: 'cancelled' })
 		.where(and(eq(proposals.id, proposalId), eq(proposals.status, 'open')));
-	if (!result.affectedRows) throw forbidden(`This proposal is already ${(await getRow(proposalId)).status}`);
+	if (!result.affectedRows) throw conflict(`This proposal is already ${(await getRow(proposalId)).status}`);
 	await publishToGroup(row.groupId, 'proposal.updated', await fetchProposal(proposalId));
 }
 

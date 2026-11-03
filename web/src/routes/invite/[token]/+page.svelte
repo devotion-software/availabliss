@@ -4,6 +4,7 @@
 	import { toasts } from '#lib/client/toast.svelte';
 	import { daysBetween, todayIn } from '#lib/client/dates';
 	import { useFormat, plural } from '#lib/client/format';
+	import { monogram } from '#lib/monogram';
 	import Orbs from '#lib/components/ui/Orbs.svelte';
 	import Logo from '#lib/components/ui/Logo.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
@@ -14,14 +15,7 @@
 	const fmt = useFormat();
 
 	let joining = $state(false);
-	const monogram = $derived(
-		(data.invite?.groupName ?? '?')
-			.split(/\s+/)
-			.filter(Boolean)
-			.slice(0, 2)
-			.map((w) => w[0]?.toUpperCase())
-			.join('')
-	);
+	const tileLetters = $derived(monogram(data.invite?.groupName ?? '?'));
 	const expires = $derived.by(() => {
 		if (!data.invite) return '';
 		const days = daysBetween(todayIn(fmt.current.timeZone), fmt.current.dayKey(data.invite.expiresAt));
@@ -48,7 +42,7 @@
 
 	<section class="glass card">
 		{#if data.invite}
-			<GroupTile {monogram} color="t1" size={72} />
+			<GroupTile monogram={tileLetters} color="t1" size={72} />
 			<div class="copy">
 				<span class="from">{data.invite.inviterName} invited you to</span>
 				<h1>{data.invite.groupName}</h1>
