@@ -62,10 +62,17 @@ and every pull request, and only builds the platforms a change touches:
 - **One API for every client.** The SvelteKit app serves the web UI and
   `/api/v1` ([contract](docs/API.md)). The web uses a session cookie; the native
   apps send `Authorization: Bearer <token>` (Better Auth `bearer` plugin).
-- **Privacy.** Only busy *time ranges* are stored: Google uses the freeBusy API,
-  Microsoft and CalDAV read start/end only, and native apps upload ranges from
+- **Privacy.** Only busy *time ranges* are stored: Google, Microsoft and CalDAV
+  read start/end, transparency and the user's own response only (never titles;
+  events are matched by a hash of their id), and native apps upload ranges from
   on-device calendars. Labels on manual blocks are private to their owner.
   Calendar credentials are encrypted at rest (AES-256-GCM, `SECRETS_KEY`).
+- **Calendar sync** (`web/src/lib/server/calendars/`) keeps busy time from a week
+  back to at least three years ahead, further when a group searches further out
+  (up to ten). Syncs only move what changed: Google lists events updated since the
+  last sync, CalDAV calendars whose change tag hasn't moved are skipped, and
+  Outlook (no per-calendar change feed) re-reads the next six months every sync
+  and the rest daily. Writes are diffs, so an unchanged calendar writes nothing.
 - **Availability engine** (`web/src/lib/server/availability/`) is pure and unit
   tested: it expands a group's requirement into candidate slots, checks every
   synced member is free, and returns per-day states (hidden / busy / free /

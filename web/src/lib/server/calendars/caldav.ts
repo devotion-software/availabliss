@@ -1,7 +1,8 @@
 /**
  * CalDAV (iCloud and other servers) with an app-specific password. The server
  * expands recurring events for us (`<C:expand>`), so we only parse VEVENT start,
- * end and transparency; summaries are ignored.
+ * end and transparency; summaries are ignored. Each calendar's change tag
+ * (`getctag`, or the WebDAV sync token) lets unchanged calendars be skipped.
  */
 import { minutesOf, zonedInstant } from '../availability/time';
 import { ReauthRequired, type CaldavCredentials, type CalendarAdapter, type RemoteBusy, type RemoteCalendar } from './types';
@@ -108,7 +109,7 @@ async function dav(creds: CaldavCredentials, url: string, method: 'PROPFIND' | '
 }
 
 const PROPFIND = (props: string) =>
-	`<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:a="http://apple.com/ns/ical/"><d:prop>${props}</d:prop></d:propfind>`;
+	`<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:a="http://apple.com/ns/ical/" xmlns:cs="http://calendarserver.org/ns/"><d:prop>${props}</d:prop></d:propfind>`;
 
 async function discoverHome(creds: CaldavCredentials): Promise<string> {
 	const principal = await dav(creds, creds.serverUrl, 'PROPFIND', '0', PROPFIND('<d:current-user-principal/>'));
@@ -128,7 +129,7 @@ export const caldav: CalendarAdapter<CaldavCredentials> = {
 			home,
 			'PROPFIND',
 			'1',
-			PROPFIND('<d:resourcetype/><d:displayname/><a:calendar-color/><c:supported-calendar-component-set/>')
+			PROPFIND('<d:resourcetype/><d:displayname/><a:calendar-color/><c:supported-calendar-component-set/><cs:getctag/><d:sync-token/>')
 		);
 		const calendars: RemoteCalendar[] = [];
 		for (const response of xmlBlocks(xml, 'response')) {
@@ -137,10 +138,13 @@ export const caldav: CalendarAdapter<CaldavCredentials> = {
 			if (!hasTag(resourceType, 'calendar') || (components && !components.includes('VEVENT'))) continue;
 			const href = xmlText(response, 'href');
 			if (!href) continue;
+			const version = (xmlText(response, 'getctag') || xmlText(response, 'sync-token'))?.slice(0, 255) || null;
 			calendars.push({
 				externalId: new URL(href, url).toString(),
 				name: xmlText(response, 'displayname') || 'Calendar',
-				color: xmlText(response, 'calendar-color')?.slice(0, 7) ?? null
+				color: xmlText(response, 'calendar-color')?.slice(0, 7) ?? null,
+				changes: version ? 'version' : 'none',
+				version
 			});
 		}
 		return calendars;

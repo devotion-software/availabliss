@@ -173,6 +173,16 @@ export async function refreshIfNeeded(provider: OAuthProvider, creds: OAuthCrede
 	return { ...fresh, refreshToken: fresh.refreshToken ?? creds.refreshToken };
 }
 
+/** A provider answered with an error status other than 401. */
+export class HttpError extends Error {
+	constructor(
+		message: string,
+		readonly status: number
+	) {
+		super(message);
+	}
+}
+
 /** GET/POST JSON with a bearer token, mapping 401 to ReauthRequired. */
 export async function bearerFetch<T>(url: string, token: string, init: RequestInit = {}): Promise<T> {
 	const res = await fetch(url, {
@@ -181,6 +191,6 @@ export async function bearerFetch<T>(url: string, token: string, init: RequestIn
 		signal: AbortSignal.timeout(15_000)
 	});
 	if (res.status === 401) throw new ReauthRequired(`${url} → 401`);
-	if (!res.ok) throw new Error(`${url} → ${res.status}: ${await res.text().catch(() => '')}`);
+	if (!res.ok) throw new HttpError(`${url} → ${res.status}: ${await res.text().catch(() => '')}`, res.status);
 	return (await res.json()) as T;
 }

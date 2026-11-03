@@ -138,15 +138,16 @@ describe('caldav adapter (stubbed fetch)', () => {
 			return {
 				body: `<d:multistatus>
 <d:response><d:href>/123/calendars/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>
-<d:response><d:href>/123/calendars/home/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>Home &amp; Away</d:displayname><x:calendar-color>#FF2968FF</x:calendar-color><c:supported-calendar-component-set><c:comp name="VEVENT"/></c:supported-calendar-component-set></d:prop></d:propstat></d:response>
+<d:response><d:href>/123/calendars/home/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>Home &amp; Away</d:displayname><x:calendar-color>#FF2968FF</x:calendar-color><cs:getctag>HwoQEgwAAA</cs:getctag><c:supported-calendar-component-set><c:comp name="VEVENT"/></c:supported-calendar-component-set></d:prop></d:propstat></d:response>
 <d:response><d:href>/123/calendars/tasks/</d:href><d:propstat><d:prop><d:resourcetype><c:calendar/></d:resourcetype><d:displayname>Tasks</d:displayname><c:supported-calendar-component-set><c:comp name="VTODO"/></c:supported-calendar-component-set></d:prop></d:propstat></d:response>
 <d:response><d:href>/123/calendars/plain/</d:href><d:propstat><d:prop><d:resourcetype><c:calendar/></d:resourcetype><d:displayname></d:displayname></d:prop></d:propstat></d:response>
 </d:multistatus>`
 			};
 		});
 		expect(await caldav.listCalendars(creds)).toEqual([
-			{ externalId: 'https://dav.example.com/123/calendars/home/', name: 'Home & Away', color: '#FF2968' },
-			{ externalId: 'https://dav.example.com/123/calendars/plain/', name: 'Calendar', color: null }
+			{ externalId: 'https://dav.example.com/123/calendars/home/', name: 'Home & Away', color: '#FF2968', changes: 'version', version: 'HwoQEgwAAA' },
+			// No change tag: re-read on a schedule.
+			{ externalId: 'https://dav.example.com/123/calendars/plain/', name: 'Calendar', color: null, changes: 'none', version: null }
 		]);
 		expect(calls.map((c) => [c.method, c.url, c.depth])).toEqual([
 			['PROPFIND', 'https://dav.example.com/', '0'],
@@ -173,7 +174,7 @@ describe('caldav adapter (stubbed fetch)', () => {
 	test('busy runs a time-range REPORT per calendar and parses the data', async () => {
 		const event = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART:20261113T180000Z\r\nDTEND:20261113T200000Z\r\nEND:VEVENT\r\nEND:VCALENDAR';
 		const calls = stub(() => ({ body: `<d:multistatus><d:response><c:calendar-data>${event.replace(/&/g, '&amp;')}</c:calendar-data></d:response></d:multistatus>` }));
-		const cal = { externalId: 'https://dav.example.com/123/calendars/home/', name: 'Home', color: null };
+		const cal = { externalId: 'https://dav.example.com/123/calendars/home/', name: 'Home', color: null, changes: 'none' as const };
 		const busy = await caldav.busy(creds, [cal], new Date('2026-11-01T00:00:00Z'), new Date('2026-12-01T00:00:00Z'), 'UTC');
 		expect(busy).toEqual([{ calendarExternalId: cal.externalId, start: new Date('2026-11-13T18:00:00Z'), end: new Date('2026-11-13T20:00:00Z') }]);
 		expect(calls[0].method).toBe('REPORT');

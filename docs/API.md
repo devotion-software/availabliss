@@ -328,7 +328,7 @@ interface DeviceSync {
   deviceId: string;             // stable per install
   deviceName: string;           // "Sam's iPhone"
   rangeStart: string;           // window the busy list covers; replaces previous data in it
-  rangeEnd: string;
+  rangeEnd: string;             // (busy outside the window is ignored; only differences are written)
   calendars: { externalId: string; name: string; color: string | null; busy?: boolean }[];
   busy: { calendarExternalId: string; start: string; end: string }[];
 }

@@ -57,6 +57,13 @@
       "when": 1793746608329,
       "tag": "0007_flippant_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1793748357686,
+      "tag": "0008_flippant_terrax",
+      "breakpoints": true
     }
   ]
 }
