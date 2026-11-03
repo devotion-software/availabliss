@@ -179,6 +179,10 @@ describe('busy members', () => {
 		const elsewhere = await createProposal(g.groupId, g.owner, slot(12));
 		expect(elsewhere.busyMemberIds).toEqual([]);
 
+		// Listed together (one busy load across both), each keeps its own clashes.
+		const listed = Object.fromEntries((await listProposals(g.groupId, g.member, 'open')).map((x) => [x.id, x.busyMemberIds.sort()]));
+		expect(listed).toEqual({ [p.id]: [g.admin, g.member].sort(), [elsewhere.id]: [] });
+
 		await cancelProposal(p.id, g.owner);
 		expect((await getProposal(p.id, g.member)).busyMemberIds).toEqual([]);
 	});

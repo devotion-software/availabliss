@@ -17,7 +17,7 @@ import { insertEvent, toGroupEvent } from './events';
 import { slotLabel } from './availability/labels';
 import { sendConfirmedEmail } from './email';
 import { env } from './env';
-import { busyDuring } from './busy';
+import { loadBusy, type LabelledBusy } from './busy';
 
 type ProposalRow = typeof proposals.$inferSelect;
 type ResponseRow = typeof proposalResponses.$inferSelect;
@@ -50,14 +50,30 @@ async function load(rows: ProposalRow[]): Promise<Proposal[]> {
 		.select()
 		.from(proposalResponses)
 		.where(inArray(proposalResponses.proposalId, rows.map((r) => r.id)));
-	return Promise.all(
-		rows.map(async (row) => {
-			const own = responses.filter((r) => r.proposalId === row.id);
-			// Who can't make it, so people see the clash before they accept or decline.
-			const busy = row.status === 'open' ? await busyDuring(own.map((r) => r.userId), row.start.getTime(), row.end.getTime()) : [];
-			return toProposal(row, own, busy);
-		})
-	);
+	const byProposal = new Map<string, ResponseRow[]>(rows.map((r) => [r.id, []]));
+	for (const r of responses) byProposal.get(r.proposalId)?.push(r);
+
+	// Who can't make each open proposal, so people see the clash before they accept
+	// or decline. One busy load for everyone over the span of all open proposals.
+	const open = rows.filter((r) => r.status === 'open');
+	const busy = open.length
+		? await loadBusy(
+				[...new Set(open.flatMap((r) => byProposal.get(r.id)!.map((x) => x.userId)))],
+				Math.min(...open.map((r) => r.start.getTime())),
+				Math.max(...open.map((r) => r.end.getTime()))
+			)
+		: new Map<string, LabelledBusy[]>();
+
+	return rows.map((row) => {
+		const own = byProposal.get(row.id)!;
+		const start = row.start.getTime();
+		const end = row.end.getTime();
+		const busyIds =
+			row.status === 'open'
+				? own.map((r) => r.userId).filter((id) => busy.get(id)?.some((b) => b.start < end && b.end > start))
+				: [];
+		return toProposal(row, own, busyIds);
+	});
 }
 
 async function getRow(proposalId: string): Promise<ProposalRow> {
@@ -153,7 +169,7 @@ export async function createProposal(groupId: string, userId: string, input: Pro
 			data: { proposalId: id }
 		}
 	);
-	return (await confirmIfEveryoneAccepted(id)) ?? proposal;
+	return (await confirmIfEveryoneAccepted(proposal)) ?? proposal;
 }
 
 async function setResponse(proposalId: string, targetId: string, response: ResponseKind, setBy: string | null) {
@@ -163,7 +179,7 @@ async function setResponse(proposalId: string, targetId: string, response: Respo
 		.onDuplicateKeyUpdate({ set: { response, setBy, updatedAt: new Date() } });
 	const proposal = await fetchProposal(proposalId);
 	await publishToGroup(proposal.groupId, 'proposal.updated', proposal);
-	return (await confirmIfEveryoneAccepted(proposalId)) ?? proposal;
+	return (await confirmIfEveryoneAccepted(proposal)) ?? proposal;
 }
 
 async function requireOpen(proposalId: string): Promise<ProposalRow> {
@@ -198,9 +214,12 @@ export async function cancelProposal(proposalId: string, userId: string): Promis
 	await publishToGroup(row.groupId, 'proposal.updated', await fetchProposal(proposalId));
 }
 
-/** Confirms the proposal when every current member has accepted. Returns it if confirmed. */
-async function confirmIfEveryoneAccepted(proposalId: string): Promise<Proposal | null> {
-	const proposal = await fetchProposal(proposalId);
+/**
+ * Confirms the proposal when every current member has accepted. Returns it if
+ * confirmed. Takes the freshly loaded proposal so callers don't load it twice.
+ */
+async function confirmIfEveryoneAccepted(proposal: Proposal): Promise<Proposal | null> {
+	const proposalId = proposal.id;
 	if (proposal.status !== 'open') return null;
 	const members = await memberIds(proposal.groupId);
 	const accepted = new Set(proposal.responses.filter((r) => r.response === 'accepted').map((r) => r.userId));
@@ -231,7 +250,8 @@ async function confirmIfEveryoneAccepted(proposalId: string): Promise<Proposal |
 	// Lost the race: another request confirmed it (and sent everything) first.
 	if (!eventId) return fetchProposal(proposalId);
 
-	const confirmed = await fetchProposal(proposalId);
+	// Only the status and event changed, and confirmed proposals list nobody as busy.
+	const confirmed: Proposal = { ...proposal, status: 'confirmed', eventId, busyMemberIds: [] };
 	const when = slotLabel({ start: Date.parse(proposal.start), end: Date.parse(proposal.end) }, group.requirement);
 	const event = toGroupEvent((await db.query.events.findFirst({ where: eq(events.id, eventId) }))!);
 
@@ -277,6 +297,6 @@ export async function onMemberLeft(groupId: string, userId: string): Promise<voi
 		.where(and(eq(proposals.groupId, groupId), eq(proposals.status, 'open')));
 	for (const p of open) {
 		await db.delete(proposalResponses).where(and(eq(proposalResponses.proposalId, p.id), eq(proposalResponses.userId, userId)));
-		await confirmIfEveryoneAccepted(p.id);
+		await confirmIfEveryoneAccepted(await fetchProposal(p.id));
 	}
 }

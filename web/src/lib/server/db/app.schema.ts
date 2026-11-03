@@ -336,7 +336,8 @@ export const schoolHolidays = mysqlTable(
 		start: date('start', { mode: 'string' }).notNull(),
 		end: date('end', { mode: 'string' }).notNull()
 	},
-	(t) => [index('school_holidays_authority_idx').on(t.country, t.authority, t.start)]
+	// Lookups filter by authority and date range (authority ids are unique across countries).
+	(t) => [index('school_holidays_authority_idx').on(t.authority, t.start)]
 );
 
 /** Cached public holiday lists from Nager.Date, one row per country and year. */

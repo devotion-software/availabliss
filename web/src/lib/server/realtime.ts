@@ -6,7 +6,14 @@
  */
 import type { LiveEvent } from '#lib/types';
 import { bus as sharedBus, type Bus } from './redis';
-import { groupIdsFor, memberIds } from './groups';
+import { memberIds } from './groups';
+import { eq } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/mysql-core';
+import { db } from './db';
+import { groupMembers } from './db/schema';
+
+const mine = alias(groupMembers, 'mine');
+const theirs = alias(groupMembers, 'theirs');
 
 type Listener = (event: LiveEvent) => void;
 
@@ -81,5 +88,15 @@ export async function publishToGroup(groupId: string, type: LiveEvent['type'], p
 
 /** A user's busy time changed: every group they're in should refresh availability. */
 export async function publishAvailabilityChanged(userId: string): Promise<void> {
-	for (const groupId of await groupIdsFor(userId)) await publishToGroup(groupId, 'availability.changed', { userId });
+	// One query for every group's members, then publish per group.
+	const rows = await db
+		.select({ groupId: mine.groupId, memberId: theirs.userId })
+		.from(mine)
+		.innerJoin(theirs, eq(theirs.groupId, mine.groupId))
+		.where(eq(mine.userId, userId));
+	const byGroup = new Map<string, string[]>();
+	for (const r of rows) byGroup.set(r.groupId, [...(byGroup.get(r.groupId) ?? []), r.memberId]);
+	for (const [groupId, members] of byGroup) {
+		publishToUsers(members, { type: 'availability.changed', groupId, payload: { userId } });
+	}
 }

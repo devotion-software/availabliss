@@ -95,6 +95,9 @@ async function saveCalendars(
 	for (const cal of remote) {
 		const current = byExternal.get(cal.externalId);
 		if (current) {
+			// Most syncs change nothing: skip the write.
+			const busyChanged = cal.busy !== undefined && cal.busy !== current.busy;
+			if (current.name === cal.name && current.color === cal.color && !busyChanged) continue;
 			await db
 				.update(calendars)
 				.set({ name: cal.name, color: cal.color, ...(cal.busy !== undefined && { busy: cal.busy }) })
