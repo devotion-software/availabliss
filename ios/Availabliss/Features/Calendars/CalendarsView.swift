@@ -152,11 +152,52 @@ private struct DeviceCalendarsSection: View {
                     }
                 )
             }
+            DeviceSyncStatus(service: service)
         } else {
             AccessPrompt(denied: service.authorization == .denied || service.authorization == .restricted) {
                 Task { await service.requestFullAccess() }
             }
         }
+    }
+}
+
+/// When this phone's busy time last reached the server, or why it didn't.
+private struct DeviceSyncStatus: View {
+    let service: DeviceCalendarService
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let error = service.lastError {
+                HStack {
+                    StatusPill(text: "Sync problem", tone: .apricot, systemImage: "exclamationmark")
+                    Spacer()
+                    Button(service.isSyncing ? "Syncing…" : "Try again") {
+                        Task { await service.syncIfAuthorized() }
+                    }
+                    .buttonStyle(.textAction)
+                    .disabled(service.isSyncing)
+                }
+                Text(error)
+                    .bodyFont(13)
+                    .foregroundStyle(theme.muted)
+                if let last = service.lastSyncedAt {
+                    Text("Last synced \(Formatting.relative(last))")
+                        .bodyFont(12)
+                        .foregroundStyle(theme.muted)
+                }
+            } else if let last = service.lastSyncedAt {
+                Text("Synced \(Formatting.relative(last))")
+                    .bodyFont(12)
+                    .foregroundStyle(theme.muted)
+            } else if service.isSyncing {
+                Text("Syncing…")
+                    .bodyFont(12)
+                    .foregroundStyle(theme.muted)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 6)
     }
 }
 

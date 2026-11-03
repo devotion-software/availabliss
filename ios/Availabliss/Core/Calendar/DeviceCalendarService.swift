@@ -80,6 +80,14 @@ final class DeviceCalendarService {
 
     var writableCalendars: [EKCalendar] { calendars.filter(\.allowsContentModifications) }
 
+    /// Short sync status for the Profile row: nil without access.
+    var statusSummary: String? {
+        guard hasFullAccess else { return nil }
+        if lastError != nil { return "Sync problem" }
+        if let lastSyncedAt { return "Synced \(Formatting.relative(lastSyncedAt))" }
+        return isSyncing ? "Syncing…" : "On"
+    }
+
     // MARK: Sync
 
     func startObservingChanges() {

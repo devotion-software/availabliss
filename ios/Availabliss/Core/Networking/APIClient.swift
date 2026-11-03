@@ -118,7 +118,11 @@ extension URLSession {
         configuration.httpCookieAcceptPolicy = .always
         configuration.httpShouldSetCookies = true
         configuration.timeoutIntervalForRequest = 30
-        configuration.waitsForConnectivity = true
+        // Fail fast when offline. With waitsForConnectivity the 30 s timeout only starts
+        // once there's a connection, so a request could wait up to the 7-day resource
+        // timeout with its spinner (and the device sync's isSyncing) stuck.
+        configuration.waitsForConnectivity = false
+        configuration.timeoutIntervalForResource = 60
         return URLSession(configuration: configuration)
     }()
 }

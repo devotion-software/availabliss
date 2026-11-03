@@ -71,7 +71,7 @@ struct ProfileView: View {
                 app.router.push(.appearance)
             }
             divider
-            SettingsRow(title: "Calendars", systemImage: "calendar", value: app.deviceCalendar.hasFullAccess ? "Syncing" : nil) {
+            SettingsRow(title: "Calendars", systemImage: "calendar", value: app.deviceCalendar.statusSummary) {
                 app.router.push(.calendars)
             }
             divider
