@@ -81,8 +81,6 @@ export const env = {
 	}
 } as const;
 
-export const isProduction = process.env.NODE_ENV === 'production';
-
 /**
  * The key for our own HMAC signatures (OAuth state, the native flow cookie).
  * Development falls back to a fixed key; production refuses to sign with a key

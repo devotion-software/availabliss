@@ -154,13 +154,6 @@ export function detailLabel(req: Requirement): string {
 /** The full one-liner: "A weekend · Fri from 18:00 → Sun · Nov – Jan". */
 export const summarize = (req: Requirement) => `${lengthLabel(req)} · ${detailLabel(req)}`;
 
-/** "2 weekends work", "1 evening works", "No times work yet". */
-export function matchesLabel(req: Requirement | null, count: number): string {
-	if (count === 0) return 'No times work yet';
-	const noun = req ? (PRESETS.find((p) => p.id === presetOf(req))?.noun ?? 'option') : 'time';
-	return `${plural(count, noun)} work${count === 1 ? 's' : ''}`;
-}
-
 export interface RequirementPreview {
 	count: number;
 	from: string;

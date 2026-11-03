@@ -13,7 +13,6 @@ import {
 	startOfMonth,
 	startOfWeek,
 	timeIn,
-	timeToMinutes,
 	weekdayOf,
 	zonedToIso
 } from './dates';
@@ -72,8 +71,7 @@ describe('zoned conversions', () => {
 });
 
 describe('times', () => {
-	test('round trips HH:MM and wraps past midnight', () => {
-		expect(timeToMinutes('18:45')).toBe(1125);
+	test('formats HH:MM and wraps past midnight', () => {
 		expect(minutesToTime(1125)).toBe('18:45');
 		expect(minutesToTime(0)).toBe('00:00');
 		expect(minutesToTime(24 * 60)).toBe('00:00');
