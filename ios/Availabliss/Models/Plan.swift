@@ -41,7 +41,4 @@ struct Plan: Decodable, Sendable, Equatable {
         guard let proUntil else { return nil }
         return "\(willRenew ? "Renews" : "Ends") \(Formatting.dayMonth(CalendarDay(proUntil)))"
     }
-
-    /// Bought on the web (RevenueCat Web Billing / Stripe), so managed there.
-    var isWebPurchase: Bool { store == "stripe" || store == "rc_billing" }
 }

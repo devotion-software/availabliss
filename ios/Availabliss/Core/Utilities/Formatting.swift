@@ -21,17 +21,9 @@ enum Formatting {
         "\(shortDay(date)) · \(time(date))"
     }
 
-    static func monthYear(_ day: CalendarDay) -> String {
-        day.startDate().formatted(.dateTime.month(.wide).year())
-    }
-
     /// "Nov 2026", for tight headers.
     static func shortMonthYear(_ day: CalendarDay) -> String {
         day.startDate().formatted(.dateTime.month(.abbreviated).year())
-    }
-
-    static func dayMonthYear(_ day: CalendarDay) -> String {
-        day.startDate().formatted(.dateTime.day().month(.abbreviated).year())
     }
 
     static func dayMonth(_ day: CalendarDay) -> String {

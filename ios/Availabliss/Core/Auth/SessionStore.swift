@@ -17,10 +17,12 @@ final class SessionStore {
 
     private let api: APIClient
     private let tokenStore: TokenStore
+    private let config: AppConfig
 
-    init(api: APIClient, tokenStore: TokenStore) {
+    init(api: APIClient, tokenStore: TokenStore, config: AppConfig) {
         self.api = api
         self.tokenStore = tokenStore
+        self.config = config
         self.state = tokenStore.token == nil ? .signedOut : .restoring
     }
 
@@ -75,7 +77,7 @@ final class SessionStore {
     }
 
     func signOut() async {
-        await AuthService(api: api, config: .load()).signOut()
+        await AuthService(api: api, config: config).signOut()
         clearLocalSession()
     }
 

@@ -10,8 +10,6 @@ import Observation
 @MainActor
 @Observable
 final class LiveEventsClient {
-    private(set) var isConnected = false
-
     @ObservationIgnored private let api: APIClient
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var subscribers: [UUID: AsyncStream<LiveEvent>.Continuation] = [:]
@@ -57,7 +55,6 @@ final class LiveEventsClient {
                 } catch {
                     // Fall through to reconnect.
                 }
-                self.isConnected = false
                 attempt += 1
                 let delay = min(30.0, pow(2.0, Double(min(attempt, 5))))
                 try? await Task.sleep(for: .seconds(delay))
@@ -70,7 +67,6 @@ final class LiveEventsClient {
     func stop(endingSession: Bool = false) {
         task?.cancel()
         task = nil
-        isConnected = false
         if endingSession { hasConnected = false }
     }
 
@@ -89,7 +85,6 @@ final class LiveEventsClient {
             if (response as? HTTPURLResponse)?.statusCode == 401 { api.reportUnauthorized(for: request) }
             throw APIError.transport("Live stream unavailable")
         }
-        isConnected = true
         onConnected()
         if hasConnected {
             yield(LiveEvent(kind: .reconnected, groupId: nil, raw: Data("{}".utf8)))
@@ -117,7 +112,7 @@ final class LiveEventsClient {
     /// Returns true when `json` was a complete event (dispatched or deliberately ignored).
     private func dispatch(_ json: String) -> Bool {
         let data = Data(json.utf8)
-        guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data) else { return false }
+        guard let envelope = try? JSONCoding.decoder.decode(Envelope.self, from: data) else { return false }
         guard let kind = LiveEvent.Kind(rawValue: envelope.type) else { return true }
         guard kind != .reconnected else { return true }
         yield(LiveEvent(kind: kind, groupId: envelope.groupId, raw: data))

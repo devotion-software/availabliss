@@ -270,7 +270,7 @@ private struct ConfirmedView: View {
                 CalendarPickerRow(selection: $calendar, calendars: app.deviceCalendar.writableCalendars)
             }
             if let event = model.event {
-                ConfirmedAddButton(event: event, calendar: calendar)
+                AddToCalendarButton(event: event, calendar: calendar)
             } else {
                 ProgressView().frame(height: 54)
             }
@@ -304,33 +304,5 @@ private struct CalendarPickerRow: View {
             .surfaceBackground(cornerRadius: 16)
         }
         .accessibilityLabel("Calendar: \(selection?.title ?? "default")")
-    }
-}
-
-private struct ConfirmedAddButton: View {
-    let event: GroupEvent
-    let calendar: EKCalendar?
-    @Environment(AppModel.self) private var app
-    @State private var isAdded = false
-    @State private var error: String?
-
-    var body: some View {
-        Button {
-            Task {
-                do {
-                    try await app.deviceCalendar.add(event, to: calendar)
-                    withAnimation { isAdded = true }
-                } catch {
-                    self.error = error.userMessage
-                }
-            }
-        } label: {
-            Label(isAdded ? "Added to your calendar" : "Add to calendar", systemImage: isAdded ? "checkmark" : "plus")
-        }
-        .buttonStyle(.filled(isAdded ? .success : .primary, height: 54, cornerRadius: 18))
-        .disabled(isAdded)
-        .onAppear { isAdded = app.deviceCalendar.isAdded(event.id) }
-        .sensoryFeedback(.success, trigger: isAdded)
-        .errorAlert($error)
     }
 }

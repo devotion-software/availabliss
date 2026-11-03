@@ -44,14 +44,6 @@ final class APIClient: Sendable {
         try makeRequest(for: Endpoint<EmptyResponse>(.get, path, mount: mount))
     }
 
-    func url(path: String, mount: APIMount = .v1, query: [String: String] = [:]) -> URL {
-        var components = URLComponents(url: baseURL.appending(path: mount.rawValue + path), resolvingAgainstBaseURL: false)
-        if !query.isEmpty {
-            components?.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
-        }
-        return components?.url ?? baseURL
-    }
-
     var bearerToken: String? { tokenStore.token }
 
     /// Reports a 401 for `request` as the session ending, but only when it was sent with the token

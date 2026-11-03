@@ -8,7 +8,7 @@ final class WebAuthenticator: NSObject, ASWebAuthenticationPresentationContextPr
     private var session: ASWebAuthenticationSession?
 
     /// Opens `url` and returns the callback URL the flow redirects to.
-    func authenticate(url: URL, callbackScheme: String, ephemeral: Bool = false) async throws -> URL {
+    func authenticate(url: URL, callbackScheme: String) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
             let completion: ASWebAuthenticationSession.CompletionHandler = { [weak self] callbackURL, error in
                 MainActor.assumeIsolated {
@@ -24,7 +24,7 @@ final class WebAuthenticator: NSObject, ASWebAuthenticationPresentationContextPr
             }
             let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme, completionHandler: completion)
             session.presentationContextProvider = self
-            session.prefersEphemeralWebBrowserSession = ephemeral
+            session.prefersEphemeralWebBrowserSession = false
             self.session = session
             if !session.start() {
                 self.session = nil

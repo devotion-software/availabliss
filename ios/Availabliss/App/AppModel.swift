@@ -28,7 +28,7 @@ final class AppModel {
         let unauthorized = UnauthorizedRelay()
         let api = APIClient(baseURL: config.apiBaseURL, tokenStore: tokenStore) { token in unauthorized.fire(token: token) }
         self.api = api
-        let session = SessionStore(api: api, tokenStore: tokenStore)
+        let session = SessionStore(api: api, tokenStore: tokenStore, config: config)
         self.session = session
         self.appearance = AppearanceStore(api: api)
         self.live = LiveEventsClient(api: api)
