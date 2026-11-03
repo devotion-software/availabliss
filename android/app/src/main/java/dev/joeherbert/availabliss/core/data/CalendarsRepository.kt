@@ -7,6 +7,7 @@ import dev.joeherbert.availabliss.core.network.model.CalDavRequest
 import dev.joeherbert.availabliss.core.network.model.CalendarBusyRequest
 import dev.joeherbert.availabliss.core.network.model.CalendarConnection
 import dev.joeherbert.availabliss.core.network.model.DeviceSync
+import dev.joeherbert.availabliss.core.network.model.OAuthCompleteRequest
 import dev.joeherbert.availabliss.core.network.model.OAuthUrlRequest
 import dev.joeherbert.availabliss.core.network.onSuccess
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,10 +50,15 @@ class CalendarsRepository @Inject constructor(
     /**
      * Google / Microsoft consent URL (`provider` = google | microsoft) with signed state,
      * fetched with the bearer token and then opened in a Custom Tab. The server redirects
-     * back to `availabliss://calendars?connected=<id>` (or `?error=`).
+     * back to `availabliss://calendars?complete=<code>&provider=<provider>` (or `?error=`);
+     * finish with [completeOAuth].
      */
     suspend fun oauthUrl(provider: String): ApiResult<String> =
         call { api.calendarOAuthUrl(provider, OAuthUrlRequest(OAUTH_REDIRECT)) }.map { it.url }
+
+    /** Links the calendar. Sent with our bearer token, so only the user who started the flow can finish it. */
+    suspend fun completeOAuth(provider: String, code: String): ApiResult<CalendarConnection> =
+        call { api.completeCalendarOAuth(provider, OAuthCompleteRequest(code)) }.onSuccess(::upsert)
 
     fun clear() {
         _connections.value = emptyList()

@@ -1,6 +1,9 @@
 package dev.joeherbert.availabliss.feature.calendars
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -30,8 +33,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import dev.joeherbert.availabliss.core.auth.CustomTabs
 import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.common.findActivity
 import dev.joeherbert.availabliss.core.network.model.CalendarConnection
 import dev.joeherbert.availabliss.core.network.model.CalendarProvider
 import dev.joeherbert.availabliss.core.network.model.ConnectedCalendar
@@ -56,13 +61,35 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.feature.common.parseHex
 import java.time.Instant
 
-/** Requests READ_CALENDAR (and WRITE_CALENDAR for one-tap "Add to calendar"). */
+/**
+ * Requests READ_CALENDAR (and WRITE_CALENDAR for one-tap "Add to calendar").
+ *
+ * After two denials (or "Don't ask again") the system rejects requests without
+ * showing anything, so once [blocked] the request opens this app's settings page
+ * instead, as ActivityScreen does for notifications. [onResult] gets `canAskAgain`
+ * = false when a denial leaves no rationale to show, which is how that state shows up.
+ */
 @Composable
-fun rememberCalendarPermissionRequest(onResult: (Boolean) -> Unit): () -> Unit {
+fun rememberCalendarPermissionRequest(
+    blocked: Boolean,
+    onResult: (granted: Boolean, canAskAgain: Boolean) -> Unit,
+): () -> Unit {
+    val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
-        onResult(results[Manifest.permission.READ_CALENDAR] == true)
+        val granted = results[Manifest.permission.READ_CALENDAR] == true
+        val canAskAgain = granted || context.findActivity()
+            ?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.READ_CALENDAR) } == true
+        onResult(granted, canAskAgain)
     }
-    return { launcher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)) }
+    return {
+        if (blocked) {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } else {
+            launcher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
+        }
+    }
 }
 
 /** Opens [CalendarSourcesUiState.pendingUrl] (OAuth start) in a Custom Tab. */
@@ -102,7 +129,7 @@ fun CalendarSourcesContent(
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (!state.hasPermission) {
-            PermissionCard(actions.onRequestPermission)
+            PermissionCard(state.permissionBlocked, actions.onRequestPermission)
         } else {
             state.deviceSources.forEach { source -> DeviceSourceSection(source, actions.onToggleDevice) }
             if (manage) DeviceSyncCard(state.lastDeviceSyncAt, state.syncingDevice, actions.onSyncDevice)
@@ -227,7 +254,7 @@ private fun DeviceSyncCard(lastSyncAt: Long?, syncing: Boolean, onSync: () -> Un
 }
 
 @Composable
-private fun PermissionCard(onRequest: () -> Unit) {
+private fun PermissionCard(blocked: Boolean, onRequest: () -> Unit) {
     val colors = AvailablissTheme.colors
     GlassPanel(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -241,7 +268,7 @@ private fun PermissionCard(onRequest: () -> Unit) {
                 )
             }
         }
-        PrimaryButton("Allow calendar access", onRequest, height = 46.dp, shape = Shapes.controlSmall, textStyle = AvailablissTheme.type.bodySmallStrong, style = ButtonStyle.Accent, modifier = Modifier.fillMaxWidth())
+        PrimaryButton(if (blocked) "Open settings" else "Allow calendar access", onRequest, height = 46.dp, shape = Shapes.controlSmall, textStyle = AvailablissTheme.type.bodySmallStrong, style = ButtonStyle.Accent, modifier = Modifier.fillMaxWidth())
     }
 }
 

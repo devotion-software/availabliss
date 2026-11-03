@@ -68,6 +68,7 @@ class GroupViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch { liveEvents.reconnected.collect { groups.refreshGroup(groupId) } }
     }
 
     fun onTabChanged(tab: GroupTab) {

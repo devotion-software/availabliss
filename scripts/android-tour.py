@@ -135,8 +135,10 @@ if tap("Lake District crew", last=True):
         adb("shell", "input", "keyevent", "KEYCODE_BACK")
         time.sleep(1)
 
-for label, name in [("My time", "10-my-time"), ("Activity", "11-activity"), ("You", "12-you"), ("Appearance", "13-appearance")]:
-    if tap(label):
+# Tabs are matched from the end of the tree (the tab bar is drawn last), so screen text that
+# starts the same way ("You're all caught up" on Activity) isn't tapped instead of the "You" tab.
+for label, name, last in [("My time", "10-my-time", True), ("Activity", "11-activity", True), ("You", "12-you", True), ("Appearance", "13-appearance", False)]:
+    if tap(label, last=last):
         snapshot(name)
 
 print(f"\nScreenshots: {out_dir}")

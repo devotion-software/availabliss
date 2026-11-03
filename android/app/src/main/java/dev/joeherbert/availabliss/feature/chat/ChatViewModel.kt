@@ -136,6 +136,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             liveEvents.payloadsFor(groupId).collect { onLive(it) }
         }
+        viewModelScope.launch { liveEvents.reconnected.collect { catchUp() } }
     }
 
     // region Loading
@@ -174,6 +175,35 @@ class ChatViewModel @Inject constructor(
                 }
                 is ApiResult.Failure -> data.update { it.copy(loadingOlder = false, message = UserMessage(result.error.message)) }
             }
+        }
+    }
+
+    /**
+     * After a gap in the live stream: fetches the newest page and splices it onto
+     * what's loaded, keeping older pages the user scrolled back through when the two
+     * overlap. Referenced proposals and events in that page are refetched too, since
+     * their updates may also have been missed.
+     */
+    private fun catchUp() {
+        if (data.value.loading) return
+        viewModelScope.launch {
+            val page = (chat.page(groupId) as? ApiResult.Success)?.value ?: return@launch
+            data.update { cur ->
+                val oldestFresh = page.messages.firstOrNull()?.id
+                val overlapAt = cur.messages.indexOfFirst { it.id == oldestFresh }
+                if (oldestFresh != null && overlapAt >= 0) {
+                    cur.copy(messages = cur.messages.take(overlapAt) + page.messages)
+                } else {
+                    cur.copy(messages = page.messages, hasMore = page.hasMore)
+                }
+            }
+            page.messages.forEach { m ->
+                m.proposalId?.let(requestedProposals::remove)
+                m.eventId?.let(requestedEvents::remove)
+            }
+            resolveReferences()
+            scheduleReceipts()
+            refreshGroup()
         }
     }
 

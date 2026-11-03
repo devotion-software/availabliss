@@ -50,6 +50,16 @@ class TokenStore @Inject constructor(
         _token.value = null
     }
 
+    /**
+     * The PKCE verifier for a web-flow sign-in in progress. Kept on disk so the
+     * sign-in still completes if the process dies while the Custom Tab is open.
+     */
+    fun saveSignInVerifier(verifier: String) = prefs.edit { putString(KEY_SIGN_IN_VERIFIER, verifier) }
+
+    /** Returns and forgets the pending verifier (single use). */
+    fun takeSignInVerifier(): String? =
+        prefs.getString(KEY_SIGN_IN_VERIFIER, null).also { prefs.edit { remove(KEY_SIGN_IN_VERIFIER) } }
+
     private fun ensureLoaded() {
         if (loaded) return
         synchronized(this) {
@@ -91,5 +101,6 @@ class TokenStore @Inject constructor(
         const val TAG = "TokenStore"
         const val FILE_NAME = "availabliss_secure"
         const val KEY_TOKEN = "auth_token"
+        const val KEY_SIGN_IN_VERIFIER = "sign_in_verifier"
     }
 }

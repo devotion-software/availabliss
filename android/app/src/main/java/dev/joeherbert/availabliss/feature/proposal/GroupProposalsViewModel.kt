@@ -71,6 +71,7 @@ class GroupProposalsViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch { liveEvents.reconnected.collect { refresh() } }
     }
 
     fun refresh() {

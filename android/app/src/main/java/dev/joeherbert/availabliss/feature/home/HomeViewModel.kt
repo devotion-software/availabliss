@@ -123,6 +123,7 @@ class HomeViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch { liveEvents.reconnected.collect { refreshRequests.tryEmit(Unit) } }
         viewModelScope.launch {
             // Live events arrive in bursts; coalesce them into one refresh.
             refreshRequests.debounce(500).collect { refresh(silent = true) }

@@ -113,6 +113,7 @@ class ProposalViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch { liveEvents.reconnected.collect { refresh() } }
     }
 
     fun refresh() {

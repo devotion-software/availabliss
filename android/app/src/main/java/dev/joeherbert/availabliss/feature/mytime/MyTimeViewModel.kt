@@ -49,6 +49,7 @@ class MyTimeViewModel @Inject constructor(
                 if (event.userId == users.user.value?.id) load(silent = true)
             }
         }
+        viewModelScope.launch { liveEvents.reconnected.collect { load(silent = true) } }
     }
 
     // region Week navigation

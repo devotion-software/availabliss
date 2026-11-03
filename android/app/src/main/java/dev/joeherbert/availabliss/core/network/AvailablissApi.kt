@@ -42,6 +42,7 @@ import dev.joeherbert.availabliss.core.network.model.MessageInfo
 import dev.joeherbert.availabliss.core.network.model.MessagesResponse
 import dev.joeherbert.availabliss.core.network.model.NotificationsResponse
 import dev.joeherbert.availabliss.core.network.model.NudgeResponse
+import dev.joeherbert.availabliss.core.network.model.OAuthCompleteRequest
 import dev.joeherbert.availabliss.core.network.model.OAuthUrlRequest
 import dev.joeherbert.availabliss.core.network.model.OAuthUrlResponse
 import dev.joeherbert.availabliss.core.network.model.RequirementPreview
@@ -131,6 +132,10 @@ interface AvailablissApi {
     /** Provider consent URL with signed state; open it in a Custom Tab (it can't carry the bearer token). */
     @POST("api/v1/calendars/oauth/{provider}/url")
     suspend fun calendarOAuthUrl(@Path("provider") provider: String, @Body body: OAuthUrlRequest): OAuthUrlResponse
+
+    /** Finishes a connection with the one-time code from `availabliss://calendars?complete=`. */
+    @POST("api/v1/calendars/oauth/{provider}/complete")
+    suspend fun completeCalendarOAuth(@Path("provider") provider: String, @Body body: OAuthCompleteRequest): CalendarConnection
 
     @PUT("api/v1/calendars/device")
     suspend fun syncDevice(@Body body: DeviceSync): CalendarConnection

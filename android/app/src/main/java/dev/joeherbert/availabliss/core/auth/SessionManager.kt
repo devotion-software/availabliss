@@ -10,6 +10,7 @@ import dev.joeherbert.availabliss.core.data.CalendarsRepository
 import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.NotificationsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
+import dev.joeherbert.availabliss.core.live.LiveConnectionObserver
 import dev.joeherbert.availabliss.core.live.LiveEvents
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.AuthInterceptor
@@ -18,9 +19,12 @@ import dev.joeherbert.availabliss.core.push.PushRegistrar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,6 +45,7 @@ class SessionManager @Inject constructor(
     private val prefs: AppPreferences,
     private val push: PushRegistrar,
     private val liveEvents: LiveEvents,
+    private val appLifecycle: LiveConnectionObserver,
     private val syncScheduler: CalendarSyncScheduler,
     private val calendarObserver: CalendarChangeObserver,
     private val cookieJar: PasskeyCookieJar,
@@ -53,34 +58,68 @@ class SessionManager @Inject constructor(
         .map { if (it == null) AuthState.SignedOut else AuthState.SignedIn }
         .stateIn(scope, SharingStarted.Eagerly, if (tokenStore.token() == null) AuthState.SignedOut else AuthState.SignedIn)
 
+    private val clearMutex = Mutex()
+
+    /** The token whose foreground work has already run in this process (see [onForegroundSession]). */
+    private var foregroundWorkFor: String? = null
+
     init {
-        scope.launch { authInterceptor.unauthorized.collect { clearLocalSession() } }
-        // Runs on launch for a returning user and again whenever a sign-in completes.
+        scope.launch { authInterceptor.unauthorized.collect { token -> clearLocalSession(ifToken = token) } }
+        // Runs on every process start for a returning user (including background starts
+        // for push or WorkManager) and again whenever a sign-in completes.
         scope.launch { authState.collect { if (it == AuthState.SignedIn) onSignedIn() } }
+        scope.launch {
+            combine(tokenStore.tokenFlow, appLifecycle.foreground) { token, foreground -> token.takeIf { foreground } }
+                .collect { token ->
+                    if (token == null) return@collect
+                    // Covers signing in while already foregrounded, when ON_START came before the token.
+                    liveEvents.start()
+                    if (token != foregroundWorkFor) {
+                        foregroundWorkFor = token
+                        onForegroundSession()
+                    }
+                }
+        }
     }
 
-    /** Post sign-in work: refresh /me, register push, start live updates and calendar sync. */
+    /** Local, cheap setup that is safe in a background process start. */
     private fun onSignedIn() {
         if (tokenStore.token() == null) return
+        scope.launch { users.restore() }
+        calendarObserver.ensureRegistered()
+        syncScheduler.schedulePeriodic()
+    }
+
+    /**
+     * Network work done once per sign-in, or once per process the first time it comes
+     * to the foreground, rather than on every background wake (each of which would
+     * otherwise refetch /me, re-register push and queue a second calendar sync).
+     */
+    private fun onForegroundSession() {
         scope.launch {
             users.restore()
             if (users.refresh() is ApiResult.Success) {
                 push.register()
             }
         }
-        liveEvents.start()
-        calendarObserver.ensureRegistered()
-        syncScheduler.schedulePeriodic()
         syncScheduler.syncSoon()
     }
 
     suspend fun signOut() {
+        val token = tokenStore.token()
         push.unregister()
         authRepository.signOutRemote()
-        clearLocalSession()
+        clearLocalSession(ifToken = token)
     }
 
-    private suspend fun clearLocalSession() {
+    /**
+     * Serialised and keyed by token so a 401 that arrives during [signOut] (e.g.
+     * `DELETE /devices` after the account was deleted) doesn't clear a second time,
+     * and can't clear a session that has since replaced the rejected one.
+     * [ifToken] = null clears unconditionally.
+     */
+    private suspend fun clearLocalSession(ifToken: String?) = clearMutex.withLock {
+        if (ifToken != null && tokenStore.token() != ifToken) return@withLock
         liveEvents.stop()
         syncScheduler.cancelAll()
         calendarObserver.unregister()

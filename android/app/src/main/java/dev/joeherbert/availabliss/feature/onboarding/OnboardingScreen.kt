@@ -66,7 +66,10 @@ fun OnboardingScreen(
     val region by regionViewModel.state.collectAsStateWithLifecycle()
     val sources by sourcesViewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
-    val requestPermission = rememberCalendarPermissionRequest(sourcesViewModel::onPermissionResult)
+    val requestPermission = rememberCalendarPermissionRequest(
+        blocked = sources.permissionBlocked,
+        onResult = sourcesViewModel::onPermissionResult,
+    )
 
     LaunchedEffect(region.saved) {
         if (region.saved) {

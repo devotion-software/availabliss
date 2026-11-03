@@ -80,6 +80,10 @@ class AppPreferences @Inject constructor(
         store.edit { it[KEY_LAST_DEVICE_SYNC] = epochMillis }
     }
 
+    suspend fun clearLastDeviceSyncAt() {
+        store.edit { it.remove(KEY_LAST_DEVICE_SYNC) }
+    }
+
     suspend fun pushToken(): String? = store.data.first()[KEY_PUSH_TOKEN]
 
     suspend fun setPushToken(token: String?) {

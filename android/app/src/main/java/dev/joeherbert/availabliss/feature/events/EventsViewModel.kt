@@ -93,6 +93,7 @@ class EventsViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch { liveEvents.reconnected.collect { refresh() } }
     }
 
     fun refresh() {

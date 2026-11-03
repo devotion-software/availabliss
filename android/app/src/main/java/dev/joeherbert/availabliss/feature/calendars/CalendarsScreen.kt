@@ -31,7 +31,10 @@ import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostSta
 fun CalendarsScreen(onBack: () -> Unit, viewModel: CalendarSourcesViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
-    val requestPermission = rememberCalendarPermissionRequest(viewModel::onPermissionResult)
+    val requestPermission = rememberCalendarPermissionRequest(
+        blocked = state.permissionBlocked,
+        onResult = viewModel::onPermissionResult,
+    )
 
     // Returning from the OAuth Custom Tab (or system settings) lands here.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }

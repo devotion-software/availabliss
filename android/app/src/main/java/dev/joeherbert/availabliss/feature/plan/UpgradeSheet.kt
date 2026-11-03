@@ -1,8 +1,5 @@
 package dev.joeherbert.availabliss.feature.plan
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -35,6 +32,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.billing.PlanLabels
 import dev.joeherbert.availabliss.core.billing.StorePackage
+import dev.joeherbert.availabliss.core.common.findActivity
 import dev.joeherbert.availabliss.core.network.model.AiPlannerAccess
 import dev.joeherbert.availabliss.core.network.model.Plan
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
@@ -185,13 +183,6 @@ private fun Spinner() {
     Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(Modifier.size(22.dp), color = AvailablissTheme.colors.muted, strokeWidth = 2.dp)
     }
-}
-
-/** The Activity behind a Compose context (Google Play's purchase sheet needs one). */
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }
 
 @Preview

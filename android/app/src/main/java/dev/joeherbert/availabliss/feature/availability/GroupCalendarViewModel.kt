@@ -129,6 +129,8 @@ class GroupCalendarViewModel @Inject constructor(
                 }
             }
         }
+        // GroupViewModel (the hosting screen) refetches the group itself on reconnect.
+        viewModelScope.launch { liveEvents.reconnected.collect { refresh() } }
     }
 
     // region Intents

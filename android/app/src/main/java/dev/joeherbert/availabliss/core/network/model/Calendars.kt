@@ -53,6 +53,10 @@ data class OAuthUrlRequest(val redirect: String? = null)
 @Serializable
 data class OAuthUrlResponse(val url: String)
 
+/** `POST /calendars/oauth/:provider/complete` body. */
+@Serializable
+data class OAuthCompleteRequest(val code: String)
+
 @Serializable
 data class CalendarBusyRequest(val busy: Boolean)
 

@@ -10,6 +10,8 @@ import dev.joeherbert.availabliss.core.network.model.ColorTheme
 import dev.joeherbert.availabliss.core.network.model.ThemeMode
 import dev.joeherbert.availabliss.core.network.model.User
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,7 +44,19 @@ class UserRepository @Inject constructor(
         }
     }
 
-    suspend fun refresh(): ApiResult<User> = call { api.getMe() }.onSuccess(::store)
+    private var inFlight: Deferred<ApiResult<User>>? = null
+
+    /**
+     * `GET /me`. Concurrent callers share one request: on a cold start with nothing
+     * cached, SessionManager and the root screen both ask at once.
+     */
+    suspend fun refresh(): ApiResult<User> {
+        val request = synchronized(this) {
+            inFlight?.takeIf { it.isActive }
+                ?: scope.async { call { api.getMe() }.onSuccess(::store) }.also { inFlight = it }
+        }
+        return request.await()
+    }
 
     /** `PATCH /me` with only the fields set in [block]. */
     suspend fun update(block: JsonPatchBuilder.() -> Unit): ApiResult<User> =

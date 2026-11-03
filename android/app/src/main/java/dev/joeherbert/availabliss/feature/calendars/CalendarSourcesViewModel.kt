@@ -17,6 +17,7 @@ import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.CalendarConnection
 import dev.joeherbert.availabliss.core.network.model.CalendarProvider
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +46,11 @@ data class CalDavForm(
 data class CalendarSourcesUiState(
     val loading: Boolean = true,
     val hasPermission: Boolean = false,
+    /**
+     * The system won't show the READ_CALENDAR prompt again (denied twice, or "Don't
+     * ask again"), so the request has to go through app settings instead.
+     */
+    val permissionBlocked: Boolean = false,
     val deviceSources: List<DeviceSource> = emptyList(),
     /** Google / Microsoft / CalDAV connections (this phone's own upload is shown as [deviceSources]). */
     val connections: List<CalendarConnection> = emptyList(),
@@ -81,6 +87,7 @@ class CalendarSourcesViewModel @Inject constructor(
     val state: StateFlow<CalendarSourcesUiState> = _state.asStateFlow()
 
     private var deviceCalendars: List<DeviceCalendarInfo> = emptyList()
+    private var refreshJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -91,27 +98,40 @@ class CalendarSourcesViewModel @Inject constructor(
         viewModelScope.launch {
             prefs.lastDeviceSyncAt.collect { at -> _state.update { it.copy(lastDeviceSyncAt = at) } }
         }
-        // OAuth return: availabliss://calendars?connected=<id> or ?error=
+        // OAuth return: availabliss://calendars?complete=<code>&provider=<provider> or ?error=
         viewModelScope.launch {
             deepLinks.pending.collect { link ->
                 if (link is DeepLink.Calendars) {
                     deepLinks.consume(link)
                     val text = when {
                         link.error != null -> "Couldn't connect that calendar (${link.error})."
-                        link.connectedId != null -> "Calendar connected."
+                        link.complete != null && link.provider != null ->
+                            when (val result = calendars.completeOAuth(link.provider, link.complete)) {
+                                is ApiResult.Success -> "Calendar connected."
+                                is ApiResult.Failure -> result.error.message
+                            }
                         else -> null
                     }
                     _state.update { it.copy(sheet = null, message = text?.let(::UserMessage) ?: it.message) }
-                    refresh()
+                    refresh(force = true)
                 }
             }
         }
         refresh()
     }
 
-    /** Reloads device calendars and server connections. Call on resume too. */
-    fun refresh() {
-        viewModelScope.launch {
+    /**
+     * Reloads device calendars and server connections. Call on resume too. A call
+     * while a refresh is already running is dropped, so the init load and the first
+     * ON_RESUME don't query the device and `GET /calendars` twice; [force] restarts it
+     * instead, for when something has changed since it began.
+     */
+    fun refresh(force: Boolean = false) {
+        if (refreshJob?.isActive == true) {
+            if (!force) return
+            refreshJob?.cancel()
+        }
+        refreshJob = viewModelScope.launch {
             loadDevice()
             when (val result = calendars.refresh()) {
                 is ApiResult.Success -> Unit
@@ -121,9 +141,17 @@ class CalendarSourcesViewModel @Inject constructor(
         }
     }
 
-    fun onPermissionResult(granted: Boolean) {
+    /** [canAskAgain] is false when the system will deny further requests without asking. */
+    fun onPermissionResult(granted: Boolean, canAskAgain: Boolean = true) {
         if (!granted) {
-            _state.update { it.copy(hasPermission = false, message = UserMessage("Calendar access is off. You can still connect a calendar or mark busy times yourself.")) }
+            val text = if (canAskAgain) {
+                "Calendar access is off. You can still connect a calendar or mark busy times yourself."
+            } else {
+                "Calendar access is off. Turn it on in Settings › Permissions › Calendar, or connect a calendar instead."
+            }
+            _state.update { it.copy(hasPermission = false, permissionBlocked = !canAskAgain, message = UserMessage(text)) }
+            // Removes what this phone uploaded before, if anything (see DeviceCalendarSync).
+            scheduler.syncSoon()
             return
         }
         observer.ensureRegistered()
@@ -163,7 +191,7 @@ class CalendarSourcesViewModel @Inject constructor(
             val result = deviceSync.sync()
             val text = when (result) {
                 is DeviceSyncResult.Synced -> if (quiet) null else "Synced this phone's busy times."
-                DeviceSyncResult.Skipped -> null
+                DeviceSyncResult.Skipped, DeviceSyncResult.Cleared -> null
                 is DeviceSyncResult.Failed -> result.error.message
             }
             _state.update { it.copy(syncingDevice = false, message = text?.let(::UserMessage) ?: it.message) }
@@ -228,7 +256,7 @@ class CalendarSourcesViewModel @Inject constructor(
                     calendars = cals.map { DeviceCalendarRow(it.externalId, it.name, it.color, it.externalId in busyIds) },
                 )
             }
-        _state.update { it.copy(hasPermission = granted, deviceSources = sources) }
+        _state.update { it.copy(hasPermission = granted, permissionBlocked = it.permissionBlocked && !granted, deviceSources = sources) }
     }
 
     private fun withConnectionBusy(connectionId: String, block: suspend () -> ApiResult<*>) {

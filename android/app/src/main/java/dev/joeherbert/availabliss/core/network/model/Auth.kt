@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.core.network.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -24,7 +25,10 @@ data class SocialIdTokenSignInRequest(val provider: String, val idToken: SocialI
 
 /** Swaps the one-time code from a web-flow sign-in (Apple on Android) for a bearer token. */
 @Serializable
-data class NativeSignInCodeRequest(val code: String)
+data class NativeSignInCodeRequest(
+    val code: String,
+    @SerialName("code_verifier") val codeVerifier: String,
+)
 
 @Serializable
 data class NativeSignInTokenResponse(val token: String)

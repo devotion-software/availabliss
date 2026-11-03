@@ -61,6 +61,7 @@ class ActivityViewModel @Inject constructor(
                 notifications.refresh()
             }
         }
+        viewModelScope.launch { liveEvents.reconnected.collect { refresh() } }
         viewModelScope.launch {
             notifications.unread.collect { count -> _state.update { it.copy(unread = count) } }
         }

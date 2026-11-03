@@ -119,13 +119,22 @@ class AuthRepository @Inject constructor(
      * Sign in with Apple has no Android SDK, so it runs as a web flow in a Custom Tab.
      * The server starts it and finishes by redirecting to
      * `availabliss://auth/callback?code=<one-time code>`; see [completeWebSignIn].
+     *
+     * PKCE: a random verifier stays on the device and only its SHA-256 goes in the URL,
+     * so another app that catches the `availabliss://` redirect can't redeem the code.
      */
-    fun appleSignInUrl(): String = "${BuildConfig.API_BASE_URL}/api/v1/auth/native/apple/start"
+    fun appleSignInUrl(): String {
+        val verifier = Pkce.newVerifier()
+        tokenStore.saveSignInVerifier(verifier)
+        return "${BuildConfig.API_BASE_URL}/api/v1/auth/native/apple/start?code_challenge=${Pkce.challenge(verifier)}"
+    }
 
     /** Completes a web sign-in from the `availabliss://auth/callback` deep link. */
     suspend fun completeWebSignIn(code: String?, error: String?): SignInResult {
+        val verifier = tokenStore.takeSignInVerifier()
         if (code.isNullOrBlank()) return SignInResult.Failed(error ?: "Sign in didn't finish. Please try again.")
-        val token = when (val result = authCall { authApi.exchangeNativeSignInCode(NativeSignInCodeRequest(code)) }) {
+        if (verifier == null) return SignInResult.Failed("Sign in didn't finish. Please try again.")
+        val token = when (val result = authCall { authApi.exchangeNativeSignInCode(NativeSignInCodeRequest(code, verifier)) }) {
             is ApiResult.Success -> result.value.body()?.token
             is ApiResult.Failure -> return SignInResult.Failed(result.error.message)
         } ?: return SignInResult.Failed("Sign in didn't finish. Please try again.")

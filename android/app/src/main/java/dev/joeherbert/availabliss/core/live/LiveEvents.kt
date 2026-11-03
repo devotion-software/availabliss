@@ -9,15 +9,13 @@ import dev.joeherbert.availabliss.core.network.model.LiveEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -41,6 +39,9 @@ import kotlin.time.Duration.Companion.seconds
  * The `GET /api/v1/live` Server-Sent Events stream. [start] while the app is in the
  * foreground (see [LiveConnectionObserver]); screens subscribe to [events] or
  * [eventsFor] and refresh what they show. Reconnects with exponential backoff.
+ *
+ * The server sends no event ids, so nothing is replayed after a gap: screens also
+ * refetch on [reconnected].
  */
 @Singleton
 class LiveEvents @Inject constructor(
@@ -53,11 +54,19 @@ class LiveEvents @Inject constructor(
     private val _events = MutableSharedFlow<LiveEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<LiveEvent> = _events.asSharedFlow()
 
-    private val _connected = MutableStateFlow(false)
-    /** True while the stream is open. Screens may refresh when it flips back to true. */
-    val connected: StateFlow<Boolean> = _connected.asStateFlow()
+    private val _reconnected = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /**
+     * Emits each time the stream opens again for the same session (after a drop, or
+     * on returning to the foreground). Events sent in between were missed, so screens
+     * should refetch what they show.
+     */
+    val reconnected: SharedFlow<Unit> = _reconnected.asSharedFlow()
 
     private var job: Job? = null
+
+    /** Token of the last successful open; a later open with the same token is a reconnect. */
+    @Volatile private var openedWith: String? = null
 
     fun eventsFor(groupId: String): Flow<LiveEvent> = events.filter { it.groupId == groupId }
 
@@ -77,37 +86,42 @@ class LiveEvents @Inject constructor(
     fun stop() {
         job?.cancel()
         job = null
-        _connected.value = false
     }
 
     private suspend fun connectLoop() {
         var backoff = INITIAL_BACKOFF
         while (scope.isActive) {
-            if (tokenStore.token() == null) return
+            val token = tokenStore.token() ?: return
             try {
-                stream().collect { event ->
+                stream(token).collect { event ->
                     backoff = INITIAL_BACKOFF
                     _events.emit(event)
                 }
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: Unauthorized) {
+                // AuthInterceptor has already reported this 401 and the session is being
+                // cleared; retrying would only hammer /live. If the token changed while
+                // connecting, the 401 was for the old session, so try again straight away.
+                if (tokenStore.token() == token) return
+                continue
             } catch (e: Exception) {
                 Log.d(TAG, "Live stream dropped: ${e.message}")
             }
-            _connected.value = false
             delay(backoff)
             backoff = (backoff * 2).coerceAtMost(MAX_BACKOFF)
         }
     }
 
-    private fun stream(): Flow<LiveEvent> = callbackFlow {
+    private fun stream(token: String): Flow<LiveEvent> = callbackFlow {
         val request = Request.Builder()
             .url(baseUrl.resolve(AvailablissApi.LIVE_PATH) ?: error("Bad live URL"))
             .header("Accept", "text/event-stream")
             .build()
         val listener = object : EventSourceListener() {
             override fun onOpen(eventSource: EventSource, response: Response) {
-                _connected.value = true
+                if (openedWith == token) _reconnected.tryEmit(Unit)
+                openedWith = token
             }
 
             override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
@@ -120,12 +134,14 @@ class LiveEvents @Inject constructor(
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-                close(t ?: IOException("Live stream failed (${response?.code})"))
+                close(if (response?.code == 401) Unauthorized() else t ?: IOException("Live stream failed (${response?.code})"))
             }
         }
         val source = EventSources.createFactory(client).newEventSource(request, listener)
         awaitClose { source.cancel() }
     }
+
+    private class Unauthorized : IOException("Live stream rejected the session (401)")
 
     private companion object {
         const val TAG = "LiveEvents"
