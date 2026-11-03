@@ -5,9 +5,11 @@ import { publishToGroup } from '#lib/server/realtime';
 import { notify } from '#lib/server/notifications';
 
 export const POST = authed<{ token: string }>(async ({ params, userId }) => {
-	const groupId = await acceptInvite(params.token, userId);
-	await onMemberJoined(groupId, userId);
+	const { groupId, joined: isNew } = await acceptInvite(params.token, userId);
 	const group = await getGroup(groupId, userId);
+	// Already a member (or a second tap): nothing changed, so nobody is told.
+	if (!isNew) return json(group);
+	await onMemberJoined(groupId, userId);
 	const joined = group.members.find((m) => m.userId === userId);
 	await publishToGroup(groupId, 'member.changed', joined);
 	await notify(

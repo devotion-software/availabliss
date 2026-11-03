@@ -1,5 +1,5 @@
 /** Admins can remind members who haven't added any busy time yet. */
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { db } from './db';
 import { groups } from './db/schema';
 import { ApiError } from './http';
@@ -23,7 +23,14 @@ export async function nudgeUnsynced(groupId: string, userId: string): Promise<{ 
 	const pending = ids.filter((id) => !synced.has(id));
 	if (!pending.length) return { nudged: 0 };
 
-	await db.update(groups).set({ lastNudgedAt: new Date() }).where(eq(groups.id, groupId));
+	// Claim the cooldown in one conditional update, so two admins nudging at once
+	// can't both get through.
+	const now = Date.now();
+	const [claimed] = await db
+		.update(groups)
+		.set({ lastNudgedAt: new Date(now) })
+		.where(and(eq(groups.id, groupId), or(isNull(groups.lastNudgedAt), lt(groups.lastNudgedAt, new Date(now - COOLDOWN_MS)))));
+	if (!claimed.affectedRows) throw new ApiError('rate_limited', 'This group was nudged recently. Try again later.');
 	await notify(pending, {
 		kind: 'nudge',
 		groupId,

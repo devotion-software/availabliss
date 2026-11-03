@@ -4,7 +4,7 @@
  */
 import { and, asc, eq, gte, inArray, isNull, lt, lte, ne, notInArray, or } from 'drizzle-orm';
 import type { CalendarConnection, CalendarProvider } from '#lib/types';
-import { db } from '../db';
+import { db, isDuplicateKey } from '../db';
 import { busyIntervals, calendarConnections, calendars, user } from '../db/schema';
 import { notFound } from '../http';
 import { newId } from '../ids';
@@ -225,16 +225,28 @@ async function createServerConnection(
 	label: string,
 	creds: OAuthCredentials | CaldavCredentials
 ): Promise<string> {
-	// Reconnecting the same account replaces the old connection.
-	const existing = await db.query.calendarConnections.findFirst({
-		where: and(eq(calendarConnections.userId, userId), eq(calendarConnections.provider, provider), eq(calendarConnections.label, label))
-	});
-	const id = existing?.id ?? newId();
-	const values = { credentials: encryptJson(creds, credentialContext(id)), status: 'ok' as const, lastError: null };
-	if (existing) await db.update(calendarConnections).set(values).where(eq(calendarConnections.id, id));
-	else await db.insert(calendarConnections).values({ id, userId, provider, label, ...values });
-	await syncConnection(id);
-	return id;
+	// Reconnecting the same account replaces the old connection. (user, provider, label)
+	// is unique for server connections, so a racing second connect updates instead.
+	const find = () =>
+		db.query.calendarConnections.findFirst({
+			where: and(eq(calendarConnections.userId, userId), eq(calendarConnections.provider, provider), eq(calendarConnections.label, label))
+		});
+	// Credentials are encrypted against the row id, so they're encrypted per row.
+	const values = (id: string) => ({ credentials: encryptJson(creds, credentialContext(id)), status: 'ok' as const, lastError: null });
+	let existing = await find();
+	if (!existing) {
+		const id = newId();
+		try {
+			await db.insert(calendarConnections).values({ id, userId, provider, label, ...values(id) });
+			await syncConnection(id);
+			return id;
+		} catch (err) {
+			if (!isDuplicateKey(err) || !(existing = await find())) throw err;
+		}
+	}
+	await db.update(calendarConnections).set(values(existing.id)).where(eq(calendarConnections.id, existing.id));
+	await syncConnection(existing.id);
+	return existing.id;
 }
 
 export async function connectOAuth(userId: string, provider: OAuthProvider, code: string): Promise<string> {
@@ -297,13 +309,23 @@ export interface DeviceSyncInput {
 }
 
 export async function syncDevice(userId: string, input: DeviceSyncInput): Promise<CalendarConnection> {
-	const existing = await db.query.calendarConnections.findFirst({
-		where: and(eq(calendarConnections.userId, userId), eq(calendarConnections.deviceId, input.deviceId))
-	});
-	const id = existing?.id ?? newId();
+	const find = () =>
+		db.query.calendarConnections.findFirst({
+			where: and(eq(calendarConnections.userId, userId), eq(calendarConnections.deviceId, input.deviceId))
+		});
 	const values = { label: input.deviceName, status: 'ok' as const, lastError: null, lastSyncedAt: new Date() };
-	if (existing) await db.update(calendarConnections).set(values).where(eq(calendarConnections.id, id));
-	else await db.insert(calendarConnections).values({ id, userId, provider: 'device', deviceId: input.deviceId, ...values });
+	let existing = await find();
+	let id = existing?.id ?? newId();
+	if (!existing) {
+		try {
+			await db.insert(calendarConnections).values({ id, userId, provider: 'device', deviceId: input.deviceId, ...values });
+		} catch (err) {
+			// Two uploads from a fresh install raced: (user, device) is unique, so use the winner's row.
+			if (!isDuplicateKey(err) || !(existing = await find())) throw err;
+			id = existing.id;
+		}
+	}
+	if (existing) await db.update(calendarConnections).set(values).where(eq(calendarConnections.id, existing.id));
 
 	const saved = await saveCalendars(id, input.calendars);
 	const busyChanged = await replaceBusy(

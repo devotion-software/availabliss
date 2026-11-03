@@ -5,9 +5,15 @@ import { db } from '#lib/server/db';
 import { devices } from '#lib/server/db/schema';
 import { createGroup } from '#lib/server/groups';
 import { createEvent, deleteEvent, getEvent, listEvents, updateEvent, upcomingFor } from '#lib/server/events';
-import { closePoll, listMessages, markReceipts, messageInfo, sendPoll, sendText, unreadCount, vote } from '#lib/server/chat';
+import { closePoll, listMessages, markReceipts, messageInfo, sendPoll, sendText, vote } from '#lib/server/chat';
+import { groupSummaries } from '#lib/server/group-summaries';
+import { newId } from '#lib/server/ids';
+import { messageReceipts, messages } from '#lib/server/db/schema';
 import { listNotifications, markRead, registerDevice, unregisterDevice } from '#lib/server/notifications';
 import { apiError, everyDay, fixture } from './fixtures';
+
+const unreadCount = async (groupId: string, userId: string) =>
+	(await groupSummaries(userId)).find((g) => g.id === groupId)?.unreadCount ?? 0;
 
 const fx = fixture('events');
 afterAll(() => fx.cleanup());
@@ -90,6 +96,31 @@ describe('chat', () => {
 		expect(own.receipt).toMatchObject({ delivered: 2, seen: 1, recipients: 2, seenBy: [admin] });
 	});
 
+	test('unread counts skip history from before joining', async () => {
+		const g = (await createGroup(owner, { name: 'Late joiner', requirement: everyDay() }, 'UTC')).id;
+		await sendText(g, owner, 'Before you joined');
+		await fx.join(g, member);
+		expect(await unreadCount(g, member)).toBe(0);
+		// History is still readable.
+		expect((await listMessages(g, member, null, 10)).messages).toHaveLength(1);
+		await sendText(g, owner, 'Welcome!');
+		expect(await unreadCount(g, member)).toBe(1);
+	});
+
+	test('marking as seen covers every earlier message, not just the newest 500', async () => {
+		const g = (await createGroup(owner, { name: 'Busy chat', requirement: everyDay() }, 'UTC')).id;
+		await fx.join(g, member);
+		// Insert straight into the table: 620 messages through sendText would be slow.
+		await db.insert(messages).values(Array.from({ length: 620 }, (_, i) => ({ id: newId(), groupId: g, authorId: owner, kind: 'text' as const, body: `m${i}` })));
+		const last = await sendText(g, owner, 'Last one');
+		expect(await unreadCount(g, member)).toBe(621);
+		await markReceipts(g, member, last.id, 'delivered');
+		await markReceipts(g, member, last.id, 'seen');
+		expect(await unreadCount(g, member)).toBe(0);
+		const rows = await db.select().from(messageReceipts).where(eq(messageReceipts.userId, member));
+		expect(rows.filter((r) => r.seenAt).length).toBeGreaterThanOrEqual(621);
+	});
+
 	test('polls: single choice, multi choice and closing', async () => {
 		const msg = await sendPoll(groupId, member, { question: 'Where?', options: ['Beach', 'Hills', 'Pub'], multi: false });
 		const poll = msg.poll!;
@@ -101,6 +132,9 @@ describe('chat', () => {
 		expect((await apiError(vote(poll.id, owner, ['nope']))).code).toBe('validation_error');
 		expect((await apiError(vote(poll.id, outsider, [beach]))).code).toBe('not_found');
 
+		// A repeated option is one vote, not a primary-key error.
+		expect((await vote(poll.id, member, [beach, beach])).options.find((o) => o.id === beach)!.voterIds).toEqual([member]);
+		await vote(poll.id, member, []);
 		await vote(poll.id, owner, [beach]);
 		const changed = await vote(poll.id, owner, [hills]);
 		expect(changed.options.find((o) => o.id === hills)!.voterIds).toEqual([owner]);

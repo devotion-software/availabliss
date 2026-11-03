@@ -141,6 +141,13 @@ describe('requireCanCreateGroup', () => {
 		for (let i = 0; i < 3; i++) await createGroup(me, { name: `G${i}` }, 'UTC');
 		expect((await apiError(requireCanCreateGroup(me))).code).toBe('upgrade_required');
 	});
+
+	test('parallel creates cannot go past the free limit', async () => {
+		const me = await fx.user();
+		const results = await Promise.allSettled(Array.from({ length: 6 }, (_, i) => createGroup(me, { name: `P${i}` }, 'UTC')));
+		expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(3);
+		expect((await getPlan(me)).groupsOwned).toBe(3);
+	});
 });
 
 describe('accounts merged into another', () => {

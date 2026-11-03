@@ -17,6 +17,7 @@ import {
 	type ProposalInput
 } from '#lib/server/proposals';
 import { createBlock } from '#lib/server/blocks';
+import { deleteAccount } from '#lib/server/users';
 import { apiError, everyDay, fixture } from './fixtures';
 
 const fx = fixture('proposals');
@@ -216,6 +217,14 @@ describe('membership changes', () => {
 		const after = await getProposal(p.id, newcomer);
 		expect(after.responses.find((r) => r.userId === newcomer)?.response).toBe('pending');
 		expect(after.responses.length).toBe(4);
+	});
+
+	test('the last pending member deleting their account confirms the proposal', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(17));
+		await respond(p.id, g.admin, 'accepted');
+		await deleteAccount(g.member);
+		expect((await getProposal(p.id, g.owner)).status).toBe('confirmed');
 	});
 
 	test('the last pending member leaving confirms the proposal', async () => {

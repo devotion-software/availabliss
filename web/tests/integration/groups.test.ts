@@ -22,6 +22,7 @@ import {
 } from '#lib/server/groups';
 import { FREE_GROUP_LIMIT, getPlan, saveEntitlement } from '#lib/server/billing';
 import { createBlock } from '#lib/server/blocks';
+import { nudgeUnsynced } from '#lib/server/nudge';
 import { apiError, everyDay, fixture } from './fixtures';
 
 const fx = fixture('groups');
@@ -160,7 +161,7 @@ describe('membership and roles', () => {
 		const g = await createGroup(owner, { name: 'Short lived' }, 'UTC');
 		await fx.join(g.id, admin, 'admin');
 		expect((await apiError(deleteGroup(g.id, admin))).code).toBe('forbidden');
-		await deleteGroup(g.id, owner);
+		expect((await deleteGroup(g.id, owner)).sort()).toEqual([owner, admin].sort());
 		expect(await db.query.groups.findFirst({ where: eq(groups.id, g.id) })).toBeUndefined();
 		expect(await roleIn(g.id, admin)).toBeNull();
 	});
@@ -189,16 +190,35 @@ describe('invites', () => {
 		const { token } = await createInvite(groupId, owner, null);
 		expect(await previewInvite(token)).toMatchObject({ groupName: 'Invites', inviterName: 'Owner Person', memberCount: 2 });
 
-		expect(await acceptInvite(token, joiner)).toBe(groupId);
-		expect(await acceptInvite(token, joiner)).toBe(groupId);
+		expect(await acceptInvite(token, joiner)).toEqual({ groupId, joined: true });
+		expect(await acceptInvite(token, joiner)).toEqual({ groupId, joined: false });
 		expect(await roleIn(groupId, joiner)).toBe('member');
 		// Accepting as an existing admin/owner doesn't demote them.
-		await acceptInvite(token, owner);
+		expect(await acceptInvite(token, owner)).toEqual({ groupId, joined: false });
 		expect(await roleIn(groupId, owner)).toBe('owner');
+
+		// Two taps at once: one joins, the other is a no-op instead of a 500.
+		const racer = await fx.user();
+		const both = await Promise.all([acceptInvite(token, racer), acceptInvite(token, racer)]);
+		expect(both.filter((r) => r.joined)).toHaveLength(1);
+		expect(await roleIn(groupId, racer)).toBe('member');
 
 		await db.update(groupInvites).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(groupInvites.token, token));
 		expect((await apiError(previewInvite(token))).code).toBe('not_found');
 		expect((await apiError(acceptInvite(token, joiner))).code).toBe('not_found');
 		expect((await apiError(previewInvite('not-a-real-token'))).code).toBe('not_found');
 	});
+});
+
+describe('nudge', () => {
+    test('two admins nudging at once: one gets through, the other is rate limited', async () => {
+        const [owner, admin, quiet] = await fx.users(3);
+        const g = await createGroup(owner, { name: 'Nudgers', requirement: everyDay() }, 'UTC');
+        await fx.join(g.id, admin, 'admin');
+        await fx.join(g.id, quiet);
+        const results = await Promise.allSettled([nudgeUnsynced(g.id, owner), nudgeUnsynced(g.id, admin)]);
+        expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+        const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+        expect(rejected.reason.code).toBe('rate_limited');
+    });
 });

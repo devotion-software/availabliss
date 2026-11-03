@@ -1,9 +1,11 @@
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import type { ColorTheme, ThemeMode, User } from '#lib/types';
 import { COLOR_THEMES, THEME_MODES } from '#lib/types';
 import { db } from './db';
 import { groupMembers, groups, user } from './db/schema';
 import { notFound } from './http';
+import { publishToGroup } from './realtime';
+import { onMemberLeft } from './proposals';
 
 type UserRow = typeof user.$inferSelect;
 
@@ -42,6 +44,9 @@ export async function updateMe(userId: string, patch: UserPatch): Promise<User> 
  * standing remaining member (preferring admins), or are deleted if empty.
  */
 export async function deleteAccount(userId: string): Promise<void> {
+	const memberOf = (await db.select({ groupId: groupMembers.groupId }).from(groupMembers).where(eq(groupMembers.userId, userId))).map(
+		(r) => r.groupId
+	);
 	await db.transaction(async (tx) => {
 		const owned = await tx
 			.select({ groupId: groupMembers.groupId })
@@ -66,4 +71,14 @@ export async function deleteAccount(userId: string): Promise<void> {
 		}
 		await tx.delete(user).where(eq(user.id, userId));
 	});
+
+	// As if they'd left each group that still exists: the others see them go, and
+	// proposals that were only waiting on them can confirm.
+	const remaining = memberOf.length
+		? (await db.select({ id: groups.id }).from(groups).where(inArray(groups.id, memberOf))).map((g) => g.id)
+		: [];
+	for (const groupId of remaining) {
+		await publishToGroup(groupId, 'member.changed', { userId, removed: true });
+		await onMemberLeft(groupId, userId);
+	}
 }
