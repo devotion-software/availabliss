@@ -24,18 +24,14 @@ final class AuthorizationRunner: NSObject {
     private var continuation: CheckedContinuation<ASAuthorization, Error>?
     private var controller: ASAuthorizationController?
 
-    func perform(_ requests: [ASAuthorizationRequest], preferImmediatelyAvailableCredentials: Bool = false) async throws -> ASAuthorization {
+    func perform(_ requests: [ASAuthorizationRequest]) async throws -> ASAuthorization {
         try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             let controller = ASAuthorizationController(authorizationRequests: requests)
             controller.delegate = self
             controller.presentationContextProvider = self
             self.controller = controller
-            if preferImmediatelyAvailableCredentials {
-                controller.performRequests(options: .preferImmediatelyAvailableCredentials)
-            } else {
-                controller.performRequests()
-            }
+            controller.performRequests()
         }
     }
 

@@ -82,6 +82,7 @@ struct ProfileView: View {
             SettingsRow(title: "Add a passkey", systemImage: "person.badge.key", value: isAddingPasskey ? "Adding…" : nil) {
                 Task { await addPasskey() }
             }
+            .disabled(isAddingPasskey)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 4)
@@ -91,6 +92,7 @@ struct ProfileView: View {
     private var divider: some View { Rectangle().fill(theme.line).frame(height: 1) }
 
     private func addPasskey() async {
+        guard !isAddingPasskey else { return }
         isAddingPasskey = true
         defer { isAddingPasskey = false }
         do {

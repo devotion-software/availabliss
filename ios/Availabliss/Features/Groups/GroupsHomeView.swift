@@ -1,3 +1,4 @@
+import EventKit
 import SwiftUI
 
 /// Groups home: greeting, the next confirmed plan, and your groups.
@@ -198,12 +199,15 @@ struct GroupRow: View {
     }
 }
 
-/// Add-to-device-calendar button with the "Added" state; picks a calendar when there's a choice.
+/// Add-to-device-calendar button with the "Added" state. Adds to `calendar`, or the default one when nil.
+/// Disabled while saving so a double tap can't create two events.
 struct AddToCalendarButton: View {
     let event: GroupEvent
+    var calendar: EKCalendar?
     var height: CGFloat = 54
     @Environment(AppModel.self) private var app
     @State private var isAdded = false
+    @State private var isSaving = false
     @State private var error: String?
 
     var body: some View {
@@ -213,15 +217,18 @@ struct AddToCalendarButton: View {
             Label(isAdded ? "Added to your calendar" : "Add to calendar", systemImage: isAdded ? "checkmark" : "calendar.badge.plus")
         }
         .buttonStyle(.filled(isAdded ? .success : .primary, height: height, cornerRadius: height > 50 ? 18 : 16))
-        .disabled(isAdded)
+        .disabled(isAdded || isSaving)
         .onAppear { isAdded = app.deviceCalendar.isAdded(event.id) }
         .errorAlert($error)
         .sensoryFeedback(.success, trigger: isAdded)
     }
 
     private func add() async {
+        guard !isSaving else { return }
+        isSaving = true
+        defer { isSaving = false }
         do {
-            try await app.deviceCalendar.add(event)
+            try await app.deviceCalendar.add(event, to: calendar)
             withAnimation { isAdded = true }
         } catch {
             self.error = error.userMessage

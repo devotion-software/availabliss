@@ -11,7 +11,8 @@ enum JSONCoding {
 
     static func formatDate(_ date: Date) -> String { fractional.format(date) }
 
-    static var decoder: JSONDecoder {
+    /// Shared, configured once: decoding and encoding with them is thread-safe.
+    static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
@@ -22,14 +23,14 @@ enum JSONCoding {
             return date
         }
         return decoder
-    }
+    }()
 
-    static var encoder: JSONEncoder {
+    static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .custom { date, encoder in
             var container = encoder.singleValueContainer()
             try container.encode(formatDate(date))
         }
         return encoder
-    }
+    }()
 }

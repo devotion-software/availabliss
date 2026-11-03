@@ -151,7 +151,6 @@ final class ProposalViewModel {
 
     private func loadEventIfConfirmed() async {
         guard let proposal, proposal.status == .confirmed, let eventId = proposal.eventId, event?.id != eventId else { return }
-        let events = try? await api.send(API.Events.list(groupId: proposal.groupId, from: proposal.start.addingTimeInterval(-86_400), to: proposal.end.addingTimeInterval(86_400)))
-        event = events?.events.first { $0.id == eventId }
+        event = try? await api.send(API.Events.get(id: eventId))
     }
 }

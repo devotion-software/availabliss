@@ -30,11 +30,6 @@ final class GroupDetailModel {
 
     func update(_ group: Group) { self.group = group }
 
-    func memberName(_ userId: String, me: String?) -> String {
-        if userId == me { return "You" }
-        return group?.member(userId)?.firstName ?? "Someone"
-    }
-
     /// Applies `group.updated` / `member.changed` live events, and refetches after a reconnect.
     func apply(_ event: LiveEvent) async {
         switch event.kind {
