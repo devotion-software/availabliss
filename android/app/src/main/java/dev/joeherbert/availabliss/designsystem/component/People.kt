@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import dev.joeherbert.availabliss.core.common.initial
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.DisplayFontFamily

@@ -179,7 +179,7 @@ fun Toggle(checked: Boolean, modifier: Modifier = Modifier) {
                 .size(26.dp)
                 .shadow(3.dp, CircleShape, ambientColor = Color(0x40141440), spotColor = Color(0x40141440))
                 .clip(CircleShape)
-                .background(Color.White),
+                .background(colors.onAccent),
         )
     }
 }

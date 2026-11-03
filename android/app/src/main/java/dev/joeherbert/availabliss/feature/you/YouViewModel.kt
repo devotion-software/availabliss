@@ -63,8 +63,8 @@ data class YouUiState(
     val regionSummary: String
         get() {
             val country = user?.country ?: return "Not set"
-            val name = Locale("", country).displayCountry.ifBlank { country }
-            return listOfNotNull(name, user?.subdivision?.substringAfter('-')).joinToString(" · ")
+            val name = runCatching { Locale.Builder().setRegion(country).build().displayCountry }.getOrNull()?.ifBlank { null } ?: country
+            return listOfNotNull(name, user.subdivision?.substringAfter('-')).joinToString(" · ")
         }
 
     /** "System · Dawn" */

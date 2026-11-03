@@ -45,7 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.network.model.ColorTheme
 import dev.joeherbert.availabliss.core.network.model.ThemeMode
@@ -210,7 +210,7 @@ private fun ThemeSwatch(
                     .size(20.dp)
                     .clip(CircleShape)
                     .background(swatchColors.accent)
-                    .border(2.dp, Color.White.copy(alpha = 0.85f), CircleShape),
+                    .border(2.dp, swatchColors.onAccent.copy(alpha = 0.85f), CircleShape),
             )
         }
         Text(theme.label, style = AvailablissTheme.type.captionStrong, color = colors.ink)

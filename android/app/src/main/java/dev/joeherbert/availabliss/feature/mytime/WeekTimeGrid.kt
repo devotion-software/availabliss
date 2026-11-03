@@ -58,6 +58,7 @@ import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.BusyInterval
 import dev.joeherbert.availabliss.core.network.model.BusySource
 import dev.joeherbert.availabliss.designsystem.component.stripes
+import dev.joeherbert.availabliss.designsystem.theme.AvWeights
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.DisplayFontFamily
 import kotlinx.coroutines.delay
@@ -183,7 +184,7 @@ private fun DayHeaderRow(days: List<LocalDate>, today: LocalDate) {
                         fontFamily = DisplayFontFamily,
                         fontSize = 17.sp,
                         lineHeight = 17.sp,
-                        fontWeight = FontWeight(650),
+                        fontWeight = AvWeights.Display650,
                         color = if (isToday) colors.onAccent else colors.ink,
                     )
                 }
@@ -348,7 +349,7 @@ private fun IntervalBox(p: PlacedInterval, compact: Boolean, showText: Boolean, 
             p.interval.displayLabel,
             fontSize = 11.sp,
             lineHeight = 13.sp,
-            fontWeight = FontWeight(650),
+            fontWeight = AvWeights.Display650,
             color = ink,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

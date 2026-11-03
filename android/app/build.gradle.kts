@@ -118,7 +118,7 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.compiler)
 
@@ -145,6 +145,7 @@ dependencies {
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.browser)
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     // Pro purchases through Google Play Billing (brings the BILLING permission). Not the RevenueCat UI library: the paywall is ours.
     implementation(libs.revenuecat.purchases)
 
