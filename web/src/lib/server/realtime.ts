@@ -12,6 +12,9 @@ import { alias } from 'drizzle-orm/mysql-core';
 import { db } from './db';
 import { groupMembers } from './db/schema';
 
+import { clearSlotCounts } from './availability/slot-count-cache';
+
+const SLOT_COUNT_EVENTS = new Set<LiveEvent['type']>(['availability.changed', 'group.updated', 'member.changed']);
 const mine = alias(groupMembers, 'mine');
 const theirs = alias(groupMembers, 'theirs');
 
@@ -83,6 +86,8 @@ export function publishToUsers(userIds: Iterable<string>, event: LiveEvent): voi
 
 /** Sends an event to every member of a group. */
 export async function publishToGroup(groupId: string, type: LiveEvent['type'], payload: unknown): Promise<void> {
+	// These change what the groups list's cached slot count would be.
+	if (SLOT_COUNT_EVENTS.has(type)) await clearSlotCounts([groupId]);
 	publishToUsers(await memberIds(groupId), { type, groupId, payload });
 }
 
@@ -96,6 +101,7 @@ export async function publishAvailabilityChanged(userId: string): Promise<void> 
 		.where(eq(mine.userId, userId));
 	const byGroup = new Map<string, string[]>();
 	for (const r of rows) byGroup.set(r.groupId, [...(byGroup.get(r.groupId) ?? []), r.memberId]);
+	await clearSlotCounts(byGroup.keys());
 	for (const [groupId, members] of byGroup) {
 		publishToUsers(members, { type: 'availability.changed', groupId, payload: { userId } });
 	}
