@@ -191,6 +191,7 @@ export async function bearerFetch<T>(url: string, token: string, init: RequestIn
 		signal: AbortSignal.timeout(15_000)
 	});
 	if (res.status === 401) throw new ReauthRequired(`${url} → 401`);
+	if (res.status === 204) return undefined as T;
 	if (!res.ok) throw new HttpError(`${url} → ${res.status}: ${await res.text().catch(() => '')}`, res.status);
 	return (await res.json()) as T;
 }

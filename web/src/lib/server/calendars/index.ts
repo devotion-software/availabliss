@@ -22,6 +22,7 @@ import { caldav, ICLOUD_CALDAV } from './caldav';
 import { google, googleAccountLabel } from './google';
 import { microsoft, microsoftAccountLabel } from './microsoft';
 import { exchangeCode, type OAuthProvider } from './oauth';
+import { maintainPush, stopPush } from './push';
 import {
 	ReauthRequired,
 	type CaldavCredentials,
@@ -51,8 +52,10 @@ const FAR_EVERY_MS = DAY_MS;
 const CURSOR_SKEW_MS = 5 * 60 * 1000;
 /** Stored as the cursor of calendars re-read on a schedule, once their first full read is done. */
 const SCHEDULED = 'scheduled';
-/** Server-side connections are refreshed in the background this often. */
+/** Server-side connections are refreshed in the background this often… */
 const STALE_AFTER_MS = 30 * 60 * 1000;
+/** …or this often when every busy calendar sends change notifications (a backstop for missed ones). */
+const PUSHED_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 /** Failing connections back off: 30 min, 1 h, 2 h … up to a day. */
 const MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
 const backoff = (failures: number) => Math.min(STALE_AFTER_MS * 2 ** Math.max(0, failures - 1), MAX_BACKOFF_MS);
@@ -228,7 +231,7 @@ async function saveCalendars(
 			changed = true;
 			const id = newId();
 			const busy = cal.busy ?? !NOT_BUSY_BY_DEFAULT.test(cal.name);
-			byExternal.set(cal.externalId, { id, connectionId, externalId: cal.externalId, name: cal.name, color: cal.color, busy, syncCursor: null });
+			byExternal.set(cal.externalId, { id, connectionId, externalId: cal.externalId, name: cal.name, color: cal.color, busy, syncCursor: null, pushId: null, pushResourceId: null, pushExpiresAt: null });
 			await db.insert(calendars).values({ id, connectionId, externalId: cal.externalId, name: cal.name, color: cal.color, busy });
 		}
 	}
@@ -387,8 +390,17 @@ async function syncBusy<Creds extends OAuthCredentials | CaldavCredentials>(
 	return { changed, farSynced };
 }
 
-/** Pulls calendars and busy time for one server-side connection. */
-export async function syncConnection(connectionId: string): Promise<void> {
+export interface SyncOptions {
+	/**
+	 * Set when change notifications triggered the sync: the changed events' ids where
+	 * the provider names them (null = unknown). Calendars without change tracking
+	 * re-read their far tier when one of these may lie past the near tier.
+	 */
+	pushedEvents?: (string | null)[];
+}
+
+/** Pulls calendars and busy time for one server-side connection, and keeps its change notifications alive. */
+export async function syncConnection(connectionId: string, options: SyncOptions = {}): Promise<void> {
 	const row = await db.query.calendarConnections.findFirst({ where: eq(calendarConnections.id, connectionId) });
 	if (!row || row.provider === 'device' || !row.credentials) return;
 	const adapter = adapters[row.provider];
@@ -404,10 +416,14 @@ export async function syncConnection(connectionId: string): Promise<void> {
 		}
 
 		const coverage = planCoverage(row, await horizonFor(row.userId));
+		if (options.pushedEvents?.length && adapter.changeIsFar && !coverage.farDue) {
+			coverage.farDue = await farChange(adapter, creds, options.pushedEvents, coverage.nearEnd);
+		}
 		const remote = await adapter.listCalendars(creds);
 		const saved = await saveCalendars(row.id, remote);
 		const result = await syncBusy(adapter, creds, row.userId, remote, saved, coverage, await timezoneOf(row.userId));
 		changed = result.changed || saved.changed;
+		const watched = await maintainPush(adapter, creds, row.provider, row.id, remote);
 		await db
 			.update(calendarConnections)
 			.set({
@@ -415,7 +431,7 @@ export async function syncConnection(connectionId: string): Promise<void> {
 				lastError: null,
 				lastSyncedAt: new Date(),
 				failures: 0,
-				nextSyncAt: new Date(Date.now() + STALE_AFTER_MS),
+				nextSyncAt: new Date(Date.now() + (watched ? PUSHED_STALE_AFTER_MS : STALE_AFTER_MS)),
 				coveredUntil: coverage.until,
 				...(result.farSynced && { farSyncedAt: coverage.now })
 			})
@@ -437,6 +453,14 @@ export async function syncConnection(connectionId: string): Promise<void> {
 	}
 	// Most syncs find nothing new: only make every group refresh when busy time changed.
 	if (changed) await publishAvailabilityChanged(row.userId);
+}
+
+/** Whether any notified change may lie past the near tier (a failed lookup counts as yes). */
+async function farChange<Creds>(adapter: CalendarAdapter<Creds>, creds: Creds, eventIds: (string | null)[], nearEnd: Date): Promise<boolean> {
+	for (const id of new Set(eventIds)) {
+		if (await adapter.changeIsFar!(creds, id, nearEnd).catch(() => true)) return true;
+	}
+	return false;
 }
 
 async function createServerConnection(
@@ -582,6 +606,11 @@ export async function setCalendarBusy(userId: string, connectionId: string, cale
 		.set({ busy })
 		.where(and(eq(calendars.id, calendarId), eq(calendars.connectionId, connectionId)));
 	if (!result[0].affectedRows) throw notFound('Calendar not found');
+	// Sync soon, so the calendar's change notifications start (or stop) with it.
+	await db
+		.update(calendarConnections)
+		.set({ nextSyncAt: null })
+		.where(and(eq(calendarConnections.id, connectionId), ne(calendarConnections.provider, 'device')));
 	await publishAvailabilityChanged(userId);
 	return getConnection(userId, connectionId);
 }
@@ -593,7 +622,17 @@ export async function syncNow(userId: string, connectionId: string): Promise<Cal
 }
 
 export async function removeConnection(userId: string, connectionId: string): Promise<void> {
-	await ownedRow(userId, connectionId);
+	const row = await ownedRow(userId, connectionId);
+	if (row.provider !== 'device' && row.credentials) {
+		// Stop change notifications first; ones we can't stop lapse within days and are ignored.
+		try {
+			const creds = decryptJson<OAuthCredentials | CaldavCredentials>(row.credentials, credentialContext(row.id));
+			const cals = await db.select().from(calendars).where(eq(calendars.connectionId, row.id));
+			await stopPush(adapters[row.provider], (await adapters[row.provider].refresh?.(creds)) ?? creds, cals);
+		} catch (err) {
+			console.warn('[calendars] stopping notifications failed', row.id, err);
+		}
+	}
 	await db.delete(calendarConnections).where(eq(calendarConnections.id, connectionId));
 	await publishAvailabilityChanged(userId);
 }

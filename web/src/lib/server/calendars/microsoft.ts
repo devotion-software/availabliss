@@ -3,10 +3,12 @@
  * show-as are read). Graph's change feed only covers the primary calendar, so
  * these calendars are re-read on a schedule (`changes: 'none'`).
  */
-import { bearerFetch, refreshIfNeeded } from './oauth';
-import type { CalendarAdapter, OAuthCredentials, RemoteBusy } from './types';
+import { bearerFetch, HttpError, refreshIfNeeded } from './oauth';
+import type { CalendarAdapter, OAuthCredentials, PushChannel, RemoteBusy } from './types';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
+/** Graph lets event subscriptions last at most 4230 minutes; stay under it. */
+const SUBSCRIPTION_MINUTES = 4200;
 
 interface CalendarsResponse {
 	value: { id: string; name: string; hexColor?: string }[];
@@ -48,6 +50,44 @@ export const microsoft: CalendarAdapter<OAuthCredentials> = {
 			}
 		}
 		return out;
+	},
+
+	async watch(creds, calendar, { address, token }): Promise<PushChannel> {
+		// Graph checks `address` answers its validation request before replying.
+		const sub = await bearerFetch<{ id: string; expirationDateTime: string }>(`${GRAPH}/subscriptions`, creds.accessToken, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				changeType: 'created,updated,deleted',
+				notificationUrl: address,
+				resource: `me/calendars/${calendar.externalId}/events`,
+				expirationDateTime: new Date(Date.now() + SUBSCRIPTION_MINUTES * 60 * 1000).toISOString(),
+				clientState: token
+			})
+		});
+		return { id: sub.id, resourceId: null, expiresAt: new Date(sub.expirationDateTime) };
+	},
+
+	async unwatch(creds, { id }) {
+		await bearerFetch(`${GRAPH}/subscriptions/${encodeURIComponent(id)}`, creds.accessToken, { method: 'DELETE' }).catch((err) => {
+			if (!(err instanceof HttpError && err.status === 404)) throw err;
+		});
+	},
+
+	async changeIsFar(creds, eventId, nearEnd) {
+		// A deleted event can't be looked up, so wherever it was is re-read.
+		if (!eventId) return true;
+		const event = await bearerFetch<{ type?: string; start?: { dateTime: string } }>(
+			`${GRAPH}/me/events/${encodeURIComponent(eventId)}?$select=start,type`,
+			creds.accessToken,
+			{ headers: { Prefer: 'outlook.timezone="UTC"' } }
+		).catch((err) => {
+			if (err instanceof HttpError && err.status === 404) return null;
+			throw err;
+		});
+		if (!event?.start) return true;
+		// A recurring series can reach any distance ahead.
+		return event.type === 'seriesMaster' || utc(event.start.dateTime) >= nearEnd;
 	},
 
 	refresh: (creds) => refreshIfNeeded('microsoft', creds)
