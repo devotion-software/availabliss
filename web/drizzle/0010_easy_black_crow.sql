@@ -1,0 +1,1 @@
+ALTER TABLE `calendar_connections` ADD `checked_at` timestamp(3);

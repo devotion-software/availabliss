@@ -54,8 +54,14 @@ const CURSOR_SKEW_MS = 5 * 60 * 1000;
 const SCHEDULED = 'scheduled';
 /** Server-side connections are refreshed in the background this often… */
 const STALE_AFTER_MS = 30 * 60 * 1000;
-/** …or this often when every busy calendar sends change notifications (a backstop for missed ones). */
-const PUSHED_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
+/**
+ * …or this often when changes reach us another way (a backstop for missed ones):
+ * every busy calendar sends change notifications, or every CalDAV calendar has a
+ * change tag that `checkCaldavConnections` reads every few minutes.
+ */
+const TRACKED_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
+/** CalDAV change-tag checks run this many connections at once. */
+const CHECK_CONCURRENCY = 10;
 /** Failing connections back off: 30 min, 1 h, 2 h … up to a day. */
 const MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
 const backoff = (failures: number) => Math.min(STALE_AFTER_MS * 2 ** Math.max(0, failures - 1), MAX_BACKOFF_MS);
@@ -423,7 +429,10 @@ export async function syncConnection(connectionId: string, options: SyncOptions 
 		const saved = await saveCalendars(row.id, remote);
 		const result = await syncBusy(adapter, creds, row.userId, remote, saved, coverage, await timezoneOf(row.userId));
 		changed = result.changed || saved.changed;
-		const watched = await maintainPush(adapter, creds, row.provider, row.id, remote);
+		const tracked =
+			row.provider === 'caldav'
+				? remote.length > 0 && remote.every((c) => c.changes === 'version')
+				: await maintainPush(adapter, creds, row.provider, row.id, remote);
 		await db
 			.update(calendarConnections)
 			.set({
@@ -431,7 +440,7 @@ export async function syncConnection(connectionId: string, options: SyncOptions 
 				lastError: null,
 				lastSyncedAt: new Date(),
 				failures: 0,
-				nextSyncAt: new Date(Date.now() + (watched ? PUSHED_STALE_AFTER_MS : STALE_AFTER_MS)),
+				nextSyncAt: new Date(Date.now() + (tracked ? TRACKED_STALE_AFTER_MS : STALE_AFTER_MS)),
 				coveredUntil: coverage.until,
 				...(result.farSynced && { farSyncedAt: coverage.now })
 			})
@@ -528,17 +537,74 @@ export async function syncStaleConnections(deadline = Infinity): Promise<number>
 		.orderBy(asc(calendarConnections.nextSyncAt))
 		.limit(50);
 
+	return pool(due.map((r) => r.id), SYNC_CONCURRENCY, deadline, async (id) => {
+		await syncConnection(id);
+		return true;
+	});
+}
+
+/** Runs `task` over `ids`, `concurrency` at a time, starting none after `deadline`. Counts the true results. */
+async function pool(ids: string[], concurrency: number, deadline: number, task: (id: string) => Promise<boolean>): Promise<number> {
 	let next = 0;
-	let synced = 0;
+	let count = 0;
 	const worker = async () => {
-		while (next < due.length && Date.now() < deadline) {
-			const { id } = due[next++];
-			await syncConnection(id);
-			synced++;
+		while (next < ids.length && Date.now() < deadline) {
+			if (await task(ids[next++])) count++;
 		}
 	};
-	await Promise.all(Array.from({ length: Math.min(SYNC_CONCURRENCY, due.length) }, worker));
-	return synced;
+	await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
+	return count;
+}
+
+// ─── CalDAV change checks ─────────────────────────────────────────────────
+
+/**
+ * iCloud and other CalDAV servers can't notify us of changes, so between full
+ * syncs each connection's change tags are read (one request for all its
+ * calendars) and the full sync runs only when one moved, or a calendar was added
+ * or removed. Calendars without a tag are left to the regular schedule. Failures
+ * are left to the full sync, which records them and backs off. Returns whether it synced.
+ */
+export async function checkConnection(connectionId: string): Promise<boolean> {
+	const row = await db.query.calendarConnections.findFirst({ where: eq(calendarConnections.id, connectionId) });
+	if (!row || row.provider !== 'caldav' || row.status !== 'ok' || !row.credentials) return false;
+	const adapter = adapters.caldav;
+	const context = credentialContext(row.id);
+	let changed = false;
+	try {
+		let creds = decryptJson<CaldavCredentials>(row.credentials, context);
+		const refreshed = await adapter.refresh?.(creds);
+		if (refreshed) {
+			creds = refreshed as CaldavCredentials;
+			await db.update(calendarConnections).set({ credentials: encryptJson(creds, context) }).where(eq(calendarConnections.id, row.id));
+		}
+		const remote = await adapter.listCalendars(creds);
+		const stored = new Map(
+			(await db.select({ externalId: calendars.externalId, cursor: calendars.syncCursor }).from(calendars).where(eq(calendars.connectionId, row.id))).map(
+				(c) => [c.externalId, c.cursor]
+			)
+		);
+		changed =
+			remote.length !== stored.size ||
+			remote.some((c) => !stored.has(c.externalId) || (c.changes === 'version' && c.version !== stored.get(c.externalId)));
+	} catch (err) {
+		console.warn('[calendars] change check failed', row.id, err);
+	}
+	await db.update(calendarConnections).set({ checkedAt: new Date() }).where(eq(calendarConnections.id, row.id));
+	if (changed) await syncConnection(row.id);
+	return changed;
+}
+
+/** Checks every working CalDAV connection, longest-unchecked first, until `deadline`. Returns how many synced. */
+export async function checkCaldavConnections(deadline = Infinity): Promise<number> {
+	const rows = await db
+		.select({ id: calendarConnections.id })
+		.from(calendarConnections)
+		.where(and(eq(calendarConnections.provider, 'caldav'), eq(calendarConnections.status, 'ok')))
+		// NULL (never checked) sorts first.
+		.orderBy(asc(calendarConnections.checkedAt))
+		.limit(1000);
+	return pool(rows.map((r) => r.id), CHECK_CONCURRENCY, deadline, checkConnection);
 }
 
 // ─── Device calendars ─────────────────────────────────────────────────────

@@ -83,7 +83,9 @@ and every pull request, and only builds the platforms a change touches:
   and those connections are only polled every six hours as a backstop. This needs
   a public HTTPS URL (`CALENDAR_PUSH_URL`, defaulting to `BETTER_AUTH_URL`); in
   plain-HTTP dev everything falls back to polling. iCloud has no push for third
-  parties, so CalDAV stays on 30-minute polling.
+  parties, so every two minutes each CalDAV account's change tags are read (one
+  request for all its calendars) and a full sync runs only when one moved; full
+  syncs are then a six-hourly backstop.
 - **Availability engine** (`web/src/lib/server/availability/`) is pure and unit
   tested: it expands a group's requirement into candidate slots, checks every
   synced member is free, and returns per-day states (hidden / busy / free /

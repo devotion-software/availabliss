@@ -37,6 +37,8 @@ export interface CaldavCredentials {
 	serverUrl: string;
 	username: string;
 	password: string;
+	/** The account's calendar home, once found (saves two requests per sync). */
+	homeUrl?: string;
 }
 
 /** A provider's change-notification channel for one calendar. */

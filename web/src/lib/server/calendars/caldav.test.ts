@@ -157,6 +157,35 @@ describe('caldav adapter (stubbed fetch)', () => {
 		expect(calls[0].auth).toBe(`Basic ${Buffer.from('sam@example.com:app-pass').toString('base64')}`);
 	});
 
+	test('a known calendar home is listed in one request, and found again if it moved', async () => {
+		const listing = `<d:multistatus><d:response><d:href>/123/calendars/home/</d:href><d:propstat><d:prop><d:resourcetype><c:calendar/></d:resourcetype><d:displayname>Home</d:displayname><cs:getctag>v1</cs:getctag></d:prop></d:propstat></d:response></d:multistatus>`;
+		const discovery = (c: Call) => {
+			if (c.body.includes('current-user-principal'))
+				return { body: '<d:multistatus><d:response><d:current-user-principal><d:href>/123/principal/</d:href></d:current-user-principal></d:response></d:multistatus>' };
+			if (c.body.includes('calendar-home-set'))
+				return { body: '<multistatus><response><C:calendar-home-set><href>/123/calendars/</href></C:calendar-home-set></response></multistatus>' };
+			return null;
+		};
+		let calls = stub((c) => discovery(c) ?? { body: listing });
+		const refreshed = await caldav.refresh!(creds);
+		expect(refreshed).toEqual({ ...creds, homeUrl: 'https://dav.example.com/123/calendars/' });
+		expect(await caldav.refresh!(refreshed!)).toBeNull();
+
+		calls = stub((c) => discovery(c) ?? { body: listing });
+		expect((await caldav.listCalendars(refreshed!)).map((c) => c.version)).toEqual(['v1']);
+		expect(calls).toHaveLength(1);
+
+		// The stored home is gone: discover it again rather than failing.
+		calls = stub((c) => discovery(c) ?? (c.url.includes('/old/') ? { status: 404, body: '' } : { body: listing }));
+		expect(await caldav.listCalendars({ ...creds, homeUrl: 'https://dav.example.com/old/' })).toHaveLength(1);
+		expect(calls.map((c) => c.url)).toEqual([
+			'https://dav.example.com/old/',
+			'https://dav.example.com/',
+			'https://dav.example.com/123/principal/',
+			'https://dav.example.com/123/calendars/'
+		]);
+	});
+
 	test('rejected credentials ask the user to reconnect', async () => {
 		stub(() => ({ status: 401, body: '' }));
 		await expect(caldav.listCalendars(creds)).rejects.toBeInstanceOf(ReauthRequired);

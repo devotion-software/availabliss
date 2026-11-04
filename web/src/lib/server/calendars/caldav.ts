@@ -121,33 +121,50 @@ async function discoverHome(creds: CaldavCredentials): Promise<string> {
 	return new URL(homeHref, home.url).toString();
 }
 
+/** Calendars in the home collection, each with its change tag. */
+async function calendarsAt(creds: CaldavCredentials, home: string): Promise<RemoteCalendar[]> {
+	const { xml, url } = await dav(
+		creds,
+		home,
+		'PROPFIND',
+		'1',
+		PROPFIND('<d:resourcetype/><d:displayname/><a:calendar-color/><c:supported-calendar-component-set/><cs:getctag/><d:sync-token/>')
+	);
+	const calendars: RemoteCalendar[] = [];
+	for (const response of xmlBlocks(xml, 'response')) {
+		const resourceType = xmlBlocks(response, 'resourcetype')[0] ?? '';
+		const components = xmlBlocks(response, 'supported-calendar-component-set')[0];
+		if (!hasTag(resourceType, 'calendar') || (components && !components.includes('VEVENT'))) continue;
+		const href = xmlText(response, 'href');
+		if (!href) continue;
+		const version = (xmlText(response, 'getctag') || xmlText(response, 'sync-token'))?.slice(0, 255) || null;
+		calendars.push({
+			externalId: new URL(href, url).toString(),
+			name: xmlText(response, 'displayname') || 'Calendar',
+			color: xmlText(response, 'calendar-color')?.slice(0, 7) ?? null,
+			changes: version ? 'version' : 'none',
+			version
+		});
+	}
+	return calendars;
+}
+
 export const caldav: CalendarAdapter<CaldavCredentials> = {
+	/** One request when the home URL is known (see `refresh`); three when it has to be found. */
 	async listCalendars(creds) {
-		const home = await discoverHome(creds);
-		const { xml, url } = await dav(
-			creds,
-			home,
-			'PROPFIND',
-			'1',
-			PROPFIND('<d:resourcetype/><d:displayname/><a:calendar-color/><c:supported-calendar-component-set/><cs:getctag/><d:sync-token/>')
-		);
-		const calendars: RemoteCalendar[] = [];
-		for (const response of xmlBlocks(xml, 'response')) {
-			const resourceType = xmlBlocks(response, 'resourcetype')[0] ?? '';
-			const components = xmlBlocks(response, 'supported-calendar-component-set')[0];
-			if (!hasTag(resourceType, 'calendar') || (components && !components.includes('VEVENT'))) continue;
-			const href = xmlText(response, 'href');
-			if (!href) continue;
-			const version = (xmlText(response, 'getctag') || xmlText(response, 'sync-token'))?.slice(0, 255) || null;
-			calendars.push({
-				externalId: new URL(href, url).toString(),
-				name: xmlText(response, 'displayname') || 'Calendar',
-				color: xmlText(response, 'calendar-color')?.slice(0, 7) ?? null,
-				changes: version ? 'version' : 'none',
-				version
-			});
+		if (!creds.homeUrl) return calendarsAt(creds, await discoverHome(creds));
+		try {
+			return await calendarsAt(creds, creds.homeUrl);
+		} catch (err) {
+			// The account's calendars moved: find them again.
+			if (err instanceof ReauthRequired) throw err;
+			return calendarsAt(creds, await discoverHome(creds));
 		}
-		return calendars;
+	},
+
+	/** Remembers where the account's calendars live, so later requests skip discovery. */
+	async refresh(creds) {
+		return creds.homeUrl ? null : { ...creds, homeUrl: await discoverHome(creds) };
 	},
 
 	async busy(creds, calendars, from, to, timeZone) {
