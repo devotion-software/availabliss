@@ -9,11 +9,12 @@ COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY web/ .
 # SvelteKit loads server modules while analysing routes. Nothing connects, but the
-# db and auth modules refuse to load unconfigured. These placeholders exist only in
-# this build stage; Coolify injects the real values into the runtime image.
-ENV DATABASE_URL=mysql://build:build@localhost:3306/build \
-    BETTER_AUTH_SECRET=build-time-placeholder-not-used-at-runtime
-RUN bun run build
+# db and auth modules refuse to load unconfigured. These placeholders are scoped to
+# this one command (not ENV), so no layer keeps them; Coolify injects the real values
+# into the runtime image.
+RUN DATABASE_URL=mysql://build:build@localhost:3306/build \
+    BETTER_AUTH_SECRET=build-time-placeholder-not-used-at-runtime \
+    bun run build
 
 # ── deps: production-only node_modules for the externalised runtime imports ──
 FROM oven/bun:1.3.14 AS deps
