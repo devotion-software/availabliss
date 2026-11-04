@@ -279,7 +279,7 @@ private struct CalendarToggleSection: View {
 
     var body: some View {
         GlassList(data: rows, id: \.id, header: title, trailingHeader: account, rowMinHeight: 50) { row in
-            Toggle(isOn: Binding(get: row.get, set: row.set)) {
+            Toggle(isOn: Binding(get: { row.get() }, set: { row.set($0) })) {
                 HStack(spacing: 12) {
                     RoundedRectangle(cornerRadius: 4).fill(row.color).frame(width: 12, height: 12).accessibilityHidden(true)
                     Text(row.name).bodyFont(15, .medium)
