@@ -330,6 +330,17 @@ interface CalendarConnection {
 | POST 🔒 | `/calendars/:connectionId/sync` | | `CalendarConnection` |
 | DELETE 🔒 | `/calendars/:connectionId` | | `204` |
 
+Calendar change notifications (called by Google and Microsoft, not by clients;
+no auth, not rate limited). Each channel carries a token derived from
+`SECRETS_KEY` and the calendar, and anything without a matching one is ignored.
+A valid notification syncs that calendar's connection a few seconds later.
+
+| Method | Path | Body | Response |
+| ------ | ---- | ---- | -------- |
+| POST | `/calendars/push/google` | none (`X-Goog-Channel-ID`, `X-Goog-Channel-Token`, `X-Goog-Resource-State` headers) | `200` |
+| POST | `/calendars/push/microsoft?validationToken=` | | `200`, the token echoed as `text/plain` (Graph's check when a subscription is created) |
+| POST | `/calendars/push/microsoft` | Graph change notifications `{ value: [{ subscriptionId, clientState, changeType, resourceData }] }` | `202` |
+
 ```ts
 /** Native apps upload busy time from on-device calendars. Titles never leave the device. */
 interface DeviceSync {

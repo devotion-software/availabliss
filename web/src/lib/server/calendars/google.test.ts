@@ -132,3 +132,41 @@ describe('google adapter (stubbed fetch)', () => {
 		expect(await google.changes!(creds, home, new Date('2020-01-01T00:00:00Z'), from, to, 'UTC')).toBeNull();
 	});
 });
+
+describe('google change notifications (stubbed fetch)', () => {
+	const realFetch = globalThis.fetch;
+	afterEach(() => {
+		globalThis.fetch = realFetch;
+	});
+	const creds = { accessToken: 't', refreshToken: 'r', expiresAt: Date.now() + 3600_000 };
+	const cal: RemoteCalendar = { externalId: 'me@example.com', name: 'Home', color: null, changes: 'cursor' };
+
+	test('watch opens a channel with our id, address and token', async () => {
+		let sent: { url: string; body: Record<string, unknown> } | null = null;
+		globalThis.fetch = (async (input: URL | string, init?: RequestInit) => {
+			sent = { url: String(input), body: JSON.parse(String(init?.body)) };
+			return new Response(JSON.stringify({ id: 'chan-1', resourceId: 'res-1', expiration: String(Date.parse('2026-11-10T00:00:00Z')) }));
+		}) as typeof fetch;
+		const channel = await google.watch!(creds, cal, { id: 'chan-1', address: 'https://app.example/api/v1/calendars/push/google', token: 'secret' });
+		expect(channel).toEqual({ id: 'chan-1', resourceId: 'res-1', expiresAt: new Date('2026-11-10T00:00:00Z') });
+		expect(sent!.url).toBe('https://www.googleapis.com/calendar/v3/calendars/me%40example.com/events/watch');
+		expect(sent!.body).toMatchObject({ id: 'chan-1', type: 'web_hook', address: 'https://app.example/api/v1/calendars/push/google', token: 'secret' });
+	});
+
+	test("calendars that can't be watched answer null", async () => {
+		globalThis.fetch = (async () => new Response('{}', { status: 403 })) as unknown as typeof fetch;
+		expect(await google.watch!(creds, cal, { id: 'c', address: 'https://a', token: 't' })).toBeNull();
+		expect(await google.watch!(creds, { ...cal, changes: 'none' }, { id: 'c', address: 'https://a', token: 't' })).toBeNull();
+	});
+
+	test('unwatch stops the channel and ignores one already gone', async () => {
+		const bodies: unknown[] = [];
+		globalThis.fetch = (async (_input: URL | string, init?: RequestInit) => {
+			bodies.push(JSON.parse(String(init?.body)));
+			return new Response(null, { status: bodies.length === 1 ? 204 : 404 });
+		}) as typeof fetch;
+		await google.unwatch!(creds, { id: 'chan-1', resourceId: 'res-1' });
+		await google.unwatch!(creds, { id: 'chan-1', resourceId: 'res-1' });
+		expect(bodies[0]).toEqual({ id: 'chan-1', resourceId: 'res-1' });
+	});
+});

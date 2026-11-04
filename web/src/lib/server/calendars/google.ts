@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto';
 import { zonedInstant } from '../availability/time';
 import { bearerFetch, HttpError, refreshIfNeeded } from './oauth';
-import type { CalendarAdapter, ChangedEvents, OAuthCredentials, RemoteBusy, RemoteCalendar } from './types';
+import type { CalendarAdapter, ChangedEvents, OAuthCredentials, PushChannel, RemoteBusy, RemoteCalendar } from './types';
 
 const API = 'https://www.googleapis.com/calendar/v3';
 /** freeBusy accepts at most 50 calendars and a bounded window per call. */
@@ -17,6 +17,8 @@ const MAX_CALENDARS = 50;
 const FREEBUSY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
 const EVENT_FIELDS = 'id,status,transparency,start,end,recurringEventId,recurrence,attendees(self,responseStatus)';
 const PAGE_FIELDS = `nextPageToken,timeZone,items(${EVENT_FIELDS})`;
+/** Channels are asked to last this long (Google may grant less). */
+const CHANNEL_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 interface CalendarListResponse {
 	items: { id: string; summary: string; summaryOverride?: string; backgroundColor?: string; primary?: boolean; accessRole?: string }[];
@@ -169,6 +171,37 @@ export const google: CalendarAdapter<OAuthCredentials> = {
 			out.set(eventKey(id), result ? toBusy(calendar.externalId, result.items, result.timeZone) : []);
 		}
 		return out;
+	},
+
+	async watch(creds, calendar, { id, address, token }): Promise<PushChannel | null> {
+		// Only calendars whose events we can list can be watched.
+		if (calendar.changes !== 'cursor') return null;
+		const channel = await bearerFetch<{ id: string; resourceId: string; expiration?: string }>(
+			`${API}/calendars/${encodeURIComponent(calendar.externalId)}/events/watch`,
+			creds.accessToken,
+			{
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ id, type: 'web_hook', address, token, params: { ttl: String(CHANNEL_TTL_SECONDS) } })
+			}
+		).catch((err) => {
+			// Some calendars (other people's, public ones) refuse to be watched.
+			if (err instanceof HttpError && err.status >= 400 && err.status < 500) return null;
+			throw err;
+		});
+		if (!channel) return null;
+		const expiresAt = new Date(channel.expiration ? Number(channel.expiration) : Date.now() + CHANNEL_TTL_SECONDS * 1000);
+		return { id: channel.id, resourceId: channel.resourceId, expiresAt };
+	},
+
+	async unwatch(creds, { id, resourceId }) {
+		await bearerFetch(`${API}/channels/stop`, creds.accessToken, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ id, resourceId })
+		}).catch((err) => {
+			if (!(err instanceof HttpError && err.status === 404)) throw err;
+		});
 	},
 
 	refresh: (creds) => refreshIfNeeded('google', creds)

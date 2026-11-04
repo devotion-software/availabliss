@@ -41,8 +41,8 @@ async function rateLimit(event: RequestEvent): Promise<Response | null> {
 	if (!env.rateLimit) return null;
 	const { pathname } = event.url;
 	try {
-		// Webhooks authenticate with a shared secret and can arrive in bursts.
-		if (pathname.startsWith('/api/v1/') && !pathname.startsWith('/api/v1/billing/')) {
+		// Webhooks authenticate with a shared secret (or a per-channel token) and can arrive in bursts.
+		if (pathname.startsWith('/api/v1/') && !pathname.startsWith('/api/v1/billing/') && !pathname.startsWith('/api/v1/calendars/push/')) {
 			const decision = await checkRateLimit(kv, event.request.method, pathname, {
 				userId: event.locals.user?.id ?? null,
 				ip: event.getClientAddress()

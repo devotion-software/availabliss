@@ -96,9 +96,15 @@ export const calendars = mysqlTable(
 		busy: boolean('busy').default(true).notNull(),
 		// Where the next sync carries on from: the provider's change tag, or when
 		// changes were last fetched. Null until the first full fetch.
-		syncCursor: varchar('sync_cursor', { length: 255 })
+		syncCursor: varchar('sync_cursor', { length: 255 }),
+		// Change notifications from the provider: our channel id (Google) or the
+		// subscription id (Microsoft), Google's resource id (needed to stop a channel),
+		// and when it lapses unless renewed.
+		pushId: varchar('push_id', { length: 64 }),
+		pushResourceId: varchar('push_resource_id', { length: 255 }),
+		pushExpiresAt: instant('push_expires_at')
 	},
-	(t) => [uniqueIndex('calendars_external_uq').on(t.connectionId, t.externalId)]
+	(t) => [uniqueIndex('calendars_external_uq').on(t.connectionId, t.externalId), uniqueIndex('calendars_push_uq').on(t.pushId)]
 );
 
 /** Busy time pulled from a calendar. Titles are never stored. */

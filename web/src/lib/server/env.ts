@@ -13,12 +13,25 @@ function list(name: string): string[] {
 		.filter(Boolean);
 }
 
+function pushUrl(): string | null {
+	const set = optional('CALENDAR_PUSH_URL');
+	if (set === 'off') return null;
+	const url = set ?? optional('BETTER_AUTH_URL');
+	return url?.startsWith('https://') ? url.replace(/\/$/, '') : null;
+}
+
 export const env = {
 	baseUrl: optional('BETTER_AUTH_URL') ?? 'http://localhost:5190',
 	/** Extra origins Better Auth accepts, e.g. the Android emulator's http://10.0.2.2:5190 in dev. */
 	trustedOrigins: list('TRUSTED_ORIGINS'),
 	authSecret: optional('BETTER_AUTH_SECRET'),
 	secretsKey: optional('SECRETS_KEY') ?? optional('BETTER_AUTH_SECRET'),
+	/**
+	 * Public HTTPS origin Google and Microsoft send calendar change notifications to.
+	 * Defaults to the app's URL when that's HTTPS; set it to a tunnel in dev, or to
+	 * `off` to rely on polling alone.
+	 */
+	calendarPushUrl: pushUrl(),
 	/** Shared state for multiple instances (live updates, sign-in codes, rate limits, locks). */
 	redisUrl: optional('REDIS_URL'),
 	/** Rate limiting: on in production, off in dev unless RATE_LIMIT=on. RATE_LIMIT=off disables it anywhere. */
