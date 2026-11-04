@@ -66,6 +66,8 @@ export const calendarConnections = mysqlTable(
 		// tier (past six months) was last fetched for calendars without change tracking.
 		coveredUntil: farInstant('covered_until'),
 		farSyncedAt: instant('far_synced_at'),
+		// CalDAV: when the change tags were last checked between full syncs.
+		checkedAt: instant('checked_at'),
 		// The label for server-side accounts and null for devices (two phones can share
 		// a name), so the unique key below only covers server connections.
 		accountLabel: varchar('account_label', { length: 255 }).generatedAlwaysAs(sql`if(provider = 'device', null, label)`, {

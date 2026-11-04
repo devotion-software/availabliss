@@ -5,7 +5,7 @@ import { db } from '#lib/server/db';
 import { busyIntervals, calendarConnections, calendars } from '#lib/server/db/schema';
 import { encryptJson } from '#lib/server/crypto';
 import { newId } from '#lib/server/ids';
-import { adapters, horizonFor, planCoverage, refreshCoverage, syncConnection } from '#lib/server/calendars';
+import { adapters, checkConnection, horizonFor, planCoverage, refreshCoverage, syncConnection } from '#lib/server/calendars';
 import type { CalendarAdapter, ChangedEvents, RemoteBusy, RemoteCalendar } from '#lib/server/calendars/types';
 import { createGroup, updateGroup } from '#lib/server/groups';
 import { loadBusy } from '#lib/server/busy';
@@ -253,5 +253,65 @@ describe('syncConnection', () => {
 		await syncConnection(id);
 		await refreshCoverage([me]);
 		expect((await conn(id)).nextSyncAt).not.toBeNull();
+	});
+});
+
+describe('CalDAV change checks', () => {
+	const HOUR = 60 * 60 * 1000;
+
+	test('one listing between syncs; a full sync only when a change tag moves or a calendar comes or goes', async () => {
+		const me = await fx.user();
+		const id = await connection(me);
+		fake.calendars = [
+			{ externalId: 'home', name: 'Home', color: null, changes: 'version', version: 'v1' },
+			{ externalId: 'work', name: 'Work', color: null, changes: 'version', version: 'w1' }
+		];
+		fake.events = [busy('home', yearsAhead(0.1))];
+		await syncConnection(id);
+		// Every calendar has a tag, so the checks stand in for frequent full syncs.
+		expect((await conn(id)).nextSyncAt!.getTime() - Date.now()).toBeGreaterThan(5 * HOUR);
+
+		fake.reads = [];
+		expect(await checkConnection(id)).toBe(false);
+		expect(fake.reads).toEqual([]);
+		expect((await conn(id)).checkedAt!.getTime()).toBeGreaterThan(Date.now() - 5000);
+
+		// An edit in Home: synced, reading only that calendar.
+		fake.calendars[0].version = 'v2';
+		fake.events = [busy('home', yearsAhead(0.2))];
+		expect(await checkConnection(id)).toBe(true);
+		expect(fake.reads.map((r) => r.calendars)).toEqual([['home']]);
+		expect((await rows(me)).map((r) => r.start)).toEqual([fake.events[0].start]);
+		expect(await checkConnection(id)).toBe(false);
+
+		// A new calendar, then a removed one.
+		fake.calendars.push({ externalId: 'gym', name: 'Gym', color: null, changes: 'version', version: 'g1' });
+		expect(await checkConnection(id)).toBe(true);
+		fake.calendars = fake.calendars.filter((c) => c.externalId !== 'work');
+		expect(await checkConnection(id)).toBe(true);
+		expect(await checkConnection(id)).toBe(false);
+	});
+
+	test('calendars without a tag are left to the regular schedule', async () => {
+		const me = await fx.user();
+		const id = await connection(me);
+		fake.calendars = [{ externalId: 'plain', name: 'Plain', color: null, changes: 'none' }];
+		await syncConnection(id);
+		expect((await conn(id)).nextSyncAt!.getTime() - Date.now()).toBeLessThan(HOUR);
+		expect(await checkConnection(id)).toBe(false);
+	});
+
+	// (checkCaldavConnections isn't run here: it would check every CalDAV connection in the database.)
+	test('connections in trouble are left to the full sync', async () => {
+		const me = await fx.user();
+		const id = await connection(me);
+		fake.calendars = [{ externalId: 'home', name: 'Home', color: null, changes: 'version', version: 'v1' }];
+		await syncConnection(id);
+		await db.update(calendarConnections).set({ status: 'reauth_required' }).where(eq(calendarConnections.id, id));
+		fake.calendars[0].version = 'v2';
+		fake.reads = [];
+		expect(await checkConnection(id)).toBe(false);
+		expect(fake.reads).toEqual([]);
+		expect((await conn(id)).checkedAt).toBeNull();
 	});
 });

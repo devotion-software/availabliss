@@ -53,16 +53,16 @@ const adapter: CalendarAdapter<object> = {
 
 /** `env` is read-only to the app; the tests point push at a fake address. */
 const mutableEnv = env as { calendarPushUrl: string | null };
-const real = adapters.caldav;
+const real = adapters.google;
 const realPushUrl = env.calendarPushUrl;
 const realDebounce = pushTiming.debounceMs;
 beforeAll(() => {
-	adapters.caldav = adapter as typeof real;
+	adapters.google = adapter as typeof real;
 	mutableEnv.calendarPushUrl = 'https://push.test.invalid';
 	pushTiming.debounceMs = 10;
 });
 afterAll(async () => {
-	adapters.caldav = real;
+	adapters.google = real;
 	mutableEnv.calendarPushUrl = realPushUrl;
 	pushTiming.debounceMs = realDebounce;
 	await fx.cleanup();
@@ -87,9 +87,9 @@ async function connection(userId: string): Promise<string> {
 	await db.insert(calendarConnections).values({
 		id,
 		userId,
-		provider: 'caldav',
+		provider: 'google',
 		label: `Push ${id}`,
-		credentials: encryptJson({ serverUrl: 'https://dav.invalid', username: 'u', password: 'p' }, `calendar:${id}`)
+		credentials: encryptJson({ accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + HOUR }, `calendar:${id}`)
 	});
 	return id;
 }
@@ -107,7 +107,7 @@ describe('keeping channels', () => {
 		// "Holidays" starts not busy, so only Home is watched.
 		expect(fake.watched.map((w) => w.calendar)).toEqual(['home']);
 		const home = await calendar(id, 'home');
-		expect(fake.watched[0]).toMatchObject({ address: 'https://push.test.invalid/api/v1/calendars/push/caldav', token: pushToken(home.id) });
+		expect(fake.watched[0]).toMatchObject({ address: 'https://push.test.invalid/api/v1/calendars/push/google', token: pushToken(home.id) });
 		expect(home).toMatchObject({ pushId: 'chan-1', pushResourceId: 'res-chan-1' });
 		expect((await conn(id)).nextSyncAt!.getTime() - Date.now()).toBeGreaterThan(5 * HOUR);
 

@@ -4,7 +4,7 @@ import { auth } from '#lib/auth';
 import { COLOR_THEMES, THEME_MODES, type ColorTheme, type ThemeMode } from '#lib/types';
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
 import type { RequestEvent } from '@sveltejs/kit';
-import { syncStaleConnections } from '#lib/server/calendars';
+import { checkCaldavConnections, syncStaleConnections } from '#lib/server/calendars';
 import { isForbiddenCrossSite, selfOrigins } from '#lib/server/csrf';
 import { env } from '#lib/server/env';
 import { kv } from '#lib/server/redis';
@@ -13,11 +13,13 @@ import { checkOtpEmail, checkRateLimit, tooManyRequests } from '#lib/server/rate
 const ALLOWED_ORIGINS = selfOrigins(env.baseUrl, env.trustedOrigins);
 
 const CALENDAR_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+/** iCloud / CalDAV can't notify us, so their change tags are checked this often instead. */
+const CALDAV_CHECK_INTERVAL_MS = 2 * 60 * 1000;
 
 /**
- * Keeps Google / Microsoft / CalDAV busy time fresh in the background. Every
- * instance runs the timer, but a lock in the shared store lets only one of them
- * sync per interval.
+ * Keeps Google / Microsoft / CalDAV busy time fresh in the background, and checks
+ * CalDAV change tags in between. Every instance runs the timers, but locks in the
+ * shared store let only one of them run each per interval.
  */
 export const init: ServerInit = () => {
 	if (process.env.NODE_ENV === 'test') return;
@@ -32,6 +34,16 @@ export const init: ServerInit = () => {
 			console.warn('[calendars] background sync failed', err);
 		}
 	}, CALENDAR_SYNC_INTERVAL_MS).unref();
+	setInterval(async () => {
+		try {
+			const lockSeconds = CALDAV_CHECK_INTERVAL_MS / 1000 - 5;
+			if (!(await kv.setIfAbsent('lock:caldav-check', String(process.pid), lockSeconds))) return;
+			// A check is one request; one that finds a change runs a full sync, so leave room for that.
+			await checkCaldavConnections(Date.now() + (lockSeconds - 45) * 1000);
+		} catch (err) {
+			console.warn('[calendars] CalDAV change check failed', err);
+		}
+	}, CALDAV_CHECK_INTERVAL_MS).unref();
 };
 
 const OTP_SEND_PATH = '/api/auth/email-otp/send-verification-otp';
