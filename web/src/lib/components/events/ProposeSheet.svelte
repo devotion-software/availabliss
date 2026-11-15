@@ -19,7 +19,7 @@
 	 */
 	interface Props {
 		open: boolean;
-		group: Pick<Group, 'id' | 'members'>;
+		group: Pick<Group, 'id' | 'name' | 'members'>;
 		meId: string;
 		/** What to prefill: a slot that works, or just a day. */
 		initial?: { start: string; end: string; allDay?: boolean; label?: string; title?: string; note?: string } | { day: string } | null;
@@ -41,6 +41,8 @@
 			: 'day' in initial
 				? blankDraft(initial.day)
 				: { ...draftFromRange(initial.start, initial.end, !!initial.allDay, tz, initial.title ?? ''), note: initial.note ?? '' };
+		// Prefill the title with the group's name, which is what the event is called anyway if left blank.
+		if (!draft.title) draft.title = group.name;
 		error = null;
 	});
 

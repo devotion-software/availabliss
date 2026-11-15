@@ -73,7 +73,8 @@ class CreateProposalViewModel @Inject constructor(
         viewModelScope.launch {
             val group = groups.cachedGroup(route.groupId) ?: (groups.refreshGroup(route.groupId) as? ApiResult.Success)?.value
             members = group?.members.orEmpty().associate { it.userId to it.name }
-            _state.update { it.copy(groupName = group?.name.orEmpty()) }
+            // Prefill the title with the group's name, which is what the event is called anyway if left blank.
+            _state.update { it.copy(groupName = group?.name.orEmpty(), title = it.title.ifEmpty { group?.name.orEmpty().take(120) }) }
         }
         watchConflicts()
     }

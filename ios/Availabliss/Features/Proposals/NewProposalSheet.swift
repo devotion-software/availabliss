@@ -70,7 +70,8 @@ struct NewProposalSheet: View {
         self.api = api
         self.onCreated = onCreated
         _draft = State(initialValue: draft)
-        _title = State(initialValue: draft.title)
+        // Prefilled with the group's name, which is what the event is called anyway if left blank.
+        _title = State(initialValue: draft.title.isEmpty ? group.name : draft.title)
         _note = State(initialValue: draft.note)
     }
 
@@ -81,16 +82,20 @@ struct NewProposalSheet: View {
             VStack(spacing: 0) {
                 DatePicker("Starts", selection: $draft.start, in: draft.bounds ?? Date.distantPast...Date.distantFuture,
                            displayedComponents: draft.allDay ? .date : [.date, .hourAndMinute])
+                    .frame(minHeight: 58)
                 Divider().overlay(theme.line)
                 DatePicker("Ends", selection: $draft.end, in: draft.start...(draft.bounds?.upperBound ?? Date.distantFuture),
                            displayedComponents: draft.allDay ? .date : [.date, .hourAndMinute])
+                    .frame(minHeight: 58)
                 Divider().overlay(theme.line)
-                Toggle("All day", isOn: $draft.allDay).toggleStyle(.glassSwitch).frame(minHeight: 50)
+                Toggle("All day", isOn: $draft.allDay).toggleStyle(.glassSwitch).frame(minHeight: 58)
             }
             .bodyFont(15, .medium)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 4)
             .surfaceBackground(cornerRadius: 18)
-            InputField(placeholder: "Title (optional)", text: $title)
+            .padding(.vertical, 6)
+            InputField(placeholder: "Title", text: $title)
             InputField(placeholder: "Where? (optional)", text: $location)
             InputField(placeholder: "Note (optional)", text: $note)
             Text("You'll accept automatically, and a card is posted in the group chat.")
