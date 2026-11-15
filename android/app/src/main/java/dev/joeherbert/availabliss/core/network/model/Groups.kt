@@ -173,11 +173,43 @@ data class AvailabilityDay(
     val busyMemberIds: List<String> = emptyList(),
     val slotPosition: SlotPosition? = null,
     val holiday: String? = null,
+    /** Members whose preferred times this day's time that works fits. */
+    val preferredBy: List<String> = emptyList(),
 )
 
-/** `label` e.g. "Fri 13 – Sun 15 Nov". */
+/** `label` e.g. "Fri 13 – Sun 15 Nov". `preferredBy`: members whose preferred times it fits. */
 @Serializable
-data class Slot(val start: String, val end: String, val label: String)
+data class Slot(val start: String, val end: String, val label: String, val preferredBy: List<String> = emptyList())
+
+/** A member's preferred time for a group. A guideline: it never blocks a date. */
+@Serializable
+data class GroupPreference(
+    val id: String,
+    val userId: String,
+    val kind: String,
+    val from: String? = null,
+    val to: String? = null,
+    val days: List<Int> = emptyList(),
+    val window: PreferenceWindow? = null,
+    /** "Weekends after 16:00", "12 – 14 Dec". */
+    val label: String,
+)
+
+@Serializable
+data class PreferenceWindow(val from: String, val to: String)
+
+@Serializable
+data class GroupPreferencesResponse(val preferences: List<GroupPreference>)
+
+/** `kind` "dates" (from, to) or "weekly" (days, window). */
+@Serializable
+data class NewGroupPreference(
+    val kind: String,
+    val from: String? = null,
+    val to: String? = null,
+    val days: List<Int>? = null,
+    val window: PreferenceWindow? = null,
+)
 
 @Serializable
 data class DayAvailability(

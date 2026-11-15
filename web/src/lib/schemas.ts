@@ -144,6 +144,18 @@ export const deviceSyncSchema = z.object({
 
 export const calendarBusySchema = z.object({ busy: z.boolean() });
 
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM');
+
+/** A member's preferred time for a group: specific dates, or repeating weekdays (optionally within a window). */
+export const preferenceSchema = z.discriminatedUnion('kind', [
+	z.object({ kind: z.literal('dates'), from: z.iso.date(), to: z.iso.date() }),
+	z.object({
+		kind: z.literal('weekly'),
+		days: z.array(z.number().int().min(0).max(6)).max(7).default([]),
+		window: z.object({ from: hhmm, to: hhmm }).nullable().default(null)
+	})
+]);
+
 /** "Not busy" for a calendar event: that occurrence (start/end), or its whole series. */
 export const busyIgnoreSchema = z.object({
 	calendarId: trimmed(36),

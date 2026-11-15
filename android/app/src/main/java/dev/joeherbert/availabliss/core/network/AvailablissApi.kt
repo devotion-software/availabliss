@@ -215,6 +215,15 @@ interface AvailablissApi {
     @POST("api/v1/groups/{id}/invites")
     suspend fun createInvite(@Path("id") groupId: String, @Body body: CreateInviteRequest): InviteLink
 
+    @GET("api/v1/groups/{id}/preferences")
+    suspend fun preferences(@Path("id") groupId: String): dev.joeherbert.availabliss.core.network.model.GroupPreferencesResponse
+
+    @POST("api/v1/groups/{id}/preferences")
+    suspend fun addPreference(@Path("id") groupId: String, @Body body: dev.joeherbert.availabliss.core.network.model.NewGroupPreference): dev.joeherbert.availabliss.core.network.model.GroupPreference
+
+    @DELETE("api/v1/groups/{id}/preferences/{prefId}")
+    suspend fun removePreference(@Path("id") groupId: String, @Path("prefId") prefId: String)
+
     @GET("api/v1/groups/{id}/invites")
     suspend fun invites(@Path("id") groupId: String): GroupInvitesResponse
 

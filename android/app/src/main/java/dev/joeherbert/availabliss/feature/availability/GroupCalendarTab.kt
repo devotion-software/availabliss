@@ -376,6 +376,12 @@ private fun DetailCard(
             StatusPill(if (detail.works) "Works" else if (detail.past) "Past" else "Doesn’t fit", if (detail.works) PillTone.Mint else PillTone.Neutral)
         }
         if (detail.past) return@Column
+        detail.preferredBy?.let {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(AvIcons.Heart, null, tint = colors.accentInk, modifier = Modifier.size(14.dp))
+                Text(it, style = AvailablissTheme.type.bodySmallStrong, color = colors.accentInk)
+            }
+        }
         if (state.dayLoading && state.timelineRows.isEmpty()) LoadingIndicator()
         else if (state.timelineRows.isNotEmpty() || state.everyone.isNotEmpty()) DayTimelineRows(state.everyone, state.timelineRows)
         val slot = detail.slot

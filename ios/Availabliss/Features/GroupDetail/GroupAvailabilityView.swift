@@ -398,6 +398,18 @@ private struct DayCell: View {
             .padding(.horizontal, compact ? 6 : 10)
             .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
             .background(background(status))
+            .overlay(alignment: .topTrailing) {
+                if status == .match, let count = info?.preferredBy?.count, count > 0 {
+                    HStack(spacing: 1) {
+                        Image(systemName: "heart.fill").font(.system(size: 8, weight: .bold))
+                        if !compact { Text("\(count)").font(.system(size: 9, weight: .bold)) }
+                    }
+                    .foregroundStyle(theme.onAccent)
+                    .padding(.top, 5)
+                    .padding(.trailing, compact ? 5 : 7)
+                    .accessibilityHidden(true)
+                }
+            }
             .opacity(status == .busy ? 0.5 : (status == .hidden ? 0.35 : 1))
             .overlay {
                 if isSelected {
@@ -436,7 +448,9 @@ private struct DayCell: View {
     private func accessibilityText(_ status: AvailabilityDay.Status) -> String {
         let base = Formatting.longDay(date.startDate())
         switch status {
-        case .match: return "\(base), works for everyone"
+        case .match:
+            let prefers = (info?.preferredBy?.count ?? 0) > 0 ? ", \(Formatting.plural(info?.preferredBy?.count ?? 0, "person", "people")) prefer it" : ""
+            return "\(base), works for everyone\(prefers)"
         case .busy: return "\(base), \(note)"
         case .free: return note.isEmpty ? base : "\(base), \(note)"
         case .hidden: return isPast ? "\(base), in the past" : "\(base), outside the group's timing"
@@ -465,6 +479,15 @@ private struct DayDetailCard: View {
                 }
                 Spacer()
                 StatusPill(text: works ? "Works" : (isPast ? "Past" : "Doesn\u{2019}t fit"), tone: works ? .mint : .neutral)
+            }
+            if works, let who = model.day(model.selectedDay)?.preferredBy, !who.isEmpty {
+                Label {
+                    Text("\(Formatting.list(who.map { $0 == me ? "You" : (group.member($0)?.firstName ?? "Someone") })) \(who.count == 1 && who.first != me ? "prefers" : "prefer") this")
+                } icon: {
+                    Image(systemName: "heart.fill")
+                }
+                .bodyFont(13, .semibold, relativeTo: .subheadline)
+                .foregroundStyle(theme.accentInk)
             }
             if isPast {
                 // Nothing to plan on a day that's gone.

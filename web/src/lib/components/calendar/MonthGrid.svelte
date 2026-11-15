@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from '#lib/components/ui/Icon.svelte';
 	import type { Availability, AvailabilityDay, Member } from '#lib/types';
 	import { dayNumber, formatDayKey, useFormat, weekdayName } from '#lib/client/format';
 	import { WEEKDAY_NAMES, weekdayShort } from '#lib/client/requirements';
@@ -47,6 +48,7 @@
 
 	function label(date: string, day: AvailabilityDay | undefined): string {
 		const parts = [`${weekdayName(date, 'long')} ${formatDayKey(date).split(' ').slice(1).join(' ')}`];
+		if (day?.preferredBy?.length) parts.push(`${busyNames(day.preferredBy, members)} ${day.preferredBy.length === 1 ? 'prefers' : 'prefer'} it`);
 		if (date === today) parts.push('today');
 		if (day?.status === 'match') parts.push('works for everyone');
 		else if (day?.status === 'busy') parts.push(day.busyMemberIds.length ? `${busyNames(day.busyMemberIds, members)} busy` : 'someone is busy');
@@ -103,6 +105,11 @@
 					>
 						<span class="num">{dayNumber(date)}</span>
 						<span class="note">{note(date, day)}</span>
+						{#if day.preferredBy?.length}
+							<span class="pref" title="{day.preferredBy.length} prefer this">
+								<Icon name="heart" size={10} strokeWidth={2.5} />{#if !compact}{day.preferredBy.length}{/if}
+							</span>
+						{/if}
 					</button>
 				{/if}
 			{/each}
@@ -239,6 +246,21 @@
 	}
 	.today:not(.match) .num {
 		color: var(--accent-ink);
+	}
+	.cell {
+		position: relative;
+	}
+	.pref {
+		position: absolute;
+		top: 6px;
+		right: 7px;
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+		font-size: 10px;
+		font-weight: 700;
+		color: currentColor;
+		opacity: 0.9;
 	}
 	.selected {
 		outline: 2px solid var(--ink);

@@ -1,5 +1,5 @@
 import { api, type Fetch } from './api';
-import type { Group, GroupInvite, GroupSummary, Member, Requirement, TileColor } from '#lib/types';
+import type { Group, GroupInvite, GroupPreference, GroupSummary, Member, Requirement, TileColor, Weekday } from '#lib/types';
 
 export interface GroupInput {
 	name: string;
@@ -45,3 +45,12 @@ export const listInvites = (groupId: string, fetch?: Fetch) =>
 export const revokeInvite = (groupId: string, inviteId: string) => api.del(`/groups/${groupId}/invites/${inviteId}`);
 export const getInvite = (token: string, fetch?: Fetch) => api.get<InvitePreview>(`/invites/${token}`, { fetch });
 export const acceptInvite = (token: string) => api.post<Group>(`/invites/${token}/accept`);
+
+/** Every member's preferred times for the group. */
+export const listPreferences = (groupId: string, fetch?: Fetch) =>
+	api.get<{ preferences: GroupPreference[] }>(`/groups/${groupId}/preferences`, { fetch }).then((r) => r.preferences);
+export const addPreference = (
+	groupId: string,
+	body: { kind: 'dates'; from: string; to: string } | { kind: 'weekly'; days: Weekday[]; window: { from: string; to: string } | null }
+) => api.post<GroupPreference>(`/groups/${groupId}/preferences`, body);
+export const removePreference = (groupId: string, id: string) => api.del(`/groups/${groupId}/preferences/${id}`);

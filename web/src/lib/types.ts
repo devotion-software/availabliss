@@ -170,11 +170,29 @@ export interface AvailabilityDay {
 	busyMemberIds: string[];
 	slotPosition: SlotPosition | null;
 	holiday: string | null;
+	/** Members whose preferences this day's time that works fits (only on `match` days). */
+	preferredBy?: string[];
 }
 
 export interface Slot {
 	start: string;
 	end: string;
+	label: string;
+	/** Members whose preferences this slot fits. */
+	preferredBy?: string[];
+}
+
+/** A member's preferred time for a group. A guideline: it never blocks a date. */
+export interface GroupPreference {
+	id: string;
+	userId: string;
+	/** `dates`: from–to (inclusive dates). `weekly`: the weekdays (empty = any), optionally within a window. */
+	kind: 'dates' | 'weekly';
+	from: string | null;
+	to: string | null;
+	days: Weekday[];
+	window: { from: string; to: string } | null;
+	/** "Weekends after 16:00", "12 – 14 Dec". */
 	label: string;
 }
 

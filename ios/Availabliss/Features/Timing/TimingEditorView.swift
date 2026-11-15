@@ -26,6 +26,8 @@ struct TimingEditorView: View {
                     .disabled(!canEdit)
                 // Anyone can keep a copy of a group's timing to reuse, admin or not.
                 SaveTemplateRow(requirement: model.draft, suggestion: group.name, api: detail.api, toast: $model.toast)
+                // Everyone's preferred times (anyone can add their own).
+                PreferencesSection(group: group, api: detail.api)
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)

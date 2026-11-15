@@ -94,6 +94,14 @@ class GroupsRepository @Inject constructor(
     suspend fun createInvite(groupId: String, emails: List<String> = emptyList()): ApiResult<InviteLink> =
         call { api.createInvite(groupId, CreateInviteRequest(emails.takeIf { it.isNotEmpty() })) }
 
+    suspend fun preferences(groupId: String): ApiResult<List<dev.joeherbert.availabliss.core.network.model.GroupPreference>> =
+        call { api.preferences(groupId).preferences }
+
+    suspend fun addPreference(groupId: String, body: dev.joeherbert.availabliss.core.network.model.NewGroupPreference) =
+        call { api.addPreference(groupId, body) }
+
+    suspend fun removePreference(groupId: String, id: String): ApiResult<Unit> = call { api.removePreference(groupId, id) }
+
     suspend fun invites(groupId: String): ApiResult<List<GroupInvite>> = call { api.invites(groupId).invites }
 
     suspend fun revokeInvite(groupId: String, inviteId: String): ApiResult<Unit> = call { api.revokeInvite(groupId, inviteId) }

@@ -21,7 +21,8 @@ import {
 	REPEATS,
 	RESPONSE_KINDS,
 	ROLES,
-	type Requirement
+	type Requirement,
+	type Weekday
 } from '../../types';
 
 const id = () => varchar('id', { length: 36 }).primaryKey();
@@ -208,6 +209,30 @@ export const groupInvites = mysqlTable(
 		createdAt: createdAt()
 	},
 	(t) => [index('group_invites_group_idx').on(t.groupId)]
+);
+
+/**
+ * A member's preferred times for one group: specific dates (`from`–`to`), or repeating
+ * weekdays (`days`, empty = any) with an optional time window. Guidelines only: they never
+ * block a date, they highlight and rank the times that work.
+ */
+export const groupPreferences = mysqlTable(
+	'group_preferences',
+	{
+		id: id(),
+		groupId: varchar('group_id', { length: 36 })
+			.notNull()
+			.references(() => groups.id, { onDelete: 'cascade' }),
+		userId: userRef(),
+		kind: mysqlEnum('kind', ['dates', 'weekly']).notNull(),
+		fromDate: date('from_date', { mode: 'string' }),
+		toDate: date('to_date', { mode: 'string' }),
+		days: json('days').$type<Weekday[]>().notNull(),
+		windowFrom: varchar('window_from', { length: 5 }),
+		windowTo: varchar('window_to', { length: 5 }),
+		createdAt: createdAt()
+	},
+	(t) => [index('group_preferences_group_idx').on(t.groupId)]
 );
 
 // ─── Proposals & events ───────────────────────────────────────────────────

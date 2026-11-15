@@ -17,7 +17,15 @@
 	let { slots, pendingCount, onpropose, onselect, onplan, max = 4 }: Props = $props();
 
 	const fmt = useFormat();
-	const upcoming = $derived(slots.filter((s) => new Date(s.end) > new Date()).slice(0, max));
+	// Times that fit more people's preferences first, then soonest.
+	const upcoming = $derived(
+		slots
+			.filter((s) => new Date(s.end) > new Date())
+			.map((s, i) => ({ s, i }))
+			.sort((a, b) => (b.s.preferredBy?.length ?? 0) - (a.s.preferredBy?.length ?? 0) || a.i - b.i)
+			.slice(0, max)
+			.map((x) => x.s)
+	);
 	const note = $derived(pendingCount ? 'Everyone synced is free' : 'Everyone is free');
 </script>
 
@@ -32,7 +40,11 @@
 		<div class="option">
 			<button type="button" class="when" onclick={() => onselect?.(slot)}>
 				<span class="label">{slot.label}</span>
-				<span class="note">{fmt.current.startsAt(slot.start) || note}</span>
+				<span class="note"
+					>{fmt.current.startsAt(slot.start) || note}{#if slot.preferredBy?.length}<span class="prefers">
+							· {slot.preferredBy.length} {slot.preferredBy.length === 1 ? 'prefers' : 'prefer'}</span
+						>{/if}</span
+				>
 			</button>
 			<Button variant="accent" size="sm" onclick={() => onpropose(slot)}>Propose</Button>
 		</div>
@@ -42,6 +54,10 @@
 </section>
 
 <style>
+	.prefers {
+		color: var(--accent-ink);
+		font-weight: 600;
+	}
 	.head {
 		display: flex;
 		align-items: center;

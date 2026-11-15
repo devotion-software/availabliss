@@ -181,6 +181,8 @@ fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackb
                     TimingEditorSections(editor, state.canEdit, actions)
                     // Anyone can keep a copy of a group's timing, not just admins.
                     SaveTemplateRow(state.templateSave, actions.onSaveTemplate, suggestion = state.groupName, bottomClearance = 110.dp)
+                    // Everyone's preferred times (anyone can add their own).
+                    PreferencesPanel()
                 }
             }
         }

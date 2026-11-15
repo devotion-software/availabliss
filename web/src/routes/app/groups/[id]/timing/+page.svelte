@@ -15,6 +15,7 @@
 	import Button from '#lib/components/ui/Button.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import RequirementsEditor from '#lib/components/timing/RequirementsEditor.svelte';
+	import PreferencesPanel from '#lib/components/group/PreferencesPanel.svelte';
 	import SaveTemplate from '#lib/components/timing/SaveTemplate.svelte';
 
 	let { data } = $props();
@@ -124,6 +125,9 @@
 	<RequirementsEditor bind:requirement={draft} readonly={!admin} country={data.user.country} {regionLabel} />
 	<!-- Anyone can keep a copy of a group's timing to reuse, admin or not. -->
 	<SaveTemplate requirement={draft} suggestion={data.group.name} />
+
+	<!-- Everyone's preferred times (anyone can add their own). -->
+	<PreferencesPanel group={data.group} meId={data.user.id} />
 
 	<div class="savebar glass">
 		<div class="summary" aria-live="polite" aria-busy={previewing}>

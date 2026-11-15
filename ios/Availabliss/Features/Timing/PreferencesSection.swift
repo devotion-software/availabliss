@@ -1,0 +1,192 @@
+import SwiftUI
+
+/// Preferred times for a group: everyone can say when they'd rather meet ("weekends after
+/// 16:00", "12 – 14 Dec"). Guidelines only: nothing is blocked; the calendar marks the times
+/// that work and fit someone's preference.
+struct PreferencesSection: View {
+    let group: Group
+    let api: APIClient
+    @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
+    @State private var preferences: [GroupPreference] = []
+    @State private var adding = false
+    @State private var error: String?
+
+    private var me: String? { app.session.user?.id }
+    private var mine: [GroupPreference] { preferences.filter { $0.userId == me } }
+    private var others: [GroupPreference] { preferences.filter { $0.userId != me } }
+
+    var body: some View {
+        GlassPanel(cornerRadius: 24) {
+            HStack {
+                Label("Preferred times", systemImage: "heart").bodyFont(16, .semibold).foregroundStyle(theme.ink)
+                Spacer()
+                Button { adding = true } label: { Label("Add", systemImage: "plus") }
+                    .buttonStyle(.glassPill)
+            }
+            Text("Say when you\u{2019}d rather meet. It never rules a date out: times that work and fit someone\u{2019}s preference are marked with a heart.")
+                .bodyFont(13, relativeTo: .subheadline)
+                .foregroundStyle(theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            if !mine.isEmpty {
+                Text("Yours").sectionLabelStyle().padding(.top, 4)
+                ForEach(mine) { pref in
+                    HStack {
+                        Text(pref.label).bodyFont(15, .medium)
+                        Spacer()
+                        Button("Remove") { Task { await remove(pref) } }
+                            .bodyFont(13, .semibold, relativeTo: .subheadline)
+                            .foregroundStyle(theme.warnInk)
+                            .accessibilityLabel("Remove \(pref.label)")
+                    }
+                    .frame(minHeight: 40)
+                }
+            }
+            if !others.isEmpty {
+                Text("Everyone else").sectionLabelStyle().padding(.top, 4)
+                ForEach(others) { pref in
+                    HStack {
+                        Text(pref.label).bodyFont(15, .medium)
+                        Spacer()
+                        Text(group.member(pref.userId)?.firstName ?? "Someone").bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
+                    }
+                    .frame(minHeight: 40)
+                }
+            }
+        }
+        .task(id: group.id) { await load() }
+        .task(id: group.id) {
+            for await event in app.live.events(forGroup: group.id) where event.kind == .availabilityChanged || event.kind == .reconnected {
+                await load()
+            }
+        }
+        .sheet(isPresented: $adding) {
+            AddPreferenceSheet { body in
+                let made = try await api.send(API.Groups.addPreference(groupId: group.id, body))
+                preferences.append(made)
+            }
+        }
+        .errorAlert($error)
+    }
+
+    private func load() async {
+        if let list = try? await api.send(API.Groups.preferences(groupId: group.id)).preferences { preferences = list }
+    }
+
+    private func remove(_ pref: GroupPreference) async {
+        do {
+            try await api.send(API.Groups.removePreference(groupId: group.id, id: pref.id))
+            preferences.removeAll { $0.id == pref.id }
+        } catch {
+            self.error = error.userMessage
+        }
+    }
+}
+
+private struct AddPreferenceSheet: View {
+    let save: (NewGroupPreference) async throws -> Void
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
+
+    private enum Kind: Hashable { case weekly, dates }
+    private enum Timing: Hashable { case any, after, between }
+
+    @State private var kind: Kind = .weekly
+    @State private var days: Set<Int> = [5, 6]
+    @State private var timing: Timing = .any
+    @State private var from = WallTime(hour: 16, minute: 0).date()
+    @State private var to = WallTime(hour: 22, minute: 0).date()
+    @State private var fromDay = CalendarDay.today()
+    @State private var toDay = CalendarDay.today()
+    @State private var isSaving = false
+    @State private var error: String?
+
+    var body: some View {
+        BottomSheet(title: "Add a preferred time") {
+            SegmentedControl(
+                selection: $kind,
+                options: [SegmentOption(value: .weekly, label: "Repeating"), SegmentOption(value: .dates, label: "Specific dates")],
+                accessibilityLabel: "Kind of preference"
+            )
+            if kind == .weekly {
+                HStack(spacing: 6) {
+                    ForEach(Weekday.all, id: \.self) { day in
+                        let on = days.contains(day)
+                        Button {
+                            if on { days.remove(day) } else { days.insert(day) }
+                        } label: {
+                            Text(Weekday.initials[day])
+                                .bodyFont(14, .bold)
+                                .foregroundStyle(on ? theme.onAccent : theme.ink)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(on ? theme.accent : theme.surface))
+                        }
+                        .buttonStyle(.pressable)
+                        .accessibilityLabel(Weekday.full(day))
+                        .accessibilityAddTraits(on ? .isSelected : [])
+                    }
+                }
+                SegmentedControl(
+                    selection: $timing,
+                    options: [SegmentOption(value: .any, label: "Any time"), SegmentOption(value: .after, label: "After"), SegmentOption(value: .between, label: "Between")],
+                    accessibilityLabel: "Time of day"
+                )
+                if timing != .any {
+                    VStack(spacing: 0) {
+                        DatePicker(timing == .after ? "After" : "From", selection: $from, displayedComponents: .hourAndMinute).frame(minHeight: 50)
+                        if timing == .between {
+                            Divider().overlay(theme.line)
+                            DatePicker("Until", selection: $to, displayedComponents: .hourAndMinute).frame(minHeight: 50)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .surfaceBackground(cornerRadius: 18)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    DayPickerPill(day: $fromDay, label: "From")
+                    Image(systemName: "arrow.right").foregroundStyle(theme.muted)
+                    DayPickerPill(day: $toDay, label: "To")
+                }
+            }
+            Button {
+                Task { await submit() }
+            } label: {
+                LoadingLabel(title: "Save preference", isLoading: isSaving)
+            }
+            .buttonStyle(.filled(.primary, height: 54, cornerRadius: 18))
+            .disabled(isSaving || (kind == .dates && toDay < fromDay))
+        }
+        .errorAlert($error)
+    }
+
+    private func submit() async {
+        isSaving = true
+        defer { isSaving = false }
+        let body: NewGroupPreference
+        switch kind {
+        case .dates:
+            body = NewGroupPreference(kind: .dates, from: fromDay.description, to: toDay.description)
+        case .weekly:
+            let window: GroupPreference.Window? = switch timing {
+            case .any: nil
+            case .after: .init(from: WallTime(from).description, to: "23:59")
+            case .between: .init(from: WallTime(from).description, to: WallTime(to).description)
+            }
+            body = NewGroupPreference(kind: .weekly, days: days.sorted(), window: window)
+        }
+        do {
+            try await save(body)
+            dismiss()
+        } catch {
+            self.error = error.userMessage
+        }
+    }
+}
+
+private extension WallTime {
+    init(_ date: Date) {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+        self.init(hour: parts.hour ?? 0, minute: parts.minute ?? 0)
+    }
+}

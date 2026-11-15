@@ -48,6 +48,8 @@ data class DayDetailUi(
     val canProposeAnyway: Boolean = false,
     /** The day has gone: nothing to plan, so no timeline or Propose. */
     val past: Boolean = false,
+    /** "Sam and Priya prefer this", when the time that works fits their preferred times. */
+    val preferredBy: String? = null,
 )
 
 /**
@@ -162,6 +164,7 @@ object AvailabilityUiMapper {
             band = band,
             note = note,
             selected = date == selected,
+            preferredCount = if (state == CellState.Match) day?.preferredBy.orEmpty().size else 0,
             accessibilityLabel = listOfNotNull(dateLabel, stateLabel, day?.holiday, if (date == today) "today" else null).joinToString(", "),
         )
     }
@@ -182,6 +185,8 @@ object AvailabilityUiMapper {
                 works = true,
                 proposeLabel = "Propose this $noun",
                 slot = local.slot,
+                preferredBy = day?.preferredBy.orEmpty().map { name(group, it, meId) }.takeIf { it.isNotEmpty() }
+                    ?.let { "${it.joinNames()} ${if (it.size == 1 && it.first() != "You") "prefers" else "prefer"} this" },
             )
         }
         val busy = day?.busyMemberIds.orEmpty().map { name(group, it, meId) }

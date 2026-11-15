@@ -110,6 +110,13 @@ enum API {
         static func createInvite(groupId: String, emails: [String] = []) -> Endpoint<InviteLink> {
             .init(.post, "/groups/\(groupId.pathEncoded)/invites", body: CreateInviteBody(emails: emails.isEmpty ? nil : emails))
         }
+        static func preferences(groupId: String) -> Endpoint<GroupPreferencesResponse> { .init(.get, "/groups/\(groupId.pathEncoded)/preferences") }
+        static func addPreference(groupId: String, _ body: NewGroupPreference) -> Endpoint<GroupPreference> {
+            .init(.post, "/groups/\(groupId.pathEncoded)/preferences", body: body)
+        }
+        static func removePreference(groupId: String, id: String) -> Endpoint<EmptyResponse> {
+            .init(.delete, "/groups/\(groupId.pathEncoded)/preferences/\(id.pathEncoded)")
+        }
         static func invites(groupId: String) -> Endpoint<GroupInvitesResponse> { .init(.get, "/groups/\(groupId.pathEncoded)/invites") }
         static func revokeInvite(groupId: String, inviteId: String) -> Endpoint<EmptyResponse> {
             .init(.delete, "/groups/\(groupId.pathEncoded)/invites/\(inviteId.pathEncoded)")

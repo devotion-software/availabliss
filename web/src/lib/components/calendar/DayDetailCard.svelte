@@ -3,6 +3,7 @@
 	import { formatDayKey, useFormat } from '#lib/client/format';
 	import Button from '#lib/components/ui/Button.svelte';
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
 	import Spinner from '#lib/components/ui/Spinner.svelte';
 	import DayTimeline from './DayTimeline.svelte';
 	import { busyNames } from './grid';
@@ -58,6 +59,9 @@
 		</div>
 		<StatusPill tone={works ? 'mint' : 'neutral'}>{works ? 'Works' : past ? 'Past' : 'Doesn’t fit'}</StatusPill>
 	</div>
+	{#if !past && works && day?.preferredBy?.length}
+		<p class="pref"><Icon name="heart" size={13} /> {busyNames(day.preferredBy, members)} {day.preferredBy.length === 1 ? 'prefers' : 'prefer'} this</p>
+	{/if}
 	{#if past}
 		<!-- Nothing to plan on a day that's gone. -->
 	{:else if detail}
@@ -111,6 +115,14 @@
 	.sub {
 		font-size: 12px;
 		color: var(--muted);
+	}
+	.pref {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--accent-ink);
 	}
 	.loading {
 		display: flex;

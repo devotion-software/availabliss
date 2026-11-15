@@ -56,6 +56,8 @@ data class MonthCellUi(
     val band: BandPosition? = null,
     val note: String = "",
     val selected: Boolean = false,
+    /** How many members' preferred times this day fits (shown as a heart on days that work). */
+    val preferredCount: Int = 0,
     val accessibilityLabel: String = "",
 )
 
@@ -126,8 +128,10 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
         CellState.Busy -> Triple(colors.busyBg, colors.ink, colors.glassBorder)
         else -> Triple(colors.surface, colors.ink, colors.glassBorder)
     }
+    Box(modifier) {
     Column(
-        modifier
+        Modifier
+            .fillMaxWidth()
             .height(54.dp)
             .then(if (cell.selected) Modifier.outlineOutside(shape, colors.ink) else Modifier)
             .then(if (cell.state == CellState.Match) Modifier.softShadow(shape, colors.accent, offsetY = 12.dp, blur = 24.dp, spread = (-14).dp) else Modifier)
@@ -145,6 +149,13 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
     ) {
         Text(cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp, color = fg)
         Text(cell.note, style = AvailablissTheme.type.micro, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+    if (cell.state == CellState.Match && cell.preferredCount > 0) {
+        Row(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Icon(dev.joeherbert.availabliss.designsystem.icon.AvIcons.Heart, null, tint = fg, modifier = Modifier.size(9.dp))
+            Text(cell.preferredCount.toString(), fontSize = 9.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = fg)
+        }
+    }
     }
 }
 

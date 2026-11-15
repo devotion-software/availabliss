@@ -397,6 +397,9 @@ interface ManualBlock {
 | PATCH 👑 | `/groups/:id/members/:userId` | `{ role: 'admin' \| 'member' }` | `Member` |
 | DELETE 👑/self | `/groups/:id/members/:userId` | | `204` (self = leave) |
 | POST 👑 | `/groups/:id/nudge` | | `{ nudged: number }` (push/email to unsynced members, rate limited to once per 12h) |
+| GET 🔒 | `/groups/:id/preferences` | | `{ preferences: GroupPreference[] }` (every member's) |
+| POST 🔒 | `/groups/:id/preferences` | `{ kind: 'dates', from, to }` or `{ kind: 'weekly', days?: Weekday[], window?: { from, to } \| null }` | `GroupPreference` |
+| DELETE 🔒 | `/groups/:id/preferences/:prefId` | | 204 (your own only) |
 | GET 👑 | `/groups/:id/invites` | | `{ invites: GroupInvite[] }` (live ones, newest first) |
 | POST 👑 | `/groups/:id/invites` | `{ emails?: string[] (≤ 20), email?: string }` | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |
 | DELETE 👑 | `/groups/:id/invites/:inviteId` | | 204 (the link stops working) |
@@ -408,6 +411,9 @@ address gets its own emailed invite that only someone signed in with that addres
 used up once they join.
 
 ```ts
+// Preferred times are guidelines: they never block a date. Availability marks the slots and
+// `match` days they fit with `preferredBy: string[]` (user ids).
+interface GroupPreference { id: string; userId: string; kind: 'dates' | 'weekly'; from: string | null; to: string | null; days: Weekday[]; window: { from: string; to: string } | null; label: string }
 interface GroupInvite { id: string; email: string | null; url: string; expiresAt: string; createdAt: string; invitedBy: string }
 ```
 

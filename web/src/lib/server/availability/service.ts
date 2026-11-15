@@ -9,6 +9,8 @@ import { calendarCoverage, loadBusy, syncedUserIds } from '../busy';
 import { bankHolidays, schoolHolidayRanges } from '../holidays';
 import { today } from '../requirements';
 import { computeAvailability, computeDay, type EngineInput } from './engine';
+import { applyPreferences } from './preferences';
+import { groupPreferenceList } from '../preferences';
 import { addDays, daysBetween, startOfDate } from './time';
 
 /** Longest range one request may cover. */
@@ -66,7 +68,9 @@ export async function groupAvailability(groupId: string, userId: string, from: s
 	if (daysBetween(from, to) > MAX_RANGE_DAYS) throw badRequest(`Ask for at most ${MAX_RANGE_DAYS} days at a time`);
 	await requireMember(groupId, userId);
 	const group = await getGroupRow(groupId);
-	return computeAvailability(await engineInput(group, from, to));
+	const [input, prefs] = await Promise.all([engineInput(group, from, to), groupPreferenceList(groupId, group.requirement.timezone)]);
+	// Preferences only mark and rank what works; they never block a date.
+	return applyPreferences(computeAvailability(input), prefs, group.requirement.timezone);
 }
 
 export async function groupDay(groupId: string, userId: string, date: string): Promise<DayAvailability> {

@@ -36,13 +36,44 @@ struct AvailabilityDay: Decodable, Sendable, Hashable {
     let busyMemberIds: [String]
     let slotPosition: SlotPosition?
     let holiday: String?
+    /// Members whose preferred times this day's time that works fits.
+    var preferredBy: [String]?
 }
 
 struct Slot: Decodable, Sendable, Hashable, Identifiable {
     let start: Date
     let end: Date
     let label: String
+    /// Members whose preferred times this slot fits.
+    var preferredBy: [String]?
     var id: Date { start }
+}
+
+/// A member's preferred time for a group. A guideline: it never blocks a date.
+struct GroupPreference: Codable, Sendable, Identifiable, Hashable {
+    enum Kind: String, Codable, Sendable { case dates, weekly }
+    struct Window: Codable, Sendable, Hashable { let from: String; let to: String }
+
+    let id: String
+    let userId: String
+    let kind: Kind
+    let from: String?
+    let to: String?
+    let days: [Int]
+    let window: Window?
+    /// "Weekends after 16:00", "12 – 14 Dec".
+    let label: String
+}
+
+struct GroupPreferencesResponse: Decodable, Sendable { let preferences: [GroupPreference] }
+
+/// Body for adding a preference: `dates` (from, to) or `weekly` (days, window).
+struct NewGroupPreference: Encodable, Sendable {
+    let kind: GroupPreference.Kind
+    var from: String?
+    var to: String?
+    var days: [Int]?
+    var window: GroupPreference.Window?
 }
 
 struct TimeSpan: Decodable, Sendable, Hashable {
