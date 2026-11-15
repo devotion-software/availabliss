@@ -18,7 +18,9 @@
 	const badge = $derived(groupBadge(group, timeZone));
 </script>
 
-<a class="card glass" href="/app/groups/{group.id}">
+<div class="card glass">
+	<!-- The whole card opens the group (stretched link); the chat strip sits above it. -->
+	<a class="open" href="/app/groups/{group.id}" aria-label="Open {group.name}"></a>
 	<GroupTile monogram={group.monogram} color={group.color} size={48} />
 	<span class="body">
 		<span class="row">
@@ -46,8 +48,17 @@
 				<span class="unread" aria-label="{unread.count(group)} unread messages">{unread.count(group)}</span>
 			{/if}
 		</span>
+		{#if unread.count(group)}
+			{@const n = unread.count(group)}
+			<a class="chat-link" href="/app/groups/{group.id}/chat">
+				<Icon name="chat" size={15} />
+				<span class="chat-count">{n === 1 ? '1 new message' : `${n > 99 ? '99+' : n} new messages`}</span>
+				<span>Open chat</span>
+				<Icon name="chevron-right" size={13} strokeWidth={2.5} />
+			</a>
+		{/if}
 	</span>
-</a>
+</div>
 
 <style>
 	.synced-tick {
@@ -62,6 +73,7 @@
 		justify-content: center;
 	}
 	.card {
+		position: relative;
 		border-radius: 24px;
 		padding: 14px;
 		display: flex;
@@ -72,8 +84,40 @@
 		transition: transform 0.2s ease;
 	}
 	.card:hover {
-		color: var(--ink);
 		transform: translateY(-1px);
+	}
+	.open {
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		z-index: 1;
+	}
+	.open:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.chat-link {
+		position: relative;
+		z-index: 2;
+		margin-top: 4px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-height: 36px;
+		padding: 0 12px;
+		border-radius: 12px;
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		font-size: 13px;
+		font-weight: 600;
+		text-decoration: none;
+	}
+	.chat-link:hover {
+		color: var(--accent-ink);
+		filter: brightness(0.97);
+	}
+	.chat-count {
+		flex: 1;
 	}
 	.body {
 		flex: 1;

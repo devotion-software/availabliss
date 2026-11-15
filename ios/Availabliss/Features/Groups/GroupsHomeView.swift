@@ -115,7 +115,7 @@ struct GroupsHomeView: View {
                     Button {
                         app.router.push(.group(id: group.id, tab: .calendar))
                     } label: {
-                        GroupRow(group: group)
+                        GroupRow(group: group) { app.router.push(.group(id: group.id, tab: .chat)) }
                     }
                     .buttonStyle(.pressable)
                 }
@@ -163,6 +163,8 @@ private struct UpNextCard: View {
 /// One group in the list.
 struct GroupRow: View {
     let group: GroupSummary
+    /// Opens the group straight on its chat (shown when there are unread messages).
+    var onOpenChat: (() -> Void)?
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -188,6 +190,10 @@ struct GroupRow: View {
                     SyncRing(synced: group.syncedCount, total: group.memberCount)
                 }
                 .frame(minHeight: 22)
+                if group.unreadCount > 0, let onOpenChat {
+                    UnreadChatButton(count: group.unreadCount, action: onOpenChat)
+                        .padding(.top, 4)
+                }
             }
         }
         .foregroundStyle(theme.ink)
@@ -196,6 +202,37 @@ struct GroupRow: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityHint(group.unreadCount > 0 ? "\(group.unreadCount) unread messages" : "")
+        .accessibilityActions {
+            if group.unreadCount > 0, let onOpenChat {
+                Button("Open chat", action: onOpenChat)
+            }
+        }
+    }
+}
+
+/// "3 new messages · Open chat" strip at the foot of a group card.
+private struct UnreadChatButton: View {
+    let count: Int
+    let action: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "bubble.left.fill").font(.system(size: 13, weight: .semibold))
+                Text(count == 1 ? "1 new message" : "\(count > 99 ? "99+" : String(count)) new messages")
+                    .bodyFont(13, .semibold, relativeTo: .subheadline)
+                Spacer(minLength: 4)
+                Text("Open chat").bodyFont(13, .semibold, relativeTo: .subheadline)
+                Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold))
+            }
+            .foregroundStyle(theme.accentInk)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 36)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.accentSoft))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressable)
     }
 }
 

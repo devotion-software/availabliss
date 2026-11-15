@@ -68,6 +68,7 @@ fun MainNavHost(root: RootViewModel) {
             composable<HomeRoute> {
                 HomeScreen(
                     onOpenGroup = { nav.navigate(GroupRoute(it)) },
+                    onOpenGroupChat = { nav.navigate(GroupRoute(it, GroupTab.Chat.name)) },
                     onNewGroup = { nav.navigate(NewGroupRoute) },
                     onOpenProfile = { nav.switchTab(YouRoute) },
                 )

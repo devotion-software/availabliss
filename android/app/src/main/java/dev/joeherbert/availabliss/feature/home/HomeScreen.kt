@@ -66,6 +66,7 @@ import dev.joeherbert.availabliss.feature.common.CalendarPickerRow
 @Composable
 fun HomeScreen(
     onOpenGroup: (String) -> Unit,
+    onOpenGroupChat: (String) -> Unit,
     onNewGroup: () -> Unit,
     onOpenProfile: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -77,6 +78,7 @@ fun HomeScreen(
     HomeContent(
         state = state,
         onOpenGroup = onOpenGroup,
+        onOpenGroupChat = onOpenGroupChat,
         onNewGroup = onNewGroup,
         onOpenProfile = onOpenProfile,
         onAddToCalendar = viewModel::addUpNextToCalendar,
@@ -90,6 +92,7 @@ fun HomeScreen(
 fun HomeContent(
     state: HomeUiState,
     onOpenGroup: (String) -> Unit,
+    onOpenGroupChat: (String) -> Unit,
     onNewGroup: () -> Unit,
     onOpenProfile: () -> Unit,
     onAddToCalendar: () -> Unit,
@@ -125,7 +128,7 @@ fun HomeContent(
                 // The concept spaces tiles 10dp apart inside an 18dp-gap column.
                 else -> item(key = "groups") {
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                        state.groups.forEach { tile -> GroupRow(tile, onClick = { onOpenGroup(tile.id) }) }
+                        state.groups.forEach { tile -> GroupRow(tile, onClick = { onOpenGroup(tile.id) }, onOpenChat = { onOpenGroupChat(tile.id) }) }
                     }
                 }
             }
@@ -189,7 +192,7 @@ private fun UpNextCard(upNext: UpNextUi, state: HomeUiState, onAddToCalendar: ()
 }
 
 @Composable
-private fun GroupRow(tile: GroupTileUi, onClick: () -> Unit) {
+private fun GroupRow(tile: GroupTileUi, onClick: () -> Unit, onOpenChat: () -> Unit) {
     val colors = AvailablissTheme.colors
     Row(
         Modifier
@@ -219,7 +222,31 @@ private fun GroupRow(tile: GroupTileUi, onClick: () -> Unit) {
                     Text(tile.syncLabel, style = AvailablissTheme.type.caption, color = colors.muted)
                 }
             }
+            if (tile.unread > 0) UnreadChatButton(tile.unread, onOpenChat, Modifier.padding(top = 4.dp))
         }
+    }
+}
+
+/** "3 new messages · Open chat" strip at the foot of a group card. */
+@Composable
+private fun UnreadChatButton(count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = AvailablissTheme.colors
+    val label = if (count == 1) "1 new message" else "${if (count > 99) "99+" else count} new messages"
+    Row(
+        modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 36.dp)
+            .clip(Shapes.row)
+            .background(colors.accentSoft)
+            .clickable(role = Role.Button, onClickLabel = "Open chat", onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(AvIcons.Chat, contentDescription = null, tint = colors.accentInk, modifier = Modifier.size(15.dp))
+        Text(label, style = AvailablissTheme.type.captionStrong, color = colors.accentInk, modifier = Modifier.weight(1f))
+        Text("Open chat", style = AvailablissTheme.type.captionStrong, color = colors.accentInk)
+        Icon(AvIcons.Forward, contentDescription = null, tint = colors.accentInk, modifier = Modifier.size(13.dp))
     }
 }
 
@@ -257,7 +284,7 @@ private fun HomePreview() {
                     GroupTileUi("2", "Mum's 60th", "60", TileColor.T4, "Needs your reply", PillTone.Apricot, "One day · school holidays only", people, 1f, "All synced", 0),
                 ),
             ),
-            onOpenGroup = {}, onNewGroup = {}, onOpenProfile = {}, onAddToCalendar = {}, onSelectCalendar = {}, onRetry = {},
+            onOpenGroup = {}, onOpenGroupChat = {}, onNewGroup = {}, onOpenProfile = {}, onAddToCalendar = {}, onSelectCalendar = {}, onRetry = {},
         )
     }
 }
