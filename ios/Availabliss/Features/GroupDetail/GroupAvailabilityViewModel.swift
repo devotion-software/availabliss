@@ -1,11 +1,11 @@
 import Foundation
 import Observation
 
-/// Month / Week / Day availability for one group.
+/// Month / Week availability for one group, plus who's free on the selected day.
 @MainActor
 @Observable
 final class GroupAvailabilityViewModel {
-    enum Mode: Hashable { case month, week, day }
+    enum Mode: Hashable { case month, week }
 
     var mode: Mode = .month
     private(set) var month: CalendarDay = CalendarDay.today().firstOfMonth
@@ -61,7 +61,6 @@ final class GroupAvailabilityViewModel {
         case .month: Formatting.shortMonthYear(month)
         case .week:
             if let first = weekDays.first, let last = weekDays.last { Formatting.dayRange(first, last) } else { "" }
-        case .day: Formatting.shortDay(selectedDay)
         }
     }
 
@@ -74,8 +73,8 @@ final class GroupAvailabilityViewModel {
         switch mode {
         case .month: await loadMonth()
         case .week: await loadWeek()
-        case .day: await loadDay(selectedDay)
         }
+        if dayDetails[selectedDay] == nil { await loadDay(selectedDay) }
     }
 
     func step(by delta: Int) async {
@@ -85,22 +84,20 @@ final class GroupAvailabilityViewModel {
             selectedDay = month == CalendarDay.today().firstOfMonth ? .today() : month
             userPickedDay = false
         case .week: selectedDay = selectedDay.adding(days: 7 * delta)
-        case .day: selectedDay = selectedDay.adding(days: delta)
         }
         if mode != .month, selectedDay.firstOfMonth != month { month = selectedDay.firstOfMonth }
         await load()
     }
 
-    /// A day tapped in the month grid.
+    /// A day tapped in the month or week grid: its detail shows underneath.
     func pick(_ date: CalendarDay) {
         selectedDay = date
         userPickedDay = true
     }
 
-    func showDay(_ date: CalendarDay) async {
-        selectedDay = date
-        mode = .day
-        await loadDay(date)
+    /// Loads who's free on the selected day, if it isn't loaded yet.
+    func loadSelectedDay() async {
+        if dayDetails[selectedDay] == nil { await loadDay(selectedDay) }
     }
 
     func invalidate() async {

@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.joeherbert.availabliss.core.common.DateTimes
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -58,6 +59,7 @@ import dev.joeherbert.availabliss.designsystem.component.StatusPill
 import dev.joeherbert.availabliss.designsystem.component.SyncRing
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.availability.DayTimeline
+import dev.joeherbert.availabliss.designsystem.component.availability.DayTimelineRows
 import dev.joeherbert.availabliss.designsystem.component.availability.MonthGrid
 import dev.joeherbert.availabliss.designsystem.component.availability.MonthLegend
 import dev.joeherbert.availabliss.designsystem.component.availability.WeekGrid
@@ -128,13 +130,13 @@ fun GroupCalendarTab(
             val (start, end) = viewModel.eveningOn(date)
             onCreateProposal(ProposalPrefill(start, end, false))
         },
+        onProposeSpan = { start, end -> onCreateProposal(ProposalPrefill(start, end, false)) },
         // Offered only when the server has the AI planner set up; without Pro it explains Pro first.
         onPlanWithAi = if (state.aiPlanner.available && state.hasSlots) {
             { if (state.aiPlanner.included) planning = true else upgradeReason = PLANNER_UPGRADE_REASON }
         } else {
             null
         },
-        onSeeWhosFree = viewModel::showDay,
         snackbar = { AvSnackbarHost(snackbar) },
     )
 }
@@ -152,10 +154,11 @@ fun GroupCalendarContent(
     onNext: () -> Unit,
     onRetry: () -> Unit,
     onPropose: (Slot) -> Unit,
-    onSeeWhosFree: () -> Unit,
     snackbar: @Composable () -> Unit = {},
     /** "Propose anyway" on a day that doesn't work for everyone. */
     onProposeDay: (LocalDate) -> Unit = {},
+    /** "Propose 18:00 – 00:00": the first time everyone's free on the selected day (ISO start, end). */
+    onProposeSpan: (String, String) -> Unit = { _, _ -> },
     /** "Plan with AI"; null hides it (not set up on this server, or nothing works yet). */
     onPlanWithAi: (() -> Unit)? = null,
 ) {
@@ -177,12 +180,13 @@ fun GroupCalendarContent(
                 state.error?.let { ErrorBanner(it, onRetry = onRetry) }
                 AnimatedContent(targetState = state.view, label = "calendar-view") { view ->
                     when (view) {
-                        CalendarView.Month -> MonthSection(state, onSelectDate, onPropose, onProposeDay, onSeeWhosFree, onPlanWithAi)
-                        CalendarView.Week -> if (state.weekLoading && state.weekColumns.isEmpty()) LoadingIndicator() else WeekGrid(state.weekColumns)
-                        CalendarView.Day -> if (state.dayLoading && state.timelineRows.isEmpty()) LoadingIndicator()
-                        else DayTimeline(state.dayTitle, state.dayNote, state.everyone, state.timelineRows)
+                        CalendarView.Month -> MonthSection(state, onSelectDate, onPlanWithAi)
+                        CalendarView.Week -> if (state.weekLoading && state.weekColumns.isEmpty()) LoadingIndicator()
+                        else WeekGrid(state.weekColumns, onSelectColumn = { i -> state.weekDates.getOrNull(i)?.let(onSelectDate) })
                     }
                 }
+                // The selected day: whether it works, who's free when, and Propose.
+                state.detail?.let { DetailCard(it, state, onPropose, onProposeDay, onProposeSpan) }
             }
             Box(Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.tabBarClearance)) { snackbar() }
         }
@@ -294,7 +298,6 @@ private fun HeadingRow(state: GroupCalendarUiState, onSelectView: (CalendarView)
     val unit = when (state.view) {
         CalendarView.Month -> "month"
         CalendarView.Week -> "week"
-        CalendarView.Day -> "day"
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         // "‹ Nov 2026 ›" keeps together and takes whatever the view switcher leaves.
@@ -315,9 +318,6 @@ private fun HeadingRow(state: GroupCalendarUiState, onSelectView: (CalendarView)
 private fun MonthSection(
     state: GroupCalendarUiState,
     onSelectDate: (LocalDate) -> Unit,
-    onPropose: (Slot) -> Unit,
-    onProposeDay: (LocalDate) -> Unit,
-    onSeeWhosFree: () -> Unit,
     onPlanWithAi: (() -> Unit)?,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
@@ -330,7 +330,6 @@ private fun MonthSection(
             }
         }
         onPlanWithAi?.let { PlanWithAiRow(it) }
-        state.detail?.let { DetailCard(it, onPropose, onProposeDay, onSeeWhosFree) }
     }
 }
 
@@ -355,7 +354,13 @@ private fun PlanWithAiRow(onClick: () -> Unit) {
 }
 
 @Composable
-private fun DetailCard(detail: DayDetailUi, onPropose: (Slot) -> Unit, onProposeDay: (LocalDate) -> Unit, onSeeWhosFree: () -> Unit) {
+private fun DetailCard(
+    detail: DayDetailUi,
+    state: GroupCalendarUiState,
+    onPropose: (Slot) -> Unit,
+    onProposeDay: (LocalDate) -> Unit,
+    onProposeSpan: (String, String) -> Unit,
+) {
     val colors = AvailablissTheme.colors
     Column(
         Modifier.fillMaxWidth().glass(Shapes.panel).padding(14.dp),
@@ -368,36 +373,36 @@ private fun DetailCard(detail: DayDetailUi, onPropose: (Slot) -> Unit, onPropose
             }
             StatusPill(if (detail.works) "Works" else "Doesn’t fit", if (detail.works) PillTone.Mint else PillTone.Neutral)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            val slot = detail.slot
-            if (slot != null && detail.proposeLabel != null) {
-                PrimaryButton(
-                    text = detail.proposeLabel,
-                    onClick = { onPropose(slot) },
-                    style = ButtonStyle.Accent,
-                    height = 44.dp,
-                    shape = Shapes.controlSmall,
-                    textStyle = AvailablissTheme.type.bodySmallStrong,
-                    // The primary action gets more room so "Propose this weekend" fits on one line.
-                    modifier = Modifier.weight(1.4f),
-                )
-            } else if (detail.canProposeAnyway) {
-                SecondaryButton(
-                    text = "Propose anyway",
-                    onClick = { onProposeDay(detail.date) },
-                    height = 44.dp,
-                    shape = Shapes.controlSmall,
-                    textStyle = AvailablissTheme.type.bodySmallStrong,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            SecondaryButton(
-                text = "See who's free",
-                onClick = onSeeWhosFree,
+        if (state.dayLoading && state.timelineRows.isEmpty()) LoadingIndicator()
+        else if (state.timelineRows.isNotEmpty() || state.everyone.isNotEmpty()) DayTimelineRows(state.everyone, state.timelineRows)
+        val slot = detail.slot
+        val free = state.dayFree
+        when {
+            slot != null && detail.proposeLabel != null -> PrimaryButton(
+                text = detail.proposeLabel,
+                onClick = { onPropose(slot) },
+                style = ButtonStyle.Accent,
                 height = 44.dp,
                 shape = Shapes.controlSmall,
                 textStyle = AvailablissTheme.type.bodySmallStrong,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            free != null -> PrimaryButton(
+                text = "Propose ${DateTimes.localDateTime(free.first)?.let(DateTimes::time).orEmpty()} – ${DateTimes.localDateTime(free.second)?.let(DateTimes::time).orEmpty()}",
+                onClick = { onProposeSpan(free.first, free.second) },
+                style = ButtonStyle.Accent,
+                height = 44.dp,
+                shape = Shapes.controlSmall,
+                textStyle = AvailablissTheme.type.bodySmallStrong,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            detail.canProposeAnyway -> SecondaryButton(
+                text = "Propose anyway",
+                onClick = { onProposeDay(detail.date) },
+                height = 44.dp,
+                shape = Shapes.controlSmall,
+                textStyle = AvailablissTheme.type.bodySmallStrong,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -419,7 +424,7 @@ private fun GroupCalendarPreview() {
                 detail = DayDetailUi(LocalDate.of(2026, 11, 13), "Fri 13 – Sun 15 Nov", "Everyone synced is free from Fri 18:00", true, "Propose this weekend", Slot("", "", "")),
             ),
             onBack = {}, onOpenMembers = {}, onOpenTiming = {}, onNudge = {}, onSelectView = {}, onSelectDate = {},
-            onPrevious = {}, onNext = {}, onRetry = {}, onPropose = {}, onSeeWhosFree = {},
+            onPrevious = {}, onNext = {}, onRetry = {}, onPropose = {},
         )
     }
 }

@@ -14,7 +14,6 @@
 	import Spinner from '#lib/components/ui/Spinner.svelte';
 	import MonthGrid from '#lib/components/calendar/MonthGrid.svelte';
 	import WeekGrid from '#lib/components/calendar/WeekGrid.svelte';
-	import DayTimeline from '#lib/components/calendar/DayTimeline.svelte';
 	import DayDetailCard from '#lib/components/calendar/DayDetailCard.svelte';
 	import { dayMap, slotOn, visibleColumns, weekDates } from '#lib/components/calendar/grid';
 	import SyncBanner from '#lib/components/group/SyncBanner.svelte';
@@ -30,11 +29,11 @@
 
 	let { data } = $props();
 
-	type View = 'month' | 'week' | 'day';
+	// The selected day's detail (who's free when, and Propose) shows under either view.
+	type View = 'month' | 'week';
 	const VIEWS = [
 		{ value: 'month', label: 'Month' },
-		{ value: 'week', label: 'Week' },
-		{ value: 'day', label: 'Day' }
+		{ value: 'week', label: 'Week' }
 	] as const;
 
 	const fmt = useFormat();
@@ -72,16 +71,14 @@
 	const selectedSlot = $derived(slotOn(availability.slots, selected, fmt.current.dayKey));
 	const week = $derived(weekDates(selected, columns));
 	const heading = $derived(
-		view === 'month' ? monthTitle(month) : view === 'week' ? formatDayRange(week[0], week[week.length - 1], false) : formatDayKey(selected)
+		view === 'month' ? monthTitle(month) : formatDayRange(week[0], week[week.length - 1], false)
 	);
 
-	// Phones have room for a terse heading only: "Nov 2026", "27–29 Nov", "Fri 27".
+	// Phones have room for a terse heading only: "Nov 2026", "27–29 Nov".
 	const shortHeading = $derived(
 		view === 'month'
 			? monthTitle(month).replace(/^(\w{3})\w*/, '$1')
-			: view === 'week'
-				? formatDayRange(week[0], week[week.length - 1], false).replace(' – ', '–')
-				: formatDayKey(selected).split(' ').slice(0, 2).join(' ')
+			: formatDayRange(week[0], week[week.length - 1], false).replace(' – ', '–')
 	);
 
 	/** First day that works this month, else today if it's in the month, else the 1st. */
@@ -108,37 +105,47 @@
 		}
 	}
 
-	let detailRequest = 0;
-	async function loadDetails() {
-		const id = ++detailRequest;
+	let weekRequest = 0;
+	let weekKey = '';
+	async function loadWeek(force = false) {
+		const dates = week;
+		const key = dates.join();
+		if (!force && key === weekKey) return;
+		weekKey = key;
+		const id = ++weekRequest;
+		weekDays = new Map();
+		const results = await Promise.all(
+			dates.map((d) => (days.get(d)?.status === 'hidden' ? null : getDayAvailability(group.id, d).catch(() => null)))
+		);
+		if (id === weekRequest) weekDays = new Map(dates.map((d, i) => [d, results[i]]));
+	}
+
+	let dayRequest = 0;
+	async function loadDay() {
+		const id = ++dayRequest;
+		const date = selected;
+		if (dayDetail?.date !== date) dayDetail = null;
 		try {
-			if (view === 'week') {
-				const dates = week;
-				weekDays = new Map();
-				const results = await Promise.all(
-					dates.map((d) => (days.get(d)?.status === 'hidden' ? null : getDayAvailability(group.id, d).catch(() => null)))
-				);
-				if (id === detailRequest) weekDays = new Map(dates.map((d, i) => [d, results[i]]));
-			} else if (view === 'day') {
-				dayDetail = null;
-				const detail = await getDayAvailability(group.id, selected);
-				if (id === detailRequest) dayDetail = detail;
-			}
+			const detail = await getDayAvailability(group.id, date);
+			if (id === dayRequest) dayDetail = detail;
 		} catch (err) {
 			toasts.error(err);
 		}
 	}
 
-	// Week and day views fetch per-day detail for what's on screen. Only the view,
-	// the selected day and the group trigger it (loadDetails also reads the month's
-	// availability, which would otherwise refetch the week every time that reloads).
+	function loadDetails(force = false) {
+		loadDay();
+		if (view === 'week') loadWeek(force);
+	}
+
+	// Per-day detail for what's on screen: the selected day, plus the week in week view. Only
+	// the view, the selected day and the group trigger it (loading also reads the month's
+	// availability, which would otherwise refetch every time that reloads).
 	$effect(() => {
 		void view;
 		void selected;
 		void group.id;
-		untrack(() => {
-			if (view !== 'month') loadDetails();
-		});
+		untrack(() => loadDetails());
 	});
 
 	// Someone's busy time, or the group's timing, changed: refresh what's visible.
@@ -147,7 +154,7 @@
 		const refresh = () =>
 			untrack(() => {
 				loadMonth(month);
-				if (view !== 'month') loadDetails();
+				loadDetails(true);
 			});
 		const off = live.on(['availability.changed', 'group.updated'], (e) => {
 			if (e.groupId === null || e.groupId === id) refresh();
@@ -171,7 +178,7 @@
 			loadMonth(m);
 			selected = m;
 		} else {
-			select(addDays(selected, direction * (view === 'week' ? 7 : 1)));
+			select(addDays(selected, direction * 7));
 		}
 	}
 
@@ -275,7 +282,7 @@
 
 			<CoverageNote gaps={availability.checkedUntil ?? []} {members} meId={data.user.id} />
 
-			<div class="cal-body" class:boxed={view !== 'month'}>
+			<div class="cal-body" class:boxed={view === 'week'}>
 			{#if view === 'month'}
 				{#if phone}
 					<span class="phone-only">
@@ -287,36 +294,23 @@
 						<MonthGrid {availability} {month} {members} {selected} onselect={select} />
 					</span>
 				{/if}
-			{:else if view === 'week'}
-				<WeekGrid
-					dates={week}
-					days={weekDays}
-					{members}
-					onselect={(d) => {
-						selected = d;
-						view = 'day';
-					}}
-				/>
-			{:else if dayDetail}
-				<DayTimeline day={dayDetail} {members} meId={data.user.id} />
 			{:else}
-				<div class="loading"><Spinner label="Loading day" /></div>
+				<WeekGrid dates={week} days={weekDays} {members} {selected} onselect={select} />
 			{/if}
 			</div>
 		</section>
 
-		{#if view === 'month'}
-			<DayDetailCard
-				date={selected}
-				day={days.get(selected)}
-				slot={selectedSlot}
-				{members}
-				{noun}
-				onpropose={propose}
-				onproposeday={(day) => propose({ day })}
-				onseeday={() => (view = 'day')}
-			/>
-		{/if}
+		<DayDetailCard
+			date={selected}
+			day={days.get(selected)}
+			detail={dayDetail?.date === selected ? dayDetail : null}
+			slot={selectedSlot}
+			{members}
+			meId={data.user.id}
+			{noun}
+			onpropose={propose}
+			onproposeday={(day) => propose({ day })}
+		/>
 	</div>
 
 	<aside class="aside">
@@ -476,11 +470,6 @@
 	.nav {
 		display: flex;
 		gap: 6px;
-	}
-	.loading {
-		display: flex;
-		justify-content: center;
-		padding: 40px;
 	}
 	.desk-only {
 		display: none;

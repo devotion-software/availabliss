@@ -68,6 +68,16 @@ fun DayTimeline(
             Text(title, style = type.bodySmallStrong, color = colors.ink)
             note?.let { Text(it, style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted) }
         }
+        DayTimelineRows(everyone, rows)
+    }
+}
+
+/** The "Everyone" row, a row per member and the hour ticks, without a card around them. */
+@Composable
+fun DayTimelineRows(everyone: List<EveryoneBandUi>, rows: List<TimelineRowUi>, modifier: Modifier = Modifier) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TimelineLine(label = "Everyone", labelColor = colors.accentInk, labelBold = true) {
                 BoxWithConstraints(

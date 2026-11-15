@@ -12,8 +12,10 @@
 		days: ReadonlyMap<string, DayAvailability | null>;
 		members: Map<string, Member>;
 		onselect?: (date: string) => void;
+		/** The day whose detail shows under the grid. */
+		selected?: string;
 	}
-	let { dates, days, members, onselect }: Props = $props();
+	let { dates, days, members, onselect, selected }: Props = $props();
 
 	const fmt = useFormat();
 	const tz = $derived(fmt.current.timeZone);
@@ -76,7 +78,14 @@
 	<div class="row heads">
 		<span></span>
 		{#each dates as d (d)}
-			<button type="button" class="head" onclick={() => onselect?.(d)} aria-label="See who's free on {formatDayKey(d)}">
+			<button
+				type="button"
+				class="head"
+				class:on={d === selected}
+				aria-pressed={d === selected}
+				onclick={() => onselect?.(d)}
+				aria-label="See who's free on {formatDayKey(d)}"
+			>
 				{formatDayKey(d).split(' ').slice(0, 2).join(' ')}
 			</button>
 		{/each}
@@ -87,7 +96,9 @@
 		</div>
 		{#each dates as d (d)}
 			{@const day = days.get(d)}
-			<div class="col" role="list" aria-label={formatDayKey(d)}>
+			<!-- Tapping a column picks the day too; the header button above is the keyboard route. -->
+			<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+			<div class="col" class:on={d === selected} role="list" aria-label={formatDayKey(d)} onclick={() => onselect?.(d)}>
 				{#if day === undefined}
 					<span class="state"><Spinner size={16} /></span>
 				{:else if day === null}
@@ -129,6 +140,17 @@
 		font-weight: 600;
 		color: var(--muted);
 		text-align: center;
+	}
+	.head.on {
+		background: var(--ink);
+		color: var(--bg);
+	}
+	.col.on {
+		outline: 2px solid var(--ink);
+		outline-offset: 1px;
+	}
+	.col {
+		cursor: pointer;
 	}
 	.head:hover {
 		background: var(--surface);

@@ -19,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
@@ -42,7 +44,7 @@ data class WeekBlockUi(
     val free: Boolean,
 )
 
-data class WeekColumnUi(val label: String, val blocks: List<WeekBlockUi>, val accessibilityLabel: String = label)
+data class WeekColumnUi(val label: String, val blocks: List<WeekBlockUi>, val accessibilityLabel: String = label, val selected: Boolean = false)
 
 /** Hour labels on the shared 08–24 axis. */
 val TimelineHours = listOf(8, 12, 16, 20, 24)
@@ -52,7 +54,7 @@ fun timelineFraction(minutesOfDay: Int): Float = ((minutesOfDay - 8 * 60) / (16f
 
 /** Week view: a 320dp time grid with one column per visible day. */
 @Composable
-fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier) {
+fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelectColumn: ((Int) -> Unit)? = null) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
     Column(
@@ -79,12 +81,14 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier) {
                     )
                 }
             }
-            columns.forEach { column ->
+            columns.forEachIndexed { index, column ->
                 BoxWithConstraints(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
+                        .then(if (column.selected) Modifier.border(2.dp, colors.ink, RoundedCornerShape(12.dp)) else Modifier)
                         .clip(RoundedCornerShape(12.dp))
+                        .then(if (onSelectColumn != null) Modifier.clickable(role = Role.Button, onClickLabel = "Show who's free") { onSelectColumn(index) } else Modifier)
                         .background(colors.line)
                         .semantics { contentDescription = column.accessibilityLabel },
                 ) {

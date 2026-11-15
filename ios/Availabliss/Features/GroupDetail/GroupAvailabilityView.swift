@@ -48,6 +48,7 @@ struct GroupAvailabilityView: View {
         .task { aiPlanner = (try? await detail.api.send(API.Me.plan()))?.aiPlanner }
         .refreshable { await model.invalidate() }
         .onChange(of: model.mode) { _, _ in Task { await model.load() } }
+        .onChange(of: model.selectedDay) { _, _ in Task { await model.loadSelectedDay() } }
         .onChange(of: group.requirement) { _, _ in Task { await model.invalidate() } }
         .task(id: group.id) {
             for await event in app.live.events(forGroup: group.id) {
@@ -136,7 +137,6 @@ struct GroupAvailabilityView: View {
                 options: [
                     SegmentOption(value: .month, label: "Month"),
                     SegmentOption(value: .week, label: "Week"),
-                    SegmentOption(value: .day, label: "Day"),
                 ],
                 style: .solid,
                 height: 32,
@@ -160,19 +160,13 @@ struct GroupAvailabilityView: View {
             StatusView(kind: .loading)
         } else {
             switch model.mode {
-            case .month:
-                MonthGrid(model: model, group: group, me: app.session.user?.id)
-                DayDetailCard(model: model, group: group, me: app.session.user?.id) { draft in
-                    proposalDraft = draft
-                }
-                planWithAI
-            case .week:
-                WeekGrid(model: model, group: group)
-            case .day:
-                DayTimeline(detail: model.dayDetails[model.selectedDay], date: model.selectedDay, group: group, me: app.session.user?.id) {
-                    proposalDraft = $0
-                }
+            case .month: MonthGrid(model: model, group: group, me: app.session.user?.id)
+            case .week: WeekGrid(model: model, group: group)
             }
+            DayDetailCard(model: model, group: group, me: app.session.user?.id) { draft in
+                proposalDraft = draft
+            }
+            if model.mode == .month { planWithAI }
         }
     }
 }
@@ -432,7 +426,7 @@ private struct DayCell: View {
     }
 }
 
-/// The card under the month: what the selected day means, with Propose / See who's free.
+/// The card under the month / week: what the selected day means, who's free when, and Propose.
 private struct DayDetailCard: View {
     let model: GroupAvailabilityViewModel
     let group: Group
@@ -452,27 +446,39 @@ private struct DayDetailCard: View {
                 Spacer()
                 StatusPill(text: works ? "Works" : "Doesn\u{2019}t fit", tone: works ? .mint : .neutral)
             }
-            HStack(spacing: 8) {
-                if works, let slot {
-                    Button("Propose this \(group.requirement.slotNoun.rawValue)") {
-                        propose(ProposalDraft(slot: slot, requirement: group.requirement))
-                    }
-                    .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))
-                } else if let status = model.day(model.selectedDay)?.status, status == .busy || status == .free {
-                    // Doesn't work for everyone: the proposal sheet warns who's busy.
-                    Button("Propose anyway") {
-                        let day = model.selectedDay
-                        propose(ProposalDraft(start: WallTime(hour: 18, minute: 0).date(on: day), end: WallTime(hour: 21, minute: 0).date(on: day), allDay: false))
-                    }
-                    .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
-                }
-                Button("See who's free") { Task { await model.showDay(model.selectedDay) } }
-                    .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
+            if let detail = model.dayDetails[model.selectedDay] {
+                DayTimeline(detail: detail, date: model.selectedDay, group: group, me: me)
+                    .padding(.vertical, 2)
+            } else {
+                ProgressView().frame(maxWidth: .infinity, minHeight: 90)
             }
+            proposeButton(works: works, slot: slot)
         }
         .padding(14)
         .glass(cornerRadius: 22)
         .animation(.easeInOut(duration: 0.2), value: model.selectedDay)
+    }
+
+    @ViewBuilder
+    private func proposeButton(works: Bool, slot: Slot?) -> some View {
+        let day = model.selectedDay
+        if works, let slot {
+            Button("Propose this \(group.requirement.slotNoun.rawValue)") {
+                propose(ProposalDraft(slot: slot, requirement: group.requirement))
+            }
+            .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))
+        } else if let free = model.dayDetails[day]?.everyoneFree.first {
+            Button("Propose \(Formatting.time(free.start)) – \(Formatting.time(free.end))") {
+                propose(ProposalDraft(start: free.start, end: free.end, allDay: false))
+            }
+            .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))
+        } else if let status = model.day(day)?.status, status == .busy || status == .free {
+            // Doesn't work for everyone: the proposal sheet warns who's busy.
+            Button("Propose anyway") {
+                propose(ProposalDraft(start: WallTime(hour: 18, minute: 0).date(on: day), end: WallTime(hour: 21, minute: 0).date(on: day), allDay: false))
+            }
+            .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
+        }
     }
 
     private func subtitle(works: Bool, slot: Slot?) -> String {

@@ -284,7 +284,7 @@ object AvailabilityUiMapper {
     }
 
     /** Week columns for the visible days: accent "everyone free" blocks and faded busy blocks. */
-    fun weekColumns(days: List<DayAvailability>, group: Group?, meId: String?): List<WeekColumnUi> = days.mapNotNull { day ->
+    fun weekColumns(days: List<DayAvailability>, group: Group?, meId: String?, selected: LocalDate? = null): List<WeekColumnUi> = days.mapNotNull { day ->
         val date = DateTimes.parseDate(day.date) ?: return@mapNotNull null
         val free = day.everyoneFree.mapNotNull { clampToDate(it.start, it.end, date) }
         val freeBlocks = free.map { (s, e) ->
@@ -302,6 +302,7 @@ object AvailabilityUiMapper {
         WeekColumnUi(
             label = DateTimes.weekdayAndDay(date),
             blocks = blocks,
+            selected = date == selected,
             accessibilityLabel = DateTimes.shortDay(date) + ": " + (freeBlocks.joinToString { it.label }.ifEmpty { "no time when everyone's free" }),
         )
     }

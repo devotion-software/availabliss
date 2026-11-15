@@ -42,7 +42,8 @@ import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
 
-enum class CalendarView(val label: String) { Month("Month"), Week("Week"), Day("Day") }
+/** Month or week; the selected day's detail (who's free when) shows under either. */
+enum class CalendarView(val label: String) { Month("Month"), Week("Week") }
 
 /** Everything the group calendar renders. Built from raw state by [AvailabilityUiMapper]. */
 data class GroupCalendarUiState(
@@ -61,7 +62,11 @@ data class GroupCalendarUiState(
     val coverageNote: String? = null,
     val nudging: Boolean = false,
     val weekColumns: List<WeekColumnUi> = emptyList(),
+    /** The date of each week column, for taps. */
+    val weekDates: List<LocalDate> = emptyList(),
     val weekLoading: Boolean = false,
+    /** The first time everyone's free on the selected day (ISO start, end), for "Propose 18:00 – 00:00". */
+    val dayFree: Pair<String, String>? = null,
     val dayTitle: String = "",
     val dayNote: String? = null,
     val everyone: List<EveryoneBandUi> = emptyList(),
@@ -105,6 +110,7 @@ class GroupCalendarViewModel @Inject constructor(
     private val raw = MutableStateFlow(RawState())
     private var monthJob: Job? = null
     private var detailJob: Job? = null
+    private var dayJob: Job? = null
     private var liveRefreshJob: Job? = null
 
     val uiState: StateFlow<GroupCalendarUiState> = combine(raw, groups.group(groupId), users.user, plans.plan) { r, group, user, plan ->
@@ -141,13 +147,11 @@ class GroupCalendarViewModel @Inject constructor(
         loadForView()
     }
 
+    /** A day tapped in the month or week grid: its detail loads underneath. */
     fun selectDate(date: LocalDate) {
         raw.update { it.copy(selected = date, userPicked = true) }
-        if (raw.value.view != CalendarView.Month) loadForView()
+        loadDay()
     }
-
-    /** "See who's free": jump to the day view for the selected date. */
-    fun showDay() = selectView(CalendarView.Day)
 
     fun previous() = step(-1)
 
@@ -156,7 +160,7 @@ class GroupCalendarViewModel @Inject constructor(
     fun refresh() {
         liveRefreshJob?.cancel()
         loadMonth(silent = true)
-        if (raw.value.view != CalendarView.Month) loadForView()
+        loadForView()
     }
 
     /**
@@ -207,23 +211,7 @@ class GroupCalendarViewModel @Inject constructor(
                 syncMonthToSelection()
                 loadForView()
             }
-            CalendarView.Day -> {
-                raw.update { it.copy(selected = nextVisibleDay(it.selected, delta.toInt())) }
-                syncMonthToSelection()
-                loadForView()
-            }
         }
-    }
-
-    /** Skips weekdays that can never match. */
-    private fun nextVisibleDay(from: LocalDate, direction: Int): LocalDate {
-        val columns = AvailabilityUiMapper.columns(raw.value.availability).toSet()
-        var d = from.plusDays(direction.toLong())
-        repeat(7) {
-            if (DateTimes.apiWeekday(d) in columns) return d
-            d = d.plusDays(direction.toLong())
-        }
-        return d
     }
 
     private fun syncMonthToSelection() {
@@ -240,8 +228,11 @@ class GroupCalendarViewModel @Inject constructor(
             val month = raw.value.month
             if (!silent) raw.update { it.copy(loading = it.availability == null, error = null) }
             when (val result = groups.availability(groupId, month.atDay(1).toString(), month.atEndOfMonth().toString())) {
-                is ApiResult.Success -> raw.update { s ->
-                    s.copy(loading = false, availability = result.value, error = null, selected = defaultSelection(s, result.value))
+                is ApiResult.Success -> {
+                    raw.update { s ->
+                        s.copy(loading = false, availability = result.value, error = null, selected = defaultSelection(s, result.value))
+                    }
+                    if (raw.value.day?.date != raw.value.selected.toString() || silent) loadDay()
                 }
                 is ApiResult.Failure -> raw.update { it.copy(loading = false, error = result.error.message) }
             }
@@ -256,16 +247,23 @@ class GroupCalendarViewModel @Inject constructor(
         return if (YearMonth.from(today) == s.month) today else s.month.atDay(1)
     }
 
+    /** Who's free on the selected day, shown under the grid. */
+    private fun loadDay() {
+        dayJob?.cancel()
+        val date = raw.value.selected
+        dayJob = viewModelScope.launch {
+            raw.update { it.copy(dayLoading = true) }
+            val day = groups.dayAvailability(groupId, date.toString())
+            raw.update { it.copy(dayLoading = false, day = day.getOrNull() ?: it.day.takeIf { d -> d?.date == date.toString() }, error = (day as? ApiResult.Failure)?.error?.message) }
+        }
+    }
+
     private fun loadForView() {
         detailJob?.cancel()
         val r = raw.value
+        if (r.view == CalendarView.Week) loadDay()
         detailJob = when (r.view) {
             CalendarView.Month -> null
-            CalendarView.Day -> viewModelScope.launch {
-                raw.update { it.copy(dayLoading = true) }
-                val day = groups.dayAvailability(groupId, r.selected.toString())
-                raw.update { it.copy(dayLoading = false, day = day.getOrNull() ?: it.day.takeIf { d -> d?.date == r.selected.toString() }, error = (day as? ApiResult.Failure)?.error?.message) }
-            }
             CalendarView.Week -> viewModelScope.launch {
                 raw.update { it.copy(weekLoading = true) }
                 val columns = AvailabilityUiMapper.columns(r.availability)
@@ -287,7 +285,6 @@ class GroupCalendarViewModel @Inject constructor(
         val heading = when (r.view) {
             CalendarView.Month -> DateTimes.shortMonthYear(r.month.atDay(1))
             CalendarView.Week -> if (weekDates.isEmpty()) "" else DateTimes.weekRange(weekDates.first(), weekDates.last()).let { shortenMonth(it, weekDates) }
-            CalendarView.Day -> DateTimes.shortDay(r.selected)
         }
         val day = r.day?.takeIf { it.date == r.selected.toString() }
         return GroupCalendarUiState(
@@ -312,7 +309,9 @@ class GroupCalendarViewModel @Inject constructor(
             syncBanner = AvailabilityUiMapper.syncBanner(r.availability, group, isAdmin),
             coverageNote = AvailabilityUiMapper.coverageNote(r.availability, group, meId),
             nudging = r.nudging,
-            weekColumns = AvailabilityUiMapper.weekColumns(r.week, group, meId),
+            weekColumns = AvailabilityUiMapper.weekColumns(r.week, group, meId, r.selected),
+            weekDates = r.week.mapNotNull { DateTimes.parseDate(it.date) },
+            dayFree = day?.everyoneFree?.firstOrNull()?.let { it.start to it.end },
             weekLoading = r.weekLoading,
             dayTitle = DateTimes.shortDay(r.selected),
             dayNote = day?.let(AvailabilityUiMapper::dayNote),

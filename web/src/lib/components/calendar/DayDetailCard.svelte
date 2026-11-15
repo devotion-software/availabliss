@@ -1,24 +1,30 @@
 <script lang="ts">
-	import type { AvailabilityDay, Member, Slot } from '#lib/types';
+	import type { AvailabilityDay, DayAvailability, Member, Slot } from '#lib/types';
 	import { formatDayKey, useFormat } from '#lib/client/format';
 	import Button from '#lib/components/ui/Button.svelte';
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
+	import Spinner from '#lib/components/ui/Spinner.svelte';
+	import DayTimeline from './DayTimeline.svelte';
 	import { busyNames } from './grid';
 
-	/** What the selected day means for the group, with the next steps. */
+	/** What the selected day means for the group, who's free when, and the next steps. */
 	interface Props {
 		date: string;
 		day: AvailabilityDay | undefined;
+		/** Who's busy when on the day (null while loading). */
+		detail: DayAvailability | null;
 		slot: Slot | null;
 		members: Map<string, Member>;
+		meId: string;
 		/** "weekend", "evening", … for "Propose this weekend". */
 		noun: string;
 		onpropose: (slot: Slot) => void;
 		/** Propose a day that doesn't work for everyone (the proposal sheet warns who's busy). */
 		onproposeday?: (date: string) => void;
-		onseeday: () => void;
 	}
-	let { date, day, slot, members, noun, onpropose, onproposeday, onseeday }: Props = $props();
+	let { date, day, detail, slot, members, meId, noun, onpropose, onproposeday }: Props = $props();
+	// The first time everyone's free that day, offered when no whole slot fits.
+	const free = $derived(detail?.everyoneFree[0] ?? null);
 
 	const fmt = useFormat();
 	const works = $derived(day?.status === 'match' && slot !== null);
@@ -49,13 +55,21 @@
 		</div>
 		<StatusPill tone={works ? 'mint' : 'neutral'}>{works ? 'Works' : 'Doesn’t fit'}</StatusPill>
 	</div>
+	{#if detail}
+		<DayTimeline day={detail} {members} {meId} showDate={false} />
+	{:else if day && day.status !== 'hidden'}
+		<div class="loading"><Spinner size={18} label="Loading who's free" /></div>
+	{/if}
 	<div class="actions">
 		{#if works && slot}
 			<Button variant="accent" size="sm" class="act" onclick={() => onpropose(slot)}>Propose this {noun}</Button>
+		{:else if free}
+			<Button variant="accent" size="sm" class="act" onclick={() => onpropose({ start: free.start, end: free.end, label: '' })}
+				>Propose {fmt.current.time(free.start)} – {fmt.current.time(free.end)}</Button
+			>
 		{:else if onproposeday && (day?.status === 'busy' || day?.status === 'free')}
 			<Button variant="secondary" size="sm" class="act" onclick={() => onproposeday(date)}>Propose anyway</Button>
 		{/if}
-		<Button variant="secondary" size="sm" class="act" onclick={onseeday}>See who's free</Button>
 	</div>
 </section>
 
@@ -86,6 +100,14 @@
 	.sub {
 		font-size: 12px;
 		color: var(--muted);
+	}
+	.loading {
+		display: flex;
+		justify-content: center;
+		padding: 20px 0;
+	}
+	.actions:empty {
+		display: none;
 	}
 	.actions {
 		display: flex;

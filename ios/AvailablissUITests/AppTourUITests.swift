@@ -42,7 +42,6 @@ final class AppTourUITests: XCTestCase {
             settle(2)
             snapshot("04-group-month")
             tapIfPresent(app.buttons["Week"]) { snapshot("05-group-week") }
-            tapIfPresent(app.buttons["Day"]) { snapshot("06-group-day") }
             tapIfPresent(app.buttons["Chat"]) { snapshot("07-group-chat") }
             // Chat is full screen (no group tab bar); go back to the calendar first.
             tapIfPresent(app.buttons["Back to calendar"]) {}

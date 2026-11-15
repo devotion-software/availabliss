@@ -45,9 +45,14 @@ struct WeekGrid: View {
             HStack(spacing: 6) {
                 hourLabels
                 ForEach(model.weekDays, id: \.self) { day in
+                    let selected = day == model.selectedDay
                     WeekColumn(day: day, detail: model.dayDetails[day], axis: axis, group: group)
-                        .onTapGesture { Task { await model.showDay(day) } }
-                        .accessibilityAddTraits(.isButton)
+                        .overlay {
+                            if selected { RoundedRectangle(cornerRadius: 14).stroke(theme.ink, lineWidth: 2).padding(-3) }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { withAnimation(.spring(response: 0.3)) { model.pick(day) } }
+                        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
                 }
             }
             .frame(height: 320)
@@ -140,39 +145,18 @@ private struct WeekColumn: View {
 
 // MARK: - Day
 
-/// Day view: an "Everyone" row, then each member's busy blocks (dashed = not synced yet).
-/// Busy is just busy: nothing shows whether it came from a calendar or was marked by hand.
+/// Who's free on one day: an "Everyone" row, then each member's busy blocks (dashed = not
+/// synced yet). Busy is just busy: nothing shows whether it came from a calendar or was marked
+/// by hand. Shown under the month / week grid for the selected day.
 struct DayTimeline: View {
-    let detail: DayAvailability?
+    let detail: DayAvailability
     let date: CalendarDay
     let group: Group
     let me: String?
-    let propose: (ProposalDraft) -> Void
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(Formatting.shortDay(date)).bodyFont(14, .semibold)
-                Spacer()
-                if let window = detail?.window {
-                    Text("Timing starts \(Formatting.time(window.start))").bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
-                }
-            }
-            if let detail {
-                rows(detail, axis: TimeAxis.fitting(detail.window, on: date))
-                if let first = detail.everyoneFree.first {
-                    Button("Propose \(Formatting.time(first.start)) – \(Formatting.time(first.end))") {
-                        propose(ProposalDraft(start: first.start, end: first.end, allDay: false))
-                    }
-                    .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))
-                }
-            } else {
-                ProgressView().frame(maxWidth: .infinity, minHeight: 120)
-            }
-        }
-        .padding(14)
-        .glass(cornerRadius: 22)
+        rows(detail, axis: TimeAxis.fitting(detail.window, on: date))
     }
 
     private func rows(_ detail: DayAvailability, axis: TimeAxis) -> some View {

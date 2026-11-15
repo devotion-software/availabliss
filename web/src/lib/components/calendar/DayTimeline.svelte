@@ -9,8 +9,10 @@
 		day: DayAvailability;
 		members: Map<string, Member>;
 		meId: string;
+		/** Off inside the day card, which already names the day. */
+		showDate?: boolean;
 	}
-	let { day, members, meId }: Props = $props();
+	let { day, members, meId, showDate = true }: Props = $props();
 
 	const fmt = useFormat();
 	const tz = $derived(fmt.current.timeZone);
@@ -39,7 +41,7 @@
 
 <div class="timeline">
 	<div class="meta">
-		<span class="date">{formatDayKey(day.date)}</span>
+		{#if showDate}<span class="date">{formatDayKey(day.date)}</span>{/if}
 		{#if windowStart && windowStart !== '00:00'}<span class="muted">Timing starts {windowStart}</span>{/if}
 	</div>
 
