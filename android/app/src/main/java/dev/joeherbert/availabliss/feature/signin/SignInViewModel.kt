@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import dev.joeherbert.availabliss.core.data.GroupsRepository
+import dev.joeherbert.availabliss.core.network.getOrNull
 import javax.inject.Inject
 
 enum class SignInStep { Email, Code }
@@ -48,6 +50,7 @@ data class SignInUiState(
 class SignInViewModel @Inject constructor(
     private val auth: AuthRepository,
     private val deepLinks: DeepLinkBus,
+    private val groups: GroupsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SignInUiState(googleAvailable = auth.isGoogleAvailable))
@@ -60,6 +63,13 @@ class SignInViewModel @Inject constructor(
                 if (link is DeepLink.AuthCallback) {
                     deepLinks.consume(link)
                     run(SignInBusy.Apple) { auth.completeWebSignIn(link.code, link.error) }
+                }
+                // Opened from an emailed invite: start with the address it was sent to. (The link stays
+                // pending; it opens once they've signed in.)
+                if (link is DeepLink.Invite && _state.value.email.isBlank()) {
+                    groups.invite(link.token).getOrNull()?.email?.let { invited ->
+                        _state.update { if (it.email.isBlank()) it.copy(email = invited) else it }
+                    }
                 }
             }
         }

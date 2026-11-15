@@ -12,11 +12,13 @@
 	interface Props {
 		/** Where to go once signed in. */
 		next: string;
+		/** Prefilled, e.g. the address an invite was emailed to. */
+		initialEmail?: string;
 	}
-	let { next }: Props = $props();
+	let { next, initialEmail = '' }: Props = $props();
 
 	let step = $state<'email' | 'code'>('email');
-	let email = $state('');
+	let email = $state((() => initialEmail)());
 	let error = $state<string | null>(null);
 	let providerError = $state<string | null>(null);
 	let sending = $state(false);

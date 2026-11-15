@@ -52,6 +52,13 @@ struct SignInView: View {
             }
         }
         .errorAlert(Binding(get: { model?.error }, set: { model?.error = $0 }))
+        // Opened from an emailed invite: start with the address it was sent to.
+        .task(id: app.router.pendingInvite?.token) {
+            guard let token = app.router.pendingInvite?.token,
+                  let invited = try? await app.api.send(API.Invites.preview(token: token)).email,
+                  let model, model.email.isEmpty, model.step == .email else { return }
+            model.email = invited
+        }
     }
 
     private var brand: some View {

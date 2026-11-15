@@ -18,7 +18,7 @@
 		</div>
 	</div>
 	<div class="panel">
-		<SignInForm next={data.next} />
+		<SignInForm next={data.next} initialEmail={data.email} />
 	</div>
 </main>
 
