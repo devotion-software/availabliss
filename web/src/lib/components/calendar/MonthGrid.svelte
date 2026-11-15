@@ -38,7 +38,7 @@
 		if (day.status === 'match') {
 			const slot = slotOn(availability.slots, date, fmt.current.dayKey);
 			const starts = slot && fmt.current.dayKey(slot.start) === date ? fmt.current.time(slot.start) : null;
-			if (starts && starts !== '00:00') return compact ? `from ${starts}` : `Free from ${starts}`;
+			if (starts && starts !== '00:00') return compact ? starts : `Free from ${starts}`;
 			return compact ? 'all free' : 'Everyone free';
 		}
 		if (day.status === 'busy' && day.busyMemberIds.length) return `${busyNames(day.busyMemberIds, members, true)} busy`;

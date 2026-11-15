@@ -218,7 +218,7 @@ private fun MonthGridPreview() {
             listOf(null, null, MonthCellUi(nov(1), CellState.Free, note = "Today")),
             listOf(MonthCellUi(nov(6), CellState.Free), MonthCellUi(nov(7), CellState.Busy, note = "Priya busy"), MonthCellUi(nov(8), CellState.Free)),
             listOf(
-                MonthCellUi(nov(13), CellState.Match, BandPosition.Start, "from 18:00", selected = true),
+                MonthCellUi(nov(13), CellState.Match, BandPosition.Start, "18:00", selected = true),
                 MonthCellUi(nov(14), CellState.Match, BandPosition.Middle, "all free"),
                 MonthCellUi(nov(15), CellState.Match, BandPosition.End, "all free"),
             ),

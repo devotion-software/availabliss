@@ -113,7 +113,7 @@ private struct AppearancePreview: View {
             Text("Lake District crew").displayFont(18, .semibold)
             Grid(horizontalSpacing: 4, verticalSpacing: 4) {
                 GridRow {
-                    cell("13", "from 18:00", .match(UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 14, bottomTrailingRadius: 5, topTrailingRadius: 5)))
+                    cell("13", "18:00", .match(UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 14, bottomTrailingRadius: 5, topTrailingRadius: 5)))
                     cell("14", "all free", .match(UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 5, bottomTrailingRadius: 5, topTrailingRadius: 5)))
                     cell("15", "all free", .match(UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 5, bottomTrailingRadius: 14, topTrailingRadius: 14)))
                 }

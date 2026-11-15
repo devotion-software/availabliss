@@ -81,7 +81,7 @@
 	</div>
 	<span class="pname">Lake District crew</span>
 	<div class="cells" aria-hidden="true">
-		<span class="cell match start">13<small>from 18:00</small></span>
+		<span class="cell match start">13<small>18:00</small></span>
 		<span class="cell match mid">14<small>all free</small></span>
 		<span class="cell match end">15<small>all free</small></span>
 		<span class="cell free">20<small>&nbsp;</small></span>

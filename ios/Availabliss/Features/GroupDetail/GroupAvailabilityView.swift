@@ -359,7 +359,7 @@ private struct MonthGrid: View {
         case .match:
             if let slot = model.slot(for: date), info.slotPosition == .start || info.slotPosition == .single {
                 let startsMidday = !Calendar.current.isDate(slot.start, equalTo: date.startDate(), toGranularity: .minute)
-                return startsMidday ? "from \(Formatting.time(slot.start))" : "all free"
+                return startsMidday ? Formatting.time(slot.start) : "all free"
             }
             return "all free"
         case .busy:

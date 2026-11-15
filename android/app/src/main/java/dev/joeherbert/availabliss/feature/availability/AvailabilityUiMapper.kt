@@ -142,7 +142,7 @@ object AvailabilityUiMapper {
         val busyNames = day?.busyMemberIds.orEmpty().map { name(group, it, meId) }
         val note = when {
             state == CellState.Match && slot != null && date == slot.start.toLocalDate() && slot.start.toLocalTime() != LocalTime.MIDNIGHT ->
-                "from ${DateTimes.time(slot.start)}"
+                DateTimes.time(slot.start)
             state == CellState.Match -> "all free"
             state == CellState.Busy && busyNames.size == 1 -> "${busyNames.first()} busy"
             state == CellState.Busy && busyNames.size > 1 -> "${busyNames.size} busy"

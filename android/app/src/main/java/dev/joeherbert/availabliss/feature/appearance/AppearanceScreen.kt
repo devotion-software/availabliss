@@ -229,7 +229,7 @@ private fun PreviewCard() {
         Text("Lake District crew", style = AvailablissTheme.type.titleXSmall.copy(fontSize = 18.sp), color = colors.ink)
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                PreviewCell("13", "from 18:00", RoundedCornerShape(14.dp, 5.dp, 5.dp, 14.dp), colors.accent, colors.onAccent, Modifier.weight(1f))
+                PreviewCell("13", "18:00", RoundedCornerShape(14.dp, 5.dp, 5.dp, 14.dp), colors.accent, colors.onAccent, Modifier.weight(1f))
                 PreviewCell("14", "all free", RoundedCornerShape(5.dp), colors.accent, colors.onAccent, Modifier.weight(1f))
                 PreviewCell("15", "all free", RoundedCornerShape(5.dp, 14.dp, 14.dp, 5.dp), colors.accent, colors.onAccent, Modifier.weight(1f))
             }
