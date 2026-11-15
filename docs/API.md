@@ -422,6 +422,8 @@ interface Slot { start: string; end: string; label: string } // label: "Fri 13 â
 interface DayAvailability {
   date: string;
   window: { start: string; end: string } | null;  // the part of the day the requirement cares about
+  // Each member's busy time, merged. Calendar and hand-marked busy look the same: `manual` is always false
+  // (kept so older app builds still decode).
   members: { userId: string; pending: boolean; busy: { start: string; end: string; manual: boolean }[] }[];
   everyoneFree: { start: string; end: string }[];
 }

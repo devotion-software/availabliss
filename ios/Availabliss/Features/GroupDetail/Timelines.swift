@@ -140,8 +140,8 @@ private struct WeekColumn: View {
 
 // MARK: - Day
 
-/// Day view: an "Everyone" row, then each member's busy blocks (striped = blocked by hand,
-/// dashed = not synced yet).
+/// Day view: an "Everyone" row, then each member's busy blocks (dashed = not synced yet).
+/// Busy is just busy: nothing shows whether it came from a calendar or was marked by hand.
 struct DayTimeline: View {
     let detail: DayAvailability?
     let date: CalendarDay
@@ -170,14 +170,6 @@ struct DayTimeline: View {
             } else {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 120)
             }
-            HStack(spacing: 6) {
-                ZStack { theme.busyBg; Stripes(color: theme.line3, lineWidth: 2, spacing: 3) }
-                    .frame(width: 14, height: 10)
-                    .clipShape(RoundedRectangle(cornerRadius: 3))
-                Text("Striped = blocked by hand")
-            }
-            .bodyFont(11, relativeTo: .caption2)
-            .foregroundStyle(theme.muted)
         }
         .padding(14)
         .glass(cornerRadius: 22)
@@ -250,7 +242,6 @@ private struct MemberTrack: View {
                 let right = axis.fraction(busy.end, on: date) * width
                 ZStack {
                     RoundedRectangle(cornerRadius: 7).fill(theme.busyBg)
-                    if busy.manual { Stripes(color: theme.line3, lineWidth: 2, spacing: 3).clipShape(RoundedRectangle(cornerRadius: 7)) }
                     RoundedRectangle(cornerRadius: 7).strokeBorder(theme.busyLine, lineWidth: 1)
                 }
                 .opacity(0.5)
@@ -269,7 +260,7 @@ private struct MemberTrack: View {
     private var accessibilityText: String {
         if member.pending { return "Not synced yet" }
         if member.busy.isEmpty { return "Free all day" }
-        return "Busy " + Formatting.list(member.busy.map { "\(Formatting.time($0.start)) to \(Formatting.time($0.end))\($0.manual ? ", blocked by hand" : "")" })
+        return "Busy " + Formatting.list(member.busy.map { "\(Formatting.time($0.start)) to \(Formatting.time($0.end))" })
     }
 }
 

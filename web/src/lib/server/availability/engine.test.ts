@@ -193,6 +193,18 @@ describe('day view', () => {
 		expect(day.members.find((m) => m.userId === 'leo')!.pending).toBe(true);
 		expect(day.everyoneFree).toEqual([{ start: '2026-11-13T18:00:00.000Z', end: '2026-11-14T00:00:00.000Z' }]);
 	});
+
+	test("merges busy time and doesn't say what was blocked by hand", () => {
+		const overlapping: MemberBusy[] = [
+			{
+				userId: 'sam',
+				synced: true,
+				busy: [busy('2026-11-13T09:00:00Z', '2026-11-13T12:00:00Z'), busy('2026-11-13T11:00:00Z', '2026-11-13T14:00:00Z', true)]
+			}
+		];
+		const day = computeDay(input({ members: overlapping }), '2026-11-13');
+		expect(day.members[0].busy).toEqual([{ start: '2026-11-13T09:00:00.000Z', end: '2026-11-13T14:00:00.000Z', manual: false }]);
+	});
 });
 
 describe('time and labels', () => {

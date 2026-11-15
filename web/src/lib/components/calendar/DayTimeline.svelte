@@ -29,7 +29,7 @@
 				...m,
 				name: memberLabel(members, m.userId, meId, { first: true }),
 				bars: m.busy
-					.map((b) => ({ manual: b.manual, span: clampToAxis(b, day.date, axis, tz) }))
+					.map((b) => ({ span: clampToAxis(b, day.date, axis, tz) }))
 					.filter((b) => b.span !== null)
 			}))
 	);
@@ -66,7 +66,7 @@
 						: `${m.name}: free all day`}
 			>
 				{#each m.bars as b, i (i)}
-					<div class="busy" class:manual={b.manual} style={style(b.span!.from, b.span!.to)}></div>
+					<div class="busy" style={style(b.span!.from, b.span!.to)}></div>
 				{/each}
 				{#if m.pending}<span class="none">Not synced yet</span>{/if}
 			</div>
@@ -77,8 +77,6 @@
 			{#each ticks as t (t.label)}<span style:left="{t.at}%">{t.label}</span>{/each}
 		</div>
 	</div>
-
-	<span class="legend"><span class="key"></span>Striped = blocked by hand</span>
 </div>
 
 <style>
@@ -156,9 +154,6 @@
 		background: var(--busy-bg);
 		border: 1px solid var(--busy-line);
 	}
-	.busy.manual {
-		background: var(--stripe-group);
-	}
 	.none {
 		position: absolute;
 		inset: 0;
@@ -183,18 +178,5 @@
 	}
 	.ticks span:last-child {
 		transform: translateX(-100%);
-	}
-	.legend {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 11px;
-		color: var(--muted);
-	}
-	.key {
-		width: 14px;
-		height: 10px;
-		border-radius: 3px;
-		background: repeating-linear-gradient(135deg, var(--line-3) 0 2px, transparent 2px 5px);
 	}
 </style>

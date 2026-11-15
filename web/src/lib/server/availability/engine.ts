@@ -238,14 +238,12 @@ export function computeDay(input: EngineInput, date: string): DayAvailability {
 	const relevant = merge(pieces);
 	const window = relevant.length ? { start: relevant[0].start, end: relevant[relevant.length - 1].end } : null;
 
+	// Busy is just busy: calendar events and hand-marked blocks are merged into one list, so
+	// nobody can tell which is which. `manual` is always false; it stays for older app builds.
 	const members = input.members.map((m) => ({
 		userId: m.userId,
 		pending: !m.synced,
-		busy: m.busy
-			.map((b) => ({ span: clip(b, day), manual: b.manual }))
-			.filter((b): b is { span: Span; manual: boolean } => b.span !== null)
-			.sort((a, b) => a.span.start - b.span.start)
-			.map((b) => ({ ...toIso(b.span), manual: b.manual }))
+		busy: merge(m.busy.map((b) => clip(b, day)).filter((s): s is Span => s !== null)).map((s) => ({ ...toIso(s), manual: false }))
 	}));
 
 	const everyoneBusy = merge(input.members.filter((m) => m.synced).flatMap((m) => m.busy));

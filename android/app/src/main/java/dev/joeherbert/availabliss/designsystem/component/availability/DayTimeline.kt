@@ -32,13 +32,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.joeherbert.availabliss.designsystem.component.dashedBorder
 import dev.joeherbert.availabliss.designsystem.component.glass
-import dev.joeherbert.availabliss.designsystem.component.stripes
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 
 /** A busy bar on a member's track (fractions of the 08–24 axis). */
-data class TimelineBarUi(val start: Float, val end: Float, val manual: Boolean)
+data class TimelineBarUi(val start: Float, val end: Float)
 
 data class TimelineRowUi(
     val name: String,
@@ -104,10 +103,6 @@ fun DayTimeline(
                 TimelineHours.forEach { Text("%02d".format(it), fontSize = 10.sp, color = colors.muted) }
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(14.dp, 10.dp).clip(RoundedCornerShape(3.dp)).stripes(colors.line3, 2.dp, 5.dp))
-            Text("Striped = blocked by hand", style = type.micro.copy(fontWeight = FontWeight.Normal), color = colors.muted)
-        }
     }
 }
 
@@ -149,7 +144,6 @@ private fun MemberTrack(row: TimelineRowUi) {
                         .alpha(0.5f)
                         .clip(shape)
                         .background(colors.busyBg)
-                        .then(if (bar.manual) Modifier.stripes(colors.line3, 2.dp, 5.dp) else Modifier)
                         .border(1.dp, colors.busyLine, shape),
                 )
             }
@@ -176,8 +170,8 @@ private fun DayTimelinePreview() {
                 note = "Timing starts 18:00",
                 everyone = listOf(EveryoneBandUi(f(18.0), 1f, "18:00 – late")),
                 rows = listOf(
-                    TimelineRowUi("Sam (you)", false, listOf(TimelineBarUi(f(9.0), f(17.5), false))),
-                    TimelineRowUi("Priya", false, listOf(TimelineBarUi(f(8.5), f(17.0), false), TimelineBarUi(f(17.0), f(18.0), true))),
+                    TimelineRowUi("Sam (you)", false, listOf(TimelineBarUi(f(9.0), f(17.5)))),
+                    TimelineRowUi("Priya", false, listOf(TimelineBarUi(f(8.5), f(18.0)))),
                     TimelineRowUi("Leo", true, emptyList()),
                 ),
             )

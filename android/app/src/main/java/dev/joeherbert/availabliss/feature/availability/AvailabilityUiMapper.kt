@@ -261,7 +261,7 @@ object AvailabilityUiMapper {
         return sorted.map { member ->
             val bars = member.busy.mapNotNull { b ->
                 val (s, e) = clampToDate(b.start, b.end, date) ?: return@mapNotNull null
-                TimelineBarUi(timelineFraction(s), timelineFraction(e), b.manual)
+                TimelineBarUi(timelineFraction(s), timelineFraction(e))
             }.filter { it.end > it.start }
             val name = name(group, member.userId, meId, youSuffix = true)
             TimelineRowUi(
