@@ -29,6 +29,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -94,6 +98,16 @@ fun YouScreen(
         viewModel.refreshAccounts()
     }
     var upgrading by rememberSaveable { mutableStateOf(false) }
+    // Android's photo picker: no storage permission needed.
+    val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val jpeg = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { photoAsJpeg(context, uri) }
+            if (jpeg == null) viewModel.photoUnreadable() else viewModel.setPhoto(jpeg)
+        }
+    }
     if (upgrading) UpgradeSheet(onDismiss = { upgrading = false }, onUpgraded = viewModel::upgraded)
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
 
@@ -101,6 +115,10 @@ fun YouScreen(
         YouContent(
             state = state,
             onEditName = viewModel::startEditingName,
+            onPickPhoto = {
+                pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            onRemovePhoto = { viewModel.setPhoto(null) },
             onOpenCalendars = onOpenCalendars,
             onOpenAppearance = onOpenAppearance,
             onOpenRegion = onOpenRegion,
@@ -182,6 +200,8 @@ fun YouContent(
     state: YouUiState,
     onEditName: () -> Unit,
     onOpenCalendars: () -> Unit,
+    onPickPhoto: () -> Unit = {},
+    onRemovePhoto: () -> Unit = {},
     onOpenAppearance: () -> Unit,
     onOpenRegion: () -> Unit,
     onAddPasskey: () -> Unit,
@@ -205,7 +225,7 @@ fun YouContent(
     ) {
         Text("You", style = AvailablissTheme.type.displayMedium, color = colors.ink, modifier = Modifier.semantics { heading() })
 
-        state.user?.let { user -> ProfileCard(user, onEditName) }
+        state.user?.let { user -> ProfileCard(user, onEditName, state.uploadingPhoto, onPickPhoto, onRemovePhoto) }
 
         GlassPanel(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp), verticalArrangement = Arrangement.Top) {
             SettingsRow(AvIcons.CalendarSync, "Calendars", "Connected calendars and what counts as busy", onOpenCalendars)
@@ -255,11 +275,35 @@ fun YouContent(
 }
 
 @Composable
-private fun ProfileCard(user: User, onEditName: () -> Unit) {
+private fun ProfileCard(user: User, onEditName: () -> Unit, uploading: Boolean, onPickPhoto: () -> Unit, onRemovePhoto: () -> Unit) {
     val colors = AvailablissTheme.colors
+    var menu by remember { mutableStateOf(false) }
     GlassPanel(shape = Shapes.cardLarge, contentPadding = PaddingValues(18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Avatar(AvatarPerson(user.id, user.name, user.image), size = 56.dp)
+            Box {
+                Box(
+                    Modifier
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .clickable(enabled = !uploading, onClickLabel = "Change your photo") { if (user.image == null) onPickPhoto() else menu = true },
+                ) {
+                    Avatar(AvatarPerson(user.id, user.name, user.image), size = 56.dp)
+                }
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(22.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(colors.solid),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (uploading) androidx.compose.material3.CircularProgressIndicator(Modifier.size(12.dp), color = colors.onSolid, strokeWidth = 2.dp)
+                    else Icon(AvIcons.Pencil, null, tint = colors.onSolid, modifier = Modifier.size(11.dp))
+                }
+                androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("Choose a new photo") }, onClick = { menu = false; onPickPhoto() })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("Remove photo") }, onClick = { menu = false; onRemovePhoto() })
+                }
+            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(user.name, style = AvailablissTheme.type.titleLarge, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(user.email, style = AvailablissTheme.type.labelRegular, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -365,3 +409,34 @@ private fun YouPreview() {
         }
     }
 }
+
+/** A picked photo as a JPEG at most 1024 px on its longest side (the server shrinks it further). */
+private fun photoAsJpeg(context: android.content.Context, uri: android.net.Uri): ByteArray? = runCatching {
+    val bitmap = if (android.os.Build.VERSION.SDK_INT >= 28) {
+        val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+        android.graphics.ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            val longest = maxOf(info.size.width, info.size.height)
+            if (longest > 1024) {
+                val scale = 1024f / longest
+                decoder.setTargetSize((info.size.width * scale).toInt(), (info.size.height * scale).toInt())
+            }
+            decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+        }
+    } else {
+        // Android 8: decode at a power-of-two sample size, then scale down.
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1024) sample *= 2
+        val decoded = context.contentResolver.openInputStream(uri)?.use {
+            android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+        } ?: return@runCatching null
+        val longest = maxOf(decoded.width, decoded.height)
+        if (longest <= 1024) decoded
+        else android.graphics.Bitmap.createScaledBitmap(decoded, decoded.width * 1024 / longest, decoded.height * 1024 / longest, true)
+    }
+    java.io.ByteArrayOutputStream().use { out ->
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
+        out.toByteArray()
+    }
+}.getOrNull()

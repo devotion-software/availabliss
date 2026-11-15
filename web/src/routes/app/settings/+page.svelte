@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
-	import { updateMe, deleteMe } from '#lib/client/me';
+	import { deleteMe, removeAvatar, setAvatar, updateMe } from '#lib/client/me';
 	import { signOutAndLeave } from '#lib/client/session';
 	import { toasts } from '#lib/client/toast.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
@@ -29,6 +29,37 @@
 	let confirmDelete = $state(false);
 
 	const nameDirty = $derived(name.trim() !== data.user.name);
+
+	let uploading = $state(false);
+	async function pickPhoto(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		if (file.size > 10 * 1024 * 1024) return void toasts.error('Photos can be up to 10 MB');
+		uploading = true;
+		try {
+			await setAvatar(file);
+			await invalidateAll();
+			toasts.success('Photo updated');
+		} catch (err) {
+			toasts.error(err);
+		} finally {
+			uploading = false;
+		}
+	}
+	async function removePhoto() {
+		uploading = true;
+		try {
+			await removeAvatar();
+			await invalidateAll();
+			toasts.success('Photo removed');
+		} catch (err) {
+			toasts.error(err);
+		} finally {
+			uploading = false;
+		}
+	}
 
 	async function saveName(e: SubmitEvent) {
 		e.preventDefault();
@@ -92,7 +123,14 @@
 			<GlassPanel as="form" padding="16px" gap={12} onsubmit={saveName} aria-labelledby="profile-title">
 				<h2 class="eyebrow" id="profile-title">Profile</h2>
 				<div class="profile">
-					<Avatar name={name || data.user.email} id={data.user.id} image={data.user.image} size={52} />
+					<div class="photo">
+						<label class="photo-pick" aria-label={data.user.image ? 'Change your photo' : 'Add a photo'}>
+							<Avatar name={name || data.user.email} id={data.user.id} image={data.user.image} size={52} />
+							<span class="badge" aria-hidden="true">{#if uploading}…{:else}<Icon name="pencil" size={11} />{/if}</span>
+							<input class="sr-only" type="file" accept="image/*" disabled={uploading} onchange={pickPhoto} />
+						</label>
+						{#if data.user.image}<button type="button" class="link small" disabled={uploading} onclick={removePhoto}>Remove</button>{/if}
+					</div>
 					<TextField label="Name" bind:value={name} autocomplete="name" maxlength={80} error={nameError} />
 				</div>
 				{#if nameDirty}<Button type="submit" size="sm" loading={savingName}>Save name</Button>{/if}
@@ -158,6 +196,39 @@
 />
 
 <style>
+	.photo {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 2px;
+	}
+	.photo-pick {
+		position: relative;
+		cursor: pointer;
+		border-radius: 50%;
+	}
+	.photo-pick:focus-within {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.badge {
+		position: absolute;
+		right: -2px;
+		bottom: -2px;
+		width: 22px;
+		height: 22px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		background: var(--solid);
+		color: var(--on-solid);
+		border: 2px solid var(--bg);
+		font-size: 11px;
+	}
+	.link {
+		color: var(--accent-ink);
+		font-weight: 600;
+	}
 	.page {
 		display: flex;
 		flex-direction: column;

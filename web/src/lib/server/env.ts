@@ -66,6 +66,18 @@ export const env = {
 	/** Base64-encoded Firebase service account JSON. */
 	fcmServiceAccount: optional('FCM_SERVICE_ACCOUNT'),
 
+	/**
+	 * Cloudflare R2 (S3-compatible) for profile pictures. `publicUrl` is the bucket's public
+	 * domain (r2.dev or a custom one). Unset: pictures are kept on local disk (dev only).
+	 */
+	r2: {
+		accountId: optional('R2_ACCOUNT_ID'),
+		accessKeyId: optional('R2_ACCESS_KEY_ID'),
+		secretAccessKey: optional('R2_SECRET_ACCESS_KEY'),
+		bucket: optional('R2_BUCKET'),
+		publicUrl: optional('R2_PUBLIC_URL')?.replace(/\/$/, '') ?? null
+	},
+
 	/** Optional AI planner (Pro). Off unless a key is set. */
 	ai: {
 		apiKey: optional('ANTHROPIC_API_KEY'),

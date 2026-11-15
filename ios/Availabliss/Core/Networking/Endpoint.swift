@@ -19,6 +19,8 @@ struct Endpoint<Response: Decodable & Sendable>: Sendable {
     var path: String
     var query: [URLQueryItem]
     var body: (any Encodable & Sendable)?
+    /// A raw body (e.g. an image) sent as-is with its content type, instead of JSON.
+    var rawBody: (data: Data, contentType: String)?
     /// Overrides the session's 30s request timeout for slow calls (the AI planner).
     var timeout: TimeInterval?
 

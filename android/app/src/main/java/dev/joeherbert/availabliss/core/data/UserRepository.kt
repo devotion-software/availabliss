@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.core.data
 
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.MediaType.Companion.toMediaType
 import dev.joeherbert.availabliss.core.common.ApplicationScope
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.AvailablissApi
@@ -88,6 +90,15 @@ class UserRepository @Inject constructor(
     }
 
     suspend fun deleteAccount(): ApiResult<Unit> = call { api.deleteAccount() }
+
+    /** Uploads a new profile picture (JPEG), or removes it with null. */
+    suspend fun setAvatar(jpeg: ByteArray?): ApiResult<User> {
+        val started = session
+        return call {
+            if (jpeg == null) api.removeAvatar()
+            else api.setAvatar(jpeg.toRequestBody("image/jpeg".toMediaType()))
+        }.onSuccess { store(it, started) }
+    }
 
     suspend fun store(user: User) = store(user, session)
 

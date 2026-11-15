@@ -12,6 +12,13 @@ enum API {
         static func busy(from: Date, to: Date) -> Endpoint<BusyIntervalsResponse> {
             .init(.get, "/me/busy", query: ["from": iso(from), "to": iso(to)])
         }
+        /// Sets your profile picture (JPEG bytes; the server shrinks it to fit 512 px).
+        static func setAvatar(jpeg: Data) -> Endpoint<User> {
+            var endpoint = Endpoint<User>(.put, "/me/avatar", timeout: 60)
+            endpoint.rawBody = (jpeg, "image/jpeg")
+            return endpoint
+        }
+        static func removeAvatar() -> Endpoint<User> { .init(.delete, "/me/avatar") }
         static func ignoreBusy(_ body: BusyIgnoreBody) -> Endpoint<BusyIgnoreResponse> { .init(.post, "/me/busy/ignores", body: body) }
         static func unignoreBusy(id: String) -> Endpoint<EmptyResponse> { .init(.delete, "/me/busy/ignores/\(id.pathEncoded)") }
         static func delete() -> Endpoint<EmptyResponse> { .init(.delete, "/me") }

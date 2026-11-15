@@ -214,6 +214,8 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | GET 🔒 | `/me` | | `User` |
 | PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded'>>` | `User` |
 | GET 🔒 | `/me/busy?from&to` (ISO instants, `to` after `from`, at most 120 days apart) | | `{ intervals: BusyInterval[] }` (own merged busy time; `label` is only ever returned to the owner) |
+| PUT 🔒 | `/me/avatar` | the image bytes (JPEG / PNG / WebP / HEIC, ≤ 10 MB) with its `image/*` content type | `User` (`image` is the new picture, shrunk to fit 512 px) |
+| DELETE 🔒 | `/me/avatar` | | `User` (no picture: initials) |
 | POST 🔒 | `/me/busy/ignores` | `{ calendarId, eventKey, start, end, series?: boolean }` | `{ id }` — that calendar event (or with `series`, every occurrence) no longer counts as busy |
 | DELETE 🔒 | `/me/busy/ignores/:id` | | 204 — it counts as busy again |
 | DELETE 🔒 | `/me` | | `204` (deletes the account and all data) |

@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth';
+import { and, eq, isNull } from 'drizzle-orm';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { bearer, emailOTP } from 'better-auth/plugins';
 import { passkey } from '@better-auth/passkey';
@@ -62,6 +63,23 @@ export const auth = betterAuth({
 			allowDifferentEmails: true
 		}
 	},
+	databaseHooks: {
+		account: {
+			create: {
+				// Linking Google (or signing up with it) gives a profile photo: use it when the
+				// account has none yet. Apple doesn't share a photo.
+				async after(account) {
+					if (account.providerId !== 'google' || !account.idToken) return;
+					const picture = googlePicture(account.idToken);
+					if (!picture) return;
+					await db
+						.update(schema.user)
+						.set({ image: picture })
+						.where(and(eq(schema.user.id, account.userId), isNull(schema.user.image)));
+				}
+			}
+		}
+	},
 	user: {
 		additionalFields: {
 			themeMode: { type: 'string', required: false, defaultValue: 'system', input: false },
@@ -92,3 +110,13 @@ export const auth = betterAuth({
 
 export type Session = typeof auth.$Infer.Session.session;
 export type User = typeof auth.$Infer.Session.user;
+
+/** The `picture` claim of a Google ID token (only read, not verified: Better Auth already did). */
+function googlePicture(idToken: string): string | null {
+	try {
+		const payload = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64url').toString('utf8'));
+		return typeof payload.picture === 'string' && payload.picture.startsWith('https://') ? payload.picture : null;
+	} catch {
+		return null;
+	}
+}

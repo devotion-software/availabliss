@@ -29,3 +29,6 @@ android/.idea/
 android/app/google-services.json
 android/keystore.properties
 *.jks
+
+# Profile pictures stored locally when R2 isn't configured (dev)
+web/.uploads/

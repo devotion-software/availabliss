@@ -91,6 +91,13 @@ interface AvailablissApi {
     @PATCH("api/v1/me")
     suspend fun updateMe(@Body patch: JsonObject): User
 
+    /** Profile picture: the JPEG bytes as the body. */
+    @PUT("api/v1/me/avatar")
+    suspend fun setAvatar(@Body jpeg: okhttp3.RequestBody): User
+
+    @DELETE("api/v1/me/avatar")
+    suspend fun removeAvatar(): User
+
     @GET("api/v1/me/busy")
     suspend fun getMyBusy(@Query("from") from: String, @Query("to") to: String): BusyResponse
 

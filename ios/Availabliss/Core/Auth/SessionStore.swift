@@ -69,6 +69,11 @@ final class SessionStore {
         return updated
     }
 
+    /// Uploads a new profile picture (or removes it with nil).
+    func setAvatar(jpeg: Data?) async throws {
+        user = try await api.send(jpeg.map { API.Me.setAvatar(jpeg: $0) } ?? API.Me.removeAvatar())
+    }
+
     /// Applies a change locally before the server confirms it (used for appearance).
     func applyLocally(_ change: (inout User) -> Void) {
         guard var current = user else { return }

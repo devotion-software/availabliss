@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 
 /// "You": account, appearance, calendars, region, plan, passkeys, timing templates, sign out.
@@ -10,6 +11,9 @@ struct ProfileView: View {
     @State private var error: String?
     @State private var toast: String?
     @State private var editsName = false
+    @State private var photoItem: PhotosPickerItem?
+    @State private var showsPhotoPicker = false
+    @State private var isUploadingPhoto = false
 
     var body: some View {
         ScrollView {
@@ -61,7 +65,42 @@ struct ProfileView: View {
     private var account: some View {
         let name = app.session.user?.name.trimmingCharacters(in: .whitespaces) ?? ""
         return HStack(spacing: 14) {
-            Avatar(name: name.isEmpty ? (app.session.user?.email ?? "?") : name, imageURL: app.session.user?.image, color: theme.tiles[0], size: 56)
+            Menu {
+                Button { showsPhotoPicker = true } label: {
+                    Label(app.session.user?.image == nil ? "Add a photo" : "Choose a new photo", systemImage: "photo")
+                }
+                if app.session.user?.image != nil {
+                    Button(role: .destructive) { Task { await setPhoto(nil) } } label: { Label("Remove photo", systemImage: "trash") }
+                }
+            } label: {
+                Avatar(name: name.isEmpty ? (app.session.user?.email ?? "?") : name, imageURL: app.session.user?.image, color: theme.tiles[0], size: 56)
+                    .overlay(alignment: .bottomTrailing) {
+                        ZStack {
+                            Circle().fill(theme.solid).frame(width: 22, height: 22)
+                            if isUploadingPhoto {
+                                ProgressView().controlSize(.mini).tint(theme.onSolid)
+                            } else {
+                                Image(systemName: "camera.fill").font(.system(size: 10, weight: .bold)).foregroundStyle(theme.onSolid)
+                            }
+                        }
+                        .overlay(Circle().stroke(theme.bg, lineWidth: 2))
+                        .offset(x: 2, y: 2)
+                    }
+            }
+            .disabled(isUploadingPhoto)
+            .accessibilityLabel("Profile photo")
+            .photosPicker(isPresented: $showsPhotoPicker, selection: $photoItem, matching: .images)
+            .onChange(of: photoItem) { _, item in
+                guard let item else { return }
+                photoItem = nil
+                Task {
+                    guard let data = try? await item.loadTransferable(type: Data.self), let jpeg = Self.jpeg(from: data) else {
+                        error = "Couldn\u{2019}t read that photo."
+                        return
+                    }
+                    await setPhoto(jpeg)
+                }
+            }
             VStack(alignment: .leading, spacing: 2) {
                 if name.isEmpty {
                     Button("Add your name") { editsName = true }
@@ -76,6 +115,31 @@ struct ProfileView: View {
             IconButton(systemImage: "pencil", label: "Edit your name") { editsName = true }
         }
         .padding(.bottom, 4)
+    }
+
+    private func setPhoto(_ jpeg: Data?) async {
+        isUploadingPhoto = true
+        defer { isUploadingPhoto = false }
+        do {
+            try await app.session.setAvatar(jpeg: jpeg)
+            toast = jpeg == nil ? "Photo removed" : "Photo updated"
+        } catch {
+            self.error = error.userMessage
+        }
+    }
+
+    /// Any photo (HEIC, PNG…) as a JPEG no bigger than 1024 px, so the upload stays small.
+    private static func jpeg(from data: Data) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        let longest = max(image.size.width, image.size.height)
+        guard longest > 1024 else { return image.jpegData(compressionQuality: 0.85) }
+        let scale = 1024 / longest
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).jpegData(withCompressionQuality: 0.85) { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
     }
 
     private var settingsList: some View {

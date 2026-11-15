@@ -74,9 +74,10 @@ async function request<T>(method: string, path: string, body: unknown, opts: Req
 		signal: opts.signal,
 		headers: {
 			accept: 'application/json',
-			...(body !== undefined && { 'content-type': 'application/json' })
+			// A Blob / File (e.g. a photo) goes as-is with its own type; anything else as JSON.
+			...(body !== undefined && { 'content-type': body instanceof Blob ? body.type || 'application/octet-stream' : 'application/json' })
 		},
-		body: body === undefined ? undefined : JSON.stringify(body)
+		body: body === undefined ? undefined : body instanceof Blob ? body : JSON.stringify(body)
 	});
 
 	if (!res.ok) {

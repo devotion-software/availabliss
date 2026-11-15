@@ -73,7 +73,10 @@ final class APIClient: Sendable {
         if let token = tokenStore.token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        if let body = endpoint.body {
+        if let raw = endpoint.rawBody {
+            request.setValue(raw.contentType, forHTTPHeaderField: "Content-Type")
+            request.httpBody = raw.data
+        } else if let body = endpoint.body {
             request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONCoding.encoder.encode(body)
         } else if endpoint.method != .get {

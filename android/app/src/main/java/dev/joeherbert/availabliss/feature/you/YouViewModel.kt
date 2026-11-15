@@ -36,6 +36,7 @@ data class YouUiState(
     val appearance: Appearance = Appearance(),
     /** Non-null while the edit-name sheet is open. */
     val nameDraft: String? = null,
+    val uploadingPhoto: Boolean = false,
     val savingName: Boolean = false,
     val addingPasskey: Boolean = false,
     /** Linked Apple / Google sign-ins; null until loaded. */
@@ -167,6 +168,28 @@ class YouViewModel @Inject constructor(
     fun onNameChange(value: String) = _state.update { it.copy(nameDraft = value.take(80)) }
 
     fun cancelEditingName() = _state.update { it.copy(nameDraft = null) }
+
+    /** Uploads a picked photo (already a JPEG), or removes the picture with null. */
+    fun setPhoto(jpeg: ByteArray?) {
+        if (_state.value.uploadingPhoto) return
+        viewModelScope.launch {
+            _state.update { it.copy(uploadingPhoto = true) }
+            val result = users.setAvatar(jpeg)
+            _state.update {
+                it.copy(
+                    uploadingPhoto = false,
+                    message = UserMessage(
+                        when (result) {
+                            is ApiResult.Success -> if (jpeg == null) "Photo removed" else "Photo updated"
+                            is ApiResult.Failure -> result.error.message
+                        },
+                    ),
+                )
+            }
+        }
+    }
+
+    fun photoUnreadable() = _state.update { it.copy(message = UserMessage("Couldn't read that photo.")) }
 
     fun saveName() {
         val draft = _state.value.nameDraft?.trim().orEmpty()
