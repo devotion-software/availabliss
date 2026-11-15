@@ -16,6 +16,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -38,14 +40,29 @@ import dev.joeherbert.availabliss.designsystem.theme.Spacing
 
 /** Accept an invite from `/invite/:token`. */
 @Composable
-fun InviteScreen(onBack: () -> Unit, onAccepted: (String) -> Unit, viewModel: InviteViewModel = hiltViewModel()) {
+fun InviteScreen(
+    onBack: () -> Unit,
+    onAccepted: (String) -> Unit,
+    /** Signs out (the invite is kept, and its address prefilled at sign-in). */
+    onSignOut: () -> Unit = {},
+    viewModel: InviteViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.joinedGroupId) { state.joinedGroupId?.let(onAccepted) }
-    InviteContent(state, onBack = onBack, onJoin = viewModel::join, onRetry = viewModel::load)
+    InviteContent(
+        state,
+        onBack = onBack,
+        onJoin = viewModel::join,
+        onRetry = viewModel::load,
+        onSwitchAccount = {
+            viewModel.rememberInviteForSignIn()
+            onSignOut()
+        },
+    )
 }
 
 @Composable
-fun InviteContent(state: InviteUiState, onBack: () -> Unit, onJoin: () -> Unit, onRetry: () -> Unit) {
+fun InviteContent(state: InviteUiState, onBack: () -> Unit, onJoin: () -> Unit, onRetry: () -> Unit, onSwitchAccount: () -> Unit = {}) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
     AvailablissBackground(OrbLayout.SignIn) {
@@ -84,7 +101,19 @@ fun InviteContent(state: InviteUiState, onBack: () -> Unit, onJoin: () -> Unit, 
                             color = colors.muted,
                         )
                         Spacer(Modifier.height(2.dp))
-                        PrimaryButton("Join group", onJoin, loading = state.joining, modifier = Modifier.fillMaxWidth())
+                        val invited = state.invitedOtherEmail
+                        if (invited != null) {
+                            // An emailed invite is only for that address.
+                            Text(
+                                "This invite was sent to $invited, but you're signed in as ${state.signedInEmail}. Sign in with $invited to join.",
+                                style = type.body,
+                                color = colors.warnInk,
+                                modifier = Modifier.fillMaxWidth().clip(Shapes.row).background(colors.warnBg).padding(12.dp),
+                            )
+                            PrimaryButton("Sign in as $invited", onSwitchAccount, modifier = Modifier.fillMaxWidth())
+                        } else {
+                            PrimaryButton("Join group", onJoin, loading = state.joining, modifier = Modifier.fillMaxWidth())
+                        }
                         TextAction("Not now", onBack, modifier = Modifier.align(Alignment.CenterHorizontally))
                     }
                 }

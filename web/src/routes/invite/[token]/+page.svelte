@@ -15,6 +15,21 @@
 	const fmt = useFormat();
 
 	let joining = $state(false);
+	// An emailed invite is only for that address: say so before they try, and offer to switch.
+	const wrongAccount = $derived(
+		!!data.user && !!data.invite?.email && data.user.email.toLowerCase() !== data.invite.email.toLowerCase()
+	);
+	const signInHref = $derived(
+		`/signin?next=${encodeURIComponent(`/invite/${data.token}`)}${data.invite?.email ? `&email=${encodeURIComponent(data.invite.email)}` : ''}`
+	);
+	let switching = $state(false);
+
+	async function switchAccount() {
+		switching = true;
+		const { authClient } = await import('#lib/auth-client');
+		await authClient.signOut();
+		await goto(signInHref, { invalidateAll: true });
+	}
 	const tileLetters = $derived(monogram(data.invite?.groupName ?? '?'));
 	const expires = $derived.by(() => {
 		if (!data.invite) return '';
@@ -49,10 +64,16 @@
 				<span class="meta">{plural(data.invite.memberCount, 'member')} · {expires}</span>
 			</div>
 			<p class="explain">Availabliss finds the times everyone's free. The group only sees when you're busy, never what you're doing.</p>
-			{#if data.user}
+			{#if wrongAccount}
+				<p class="wrong" role="alert">
+					This invite was sent to <strong>{data.invite.email}</strong>, but you're signed in as <strong>{data.user?.email}</strong>. Sign in
+					with {data.invite.email} to join.
+				</p>
+				<Button variant="accent" size="lg" block loading={switching} onclick={switchAccount}>Sign in as {data.invite.email}</Button>
+			{:else if data.user}
 				<Button variant="accent" size="lg" block loading={joining} onclick={join}>Join group</Button>
 			{:else}
-				<Button href="/signin?next={encodeURIComponent(`/invite/${data.token}`)}" size="lg" block>Sign in to join</Button>
+				<Button href={signInHref} size="lg" block>Sign in to join</Button>
 				<span class="hint">New here? Signing in creates your account.</span>
 			{/if}
 		{:else}
@@ -121,6 +142,15 @@
 		font-size: 14px;
 		color: var(--muted);
 		max-width: 32ch;
+	}
+	.wrong {
+		font-size: 14px;
+		line-height: 1.45;
+		padding: 12px 14px;
+		border-radius: 16px;
+		background: var(--warn-bg);
+		color: var(--warn-ink);
+		text-align: left;
 	}
 	.hint {
 		font-size: 12px;

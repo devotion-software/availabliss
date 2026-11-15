@@ -10,7 +10,15 @@ struct InviteAcceptView: View {
     @State private var preview: InvitePreview?
     @State private var loadError: String?
     @State private var isJoining = false
+    @State private var isSwitching = false
     @State private var error: String?
+
+    /// An emailed invite is only for that address; someone signed in as anyone else can't use it.
+    private var invitedOtherEmail: String? {
+        guard let invited = preview?.email, let mine = app.session.user?.email,
+              invited.caseInsensitiveCompare(mine) != .orderedSame else { return nil }
+        return invited
+    }
 
     var body: some View {
         BottomSheet(title: "You're invited") {
@@ -27,13 +35,30 @@ struct InviteAcceptView: View {
                 Label("Your group only ever sees when you're busy, never what you're doing.", systemImage: "shield")
                     .bodyFont(12, relativeTo: .caption)
                     .foregroundStyle(theme.muted)
-                Button {
-                    Task { await join() }
-                } label: {
-                    LoadingLabel(title: "Join \(preview.groupName)", isLoading: isJoining)
+                if let invited = invitedOtherEmail {
+                    Text("This invite was sent to \(invited), but you\u{2019}re signed in as \(app.session.user?.email ?? "someone else"). Sign in with \(invited) to join.")
+                        .bodyFont(14)
+                        .foregroundStyle(theme.warnInk)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(theme.warnBg))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        Task { await switchAccount() }
+                    } label: {
+                        LoadingLabel(title: "Sign in as \(invited)", isLoading: isSwitching)
+                    }
+                    .buttonStyle(.primary)
+                    .disabled(isSwitching)
+                } else {
+                    Button {
+                        Task { await join() }
+                    } label: {
+                        LoadingLabel(title: "Join \(preview.groupName)", isLoading: isJoining)
+                    }
+                    .buttonStyle(.primary)
+                    .disabled(isJoining)
                 }
-                .buttonStyle(.primary)
-                .disabled(isJoining)
                 Button("Not now") { dismiss() }.buttonStyle(.textAction).frame(maxWidth: .infinity)
             } else if let loadError {
                 StatusView(kind: .error(loadError) { Task { await load() } })
@@ -58,6 +83,13 @@ struct InviteAcceptView: View {
         } catch {
             loadError = error.userMessage
         }
+    }
+
+    /// Signs out, keeping the invite so it opens again once they've signed in (with its email prefilled).
+    private func switchAccount() async {
+        isSwitching = true
+        await app.signOut()
+        app.router.pendingInvite = Router.InviteToken(token: token)
     }
 
     private func join() async {

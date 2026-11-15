@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.data.GroupsRepository
+import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
+import dev.joeherbert.availabliss.core.deeplink.DeepLink
+import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiError
 import dev.joeherbert.availabliss.core.network.ApiResult
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,12 +36,17 @@ data class InviteUiState(
     val joining: Boolean = false,
     /** Set once joined; the screen navigates to the group. */
     val joinedGroupId: String? = null,
+    /** The invite was emailed to this address, and you're signed in as [signedInEmail]: you can't use it. */
+    val invitedOtherEmail: String? = null,
+    val signedInEmail: String = "",
 )
 
 @HiltViewModel
 class InviteViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val groups: GroupsRepository,
+    private val users: UserRepository,
+    private val deepLinks: DeepLinkBus,
 ) : ViewModel() {
 
     private val token: String = savedStateHandle.get<String>("token").orEmpty()
@@ -58,10 +66,13 @@ class InviteViewModel @Inject constructor(
                     val p = result.value
                     val expires = DateTimes.parseInstant(p.expiresAt)
                     val expired = expires != null && expires.isBefore(Instant.now())
+                    val mine = users.user.value?.email.orEmpty()
                     _state.update {
                         it.copy(
                             loading = false,
                             invalid = expired,
+                            invitedOtherEmail = p.email?.takeIf { invited -> !invited.equals(mine, ignoreCase = true) },
+                            signedInEmail = mine,
                             preview = InvitePreviewUi(
                                 groupName = p.groupName,
                                 inviterName = p.inviterName,
@@ -80,6 +91,9 @@ class InviteViewModel @Inject constructor(
             }
         }
     }
+
+    /** Keeps the invite for after sign-in (where its email is prefilled); the caller then signs out. */
+    fun rememberInviteForSignIn() = deepLinks.post(DeepLink.Invite(token))
 
     fun join() {
         if (_state.value.joining) return

@@ -114,6 +114,7 @@ fun MainNavHost(root: RootViewModel) {
                 InviteScreen(
                     onBack = { nav.popBackStack() },
                     onAccepted = { id -> nav.navigate(GroupRoute(id)) { popUpTo<InviteRoute> { inclusive = true } } },
+                    onSignOut = root::signOut,
                 )
             }
             composable<ProposalRoute> { ProposalScreen(onBack = { nav.popBackStack() }) }
