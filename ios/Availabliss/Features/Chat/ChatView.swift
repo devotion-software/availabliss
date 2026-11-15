@@ -85,6 +85,7 @@ struct ChatView: View {
                         me: me,
                         model: model,
                         isLatestOwn: message.id == model.latestOwnMessageId,
+                        startsRun: startsRun(at: index),
                         openInfo: { sheet = .info(message) },
                         openProposal: { id in app.router.push(.proposal(id: id)) }
                     )
@@ -97,6 +98,15 @@ struct ChatView: View {
         }
         .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    /// First message in a run from the same person on the same day, so it shows their name.
+    private func startsRun(at index: Int) -> Bool {
+        guard index > 0 else { return true }
+        let previous = model.messages[index - 1], message = model.messages[index]
+        return previous.authorId != message.authorId
+            || previous.kind == .system
+            || !Calendar.current.isDate(previous.createdAt, inSameDayAs: message.createdAt)
     }
 
     @ViewBuilder

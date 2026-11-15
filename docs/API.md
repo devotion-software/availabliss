@@ -115,7 +115,7 @@ interface User {
 
 interface Member {
   userId: string;
-  name: string;
+  name: string;     // their name, or their email address if they haven't set one
   image: string | null;
   role: Role;
   synced: boolean;               // has a connected calendar or any manual block

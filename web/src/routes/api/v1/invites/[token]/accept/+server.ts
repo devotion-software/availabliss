@@ -14,7 +14,7 @@ export const POST = authed<{ token: string }>(async ({ params, userId }) => {
 	await publishToGroup(groupId, 'member.changed', joined);
 	await notify(
 		group.members.filter((m) => m.userId !== userId && m.role !== 'member').map((m) => m.userId),
-		{ kind: 'invite.accepted', groupId, title: group.name, body: `${joined?.name ?? 'Someone'} joined the group` }
+		{ kind: 'invite.accepted', groupId, title: group.name, body: `${joined?.name || 'Someone'} joined the group` }
 	);
 	return json(group);
 });

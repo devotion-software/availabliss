@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,11 +18,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.glass
@@ -43,6 +46,7 @@ fun MessageBubble(
     modifier: Modifier = Modifier,
     author: AvatarPerson? = null,
     showAvatar: Boolean = true,
+    authorName: String? = null,
     onClick: (() -> Unit)? = null,
     accessibilityLabel: String? = null,
 ) {
@@ -67,14 +71,25 @@ fun MessageBubble(
             verticalAlignment = Alignment.Bottom,
         ) {
             if (author != null && showAvatar) Avatar(author, size = 28.dp) else Spacer(Modifier.size(28.dp))
-            BubbleText(
-                text = text,
-                modifier = Modifier
-                    .glass(IncomingBubbleShape, shadow = false)
-                    .then(clickable(onClick, accessibilityLabel))
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
-                own = false,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                if (authorName != null) {
+                    Text(
+                        authorName,
+                        style = AvailablissTheme.type.captionStrong.copy(fontSize = 11.sp),
+                        color = colors.muted,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 4.dp).clearAndSetSemantics {},
+                    )
+                }
+                BubbleText(
+                    text = text,
+                    modifier = Modifier
+                        .glass(IncomingBubbleShape, shadow = false)
+                        .then(clickable(onClick, accessibilityLabel))
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                    own = false,
+                )
+            }
         }
     }
 }

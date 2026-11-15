@@ -18,6 +18,7 @@ import { slotLabel } from './availability/labels';
 import { sendConfirmedEmail } from './email';
 import { env } from './env';
 import { loadBusy, type LabelledBusy } from './busy';
+import { displayName } from './names';
 
 type ProposalRow = typeof proposals.$inferSelect;
 type ResponseRow = typeof proposalResponses.$inferSelect;
@@ -153,7 +154,7 @@ export async function createProposal(groupId: string, userId: string, input: Pro
 	});
 
 	const group = await getGroupRow(groupId);
-	const proposer = await db.query.user.findFirst({ where: eq(user.id, userId), columns: { name: true } });
+	const proposer = await db.query.user.findFirst({ where: eq(user.id, userId), columns: { name: true, email: true } });
 	const when = slotLabel({ start: Date.parse(input.start), end: Date.parse(input.end) }, group.requirement);
 
 	await postMessage(groupId, userId, { kind: 'proposal', proposalId: id });
@@ -165,7 +166,7 @@ export async function createProposal(groupId: string, userId: string, input: Pro
 			kind: 'proposal.created',
 			groupId,
 			title: group.name,
-			body: `${proposer?.name ?? 'Someone'} proposed ${when}. Can you make it?`,
+			body: `${displayName(proposer)} proposed ${when}. Can you make it?`,
 			data: { proposalId: id }
 		}
 	);

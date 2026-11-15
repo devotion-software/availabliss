@@ -9,6 +9,7 @@ import { newId } from './ids';
 import { memberIds, requireMember } from './groups';
 import { publishToGroup } from './realtime';
 import { notify } from './notifications';
+import { displayName } from './names';
 
 type MessageRow = typeof messages.$inferSelect;
 
@@ -253,14 +254,14 @@ export async function postMessage(groupId: string, authorId: string | null, inpu
 	await publishToGroup(groupId, 'message.created', message);
 
 	if (authorId && (input.kind === 'text' || input.kind === 'poll')) {
-		const author = await db.query.user.findFirst({ where: eq(user.id, authorId), columns: { name: true } });
+		const author = await db.query.user.findFirst({ where: eq(user.id, authorId), columns: { name: true, email: true } });
 		const poll = message.poll ? `Poll: ${message.poll.question}` : null;
 		await notify(
 			members.filter((m) => m !== authorId),
 			{
 				kind: 'message',
 				groupId,
-				title: author?.name ?? 'New message',
+				title: displayName(author, 'New message'),
 				body: pushPreview(poll ?? input.body ?? ''),
 				data: { messageId: id },
 				record: false

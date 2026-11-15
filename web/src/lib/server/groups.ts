@@ -11,6 +11,7 @@ import { requirementSummary } from './availability/labels';
 import { defaultRequirement } from './requirements';
 import { syncedUserIds } from './busy';
 import { refreshCoverage } from './calendars';
+import { displayName } from './names';
 
 const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -61,6 +62,7 @@ export async function listMembers(groupId: string): Promise<Member[]> {
 			role: groupMembers.role,
 			joinedAt: groupMembers.joinedAt,
 			name: user.name,
+			email: user.email,
 			image: user.image
 		})
 		.from(groupMembers)
@@ -68,7 +70,12 @@ export async function listMembers(groupId: string): Promise<Member[]> {
 		.where(eq(groupMembers.groupId, groupId))
 		.orderBy(asc(groupMembers.joinedAt));
 	const synced = await syncedUserIds(rows.map((r) => r.userId));
-	return rows.map((r) => ({ ...r, joinedAt: r.joinedAt.toISOString(), synced: synced.has(r.userId) }));
+	return rows.map(({ email, ...r }) => ({
+		...r,
+		name: displayName({ name: r.name, email }),
+		joinedAt: r.joinedAt.toISOString(),
+		synced: synced.has(r.userId)
+	}));
 }
 
 export type GroupRow = typeof groups.$inferSelect;
@@ -210,12 +217,12 @@ export async function previewInvite(token: string) {
 	const invite = await liveInvite(token);
 	const [group, inviter, members] = await Promise.all([
 		getGroupRow(invite.groupId),
-		db.query.user.findFirst({ where: eq(user.id, invite.createdBy), columns: { name: true } }),
+		db.query.user.findFirst({ where: eq(user.id, invite.createdBy), columns: { name: true, email: true } }),
 		memberIds(invite.groupId)
 	]);
 	return {
 		groupName: group.name,
-		inviterName: inviter?.name ?? 'Someone',
+		inviterName: displayName(inviter),
 		memberCount: members.length,
 		expiresAt: invite.expiresAt.toISOString()
 	};

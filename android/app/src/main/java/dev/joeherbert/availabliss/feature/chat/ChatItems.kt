@@ -30,6 +30,8 @@ sealed interface ChatItem {
         val author: AvatarPerson?,
         val showAvatar: Boolean,
         val accessibilityLabel: String,
+        /** Shown above the first incoming message in a run from the same person. */
+        val authorName: String? = null,
     ) : ChatItem {
         override val key get() = id
     }
@@ -125,6 +127,9 @@ fun buildChatItems(
                     val next = messages.getOrNull(index + 1)
                     val continues = next != null && next.authorId == m.authorId && next.kind == MessageKind.Text &&
                         DateTimes.localDate(next.createdAt) == date
+                    val prev = messages.getOrNull(index - 1)
+                    val startsRun = prev == null || prev.authorId != m.authorId || prev.kind != MessageKind.Text ||
+                        DateTimes.localDate(prev.createdAt) != date
                     items += ChatItem.Text(
                         id = m.id,
                         text = text,
@@ -132,6 +137,7 @@ fun buildChatItems(
                         author = m.authorId?.let(directory::avatar),
                         showAvatar = !continues,
                         accessibilityLabel = if (own) "Your message: $text. Tap for message info" else "$authorName: $text",
+                        authorName = if (!own && startsRun) m.authorId?.let { directory.avatar(it).name } else null,
                     )
                 }
             }

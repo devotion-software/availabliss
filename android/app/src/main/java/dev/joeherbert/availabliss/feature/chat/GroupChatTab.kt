@@ -253,6 +253,7 @@ private fun ChatRow(item: ChatItem, actions: ChatActions) {
             own = item.own,
             author = item.author,
             showAvatar = item.showAvatar,
+            authorName = item.authorName,
             onClick = if (item.own) ({ actions.onOpenInfo(item.id) }) else null,
             accessibilityLabel = item.accessibilityLabel,
         )

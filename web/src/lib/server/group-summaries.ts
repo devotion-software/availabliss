@@ -11,6 +11,7 @@ import { groupBase, groupsFor, type GroupRow } from './groups';
 import { syncedUserIds } from './busy';
 import { cachedSlotCount } from './availability/slot-count-cache';
 import { slotNoun } from './availability/labels';
+import { displayName } from './names';
 
 const PREVIEW_SIZE = 5;
 
@@ -23,6 +24,7 @@ async function membersByGroup(groupIds: string[]): Promise<Map<string, Member[]>
 			role: groupMembers.role,
 			joinedAt: groupMembers.joinedAt,
 			name: user.name,
+			email: user.email,
 			image: user.image
 		})
 		.from(groupMembers)
@@ -31,8 +33,8 @@ async function membersByGroup(groupIds: string[]): Promise<Map<string, Member[]>
 		.orderBy(asc(groupMembers.joinedAt));
 	const synced = await syncedUserIds([...new Set(rows.map((r) => r.userId))]);
 	const result = new Map<string, Member[]>(groupIds.map((id) => [id, []]));
-	for (const { groupId, ...m } of rows) {
-		result.get(groupId)!.push({ ...m, joinedAt: m.joinedAt.toISOString(), synced: synced.has(m.userId) });
+	for (const { groupId, email, ...m } of rows) {
+		result.get(groupId)!.push({ ...m, name: displayName({ name: m.name, email }), joinedAt: m.joinedAt.toISOString(), synced: synced.has(m.userId) });
 	}
 	return result;
 }

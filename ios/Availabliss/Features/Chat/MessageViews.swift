@@ -7,6 +7,8 @@ struct MessageRow: View {
     let me: String?
     let model: ChatViewModel
     let isLatestOwn: Bool
+    /// First in a run from this person: incoming messages show their name above.
+    var startsRun = true
     let openInfo: () -> Void
     let openProposal: (String) -> Void
     @Environment(\.theme) private var theme
@@ -35,7 +37,7 @@ struct MessageRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
-                IncomingRow(author: author) { MessageBubble(text: message.body ?? "", isMine: false) }
+                IncomingRow(author: author, showsName: startsRun) { MessageBubble(text: message.body ?? "", isMine: false) }
             }
         case .poll:
             if let poll = message.poll {
@@ -70,13 +72,23 @@ struct MessageRow: View {
 
 private struct IncomingRow<Content: View>: View {
     let author: Member?
+    var showsName = true
     @ViewBuilder let content: Content
     @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
             Avatar(name: author?.name ?? "?", imageURL: author?.image, color: theme.tile(forUser: author?.userId ?? ""), size: 28)
-            content
+            VStack(alignment: .leading, spacing: 3) {
+                if showsName {
+                    Text(author?.name ?? "Someone")
+                        .bodyFont(11, .semibold, relativeTo: .caption2)
+                        .foregroundStyle(theme.muted)
+                        .lineLimit(1)
+                        .padding(.leading, 4)
+                }
+                content
+            }
             Spacer(minLength: 40)
         }
         .accessibilityElement(children: .combine)
