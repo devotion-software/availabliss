@@ -6,10 +6,10 @@
 //   https:/$()/example.com
 
 // API host serving /api/v1 and /api/auth (no trailing slash).
-API_BASE_URL = https:/$()/availabliss.app
+API_BASE_URL = https:/$()/availabliss.com
 
 // Host used for universal links + passkeys (webcredentials) — no scheme.
-ASSOCIATED_DOMAIN_HOST = availabliss.app
+ASSOCIATED_DOMAIN_HOST = availabliss.com
 
 // Google Sign-In (iOS OAuth client). Leave empty to hide the Google button.
 GOOGLE_IOS_CLIENT_ID =

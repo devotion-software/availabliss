@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { isForbiddenCrossSite, selfOrigins } from './csrf';
 
-const SELF = 'https://availabliss.app';
+const SELF = 'https://availabliss.com';
 const allowed = selfOrigins(SELF, ['http://10.0.2.2:5190']);
 
 function check(method: string, path: string, headers: Record<string, string> = {}) {
@@ -39,6 +39,6 @@ describe('isForbiddenCrossSite', () => {
 });
 
 test('selfOrigins normalises the base URL and tolerates junk', () => {
-	expect(selfOrigins('https://availabliss.app/path', [])).toEqual(['https://availabliss.app']);
+	expect(selfOrigins('https://availabliss.com/path', [])).toEqual(['https://availabliss.com']);
 	expect(selfOrigins('not a url', ['https://x.test'])).toEqual(['https://x.test']);
 });

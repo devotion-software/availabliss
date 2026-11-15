@@ -28,7 +28,7 @@ fun config(key: String, default: String): String =
 
 val apiBaseUrl = config("availabliss.apiBaseUrl", "http://10.0.2.2:5190").trimEnd('/')
 val googleWebClientId = config("availabliss.googleWebClientId", "")
-val appLinkHost = config("availabliss.appLinkHost", "availabliss.app")
+val appLinkHost = config("availabliss.appLinkHost", "availabliss.com")
 
 android {
     namespace = "dev.joeherbert.availabliss"
@@ -38,8 +38,8 @@ android {
         applicationId = "dev.joeherbert.availabliss"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

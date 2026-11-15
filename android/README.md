@@ -51,7 +51,7 @@ availabliss.apiBaseUrl=http://10.0.2.2:5190
 availabliss.googleWebClientId=1234567890-abc.apps.googleusercontent.com
 
 # Host for verified app links (https://<host>/invite/:token, /app/...).
-availabliss.appLinkHost=availabliss.app
+availabliss.appLinkHost=availabliss.com
 ```
 
 These become `BuildConfig.API_BASE_URL`, `BuildConfig.GOOGLE_WEB_CLIENT_ID` and

@@ -21,12 +21,12 @@ const lines = (ics: string) => ics.split('\r\n');
 
 describe('buildIcs', () => {
 	test('timed event uses UTC stamps and CRLF line endings', () => {
-		const ics = buildIcs(event(), 'Climbers', 'availabliss.app', 'Europe/London');
+		const ics = buildIcs(event(), 'Climbers', 'availabliss.com', 'Europe/London');
 		expect(ics.endsWith('END:VCALENDAR\r\n')).toBe(true);
 		expect(ics).not.toMatch(/[^\r]\n/);
 		const l = lines(ics);
 		expect(l[0]).toBe('BEGIN:VCALENDAR');
-		expect(l).toContain('UID:evt-1@availabliss.app');
+		expect(l).toContain('UID:evt-1@availabliss.com');
 		expect(l).toContain('DTSTART:20261113T180000Z');
 		expect(l).toContain('DTEND:20261113T213000Z');
 		expect(l).toContain('SUMMARY:Dinner');

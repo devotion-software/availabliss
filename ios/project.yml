@@ -46,20 +46,27 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER)
         PRODUCT_NAME: Availabliss
-        MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0.1"
+        CURRENT_PROJECT_VERSION: "2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
+        ASSOCIATED_DOMAIN_MODE: ""
+      configs:
+        # Debug builds fetch the apple-app-site-association file straight from the server instead of
+        # Apple's CDN (which can lag a day). Needs Settings → Developer → Associated Domains
+        # Development turned on on the device. Release builds keep the normal CDN lookup.
+        Debug:
+          ASSOCIATED_DOMAIN_MODE: "?mode=developer"
     entitlements:
       path: Availabliss/Resources/Availabliss.entitlements
       properties:
         com.apple.developer.applesignin:
           - Default
         com.apple.developer.associated-domains:
-          - webcredentials:$(ASSOCIATED_DOMAIN_HOST)
-          - applinks:$(ASSOCIATED_DOMAIN_HOST)
+          - webcredentials:$(ASSOCIATED_DOMAIN_HOST)$(ASSOCIATED_DOMAIN_MODE)
+          - applinks:$(ASSOCIATED_DOMAIN_HOST)$(ASSOCIATED_DOMAIN_MODE)
         aps-environment: $(APS_ENVIRONMENT)
     info:
       path: Availabliss/Resources/Info.plist

@@ -7,7 +7,7 @@ struct AppConfig: Sendable {
     let googleClientID: String
     let googleRedirectScheme: String
 
-    static let fallbackBaseURL = URL(string: "https://availabliss.app")!
+    static let fallbackBaseURL = URL(string: "https://availabliss.com")!
 
     static func load(from bundle: Bundle = .main) -> AppConfig {
         func value(_ key: String) -> String {
@@ -17,7 +17,7 @@ struct AppConfig: Sendable {
         let host = value("AVAssociatedDomainHost")
         return AppConfig(
             apiBaseURL: base,
-            associatedDomainHost: host.isEmpty ? (base.host() ?? "availabliss.app") : host,
+            associatedDomainHost: host.isEmpty ? (base.host() ?? "availabliss.com") : host,
             googleClientID: value("AVGoogleClientID"),
             googleRedirectScheme: value("AVGoogleRedirectScheme")
         )

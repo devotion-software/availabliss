@@ -10,8 +10,8 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>webcredentials:$(ASSOCIATED_DOMAIN_HOST)</string>
-		<string>applinks:$(ASSOCIATED_DOMAIN_HOST)</string>
+		<string>webcredentials:$(ASSOCIATED_DOMAIN_HOST)$(ASSOCIATED_DOMAIN_MODE)</string>
+		<string>applinks:$(ASSOCIATED_DOMAIN_HOST)$(ASSOCIATED_DOMAIN_MODE)</string>
 	</array>
 </dict>
 </plist>

@@ -66,6 +66,10 @@ final class APIClient: Sendable {
         request.httpMethod = endpoint.method.rawValue
         if let timeout = endpoint.timeout { request.timeoutInterval = timeout }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        // Cookies only for the passkey endpoints (see URLSession.availabliss). Anywhere else a
+        // cookie (e.g. the session cookie passkey sign-in sets) makes Better Auth demand an Origin
+        // header, which native requests don't have: "Missing or null Origin".
+        request.httpShouldHandleCookies = endpoint.mount == .auth && endpoint.path.hasPrefix("/passkey/")
         if let token = tokenStore.token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -104,7 +108,9 @@ final class APIClient: Sendable {
 
 extension URLSession {
     /// Shared session. Cookies are kept because Better Auth's passkey flow stores the
-    /// WebAuthn challenge in a short-lived cookie between the options and verify calls.
+    /// WebAuthn challenge in a short-lived cookie between the options and verify calls;
+    /// `APIClient` turns cookie handling off for every other request (as Android's
+    /// `PasskeyCookieJar` does). Auth is otherwise the bearer token.
     static let availabliss: URLSession = {
         let configuration = URLSessionConfiguration.default
         configuration.httpCookieAcceptPolicy = .always
