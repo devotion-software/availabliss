@@ -12,13 +12,6 @@ struct TimeAxis {
         let seconds = date.timeIntervalSince(day.startDate())
         return min(1, max(0, (seconds / 3600 - Double(startHour)) / hours))
     }
-
-    /// Widens the default 08–24 axis to include the requirement's window.
-    static func fitting(_ window: TimeSpan?, on day: CalendarDay) -> TimeAxis {
-        guard let window else { return TimeAxis() }
-        let startHour = Int(window.start.timeIntervalSince(day.startDate()) / 3600)
-        return TimeAxis(startHour: max(0, min(8, startHour - startHour % 4)), endHour: 24)
-    }
 }
 
 // MARK: - Week
@@ -156,7 +149,21 @@ struct DayTimeline: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        rows(detail, axis: TimeAxis.fitting(detail.window, on: date))
+        VStack(alignment: .leading, spacing: 8) {
+            // The whole day, so early and late busy time is never cut off.
+            rows(detail, axis: TimeAxis(startHour: 0, endHour: 24))
+            legend
+        }
+    }
+
+    private var legend: some View {
+        HStack(spacing: 14) {
+            LegendItem(label: "Free") { theme.okBg.overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(theme.ok.opacity(0.5), lineWidth: 1)) }
+            LegendItem(label: "Busy") { theme.busyFill }
+            LegendItem(label: "Everyone free") { theme.accent }
+        }
+        .bodyFont(11, relativeTo: .caption2)
+        .foregroundStyle(theme.muted)
     }
 
     private func rows(_ detail: DayAvailability, axis: TimeAxis) -> some View {
@@ -213,7 +220,7 @@ private struct MemberTrack: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        Track(height: 22, radius: 7, background: member.pending ? AnyShapeStyle(Color.clear) : AnyShapeStyle(theme.accentSoft)) { width in
+        Track(height: 22, radius: 7, background: member.pending ? AnyShapeStyle(Color.clear) : AnyShapeStyle(theme.okBg)) { width in
             if member.pending {
                 Text("Not synced yet")
                     .bodyFont(10, relativeTo: .caption2)
@@ -224,12 +231,8 @@ private struct MemberTrack: View {
             ForEach(member.busy, id: \.self) { busy in
                 let left = axis.fraction(busy.start, on: date) * width
                 let right = axis.fraction(busy.end, on: date) * width
-                ZStack {
-                    RoundedRectangle(cornerRadius: 7).fill(theme.busyBg)
-                    RoundedRectangle(cornerRadius: 7).strokeBorder(theme.busyLine, lineWidth: 1)
-                }
-                .opacity(0.5)
-                .frame(width: max(0, right - left), height: 22)
+                RoundedRectangle(cornerRadius: 7).fill(theme.busyFill)
+                .frame(width: max(2, right - left), height: 22)
                 .offset(x: left)
             }
         }
@@ -265,4 +268,9 @@ private struct Track<Content: View>: View {
         .frame(height: height)
         .accessibilityElement(children: .ignore)
     }
+}
+
+extension Theme {
+    /// Solid fill for someone's busy time in the day timeline: clearly darker than the mint free track.
+    var busyFill: Color { ink.opacity(0.32) }
 }

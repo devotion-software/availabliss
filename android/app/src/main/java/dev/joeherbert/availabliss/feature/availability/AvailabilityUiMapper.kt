@@ -18,6 +18,7 @@ import dev.joeherbert.availabliss.designsystem.component.availability.TimelineBa
 import dev.joeherbert.availabliss.designsystem.component.availability.TimelineRowUi
 import dev.joeherbert.availabliss.designsystem.component.availability.WeekBlockUi
 import dev.joeherbert.availabliss.designsystem.component.availability.WeekColumnUi
+import dev.joeherbert.availabliss.designsystem.component.availability.dayFraction
 import dev.joeherbert.availabliss.designsystem.component.availability.timelineFraction
 import dev.joeherbert.availabliss.feature.timing.slotNoun
 import java.time.LocalDate
@@ -250,7 +251,7 @@ object AvailabilityUiMapper {
         val (s, e) = clampToDate(interval.start, interval.end, date) ?: return@mapNotNull null
         val from = "%02d:%02d".format(s / 60, s % 60)
         val to = if (e >= 23 * 60 + 59) "late" else "%02d:%02d".format(e / 60, e % 60)
-        EveryoneBandUi(timelineFraction(s), timelineFraction(e), "$from – $to")
+        EveryoneBandUi(dayFraction(s), dayFraction(e), "$from – $to")
     }.filter { it.end > it.start }
 
     fun timelineRows(day: DayAvailability, group: Group?, meId: String?): List<TimelineRowUi> {
@@ -261,7 +262,7 @@ object AvailabilityUiMapper {
         return sorted.map { member ->
             val bars = member.busy.mapNotNull { b ->
                 val (s, e) = clampToDate(b.start, b.end, date) ?: return@mapNotNull null
-                TimelineBarUi(timelineFraction(s), timelineFraction(e))
+                TimelineBarUi(dayFraction(s), dayFraction(e))
             }.filter { it.end > it.start }
             val name = name(group, member.userId, meId, youSuffix = true)
             TimelineRowUi(

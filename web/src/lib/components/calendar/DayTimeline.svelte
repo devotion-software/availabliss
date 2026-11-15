@@ -2,7 +2,7 @@
 	import type { DayAvailability, Member } from '#lib/types';
 	import { formatDayKey, useFormat } from '#lib/client/format';
 	import { memberLabel } from '#lib/client/members';
-	import { axisFor, clampToAxis, hourTicks, pct, spanText } from './timeline';
+	import { clampToAxis, hourTicks, pct, spanText, type Axis } from './timeline';
 
 	/** Who's busy when on one day: an "Everyone" row of shared free time, then a row per member. */
 	interface Props {
@@ -16,9 +16,8 @@
 
 	const fmt = useFormat();
 	const tz = $derived(fmt.current.timeZone);
-	const axis = $derived(
-		axisFor(day.date, day.members.flatMap((m) => m.busy), tz)
-	);
+	// The whole day, so early and late busy time is never cut off.
+	const axis: Axis = { start: 0, end: 24 * 60 };
 	const ticks = $derived(hourTicks(axis));
 	const windowStart = $derived(day.window ? fmt.current.time(day.window.start) : null);
 
@@ -79,6 +78,12 @@
 			{#each ticks as t (t.label)}<span style:left="{t.at}%">{t.label}</span>{/each}
 		</div>
 	</div>
+
+	<div class="legend" aria-hidden="true">
+		<span><i class="key free-key"></i>Free</span>
+		<span><i class="key busy-key"></i>Busy</span>
+		<span><i class="key all-key"></i>Everyone free</span>
+	</div>
 </div>
 
 <style>
@@ -121,7 +126,7 @@
 		position: relative;
 		height: 22px;
 		border-radius: 7px;
-		background: var(--accent-soft);
+		background: var(--ok-bg);
 	}
 	.track.shared {
 		height: 30px;
@@ -151,10 +156,9 @@
 		position: absolute;
 		top: 0;
 		bottom: 0;
+		min-width: 2px;
 		border-radius: 7px;
-		opacity: 0.5;
-		background: var(--busy-bg);
-		border: 1px solid var(--busy-line);
+		background: var(--busy-fill);
 	}
 	.none {
 		position: absolute;
@@ -180,5 +184,34 @@
 	}
 	.ticks span:last-child {
 		transform: translateX(-100%);
+	}
+	.legend {
+		display: flex;
+		gap: 14px;
+		font-size: 11px;
+		color: var(--muted);
+	}
+	.legend span {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+	}
+	.key {
+		width: 12px;
+		height: 10px;
+		border-radius: 3px;
+	}
+	.free-key {
+		background: var(--ok-bg);
+	}
+	.busy-key {
+		background: var(--busy-fill);
+	}
+	.all-key {
+		background: var(--accent);
+	}
+	.timeline {
+		/* Someone's busy time: clearly darker than the mint free track. */
+		--busy-fill: color-mix(in srgb, var(--ink) 32%, transparent);
 	}
 </style>

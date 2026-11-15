@@ -46,6 +46,12 @@ data class TimelineRowUi(
     val accessibilityLabel: String = name,
 )
 
+/** Hour labels on the day timeline, which shows the whole day. */
+val DayTimelineHours = listOf(0, 4, 8, 12, 16, 20, 24)
+
+/** Fraction of the 00:00–24:00 day timeline for [minutesOfDay]. */
+fun dayFraction(minutesOfDay: Int): Float = (minutesOfDay / (24f * 60)).coerceIn(0f, 1f)
+
 /** An "Everyone" free band. */
 data class EveryoneBandUi(val start: Float, val end: Float, val label: String)
 
@@ -110,11 +116,28 @@ fun DayTimelineRows(everyone: List<EveryoneBandUi>, rows: List<TimelineRowUi>, m
         Row(Modifier.fillMaxWidth()) {
             Spacer(Modifier.width(72.dp))
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
-                TimelineHours.forEach { Text("%02d".format(it), fontSize = 10.sp, color = colors.muted) }
+                DayTimelineHours.forEach { Text("%02d".format(it), fontSize = 10.sp, color = colors.muted) }
             }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            LegendSwatch(colors.okBg, "Free")
+            LegendSwatch(colors.busyFill, "Busy")
+            LegendSwatch(colors.accent, "Everyone free")
         }
     }
 }
+
+@Composable
+private fun LegendSwatch(color: androidx.compose.ui.graphics.Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Box(Modifier.size(12.dp, 10.dp).clip(RoundedCornerShape(3.dp)).background(color))
+        Text(label, style = AvailablissTheme.type.micro.copy(fontWeight = FontWeight.Normal), color = AvailablissTheme.colors.muted)
+    }
+}
+
+/** Solid fill for someone's busy time: clearly darker than the mint free track. */
+private val dev.joeherbert.availabliss.designsystem.theme.AvailablissColors.busyFill
+    get() = ink.copy(alpha = 0.32f)
 
 @Composable
 private fun TimelineLine(label: String, labelColor: androidx.compose.ui.graphics.Color, labelBold: Boolean, track: @Composable () -> Unit) {
@@ -141,7 +164,7 @@ private fun MemberTrack(row: TimelineRowUi) {
             Modifier
                 .fillMaxWidth()
                 .height(22.dp)
-                .then(if (row.pending) Modifier.dashedBorder(colors.line3, shape) else Modifier.clip(shape).background(colors.accentSoft))
+                .then(if (row.pending) Modifier.dashedBorder(colors.line3, shape) else Modifier.clip(shape).background(colors.okBg))
                 .semantics { contentDescription = row.accessibilityLabel },
         ) {
             val w = maxWidth
@@ -151,10 +174,8 @@ private fun MemberTrack(row: TimelineRowUi) {
                         .offset(x = w * bar.start)
                         .width((w * (bar.end - bar.start)).coerceAtLeast(2.dp))
                         .fillMaxHeight()
-                        .alpha(0.5f)
                         .clip(shape)
-                        .background(colors.busyBg)
-                        .border(1.dp, colors.busyLine, shape),
+                        .background(colors.busyFill),
                 )
             }
             if (row.pending) {
