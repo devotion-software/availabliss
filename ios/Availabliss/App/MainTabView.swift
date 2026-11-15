@@ -16,7 +16,9 @@ struct MainTabView: View {
             tabStack(path: $router.youPath) { ProfileView() }
                 .tag(AppTab.you)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        // Overlaid rather than a safe-area inset: an inset on the TabView doesn't reach the scroll
+        // views inside its pages, so each tab root reserves the room itself (`tabStack`).
+        .overlay(alignment: .bottom) {
             if router.showsTabBar {
                 TabBar(selection: $router.tab, items: tabItems)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -37,6 +39,7 @@ struct MainTabView: View {
     private func tabStack<Root: View>(path: Binding<[AppRoute]>, @ViewBuilder root: () -> Root) -> some View {
         NavigationStack(path: path) {
             root()
+                .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: TabBar<AppTab>.reservedHeight) }
                 .navigationDestination(for: AppRoute.self) { route in
                     RouteDestination(route: route)
                 }

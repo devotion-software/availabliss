@@ -59,11 +59,25 @@ enum TabBadge: Equatable {
     case count(Int)
 }
 
-/// The floating glass tab bar (66pt tall, radius 24, 20pt from the edges).
+/// The floating glass tab bar (66pt tall, radius 24, 20pt from the edges). On phones with a
+/// home indicator it sits down in the indicator's safe area, 20pt from the bottom edge.
 struct TabBar<Value: Hashable>: View {
     @Binding var selection: Value
     let items: [TabItem<Value>]
     @Environment(\.theme) private var theme
+
+    static var height: CGFloat { 66 }
+
+    /// Space from the bottom of the safe area to the bar's bottom edge (negative = into it).
+    static var bottomPadding: CGFloat {
+        let inset = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow?.safeAreaInsets.bottom }
+            .first ?? 0
+        return inset > 0 ? 20 - inset : 8
+    }
+
+    /// Room a screen under the bar should leave at the bottom of the safe area.
+    static var reservedHeight: CGFloat { height + bottomPadding + 8 }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -72,10 +86,10 @@ struct TabBar<Value: Hashable>: View {
             }
         }
         .padding(.horizontal, 6)
-        .frame(height: 66)
+        .frame(height: Self.height)
         .glass(cornerRadius: 24)
         .padding(.horizontal, 20)
-        .padding(.bottom, 8)
+        .padding(.bottom, Self.bottomPadding)
     }
 
     private func tab(_ item: TabItem<Value>) -> some View {
