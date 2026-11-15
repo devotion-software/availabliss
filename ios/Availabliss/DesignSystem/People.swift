@@ -159,14 +159,24 @@ struct SyncRing: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            ProgressRing(progress: total == 0 ? 0 : Double(synced) / Double(total))
-                .frame(width: 16, height: 16)
+            if allSynced {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(theme.ok)
+                    .frame(width: 16, height: 16)
+                    .accessibilityHidden(true)
+            } else {
+                ProgressRing(progress: total == 0 ? 0 : Double(synced) / Double(total))
+                    .frame(width: 16, height: 16)
+            }
             Text(label)
                 .bodyFont(12, .medium, relativeTo: .caption)
                 .foregroundStyle(theme.muted)
         }
         .accessibilityElement(children: .combine)
     }
+
+    private var allSynced: Bool { total > 0 && synced >= total }
 
     private var label: String {
         let left = total - synced

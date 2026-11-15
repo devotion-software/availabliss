@@ -4,6 +4,7 @@
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
 	import SyncRing from '#lib/components/ui/SyncRing.svelte';
 	import AvatarStack from '#lib/components/ui/AvatarStack.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
 	import { groupBadge, syncText } from './status';
 	import { unread } from '#lib/client/unread.svelte';
 
@@ -34,7 +35,11 @@
 				{/if}
 			</span>
 			<span class="sync">
-				<SyncRing value={group.syncedCount} total={group.memberCount} />
+				{#if group.memberCount > 0 && group.syncedCount >= group.memberCount}
+					<span class="synced-tick" aria-hidden="true"><Icon name="check" size={10} strokeWidth={3} /></span>
+				{:else}
+					<SyncRing value={group.syncedCount} total={group.memberCount} />
+				{/if}
 				{syncText(group)}
 			</span>
 			{#if unread.count(group)}
@@ -45,6 +50,17 @@
 </a>
 
 <style>
+	.synced-tick {
+		flex: none;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--ok);
+		color: #fff;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
 	.card {
 		border-radius: 24px;
 		padding: 14px;

@@ -17,12 +17,14 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -213,7 +215,7 @@ private fun GroupRow(tile: GroupTileUi, onClick: () -> Unit) {
                     Box(Modifier.height(22.dp))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SyncRing(tile.syncProgress)
+                    if (tile.syncProgress >= 1f) SyncedTick() else SyncRing(tile.syncProgress)
                     Text(tile.syncLabel, style = AvailablissTheme.type.caption, color = colors.muted)
                 }
             }
@@ -257,5 +259,14 @@ private fun HomePreview() {
             ),
             onOpenGroup = {}, onNewGroup = {}, onOpenProfile = {}, onAddToCalendar = {}, onSelectCalendar = {}, onRetry = {},
         )
+    }
+}
+
+/** Green tick in place of the sync ring once everyone has synced. */
+@Composable
+private fun SyncedTick() {
+    val colors = AvailablissTheme.colors
+    Box(Modifier.size(16.dp).clip(CircleShape).background(colors.ok), contentAlignment = Alignment.Center) {
+        Icon(AvIcons.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp))
     }
 }
