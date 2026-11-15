@@ -33,6 +33,8 @@
 	async function finish(kind: 'continue' | 'manual') {
 		finishing = kind;
 		try {
+			// Next: your first group (unless you joined one from an invite).
+			if (data.steps > 2) return void (await goto(kind === 'manual' ? '/onboarding/group?then=my-time' : '/onboarding/group'));
 			await updateMe({ onboarded: true });
 			await goto(kind === 'manual' ? '/app/my-time' : '/app', { invalidateAll: true });
 		} catch (err) {
@@ -46,7 +48,7 @@
 
 <div class="top">
 	<IconButton href="/onboarding" icon="chevron-left" label="Back" />
-	<StepDots step={2} total={2} />
+	<StepDots step={2} total={data.steps} />
 </div>
 
 <div class="intro">

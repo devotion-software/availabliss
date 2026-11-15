@@ -55,7 +55,7 @@
 
 <div class="top">
 	<Logo size={34} />
-	<StepDots step={1} total={2} />
+	<StepDots step={1} total={data.steps} />
 </div>
 
 <div class="intro">

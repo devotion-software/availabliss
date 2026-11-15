@@ -13,6 +13,7 @@ struct CalendarsView: View {
     @Environment(\.theme) private var theme
     @State private var model: CalendarsViewModel
     @State private var showsCalDAV = false
+    @Environment(\.onboardingSteps) private var onboardingSteps
     @State private var showsProviders = false
     /// Picked in the providers sheet; acted on once it has gone (iCloud opens its own sheet).
     @State private var pickedProvider: ProviderChoice?
@@ -67,7 +68,7 @@ struct CalendarsView: View {
             case .onboarding(let onBack, _, _):
                 IconButton(systemImage: "chevron.left", label: "Back", action: onBack)
                 Spacer()
-                StepDots(current: 1, total: 2)
+                StepDots(current: 1, total: onboardingSteps)
             case .settings:
                 IconButton(systemImage: "chevron.left", label: "Back") { app.router.pop() }
                 Spacer()

@@ -13,6 +13,7 @@ struct RegionView: View {
     @Environment(\.theme) private var theme
     @State private var model: RegionViewModel
     @State private var picker: PickerKind?
+    @Environment(\.onboardingSteps) private var onboardingSteps
 
     private enum PickerKind: String, Identifiable {
         case country, subdivision, authority
@@ -77,7 +78,7 @@ struct RegionView: View {
         if isOnboarding {
             HStack {
                 Spacer()
-                StepDots(current: 0, total: 2)
+                StepDots(current: 0, total: onboardingSteps)
             }
             .frame(height: 44)
         } else {
@@ -229,4 +230,9 @@ struct StepDots: View {
         .accessibilityElement()
         .accessibilityLabel("Step \(current + 1) of \(total)")
     }
+}
+
+extension EnvironmentValues {
+    /// How many steps the sign-up wizard has (fewer when joining a group from an invite).
+    @Entry var onboardingSteps: Int = 4
 }

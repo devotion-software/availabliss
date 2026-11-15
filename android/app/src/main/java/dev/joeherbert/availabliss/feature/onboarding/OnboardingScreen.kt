@@ -30,6 +30,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.joeherbert.availabliss.feature.timing.TimingPreset
+import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
+import dev.joeherbert.availabliss.designsystem.component.Chip
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.semantics.heading
@@ -59,7 +62,7 @@ import dev.joeherbert.availabliss.feature.calendars.ConnectCalendarSheet
 import dev.joeherbert.availabliss.feature.calendars.PendingUrlEffect
 import dev.joeherbert.availabliss.feature.calendars.rememberCalendarPermissionRequest
 
-/** First-run setup: region, then which calendars mean busy. */
+/** The sign-up wizard: about you, calendars, your first group, invite people. */
 @Composable
 fun OnboardingScreen(
     viewModel: OnboardingViewModel = hiltViewModel(),
@@ -100,12 +103,24 @@ fun OnboardingScreen(
     UserMessageEffect(region.message, snackbar, regionViewModel::onMessageShown)
     UserMessageEffect(sources.message, snackbar, sourcesViewModel::onMessageShown)
     BackHandler(enabled = state.step == OnboardingStep.Calendars, onBack = viewModel::goToRegion)
+    BackHandler(enabled = state.step == OnboardingStep.Group, onBack = viewModel::backToCalendars)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(state.pendingShareUrl) {
+        val url = state.pendingShareUrl ?: return@LaunchedEffect
+        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_TEXT, "Join ${state.groupName.trim()} on Availabliss so we can find a time that works: $url")
+        }
+        context.startActivity(android.content.Intent.createChooser(send, "Share invite link"))
+        viewModel.onShareHandled()
+    }
 
     AvailablissBackground(if (state.step == OnboardingStep.Region) OrbLayout.SignIn else OrbLayout.Calendars) {
         AnimatedContent(state.step, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "onboarding") { step ->
             when (step) {
                 OnboardingStep.Region -> OnboardingPage(
                     stepNumber = 1,
+                    steps = state.steps,
                     onBack = null,
                     title = "About you",
                     subtitle = "Your name is how your groups see you. Your region sets bank holidays and school term dates.",
@@ -131,19 +146,20 @@ fun OnboardingScreen(
                 }
                 OnboardingStep.Calendars -> OnboardingPage(
                     stepNumber = 2,
+                    steps = state.steps,
                     onBack = viewModel::goToRegion,
                     title = "Which calendars mean you're busy?",
                     subtitle = "Events in these calendars block out your time. Only “busy” is shared, never the details.",
                     footer = {
                         PrimaryButton(
                             "Continue",
-                            { viewModel.finish(markBusyByHand = false) },
+                            { viewModel.calendarsDone(byHand = false) },
                             loading = state.finishing,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         TextAction(
                             "No calendar? Mark busy times yourself",
-                            { viewModel.finish(markBusyByHand = true) },
+                            { viewModel.calendarsDone(byHand = true) },
                             color = AvailablissTheme.colors.ink,
                             enabled = !state.finishing,
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -155,6 +171,88 @@ fun OnboardingScreen(
                         actions = sourceActions,
                     )
                     RegionSummaryCard(region.summaryTitle, region.summarySubtitle, onChange = viewModel::goToRegion)
+                }
+                OnboardingStep.Group -> OnboardingPage(
+                    stepNumber = 3,
+                    steps = state.steps,
+                    onBack = viewModel::backToCalendars,
+                    title = "Start your first group",
+                    subtitle = "Who are you trying to find a time with? You can change everything later.",
+                    footer = {
+                        PrimaryButton(
+                            "Create group",
+                            viewModel::createGroup,
+                            enabled = state.groupName.isNotBlank(),
+                            loading = state.creating,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        TextAction(
+                            "Skip for now",
+                            viewModel::finish,
+                            color = AvailablissTheme.colors.ink,
+                            enabled = !state.finishing && !state.creating,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        )
+                    },
+                ) {
+                    AvTextField(
+                        value = state.groupName,
+                        onValueChange = viewModel::onGroupNameChange,
+                        label = "Group name",
+                        placeholder = "e.g. Lake District crew",
+                        capitalization = KeyboardCapitalization.Words,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text("What are you planning?", style = AvailablissTheme.type.label, color = AvailablissTheme.colors.muted)
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        TimingPreset.entries.filter { it != TimingPreset.Custom }.forEach { preset ->
+                            Chip(preset.label, selected = state.preset == preset, onClick = { viewModel.onPresetChange(preset) }, height = 40.dp)
+                        }
+                    }
+                }
+                OnboardingStep.Invite -> OnboardingPage(
+                    stepNumber = 4,
+                    steps = state.steps,
+                    onBack = null,
+                    title = "Invite people to ${state.groupName.trim()}",
+                    subtitle = "Once they've added their busy times, you'll see when everyone's free.",
+                    footer = {
+                        PrimaryButton(
+                            if (state.inviteLink == null && state.invited.isEmpty()) "Skip for now" else "Done",
+                            viewModel::finish,
+                            loading = state.finishing,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                ) {
+                    GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Share a link", style = AvailablissTheme.type.bodySmallStrong, color = AvailablissTheme.colors.ink)
+                        Text("Anyone with the link can join.", style = AvailablissTheme.type.caption, color = AvailablissTheme.colors.muted)
+                        PrimaryButton("Share invite link", viewModel::shareLink, icon = AvIcons.Share, loading = state.creatingLink, modifier = Modifier.fillMaxWidth())
+                    }
+                    GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Or invite by email", style = AvailablissTheme.type.bodySmallStrong, color = AvailablissTheme.colors.ink)
+                        Text("Each person gets their own invite; only they can use it.", style = AvailablissTheme.type.caption, color = AvailablissTheme.colors.muted)
+                        AvTextField(
+                            value = state.inviteEmails,
+                            onValueChange = viewModel::onInviteEmailsChange,
+                            placeholder = "sam@example.com, priya@example.com",
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        SecondaryButton(
+                            if (state.sendingInvites) "Sending…" else "Send invites",
+                            viewModel::sendInvites,
+                            enabled = state.inviteEmails.contains('@') && !state.sendingInvites,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (state.invited.isNotEmpty()) {
+                            Text("Invited: ${state.invited.joinToString()}", style = AvailablissTheme.type.caption, color = AvailablissTheme.colors.muted)
+                        }
+                    }
                 }
             }
         }
@@ -179,6 +277,7 @@ fun OnboardingScreen(
 @Composable
 private fun OnboardingPage(
     stepNumber: Int,
+    steps: Int,
     onBack: (() -> Unit)?,
     title: String,
     subtitle: String,
@@ -197,7 +296,7 @@ private fun OnboardingPage(
             Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (onBack != null) GlassIconButton(AvIcons.Back, "Back", onBack)
                 Spacer(Modifier.weight(1f))
-                StepIndicator(current = stepNumber, total = 2)
+                StepIndicator(current = stepNumber, total = steps)
             }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(title, style = AvailablissTheme.type.displaySmall, color = colors.ink, modifier = Modifier.semantics { heading() })
