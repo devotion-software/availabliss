@@ -13,6 +13,11 @@ struct CalendarsView: View {
     @Environment(\.theme) private var theme
     @State private var model: CalendarsViewModel
     @State private var showsCalDAV = false
+    @State private var showsProviders = false
+    /// Picked in the providers sheet; acted on once it has gone (iCloud opens its own sheet).
+    @State private var pickedProvider: ProviderChoice?
+
+    private enum ProviderChoice { case google, microsoft, iCloud }
 
     init(api: APIClient, mode: Mode) {
         self.mode = mode
@@ -45,6 +50,13 @@ struct CalendarsView: View {
         .task { await model.load() }
         .refreshable { await model.load() }
         .sheet(isPresented: $showsCalDAV) { CalDAVSheet(model: model) }
+        .sheet(isPresented: $showsProviders, onDismiss: connectPicked) {
+            BottomSheet(title: "Connect a calendar") {
+                ProviderRow(title: "Google Calendar", systemImage: "globe") { pick(.google) }
+                ProviderRow(title: "Outlook", systemImage: "envelope") { pick(.microsoft) }
+                ProviderRow(title: "iCloud", subtitle: "With an app-specific password", systemImage: "icloud") { pick(.iCloud) }
+            }
+        }
         .errorAlert($model.error)
         .toast($model.toast)
     }
@@ -76,11 +88,10 @@ struct CalendarsView: View {
         }
     }
 
+    /// Opens a sheet of providers. (A Menu here morphed oddly back into the glass button as it closed.)
     private var connectButton: some View {
-        Menu {
-            Button { Task { await model.connectOAuth(.google) } } label: { Label("Google Calendar", systemImage: "globe") }
-            Button { Task { await model.connectOAuth(.microsoft) } } label: { Label("Outlook", systemImage: "envelope") }
-            Button { showsCalDAV = true } label: { Label("iCloud (app-specific password)", systemImage: "icloud") }
+        Button {
+            showsProviders = true
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "plus")
@@ -88,20 +99,40 @@ struct CalendarsView: View {
                     .foregroundStyle(theme.accentInk)
                     .frame(width: 30, height: 30)
                     .background(RoundedRectangle(cornerRadius: 10).fill(theme.accentSoft))
-                Text("Connect another calendar").bodyFont(14, .semibold)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Connect another calendar").bodyFont(14, .semibold).lineLimit(1)
+                    Text("Google · Outlook · iCloud").bodyFont(12, .medium, relativeTo: .caption).foregroundStyle(theme.muted).lineLimit(1)
+                }
                 Spacer()
                 if model.connectingProvider != nil {
                     ProgressView()
                 } else {
-                    Text("Google · Outlook · iCloud").bodyFont(12, .medium, relativeTo: .caption).foregroundStyle(theme.muted)
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.muted)
                 }
             }
             .foregroundStyle(theme.ink)
             .padding(.horizontal, 14)
-            .frame(minHeight: 52)
+            .frame(minHeight: 58)
             .glass(cornerRadius: 20)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.pressable)
         .disabled(model.connectingProvider != nil)
+    }
+
+    private func pick(_ choice: ProviderChoice) {
+        pickedProvider = choice
+        showsProviders = false
+    }
+
+    private func connectPicked() {
+        guard let choice = pickedProvider else { return }
+        pickedProvider = nil
+        switch choice {
+        case .google: Task { await model.connectOAuth(.google) }
+        case .microsoft: Task { await model.connectOAuth(.microsoft) }
+        case .iCloud: showsCalDAV = true
+        }
     }
 
     @ViewBuilder
@@ -363,5 +394,38 @@ private struct CalDAVSheet: View {
             .buttonStyle(.accent)
             .disabled(username.isEmpty || password.count < 8 || model.connectingProvider != nil)
         }
+    }
+}
+
+/// One provider in the "Connect a calendar" sheet.
+private struct ProviderRow: View {
+    let title: String
+    var subtitle: String?
+    let systemImage: String
+    let action: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(theme.accentInk)
+                    .frame(width: 36, height: 36)
+                    .background(RoundedRectangle(cornerRadius: 11).fill(theme.accentSoft))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).bodyFont(15, .semibold)
+                    if let subtitle { Text(subtitle).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted) }
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.muted)
+            }
+            .foregroundStyle(theme.ink)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 60)
+            .surfaceBackground(cornerRadius: 18)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressable)
     }
 }
