@@ -16,8 +16,6 @@ struct OneTimeCodeField: View {
     var body: some View {
         ZStack {
             CodeTextField(text: $code, isFocused: $isFocused, length: length)
-                .accessibilityLabel("One-time code")
-                .accessibilityValue(code.isEmpty ? "Empty" : code.map(String.init).joined(separator: " "))
 
             HStack(spacing: 8) {
                 ForEach(0..<length, id: \.self) { index in
@@ -68,6 +66,7 @@ private struct CodeTextField: UIViewRepresentable {
         field.textColor = .clear
         field.tintColor = .clear
         field.backgroundColor = .clear
+        field.accessibilityLabel = "One-time code"
         field.delegate = context.coordinator
         field.addTarget(context.coordinator, action: #selector(Coordinator.editingChanged(_:)), for: .editingChanged)
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
