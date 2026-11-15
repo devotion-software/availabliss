@@ -10,6 +10,7 @@
 	let { data } = $props();
 	const fmt = useFormat();
 	const next = $derived(data.upcoming[0]);
+	const greeting = $derived(data.user.name?.trim() ? `Hi, ${firstName(data.user.name)}` : 'Hi');
 </script>
 
 <svelte:head><title>Your groups · Availabliss</title></svelte:head>
@@ -18,7 +19,7 @@
 	<header class="hello">
 		<div class="titles">
 			<span class="date">{fmt.current.dayLong(new Date())}</span>
-			<h1>Hi, {firstName(data.user.name || 'there')}</h1>
+			<h1>{greeting}</h1>
 		</div>
 		<span class="phone-only"><ProfileMenu user={data.user} /></span>
 	</header>

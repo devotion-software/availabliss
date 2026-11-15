@@ -69,7 +69,7 @@ struct GroupsHomeView: View {
                 Text(Formatting.longDay(Date()))
                     .bodyFont(13, .medium, relativeTo: .subheadline)
                     .foregroundStyle(theme.muted)
-                Text("Hi, \(app.session.user?.firstName ?? "there")")
+                Text(app.session.user.map(\.firstName).flatMap { $0.isEmpty ? nil : "Hi, \($0)" } ?? "Hi")
                     .displayFont(32, .bold, relativeTo: .largeTitle)
                     .accessibilityAddTraits(.isHeader)
             }
