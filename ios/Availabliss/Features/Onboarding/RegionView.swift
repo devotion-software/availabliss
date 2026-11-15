@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// "Where are you?" — region drives bank holidays and school holidays.
+/// In onboarding it also asks for your name ("About you").
 struct RegionView: View {
     enum Mode {
         case onboarding(onContinue: () -> Void)
@@ -27,12 +28,23 @@ struct RegionView: View {
         VStack(alignment: .leading, spacing: 16) {
             header
             VStack(alignment: .leading, spacing: 6) {
-                Text("Where are you?")
+                Text(isOnboarding ? "About you" : "Where are you?")
                     .displayFont(30, .bold)
                     .accessibilityAddTraits(.isHeader)
-                Text("We use this for bank holidays and school term dates, so your groups can plan around them.")
+                Text(isOnboarding
+                     ? "Your name is how your groups see you. Your region sets bank holidays and school term dates."
+                     : "We use this for bank holidays and school term dates, so your groups can plan around them.")
                     .bodyFont(14)
                     .foregroundStyle(theme.muted)
+            }
+            if isOnboarding {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Your name").sectionLabelStyle()
+                    InputField(placeholder: "First and last name", text: $model.name)
+                        .textContentType(.name)
+                        .textInputAutocapitalization(.words)
+                        .submitLabel(.done)
+                }
             }
             fields
             Spacer(minLength: 0)
@@ -42,7 +54,7 @@ struct RegionView: View {
                 LoadingLabel(title: isOnboarding ? "Continue" : "Save", isLoading: model.isSaving)
             }
             .buttonStyle(.filled(.primary, height: 54, cornerRadius: 18))
-            .disabled(model.country == nil || model.isSaving)
+            .disabled(model.country == nil || model.isSaving || (isOnboarding && model.trimmedName.isEmpty))
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)
@@ -109,7 +121,7 @@ struct RegionView: View {
     }
 
     private func save() async {
-        guard await model.save(session: app.session) else { return }
+        guard await model.save(session: app.session, includingName: isOnboarding) else { return }
         switch mode {
         case .onboarding(let onContinue): onContinue()
         case .settings: app.router.pop()

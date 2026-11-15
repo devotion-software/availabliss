@@ -45,7 +45,7 @@
 <svelte:head><title>Your calendars · Availabliss</title></svelte:head>
 
 <div class="top">
-	<IconButton href="/onboarding" icon="chevron-left" label="Back to your region" />
+	<IconButton href="/onboarding" icon="chevron-left" label="Back" />
 	<StepDots step={2} total={2} />
 </div>
 

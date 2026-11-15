@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -57,6 +58,7 @@ fun AvTextField(
     height: Dp = 50.dp,
     shape: Shape = Shapes.control,
     keyboardType: KeyboardType = KeyboardType.Text,
+    capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
     imeAction: ImeAction = ImeAction.Done,
     onImeAction: () -> Unit = {},
     password: Boolean = false,
@@ -74,7 +76,7 @@ fun AvTextField(
             singleLine = singleLine,
             textStyle = textStyle.copy(color = colors.ink),
             cursorBrush = SolidColor(colors.accent),
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+            keyboardOptions = KeyboardOptions(capitalization = capitalization, keyboardType = keyboardType, imeAction = imeAction),
             keyboardActions = KeyboardActions(onAny = { onImeAction() }),
             visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
             modifier = Modifier

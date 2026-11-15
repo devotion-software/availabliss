@@ -32,6 +32,8 @@ data class RegionUiState(
     val subdivision: String? = null,
     val schoolAuthority: String? = null,
     val timezone: String = ZoneId.systemDefault().id,
+    /** Your name, asked for during onboarding (email sign-up creates accounts without one). */
+    val name: String = "",
     val picker: RegionPicker? = null,
     val query: String = "",
     val saving: Boolean = false,
@@ -113,6 +115,7 @@ class RegionViewModel @Inject constructor(
                     subdivision = subdivision,
                     schoolAuthority = user?.schoolAuthority,
                     timezone = timezone,
+                    name = it.name.ifEmpty { user?.name.orEmpty() },
                 )
             }
             country?.let { loadCountryDetails(it) }
@@ -148,12 +151,15 @@ class RegionViewModel @Inject constructor(
         closePicker()
     }
 
+    fun onNameChange(value: String) = _state.update { it.copy(name = value.take(80)) }
+
     fun useDeviceTimezone() = _state.update { it.copy(timezone = ZoneId.systemDefault().id) }
 
-    fun save() {
+    /** Saves the region, and the name too when [includingName] (onboarding). */
+    fun save(includingName: Boolean = false) {
         val s = _state.value
         val country = s.country ?: return
-        if (s.saving) return
+        if (s.saving || (includingName && s.name.isBlank())) return
         viewModelScope.launch {
             _state.update { it.copy(saving = true) }
             val result = users.update {
@@ -161,6 +167,7 @@ class RegionViewModel @Inject constructor(
                 set("subdivision", s.subdivision)
                 set("schoolAuthority", s.schoolAuthority)
                 set("timezone", s.timezone)
+                if (includingName) set("name", s.name.trim())
             }
             _state.update {
                 when (result) {

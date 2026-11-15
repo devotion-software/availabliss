@@ -7,6 +7,7 @@
 	import { signOutAndLeave } from '#lib/client/session';
 	import Button from '#lib/components/ui/Button.svelte';
 	import GlassPanel from '#lib/components/ui/GlassPanel.svelte';
+	import TextField from '#lib/components/ui/TextField.svelte';
 	import Logo from '#lib/components/ui/Logo.svelte';
 	import StepDots from '#lib/components/onboarding/StepDots.svelte';
 	import RegionFields from '#lib/components/region/RegionFields.svelte';
@@ -16,6 +17,8 @@
 
 	// The form owns its copy; it's seeded once from the saved user.
 	let region = $state<RegionValue>(regionFromUser((() => data.user)()));
+	// Email sign-up creates accounts without a name, so ask for one here.
+	let name = $state((() => data.user.name)());
 	let busy = $state(false);
 
 	// First visit: fill in what we can guess from the browser and the request.
@@ -34,9 +37,10 @@
 
 	async function next(e: SubmitEvent) {
 		e.preventDefault();
+		if (!name.trim()) return;
 		busy = true;
 		try {
-			await updateMe(regionPatch(region));
+			await updateMe({ ...regionPatch(region), name: name.trim() });
 			await invalidateAll();
 			await goto('/onboarding/calendars');
 		} catch (err) {
@@ -47,7 +51,7 @@
 	}
 </script>
 
-<svelte:head><title>Where are you? · Availabliss</title></svelte:head>
+<svelte:head><title>About you · Availabliss</title></svelte:head>
 
 <div class="top">
 	<Logo size={34} />
@@ -55,16 +59,19 @@
 </div>
 
 <div class="intro">
-	<h1>Where are you?</h1>
-	<p>We use this for bank holidays, school holidays and to show times in your zone.</p>
+	<h1>About you</h1>
+	<p>Your name is how your groups see you. Your region sets bank holidays, school holidays and the time zone we show times in.</p>
 </div>
 
 <form class="form" onsubmit={next}>
 	<GlassPanel as="section" padding="16px">
+		<TextField label="Your name" placeholder="First and last name" bind:value={name} autocomplete="name" maxlength={80} required />
+	</GlassPanel>
+	<GlassPanel as="section" padding="16px">
 		<RegionFields bind:value={region} />
 	</GlassPanel>
 	<span class="spacer"></span>
-	<Button type="submit" size="lg" block loading={busy}>Continue</Button>
+	<Button type="submit" size="lg" block loading={busy} disabled={!name.trim()}>Continue</Button>
 	<button type="button" class="link" onclick={signOutAndLeave}>Not you? Sign out</button>
 </form>
 

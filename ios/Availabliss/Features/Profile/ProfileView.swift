@@ -9,6 +9,7 @@ struct ProfileView: View {
     @State private var isAddingPasskey = false
     @State private var error: String?
     @State private var toast: String?
+    @State private var editsName = false
 
     var body: some View {
         ScrollView {
@@ -42,6 +43,9 @@ struct ProfileView: View {
                 }
             }
         }
+        .sheet(isPresented: $editsName) {
+            EditNameSheet(initialName: app.session.user?.name ?? "") { toast = "Name updated" }
+        }
         .errorAlert($error)
         .toast($toast)
     }
@@ -55,12 +59,21 @@ struct ProfileView: View {
     }
 
     private var account: some View {
-        HStack(spacing: 14) {
-            Avatar(name: app.session.user?.name ?? "?", imageURL: app.session.user?.image, color: theme.tiles[0], size: 56)
+        let name = app.session.user?.name.trimmingCharacters(in: .whitespaces) ?? ""
+        return HStack(spacing: 14) {
+            Avatar(name: name.isEmpty ? (app.session.user?.email ?? "?") : name, imageURL: app.session.user?.image, color: theme.tiles[0], size: 56)
             VStack(alignment: .leading, spacing: 2) {
-                Text(app.session.user?.name ?? "").displayFont(24, .bold).accessibilityAddTraits(.isHeader)
+                if name.isEmpty {
+                    Button("Add your name") { editsName = true }
+                        .bodyFont(20, .bold)
+                        .foregroundStyle(theme.accentInk)
+                } else {
+                    Text(name).displayFont(24, .bold).lineLimit(2).accessibilityAddTraits(.isHeader)
+                }
                 Text(app.session.user?.email ?? "").bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            IconButton(systemImage: "pencil", label: "Edit your name") { editsName = true }
         }
         .padding(.bottom, 4)
     }
@@ -129,5 +142,58 @@ private struct SettingsRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Change the name your groups see.
+private struct EditNameSheet: View {
+    let initialName: String
+    let onSaved: () -> Void
+    @Environment(AppModel.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var isSaving = false
+    @State private var error: String?
+    @FocusState private var focused: Bool
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        BottomSheet(title: "Your name") {
+            InputField(placeholder: "First and last name", text: $name)
+                .textContentType(.name)
+                .textInputAutocapitalization(.words)
+                .submitLabel(.done)
+                .focused($focused)
+                .onSubmit { Task { await save() } }
+            Text("This is how you appear to people in your groups.")
+                .bodyFont(13, relativeTo: .subheadline)
+                .foregroundStyle(.secondary)
+            Button {
+                Task { await save() }
+            } label: {
+                LoadingLabel(title: "Save", isLoading: isSaving)
+            }
+            .buttonStyle(.filled(.primary, height: 54, cornerRadius: 18))
+            .disabled(trimmed.isEmpty || trimmed == initialName || isSaving)
+        }
+        .onAppear {
+            name = initialName
+            focused = true
+        }
+        .errorAlert($error)
+    }
+
+    private func save() async {
+        guard !trimmed.isEmpty, !isSaving else { return }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            _ = try await app.session.update(UserPatch(name: String(trimmed.prefix(80))))
+            onSaved()
+            dismiss()
+        } catch {
+            self.error = error.userMessage
+        }
     }
 }

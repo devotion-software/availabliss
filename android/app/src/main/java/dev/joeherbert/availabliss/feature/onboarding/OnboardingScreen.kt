@@ -30,6 +30,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.joeherbert.availabliss.designsystem.component.AvTextField
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -105,18 +107,26 @@ fun OnboardingScreen(
                 OnboardingStep.Region -> OnboardingPage(
                     stepNumber = 1,
                     onBack = null,
-                    title = "Where are you based?",
-                    subtitle = "We use this for bank holidays and school term dates, so groups never land on a day you're away.",
+                    title = "About you",
+                    subtitle = "Your name is how your groups see you. Your region sets bank holidays and school term dates.",
                     footer = {
                         PrimaryButton(
                             "Continue",
-                            regionViewModel::save,
-                            enabled = region.canSave,
+                            { regionViewModel.save(includingName = true) },
+                            enabled = region.canSave && region.name.isNotBlank(),
                             loading = region.saving,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     },
                 ) {
+                    AvTextField(
+                        value = region.name,
+                        onValueChange = regionViewModel::onNameChange,
+                        label = "Your name",
+                        placeholder = "First and last name",
+                        capitalization = KeyboardCapitalization.Words,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     RegionForm(region, regionViewModel::openPicker, regionViewModel::useDeviceTimezone)
                 }
                 OnboardingStep.Calendars -> OnboardingPage(

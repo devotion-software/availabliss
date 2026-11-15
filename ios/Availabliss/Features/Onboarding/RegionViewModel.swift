@@ -12,6 +12,8 @@ final class RegionViewModel {
     var subdivision: String?
     var schoolAuthority: String?
     var timezone = TimeZone.current.identifier
+    /// Asked for during onboarding (email sign-up creates accounts without one).
+    var name = ""
     private(set) var isLoading = false
     private(set) var isSaving = false
     var error: String?
@@ -35,6 +37,7 @@ final class RegionViewModel {
     func load(user: User?) async {
         isLoading = true
         defer { isLoading = false }
+        if name.isEmpty { name = user?.name ?? "" }
         do {
             async let countriesRequest = api.send(API.Regions.countries())
             if let user, user.country != nil {
@@ -62,11 +65,16 @@ final class RegionViewModel {
         await loadCountryDetails()
     }
 
-    func save(session: SessionStore) async -> Bool {
+    var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Saves the region, and the name too when `includingName`.
+    func save(session: SessionStore, includingName: Bool = false) async -> Bool {
         isSaving = true
         defer { isSaving = false }
         do {
-            try await session.update(.region(country: country, subdivision: subdivision, schoolAuthority: schoolAuthority, timezone: timezone))
+            var patch = UserPatch.region(country: country, subdivision: subdivision, schoolAuthority: schoolAuthority, timezone: timezone)
+            if includingName { patch.name = trimmedName }
+            try await session.update(patch)
             return true
         } catch {
             self.error = error.userMessage
