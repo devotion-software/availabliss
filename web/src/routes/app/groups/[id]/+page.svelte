@@ -224,7 +224,7 @@
 				<h1>{group.name}</h1>
 				<span class="sub">{groupSubtitle(group)}</span>
 			</div>
-			<IconButton href="{base}/members" icon="user-plus" label="Members and invites" />
+			<IconButton href="{base}/members" icon={isAdmin ? 'user-plus' : 'users'} label={isAdmin ? 'Members and invites' : 'Members'} />
 		</header>
 		{/if}
 

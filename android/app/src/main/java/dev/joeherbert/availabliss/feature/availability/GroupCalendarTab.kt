@@ -198,7 +198,9 @@ private fun GroupHeader(state: GroupCalendarUiState, onBack: () -> Unit, onOpenM
             Text(state.groupName, style = AvailablissTheme.type.headlineSmall, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(state.membersLine, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
         }
-        GlassIconButton(AvIcons.AddPerson, "Invite people", onOpenMembers)
+        // Only owners and admins can invite, so only they see the "add person" icon.
+        if (state.isAdmin) GlassIconButton(AvIcons.AddPerson, "Members and invites", onOpenMembers)
+        else GlassIconButton(AvIcons.People, "Members", onOpenMembers)
     }
 }
 

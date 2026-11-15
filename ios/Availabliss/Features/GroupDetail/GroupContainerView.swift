@@ -80,11 +80,14 @@ struct GroupHeader: View {
 
     var body: some View {
         ScreenHeader(title: group.name, subtitle: subtitle, titleSize: 22, backLabel: "Back to groups", onBack: { app.router.pop() }) {
-            IconButton(systemImage: "person.badge.plus", label: "Members and invites") {
+            IconButton(systemImage: canInvite ? "person.badge.plus" : "person.2", label: canInvite ? "Members and invites" : "Members") {
                 app.router.push(.members(groupId: group.id))
             }
         }
     }
+
+    /// Only owners and admins can invite, so only they see the "add person" icon.
+    private var canInvite: Bool { group.role != .member }
 
     private var subtitle: String {
         let members = Formatting.plural(group.memberCount, "member")

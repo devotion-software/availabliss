@@ -19,7 +19,7 @@
 		{ path: '/chat', label: 'Chat', icon: 'chat', routes: ['/app/groups/[id]/chat'] },
 		{ path: '/proposals', label: 'Proposals', icon: 'check-circle', routes: ['/app/groups/[id]/proposals', '/app/proposals/[id]'] },
 		{ path: '/timing', label: 'Timing', icon: 'sliders', routes: ['/app/groups/[id]/timing'] },
-		{ path: '/members', label: 'Members', icon: 'user-plus', routes: ['/app/groups/[id]/members'] }
+		{ path: '/members', label: 'Members', icon: 'users', routes: ['/app/groups/[id]/members'] }
 	];
 </script>
 

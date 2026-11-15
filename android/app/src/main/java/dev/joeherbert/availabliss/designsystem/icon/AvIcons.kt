@@ -35,6 +35,7 @@ object AvIcons {
     val Chat = line("Chat", "M4 5h16v11H9l-5 4V5z")
     val ProposalCheck = line("ProposalCheck", circle(12f, 12f, 9f), "M8 12l3 3 5-6")
     val Sliders = line("Sliders", "M4 7h10M18 7h2M4 17h4M12 17h8", circle(16f, 7f, 2f), circle(10f, 17f, 2f))
+    val People = line("People", circle(9f, 8f, 3.5f), "M2.5 20c1-3.3 3.5-5 6.5-5s5.5 1.7 6.5 5", circle(17f, 9f, 2.5f), "M17.5 14.5c2 .2 3.4 1.5 4 3.5")
     val AddPerson = line("AddPerson", circle(10f, 8f, 4f), "M3 20c1.2-3.5 3.8-5 7-5s5.8 1.5 7 5M19 8v6M16 11h6")
     val Clock = line("Clock", circle(12f, 12f, 9f), "M12 7v5l3 2")
     val Pencil = line("Pencil", "M4 20h4L19 9l-4-4L4 16v4z")
