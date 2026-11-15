@@ -47,6 +47,8 @@ final class MyTimeViewModel {
             loadedWeek = week
         } catch where !error.isCancellation {
             self.error = error.userMessage
+            // Show the (empty) grid rather than a loader that never ends.
+            if loadedWeek == nil { loadedWeek = week }
         } catch {}
     }
 

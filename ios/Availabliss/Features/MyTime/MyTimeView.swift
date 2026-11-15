@@ -156,7 +156,16 @@ private struct WeekPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            WeekTimeGrid(layout: model.layout, scrollKey: model.loadedWeek, onSelect: onSelect, onOpen: onOpen)
+            // Until the first week lands, a loader the grid's size: the tab opens straight away
+            // instead of waiting to build the grid.
+            if model.loadedWeek == nil {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: WeekTimeGrid.visibleHeight + 48)
+                    .accessibilityLabel("Loading your week")
+            } else {
+                WeekTimeGrid(layout: model.layout, scrollKey: model.loadedWeek, onSelect: onSelect, onOpen: onOpen)
+            }
             legend
         }
         .padding(12)
