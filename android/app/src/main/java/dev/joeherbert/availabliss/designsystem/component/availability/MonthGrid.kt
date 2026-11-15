@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -98,12 +99,14 @@ fun MonthGrid(
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             rows.forEach { week ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // The selected cell (and its row) draw above their neighbours, which would otherwise cover the ring.
+                val hasSelected = week.any { it?.selected == true }
+                Row(Modifier.fillMaxWidth().zIndex(if (hasSelected) 1f else 0f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     week.forEach { cell ->
                         if (cell == null || cell.state == CellState.Hidden) {
                             Spacer(Modifier.weight(1f).height(54.dp))
                         } else {
-                            MonthCell(cell, onClick = { onSelect(cell.date) }, modifier = Modifier.weight(1f))
+                            MonthCell(cell, onClick = { onSelect(cell.date) }, modifier = Modifier.weight(1f).zIndex(if (cell.selected) 1f else 0f))
                         }
                     }
                 }

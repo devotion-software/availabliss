@@ -312,6 +312,8 @@ private struct MonthGrid: View {
                             ) {
                                 withAnimation(.spring(response: 0.3)) { model.pick(date) }
                             }
+                            // Above its neighbours, so their cells don't cover the selection ring.
+                            .zIndex(date == model.selectedDay ? 1 : 0)
                         } else {
                             Color.clear.frame(height: 54).accessibilityHidden(true)
                         }

@@ -243,6 +243,9 @@
 	.selected {
 		outline: 2px solid var(--ink);
 		outline-offset: 2px;
+		/* Above the neighbouring cells, which would otherwise paint over the ring. */
+		position: relative;
+		z-index: 1;
 	}
 	.busy.selected {
 		opacity: 0.75;
