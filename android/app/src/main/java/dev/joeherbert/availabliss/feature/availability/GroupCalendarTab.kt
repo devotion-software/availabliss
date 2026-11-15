@@ -29,6 +29,8 @@ import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import dev.joeherbert.availabliss.designsystem.component.availability.WeekCards
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Spacer
+import dev.joeherbert.availabliss.feature.group.GroupTopBarHeight
 import dev.joeherbert.availabliss.designsystem.component.swipeToStep
 import dev.joeherbert.availabliss.core.common.DateTimes
 import androidx.compose.ui.draw.clip
@@ -176,7 +178,8 @@ fun GroupCalendarContent(
                     .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = Spacing.tabBarClearance),
                 verticalArrangement = Arrangement.spacedBy(Spacing.l),
             ) {
-                GroupHeader(state, onBack, onOpenMembers)
+                // Room for the group's pinned header and section strip (GroupScreen).
+                Spacer(Modifier.height(GroupTopBarHeight - Spacing.screen))
                 state.syncBanner?.let { SyncBanner(it, state.nudging, onNudge) }
                 if (state.requirementSummary.isNotBlank()) TimingChip(state.requirementSummary, state.isAdmin, onOpenTiming)
                 HeadingRow(state, onSelectView, onPrevious, onNext)
@@ -204,21 +207,6 @@ fun GroupCalendarContent(
             }
             Box(Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.tabBarClearance)) { snackbar() }
         }
-    }
-}
-
-@Composable
-private fun GroupHeader(state: GroupCalendarUiState, onBack: () -> Unit, onOpenMembers: () -> Unit) {
-    val colors = AvailablissTheme.colors
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        GlassIconButton(AvIcons.Back, "Back to groups", onBack)
-        Column(Modifier.weight(1f)) {
-            Text(state.groupName, style = AvailablissTheme.type.headlineSmall, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(state.membersLine, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
-        }
-        // Only owners and admins can invite, so only they see the "add person" icon.
-        if (state.isAdmin) GlassIconButton(AvIcons.AddPerson, "Members and invites", onOpenMembers)
-        else GlassIconButton(AvIcons.People, "Members", onOpenMembers)
     }
 }
 

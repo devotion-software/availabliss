@@ -15,10 +15,9 @@ struct GroupContainerView: View {
 
     var body: some View {
         content
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if tab != .chat {
-                    TabBar(selection: $tab, items: tabItems)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let group = detail.group {
+                    GroupTopBar(group: group, tab: $tab, unreadCount: detail.unreadCount)
                 }
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.85), value: tab)
@@ -43,7 +42,7 @@ struct GroupContainerView: View {
                 case .calendar:
                     GroupAvailabilityView(detail: detail, group: group, onOpenTiming: { tab = .timing })
                 case .chat:
-                    ChatView(detail: detail, group: group, onBack: { tab = .calendar }, onShowCalendar: { tab = .calendar })
+                    ChatView(detail: detail, group: group)
                 case .proposals:
                     GroupPlansView(detail: detail, group: group)
                 case .timing:
@@ -68,14 +67,6 @@ struct GroupContainerView: View {
         }
     }
 
-    private var tabItems: [TabItem<GroupTab>] {
-        [
-            TabItem(value: .calendar, title: "Calendar", systemImage: "calendar"),
-            TabItem(value: .chat, title: "Chat", systemImage: "bubble.left", badge: detail.unreadCount > 0 ? .count(detail.unreadCount) : .none),
-            TabItem(value: .proposals, title: "Proposals", systemImage: "checkmark.circle"),
-            TabItem(value: .timing, title: "Timing", systemImage: "slider.horizontal.3"),
-        ]
-    }
 }
 
 /// Header shared by the group's tabs: back, name + "6 members · you're an admin", invite.
@@ -101,5 +92,63 @@ struct GroupHeader: View {
         case .admin: return "\(members) · you're an admin"
         case .member: return members
         }
+    }
+}
+
+/// Pinned at the top of a group: back, name, members, and the section strip.
+private struct GroupTopBar: View {
+    let group: Group
+    @Binding var tab: GroupTab
+    let unreadCount: Int
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(spacing: 10) {
+            GroupHeader(group: group)
+            HStack(spacing: 4) {
+                item(.calendar, "Calendar", "calendar")
+                item(.chat, "Chat", "bubble.left")
+                item(.proposals, "Proposals", "checkmark.circle")
+                item(.timing, "Timing", "slider.horizontal.3")
+            }
+            .padding(4)
+            .glass(cornerRadius: 16, shadow: false)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+        .background {
+            Rectangle().fill(.ultraThinMaterial).mask {
+                LinearGradient(stops: [.init(color: .black, location: 0.75), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom)
+            }
+            .ignoresSafeArea(edges: .top)
+        }
+    }
+
+    private func item(_ value: GroupTab, _ title: String, _ systemImage: String) -> some View {
+        let isOn = tab == value
+        return Button {
+            tab = value
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage).font(.system(size: 13, weight: .semibold))
+                Text(title).bodyFont(13, isOn ? .semibold : .medium, relativeTo: .caption).lineLimit(1).minimumScaleFactor(0.8)
+                if value == .chat, unreadCount > 0 {
+                    Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
+                        .font(AppFont.body(10, .bold, relativeTo: .caption2))
+                        .foregroundStyle(Color(hex: 0x1A1B3A))
+                        .padding(.horizontal, 5)
+                        .frame(minWidth: 16, minHeight: 16)
+                        .background(Capsule().fill(theme.warn))
+                }
+            }
+            .foregroundStyle(isOn ? theme.onSolid : theme.ink)
+            .frame(maxWidth: .infinity, minHeight: 36)
+            .background { if isOn { RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.solid) } }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(unreadCount > 0 && value == .chat ? "\(title), \(unreadCount) unread" : title)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

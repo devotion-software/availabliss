@@ -26,6 +26,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import dev.joeherbert.availabliss.feature.group.GroupTopBarHeight
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -155,7 +158,8 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
     val listState = rememberLazyListState()
     AvailablissBackground(OrbLayout.Chat) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-            ChatHeader(state, actions.onBack)
+            // Room for the group's pinned header and section strip (GroupScreen).
+            Spacer(Modifier.height(GroupTopBarHeight))
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     state.loading && state.items.isEmpty() -> LoadingIndicator(Modifier.align(Alignment.Center))
@@ -182,30 +186,6 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
                 sending = state.sending,
             )
         }
-    }
-}
-
-@Composable
-private fun ChatHeader(state: ChatUiState, onBack: () -> Unit) {
-    val colors = AvailablissTheme.colors
-    Row(
-        Modifier
-            .padding(start = 12.dp, end = 12.dp, top = 14.dp)
-            .fillMaxWidth()
-            .glass(Shapes.card)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        PlainIconButton(AvIcons.Back, "Back to calendar", onBack)
-        GroupTile(state.monogram, colors.tile(state.tileColor), size = 40.dp, radius = 14.dp)
-        Column(Modifier.weight(1f)) {
-            Text(state.groupName, style = AvailablissTheme.type.bodyStrong.copy(fontWeight = AvWeights.Display650), color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (state.membersSummary.isNotEmpty()) {
-                Text(state.membersSummary, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        PlainIconButton(AvIcons.Calendar, "Group calendar", onBack)
     }
 }
 

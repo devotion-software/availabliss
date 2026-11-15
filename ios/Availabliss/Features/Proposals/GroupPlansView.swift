@@ -15,7 +15,6 @@ struct GroupPlansView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                GroupHeader(group: group)
                 HStack {
                     Text("Proposals").displayFont(19, .semibold).accessibilityAddTraits(.isHeader)
                     Spacer()

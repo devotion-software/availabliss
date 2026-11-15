@@ -98,9 +98,6 @@
 <div class="page">
 	<PageHeader
 	title="Timing"
-	subtitle={data.group.name}
-	backHref="/app/groups/{data.group.id}"
-	backLabel="Back to calendar"
 	size="lg"
 	crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Timing' }]}
 >
@@ -162,7 +159,8 @@
 	}
 	.savebar {
 		position: sticky;
-		bottom: max(16px, env(safe-area-inset-bottom));
+		/* Above the main tab bar on phones. */
+		bottom: calc(var(--tabbar-space) - 8px + env(safe-area-inset-bottom));
 		margin-top: auto;
 		z-index: 5;
 		border-radius: 26px;

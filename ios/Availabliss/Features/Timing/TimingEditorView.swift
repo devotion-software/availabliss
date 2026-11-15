@@ -40,7 +40,9 @@ struct TimingEditorView: View {
     }
 
     private var header: some View {
-        ScreenHeader(title: "Timing", subtitle: group.name, backLabel: "Back to calendar", onBack: onDone) {
+        HStack {
+            Text("Timing").displayFont(19, .semibold).accessibilityAddTraits(.isHeader)
+            Spacer()
             StatusPill(text: canEdit ? "Admins only" : "View only", tone: .indigo, systemImage: canEdit ? "shield" : "eye")
         }
     }

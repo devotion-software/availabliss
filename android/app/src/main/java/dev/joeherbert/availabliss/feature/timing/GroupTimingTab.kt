@@ -34,6 +34,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Spacer
+import dev.joeherbert.availabliss.feature.group.GroupTopBarHeight
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -141,13 +143,13 @@ fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackb
     AvailablissBackground(OrbLayout.Timing) {
         // imePadding: the template name field sits at the bottom of the scroller.
         Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
-            ScreenHeader(
-                title = "Timing",
-                subtitle = state.groupName,
-                onBack = actions.onBack,
-                backDescription = "Back to calendar",
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp),
+            // Room for the group's pinned header and section strip (GroupScreen).
+            Spacer(Modifier.height(GroupTopBarHeight))
+            Row(
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                Text("Timing", style = AvailablissTheme.type.titleSmall, color = AvailablissTheme.colors.ink, modifier = Modifier.weight(1f))
                 StatusPill(
                     "Admins only",
                     PillTone.Indigo,

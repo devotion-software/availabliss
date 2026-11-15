@@ -226,17 +226,6 @@
 
 <div class="page">
 	<div class="main">
-		{#if phone}
-		<!-- Phone header (GroupCalendar.dc) -->
-		<header class="phone-head">
-			<IconButton href="/app" icon="chevron-left" label="Back to groups" />
-			<div class="titles">
-				<h1>{group.name}</h1>
-				<span class="sub">{groupSubtitle(group)}</span>
-			</div>
-			<IconButton href="{base}/members" icon={isAdmin ? 'user-plus' : 'users'} label={isAdmin ? 'Members and invites' : 'Members'} />
-		</header>
-		{/if}
 
 		{#if desk}
 		<!-- Desktop header (Web.dc) -->
@@ -364,7 +353,6 @@
 		gap: 12px;
 	}
 
-	.phone-head,
 	.desk-head {
 		display: flex;
 		align-items: center;
@@ -489,7 +477,6 @@
 	}
 
 	@media (min-width: 900px) {
-		.phone-head,
 		.phone-only,
 		.phone-only.stack,
 		.phone-only:not(.stack) {

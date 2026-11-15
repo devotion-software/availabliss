@@ -37,6 +37,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
@@ -112,6 +119,9 @@ fun SignInContent(
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
     val focusManager = LocalFocusManager.current
+    // Where the sign-in card is: a tap outside it puts the keyboard away; taps inside are the card's.
+    var cardBounds by remember { mutableStateOf(Rect.Zero) }
+    var rootOffset by remember { mutableStateOf(Offset.Zero) }
     AvailablissBackground(OrbLayout.SignIn) {
         BoxWithConstraints(
             Modifier
@@ -119,8 +129,10 @@ fun SignInContent(
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .imePadding()
-                // A tap anywhere outside the fields puts the keyboard away (fields and buttons consume their own taps).
-                .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
+                .onGloballyPositioned { rootOffset = it.positionInRoot() }
+                .pointerInput(Unit) {
+                    detectTapGestures { tap -> if (!cardBounds.contains(tap + rootOffset)) focusManager.clearFocus() }
+                },
         ) {
             // Sized to fit one screen; it only scrolls on the smallest phones or with large text.
             val short = maxHeight < 720.dp
@@ -158,6 +170,7 @@ fun SignInContent(
                     Modifier
                         .padding(top = 20.dp)
                         .fillMaxWidth()
+                        .onGloballyPositioned { cardBounds = it.boundsInRoot() }
                         .glass(RoundedCornerShape(30.dp))
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),

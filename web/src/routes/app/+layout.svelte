@@ -79,10 +79,10 @@
 	});
 
 	const path = $derived(page.url.pathname);
-	// Group screens and proposals bring their own phone navigation.
-	const mainTabs = $derived(!/^\/app\/(groups|proposals)\//.test(path));
+	// The main tab bar stays on every app screen, inside groups too (they add a section strip at the top).
+	const mainTabs = $derived(!/\/events\/new$/.test(path));
 	const tabs = $derived([
-		{ href: '/app', label: 'Groups', icon: 'groups' as const, current: path === '/app' },
+		{ href: '/app', label: 'Groups', icon: 'groups' as const, current: path === '/app' || /^\/app\/(groups|proposals)\//.test(path) },
 		{ href: '/app/my-time', label: 'My time', icon: 'calendar' as const, current: path.startsWith('/app/my-time') },
 		{ href: '/app/activity', label: 'Activity', icon: 'bell' as const, current: path.startsWith('/app/activity'), badge: (activity.seeded ? activity.unread : data.notifications.unread) > 0 },
 		{

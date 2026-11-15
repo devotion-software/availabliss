@@ -7,6 +7,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.joeherbert.availabliss.designsystem.theme.Spacing
+import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
+import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.background
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -38,7 +51,11 @@ import dev.joeherbert.availabliss.feature.you.YouScreen
 
 private enum class MainTab { Groups, MyTime, Activity, You }
 
-/** The signed-in, onboarded app: every destination plus the floating main tab bar. */
+/**
+ * The signed-in, onboarded app: every destination plus the floating main tab bar, which stays
+ * on screen everywhere except full-screen editors and while the keyboard is up.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MainNavHost(root: RootViewModel) {
     val nav = rememberNavController()
@@ -62,9 +79,26 @@ fun MainNavHost(root: RootViewModel) {
         destination.hasRoute<YouRoute>() -> MainTab.You
         else -> null
     }
+    // Inside a tab (a group, a proposal, settings…) the bar shows the tab you came from.
+    var lastTab by remember { mutableStateOf(MainTab.Groups) }
+    if (currentTab != null) lastTab = currentTab
+    val isEditor = destination != null && (
+        destination.hasRoute<NewGroupRoute>() || destination.hasRoute<CreateProposalRoute>() ||
+            destination.hasRoute<EventEditorRoute>() || destination.hasRoute<InviteRoute>()
+        )
+    val showBar = destination != null && !isEditor && !WindowInsets.isImeVisible
+    // Tab roots leave room for the floating bar themselves; other screens are laid out above it.
+    val innerPadding = if (showBar && currentTab == null) Spacing.tabBarClearance else 0.dp
 
-    Box(Modifier.fillMaxSize()) {
-        NavHost(navController = nav, startDestination = HomeRoute, modifier = Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().background(AvailablissTheme.colors.bg)) {
+        NavHost(
+            navController = nav,
+            startDestination = HomeRoute,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = innerPadding)
+                .then(if (innerPadding > 0.dp) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier),
+        ) {
             composable<HomeRoute> {
                 HomeScreen(
                     onOpenGroup = { nav.navigate(GroupRoute(it)) },
@@ -138,7 +172,7 @@ fun MainNavHost(root: RootViewModel) {
             composable<RegionRoute> { RegionScreen(onBack = { nav.popBackStack() }) }
         }
 
-        if (currentTab != null) {
+        if (showBar) {
             TabBar(
                 items = listOf(
                     TabItem(MainTab.Groups, "Groups", AvIcons.Groups),
@@ -146,7 +180,7 @@ fun MainNavHost(root: RootViewModel) {
                     TabItem(MainTab.Activity, "Activity", AvIcons.Bell, dot = unread > 0),
                     TabItem(MainTab.You, "You", AvIcons.Person),
                 ),
-                selected = currentTab,
+                selected = currentTab ?: lastTab,
                 onSelect = { tab ->
                     nav.switchTab(
                         when (tab) {

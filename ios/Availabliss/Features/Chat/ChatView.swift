@@ -4,8 +4,6 @@ import SwiftUI
 struct ChatView: View {
     let detail: GroupDetailModel
     let group: Group
-    let onBack: () -> Void
-    let onShowCalendar: () -> Void
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var model: ChatViewModel
@@ -24,11 +22,9 @@ struct ChatView: View {
         }
     }
 
-    init(detail: GroupDetailModel, group: Group, onBack: @escaping () -> Void, onShowCalendar: @escaping () -> Void) {
+    init(detail: GroupDetailModel, group: Group) {
         self.detail = detail
         self.group = group
-        self.onBack = onBack
-        self.onShowCalendar = onShowCalendar
         _model = State(initialValue: ChatViewModel(groupId: group.id, api: detail.api))
     }
 
@@ -36,7 +32,6 @@ struct ChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ChatHeader(group: group, me: me, onBack: onBack, onShowCalendar: onShowCalendar)
             messageList
             if showsMenu {
                 ComposerMenu { choice in
@@ -121,36 +116,6 @@ struct ChatView: View {
         case .info(let message):
             MessageInfoSheet(message: message, group: group, model: model)
         }
-    }
-}
-
-/// Glass header: back, tile, name + members, calendar.
-private struct ChatHeader: View {
-    let group: Group
-    let me: String?
-    let onBack: () -> Void
-    let onShowCalendar: () -> Void
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        HStack(spacing: 10) {
-            IconButton(systemImage: "chevron.left", label: "Back to calendar", glass: false, action: onBack)
-            GroupTile(monogram: group.monogram, colorToken: group.color, size: 40, cornerRadius: 14)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(group.name).bodyFont(16, .semibold).lineLimit(1)
-                Text(Formatting.memberSummary(group.members.filter { $0.userId != me }.map(\.firstName)))
-                    .bodyFont(12, relativeTo: .caption)
-                    .foregroundStyle(theme.muted)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            IconButton(systemImage: "calendar", label: "Group calendar", glass: false, action: onShowCalendar)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .glass(cornerRadius: 24)
-        .padding(.horizontal, 12)
-        .padding(.top, 14)
     }
 }
 

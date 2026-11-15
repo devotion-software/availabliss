@@ -65,14 +65,15 @@
 <ProposeSheet bind:open={proposeOpen} {group} meId={data.user.id} initial={null} />
 
 <style>
-	/* Phone: a full-screen conversation above the orbs (Chat.dc.html). */
+	/* Phone: the conversation fills the space between the group's header (layout) and the main tab bar. */
 	.chat {
-		position: fixed;
-		inset: 0;
-		z-index: 2;
+		height: calc(100dvh - 150px - var(--tabbar-space) - env(safe-area-inset-bottom) - env(safe-area-inset-top));
+		min-height: 320px;
 		display: flex;
 		flex-direction: column;
-		padding-top: max(14px, env(safe-area-inset-top));
+	}
+	.chat > .head {
+		display: none;
 	}
 	.head {
 		margin: 0 12px;
@@ -105,7 +106,7 @@
 		text-overflow: ellipsis;
 	}
 	.composer {
-		padding: 10px 12px max(18px, env(safe-area-inset-bottom));
+		padding: 10px 0 0;
 	}
 
 	/* Desktop: a tall glass panel in the content column, beside the groups sidebar. */
@@ -124,6 +125,9 @@
 			border: 1px solid var(--glass-border);
 			box-shadow: var(--glass-shadow);
 			overflow: hidden;
+		}
+		.chat > .head {
+			display: flex;
 		}
 		.head {
 			margin: 12px 12px 0;

@@ -26,6 +26,8 @@ data class GroupShellUiState(
     val groupName: String = "",
     val unreadCount: Int = 0,
     val isAdmin: Boolean = false,
+    /** "5 members · you're the owner" */
+    val membersLine: String = "",
 )
 
 /**
@@ -45,7 +47,19 @@ class GroupViewModel @Inject constructor(
     private var currentTab: GroupTab = GroupTab.Calendar
 
     val uiState: StateFlow<GroupShellUiState> = combine(groups.group(groupId), unread) { group, count ->
-        GroupShellUiState(groupName = group?.name.orEmpty(), unreadCount = count, isAdmin = group?.role?.isAdmin == true)
+        GroupShellUiState(
+            groupName = group?.name.orEmpty(),
+            unreadCount = count,
+            isAdmin = group?.role?.isAdmin == true,
+            membersLine = group?.let {
+                val members = "${it.memberCount} ${if (it.memberCount == 1) "member" else "members"}"
+                when (it.role) {
+                    dev.joeherbert.availabliss.core.network.model.Role.Owner -> "$members · you're the owner"
+                    dev.joeherbert.availabliss.core.network.model.Role.Admin -> "$members · you're an admin"
+                    else -> members
+                }
+            }.orEmpty(),
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GroupShellUiState())
 
     init {

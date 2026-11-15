@@ -42,9 +42,6 @@ final class Router {
         var id: String { token }
     }
 
-    /// The main tab bar hides once you drill into a screen.
-    var showsTabBar: Bool { currentPath.isEmpty }
-
     var currentPath: [AppRoute] {
         switch tab {
         case .groups: groupsPath

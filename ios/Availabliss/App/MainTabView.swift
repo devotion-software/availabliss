@@ -1,51 +1,78 @@
 import SwiftUI
 
-/// The four main tabs with the floating glass tab bar.
+/// The four main tabs on the system tab bar, which stays on screen everywhere (inside groups
+/// and pushed screens too) and, on iOS 26, shrinks while you scroll down.
 struct MainTabView: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
 
     var body: some View {
-        @Bindable var router = app.router
-        TabView(selection: $router.tab) {
-            tabStack(path: $router.groupsPath) { GroupsHomeView(api: app.api) }
-                .tag(AppTab.groups)
-            tabStack(path: $router.myTimePath) { MyTimeView(api: app.api) }
-                .tag(AppTab.myTime)
-            tabStack(path: $router.activityPath) { ActivityView(api: app.api) }
-                .tag(AppTab.activity)
-            tabStack(path: $router.youPath) { ProfileView() }
-                .tag(AppTab.you)
+        SwiftUI.Group {
+            if #available(iOS 18.0, *) { modernTabs } else { legacyTabs }
         }
-        // Overlaid rather than a safe-area inset: an inset on the TabView doesn't reach the scroll
-        // views inside its pages, so each tab root reserves the room itself (`tabStack`).
-        .overlay(alignment: .bottom) {
-            if router.showsTabBar {
-                TabBar(selection: $router.tab, items: tabItems)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: router.showsTabBar)
+        .tint(theme.accentInk)
+        .modifier(MinimizeTabBarOnScroll())
     }
 
-    private var tabItems: [TabItem<AppTab>] {
-        [
-            TabItem(value: .groups, title: "Groups", systemImage: "circle.hexagongrid"),
-            TabItem(value: .myTime, title: "My time", systemImage: "calendar"),
-            TabItem(value: .activity, title: "Activity", systemImage: "bell", badge: app.unreadNotifications > 0 ? .dot : .none),
-            TabItem(value: .you, title: "You", systemImage: "person"),
-        ]
+    /// iOS 18+: `Tab`s, which the iOS 26 tab bar can shrink on scroll.
+    @available(iOS 18.0, *)
+    private var modernTabs: some View {
+        @Bindable var router = app.router
+        return TabView(selection: $router.tab) {
+            Tab("Groups", systemImage: "circle.hexagongrid", value: AppTab.groups) {
+                tabStack(path: $router.groupsPath) { GroupsHomeView(api: app.api) }
+            }
+            Tab("My time", systemImage: "calendar", value: AppTab.myTime) {
+                tabStack(path: $router.myTimePath) { MyTimeView(api: app.api) }
+            }
+            Tab("Activity", systemImage: "bell", value: AppTab.activity) {
+                tabStack(path: $router.activityPath) { ActivityView(api: app.api) }
+            }
+            .badge(app.unreadNotifications)
+            Tab("You", systemImage: "person", value: AppTab.you) {
+                tabStack(path: $router.youPath) { ProfileView() }
+            }
+        }
+    }
+
+    private var legacyTabs: some View {
+        @Bindable var router = app.router
+        return TabView(selection: $router.tab) {
+            tabStack(path: $router.groupsPath) { GroupsHomeView(api: app.api) }
+                .tabItem { Label("Groups", systemImage: "circle.hexagongrid") }
+                .tag(AppTab.groups)
+            tabStack(path: $router.myTimePath) { MyTimeView(api: app.api) }
+                .tabItem { Label("My time", systemImage: "calendar") }
+                .tag(AppTab.myTime)
+            tabStack(path: $router.activityPath) { ActivityView(api: app.api) }
+                .tabItem { Label("Activity", systemImage: "bell") }
+                .badge(app.unreadNotifications)
+                .tag(AppTab.activity)
+            tabStack(path: $router.youPath) { ProfileView() }
+                .tabItem { Label("You", systemImage: "person") }
+                .tag(AppTab.you)
+        }
     }
 
     private func tabStack<Root: View>(path: Binding<[AppRoute]>, @ViewBuilder root: () -> Root) -> some View {
         NavigationStack(path: path) {
             root()
                 .modifier(FadeInOnAppear())
-                .safeAreaInset(edge: .bottom, spacing: 0) { TabBarSpacer() }
                 .navigationDestination(for: AppRoute.self) { route in
                     RouteDestination(route: route)
                 }
         }
-        .toolbar(.hidden, for: .tabBar)
+    }
+}
+
+/// iOS 26+: the tab bar shrinks to a small pill while scrolling down, and comes back on scroll up.
+private struct MinimizeTabBarOnScroll: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            content
+        }
     }
 }
 

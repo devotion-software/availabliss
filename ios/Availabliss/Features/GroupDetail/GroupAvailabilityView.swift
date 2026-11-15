@@ -27,7 +27,6 @@ struct GroupAvailabilityView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                GroupHeader(group: group)
                 if !group.pendingMembers.isEmpty {
                     SyncBanner(group: group, isAdmin: group.role.isAdmin, isNudging: model.isNudging) {
                         Task { await model.nudge() }
