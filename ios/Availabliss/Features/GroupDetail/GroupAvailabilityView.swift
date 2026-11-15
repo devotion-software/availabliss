@@ -159,10 +159,20 @@ struct GroupAvailabilityView: View {
         if model.isLoading {
             StatusView(kind: .loading)
         } else {
-            switch model.mode {
-            case .month: MonthGrid(model: model, group: group, me: app.session.user?.id)
-            case .week: WeekGrid(model: model, group: group)
+            SwiftUI.Group {
+                switch model.mode {
+                case .month: MonthGrid(model: model, group: group, me: app.session.user?.id)
+                case .week: WeekGrid(model: model, group: group)
+                }
             }
+            // Swipe sideways for the previous / next month or week.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 30).onEnded { drag in
+                    let dx = drag.translation.width, dy = drag.translation.height
+                    guard abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
+                    Task { await model.step(by: dx < 0 ? 1 : -1) }
+                }
+            )
             DayDetailCard(model: model, group: group, me: app.session.user?.id) { draft in
                 proposalDraft = draft
             }

@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.joeherbert.availabliss.designsystem.component.swipeToStep
 import dev.joeherbert.availabliss.core.common.DateTimes
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
@@ -178,7 +179,12 @@ fun GroupCalendarContent(
                 HeadingRow(state, onSelectView, onPrevious, onNext)
                 state.coverageNote?.let { CoverageNote(it) }
                 state.error?.let { ErrorBanner(it, onRetry = onRetry) }
-                AnimatedContent(targetState = state.view, label = "calendar-view") { view ->
+                AnimatedContent(
+                    targetState = state.view,
+                    label = "calendar-view",
+                    // Swipe sideways for the previous / next month or week.
+                    modifier = Modifier.swipeToStep(onPrevious = onPrevious, onNext = onNext),
+                ) { view ->
                     when (view) {
                         CalendarView.Month -> MonthSection(state, onSelectDate, onPlanWithAi)
                         CalendarView.Week -> if (state.weekLoading && state.weekColumns.isEmpty()) LoadingIndicator()

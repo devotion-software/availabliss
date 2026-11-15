@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.joeherbert.availabliss.designsystem.component.swipeToStep
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -163,7 +164,10 @@ fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: My
                     verticalArrangement = Arrangement.spacedBy(Spacing.xl),
                 ) {
                     state.error?.let { ErrorBanner(it, onRetry = actions.onRetry) }
-                    WeekGridCard(state, gridHeight, actions.onEmptyTapped, actions.onIntervalTapped)
+                    // Swipe sideways for the previous / next week.
+                    Box(Modifier.swipeToStep(onPrevious = actions.onPreviousWeek, onNext = actions.onNextWeek)) {
+                        WeekGridCard(state, gridHeight, actions.onEmptyTapped, actions.onIntervalTapped)
+                    }
                     state.recurring.forEach { block ->
                         RecurringBlockRow(block, onClick = { actions.onOpenRecurring(block.id) }, onDelete = { actions.onDeleteRecurring(block.id) })
                     }
