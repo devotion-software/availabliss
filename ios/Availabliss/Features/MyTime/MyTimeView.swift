@@ -34,12 +34,32 @@ struct MyTimeView: View {
                 ScreenHeader(title: "My time", subtitle: "Tap to block time, tap a block to edit it") {
                     IconButton(icon: .asset("CalendarSync"), label: "Connected calendars") { app.router.push(.calendars) }
                 }
+                SegmentedControl(
+                    selection: Binding(get: { model.mode }, set: { mode in Task { await model.setMode(mode) } }),
+                    options: [SegmentOption(value: .week, label: "Week"), SegmentOption(value: .month, label: "Month")],
+                    accessibilityLabel: "My time view"
+                )
                 weekSwitcher
-                WeekPanel(model: model) { day, from, to in
-                    draft = BlockDraft(day: day, range: (from, to))
-                } onOpen: { interval in
-                    open(interval)
+                SwiftUI.Group {
+                    switch model.mode {
+                    case .week:
+                        WeekPanel(model: model) { day, from, to in
+                            draft = BlockDraft(day: day, range: (from, to))
+                        } onOpen: { interval in
+                            open(interval)
+                        }
+                    case .month:
+                        MonthPanel(model: model) { day in Task { await model.showWeek(of: day) } }
+                    }
                 }
+                // Swipe sideways for the previous / next week or month.
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 30).onEnded { drag in
+                        let dx = drag.translation.width, dy = drag.translation.height
+                        guard abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
+                        Task { await model.move(by: dx < 0 ? 1 : -1) }
+                    }
+                )
                 ForEach(model.recurringBlocks) { block in
                     RecurringBlockRow(block: block) {
                         draft = BlockDraft(day: CalendarDay(block.start), editing: block)
@@ -116,12 +136,12 @@ struct MyTimeView: View {
 
     private var weekSwitcher: some View {
         HStack(spacing: 8) {
-            WeekArrow(systemImage: "chevron.left", label: "Previous week") { Task { await model.moveWeek(by: -1) } }
+            WeekArrow(systemImage: "chevron.left", label: model.mode == .week ? "Previous week" : "Previous month") { Task { await model.move(by: -1) } }
             Text(model.title)
                 .displayFont(17, .semibold, relativeTo: .headline)
                 .frame(maxWidth: .infinity)
                 .contentTransition(.numericText())
-            WeekArrow(systemImage: "chevron.right", label: "Next week") { Task { await model.moveWeek(by: 1) } }
+            WeekArrow(systemImage: "chevron.right", label: model.mode == .week ? "Next week" : "Next month") { Task { await model.move(by: 1) } }
         }
     }
 }
@@ -226,5 +246,105 @@ private struct RecurringBlockRow: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Double-tap to edit")
         .accessibilityAction(named: "Remove", onRemove)
+    }
+}
+
+/// The month: each day with a strip of its busy time (blocked by you striped, calendars grey).
+/// Tap a day to open its week.
+private struct MonthPanel: View {
+    let model: MyTimeViewModel
+    let onPick: (CalendarDay) -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 4) {
+                ForEach(0..<7, id: \.self) { column in
+                    Text(Weekday.short((model.monthWeeks.first?.first ?? .today()).adding(days: column).weekday()))
+                        .bodyFont(11, .semibold, relativeTo: .caption2)
+                        .foregroundStyle(theme.muted)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            ForEach(model.monthWeeks, id: \.self) { week in
+                HStack(spacing: 4) {
+                    ForEach(week, id: \.self) { day in
+                        MonthDayCell(
+                            day: day,
+                            inMonth: day.month == model.monthStart.month,
+                            intervals: model.intervals(on: day)
+                        ) { onPick(day) }
+                    }
+                }
+            }
+            HStack(spacing: 12) {
+                LegendItem(label: "Blocked by you") { theme.accent }
+                LegendItem(label: "From a calendar") { theme.ink.opacity(0.3) }
+                Spacer(minLength: 0)
+                Text("Tap a day for its week")
+            }
+            .bodyFont(11, relativeTo: .caption2)
+            .foregroundStyle(theme.muted)
+            .padding(.top, 6)
+        }
+        .padding(12)
+        .glass(cornerRadius: 24)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Busy times this month")
+    }
+}
+
+private struct MonthDayCell: View {
+    let day: CalendarDay
+    let inMonth: Bool
+    let intervals: [BusyInterval]
+    let action: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let isToday = day == .today()
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Text("\(day.day)")
+                    .bodyFont(14, .semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(isToday ? theme.onAccent : theme.ink)
+                    .frame(width: 26, height: 26)
+                    .background { if isToday { Circle().fill(theme.accent) } }
+                strip
+            }
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.surface.opacity(inMonth ? 1 : 0.4)))
+            .opacity(inMonth ? 1 : 0.5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressable)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    /// The day's 24 hours as a thin bar, busy time drawn where it falls.
+    private var strip: some View {
+        GeometryReader { proxy in
+            let start = day.startDate(), length = day.adding(days: 1).startDate().timeIntervalSince(start)
+            ZStack(alignment: .leading) {
+                Capsule().fill(theme.line)
+                ForEach(Array(intervals.enumerated()), id: \.offset) { _, interval in
+                    let from = max(0, interval.start.timeIntervalSince(start)) / length
+                    let to = min(length, interval.end.timeIntervalSince(start)) / length
+                    Capsule()
+                        .fill(interval.source == .manual ? theme.accent : theme.ink.opacity(0.3))
+                        .frame(width: max(3, (to - from) * proxy.size.width))
+                        .offset(x: from * proxy.size.width)
+                }
+            }
+        }
+        .frame(height: 6)
+        .padding(.horizontal, 6)
+        .accessibilityHidden(true)
+    }
+
+    private var accessibilityText: String {
+        let base = Formatting.longDay(day.startDate())
+        return intervals.isEmpty ? "\(base), free" : "\(base), \(Formatting.plural(intervals.count, "busy time")). Opens the week"
     }
 }

@@ -4,7 +4,11 @@ import Observation
 @MainActor
 @Observable
 final class MyTimeViewModel {
+    enum Mode: Hashable { case week, month }
+
+    var mode: Mode = .week
     private(set) var weekStart: CalendarDay = CalendarDay.today().startOfWeek()
+    private(set) var monthStart: CalendarDay = CalendarDay.today().firstOfMonth
     private(set) var intervals: [BusyInterval] = []
     private(set) var blocks: [ManualBlock] = []
     private(set) var isLoading = false
@@ -20,7 +24,30 @@ final class MyTimeViewModel {
         self.api = api
     }
 
-    var title: String { Formatting.dayRange(weekStart, weekStart.adding(days: 6)) }
+    var title: String {
+        switch mode {
+        case .week: Formatting.dayRange(weekStart, weekStart.adding(days: 6))
+        case .month: Formatting.shortMonthYear(monthStart)
+        }
+    }
+
+    /// Whole weeks covering the month on screen (rows of seven days; days outside the month included).
+    var monthWeeks: [[CalendarDay]] {
+        var weeks: [[CalendarDay]] = []
+        var start = monthStart.startOfWeek()
+        let last = monthStart.lastOfMonth()
+        while start <= last {
+            weeks.append((0..<7).map { start.adding(days: $0) })
+            start = start.adding(days: 7)
+        }
+        return weeks
+    }
+
+    /// Busy intervals touching `day` (for the month view).
+    func intervals(on day: CalendarDay) -> [BusyInterval] {
+        let start = day.startDate(), end = day.adding(days: 1).startDate()
+        return intervals.filter { $0.overlaps(start, end) }
+    }
 
     var recurringBlocks: [ManualBlock] { blocks.filter { $0.repeat != .none } }
 
@@ -35,14 +62,16 @@ final class MyTimeViewModel {
         isLoading = intervals.isEmpty
         defer { isLoading = false }
         let week = weekStart
-        let from = week.startDate()
-        let to = week.adding(days: 7).startDate()
+        let mode = self.mode
+        let month = monthStart
+        let from = mode == .week ? week.startDate() : month.startOfWeek().startDate()
+        let to = mode == .week ? week.adding(days: 7).startDate() : (monthWeeks.last?.last ?? month).adding(days: 1).startDate()
         do {
             async let busy = api.send(API.Me.busy(from: from, to: to))
             async let blockList = api.send(API.Blocks.list())
             let loaded = try await busy.intervals
             blocks = try await blockList.blocks
-            guard week == weekStart else { return }
+            guard week == weekStart, mode == self.mode, month == monthStart else { return }
             intervals = loaded
             loadedWeek = week
         } catch where !error.isCancellation {
@@ -54,6 +83,39 @@ final class MyTimeViewModel {
 
     func moveWeek(by weeks: Int) async {
         weekStart = weekStart.adding(days: 7 * weeks)
+        intervals = []
+        await load()
+    }
+
+    /// Previous / next week or month, whichever is showing.
+    func move(by steps: Int) async {
+        switch mode {
+        case .week: await moveWeek(by: steps)
+        case .month:
+            monthStart = monthStart.addingMonths(steps)
+            intervals = []
+            await load()
+        }
+    }
+
+    func setMode(_ newMode: Mode) async {
+        guard newMode != mode else { return }
+        // Keep roughly the same place: the month of the week on screen, or the first week of the month.
+        if newMode == .month {
+            monthStart = weekStart.adding(days: 3).firstOfMonth
+        } else {
+            let today = CalendarDay.today()
+            weekStart = (today.firstOfMonth == monthStart ? today : monthStart).startOfWeek()
+        }
+        mode = newMode
+        intervals = []
+        await load()
+    }
+
+    /// A day tapped in the month: open its week.
+    func showWeek(of day: CalendarDay) async {
+        weekStart = day.startOfWeek()
+        mode = .week
         intervals = []
         await load()
     }
