@@ -214,13 +214,21 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | GET 🔒 | `/me` | | `User` |
 | PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded'>>` | `User` |
 | GET 🔒 | `/me/busy?from&to` (ISO instants, `to` after `from`, at most 120 days apart) | | `{ intervals: BusyInterval[] }` (own merged busy time; `label` is only ever returned to the owner) |
+| POST 🔒 | `/me/busy/ignores` | `{ calendarId, eventKey, start, end, series?: boolean }` | `{ id }` — that calendar event (or with `series`, every occurrence) no longer counts as busy |
+| DELETE 🔒 | `/me/busy/ignores/:id` | | 204 — it counts as busy again |
 | DELETE 🔒 | `/me` | | `204` (deletes the account and all data) |
 | GET 🔒 | `/me/accounts` | | `{ linked: { provider: 'apple' \| 'google'; linkedAt }[]; available: ('apple' \| 'google')[] }` (Apple / Google sign-ins on the account, and which ones this server can link) |
 | POST 🔒 | `/me/accounts/link` | `{ provider: 'apple' \| 'google', idToken, nonce?, merge? }` | `{ linked: true, merged }`, or `409` `{ message, code: 'conflict', account: { name, email, groups } }` when that sign-in already has its own account. Show it, then send again with `merge: true` to merge it into this account (its groups, busy time, calendars, chats, templates and Pro move here; the other account is deleted). Native only: the id token comes from Sign in with Apple / Google. An id token that can't be verified (e.g. expired while the merge prompt was open) is `400`, never `401`, so it can't be mistaken for the session ending. |
 | POST 🔒 | `/me/accounts/merge-intent` | `{ provider }` | `204` + a short-lived cookie (web only; see Linking on the web) |
 
 ```ts
-interface BusyInterval { start: string; end: string; source: 'calendar' | 'manual'; label: string | null; calendarId: string | null; blockId: string | null }
+interface BusyInterval {
+  start: string; end: string; source: 'calendar' | 'manual'; label: string | null; calendarId: string | null; blockId: string | null;
+  // Calendar busy only:
+  eventKey?: string;        // opaque key of the event / its series ('' if the calendar gives no ids)
+  recurring?: boolean;      // the event repeats, so "not busy" can cover every occurrence
+  ignoreId?: string | null; // set when you've marked it not busy (it doesn't count as busy for anyone)
+}
 ```
 
 ### Plans (Pro)

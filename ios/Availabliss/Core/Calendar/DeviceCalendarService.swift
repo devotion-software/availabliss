@@ -258,12 +258,22 @@ final class DeviceCalendarService {
         return zip(bounds, bounds.dropFirst()).map { (start: $0, end: $1) }
     }
 
+    /// An opaque key for the event's series: every occurrence of a recurring event shares its
+    /// calendar item id. Hashed (22 base64url chars, as the server does) so the id isn't sent.
+    static func eventKey(_ event: EKEvent) -> String? {
+        guard let id = event.calendarItemExternalIdentifier ?? event.calendarItemIdentifier as String?, !id.isEmpty else { return nil }
+        let digest = Data(SHA256.hash(data: Data(id.utf8)))
+        return String(digest.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").prefix(22))
+    }
+
     private func busy(from start: Date, to end: Date, in selected: [EKCalendar]) -> [DeviceSync.BusyRange] {
         guard !selected.isEmpty else { return [] }
         return store
             .events(matching: store.predicateForEvents(withStart: start, end: end, calendars: selected))
             .filter { $0.availability != .free && $0.status != .canceled && !Self.isDeclined($0) }
-            .map { DeviceSync.BusyRange(calendarExternalId: $0.calendar.calendarIdentifier, start: $0.startDate, end: $0.endDate) }
+            .map {
+                DeviceSync.BusyRange(calendarExternalId: $0.calendar.calendarIdentifier, start: $0.startDate, end: $0.endDate, eventKey: Self.eventKey($0))
+            }
             .sorted { ($0.start, $0.end, $0.calendarExternalId) < ($1.start, $1.end, $1.calendarExternalId) }
     }
 

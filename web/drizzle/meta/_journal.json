@@ -78,6 +78,13 @@
       "when": 1793750810448,
       "tag": "0010_easy_black_crow",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1794758008283,
+      "tag": "0011_nappy_the_renegades",
+      "breakpoints": true
     }
   ]
 }

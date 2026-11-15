@@ -8,6 +8,7 @@ import { minutesOf, zonedInstant } from '../availability/time';
 import { ReauthRequired, type CaldavCredentials, type CalendarAdapter, type RemoteBusy, type RemoteCalendar } from './types';
 import { isValidZone } from '#lib/timezone';
 import { publicFetch } from './public-fetch';
+import { eventKey } from './keys';
 
 export const ICLOUD_CALDAV = 'https://caldav.icloud.com';
 
@@ -62,10 +63,10 @@ function parseDuration(value: string): number {
 }
 
 /** Busy spans from the VEVENTs in an iCalendar document. */
-export function parseBusyEvents(ics: string, timeZone: string): { start: number; end: number }[] {
+export function parseBusyEvents(ics: string, timeZone: string): { start: number; end: number; uid?: string }[] {
 	const unfolded = ics.replace(/\r?\n[ \t]/g, '');
 	const events = unfolded.split(/BEGIN:VEVENT/).slice(1).map((chunk) => chunk.split(/END:VEVENT/)[0]);
-	const out: { start: number; end: number }[] = [];
+	const out: { start: number; end: number; uid?: string }[] = [];
 
 	for (const body of events) {
 		const props = new Map<string, { params: string; value: string }>();
@@ -85,7 +86,9 @@ export function parseBusyEvents(ics: string, timeZone: string): { start: number;
 			: duration
 				? start.at + parseDuration(duration.value)
 				: start.at + (start.date ? 24 * 60 * 60 * 1000 : 0);
-		if (end && end > start.at) out.push({ start: start.at, end });
+		// Expanded recurrences share their series' UID.
+		const uid = props.get('UID')?.value;
+		if (end && end > start.at) out.push({ start: start.at, end, ...(uid && { uid }) });
 	}
 	return out;
 }
@@ -181,7 +184,12 @@ export const caldav: CalendarAdapter<CaldavCredentials> = {
 			const { xml } = await dav(creds, cal.externalId, 'REPORT', '1', body);
 			for (const data of xmlBlocks(xml, 'calendar-data')) {
 				for (const span of parseBusyEvents(decodeEntities(data), timeZone)) {
-					out.push({ calendarExternalId: cal.externalId, start: new Date(span.start), end: new Date(span.end) });
+					out.push({
+						calendarExternalId: cal.externalId,
+						...(span.uid && { eventKey: eventKey(span.uid) }),
+						start: new Date(span.start),
+						end: new Date(span.end)
+					});
 				}
 			}
 		}

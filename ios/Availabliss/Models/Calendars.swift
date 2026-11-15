@@ -59,6 +59,8 @@ struct DeviceSync: Encodable, Sendable {
         let calendarExternalId: String
         let start: Date
         let end: Date
+        /// Hash of the event's series id (shared by every occurrence), so a series can be marked not busy.
+        var eventKey: String?
     }
 
     let deviceId: String

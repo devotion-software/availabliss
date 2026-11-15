@@ -6,10 +6,10 @@
  * the freeBusy API. Only start, end, transparency and the user's own response
  * are read; titles never are.
  */
-import { createHash } from 'node:crypto';
 import { zonedInstant } from '../availability/time';
 import { bearerFetch, HttpError, refreshIfNeeded } from './oauth';
 import type { CalendarAdapter, ChangedEvents, OAuthCredentials, PushChannel, RemoteBusy, RemoteCalendar } from './types';
+import { eventKey } from './keys';
 
 const API = 'https://www.googleapis.com/calendar/v3';
 /** freeBusy accepts at most 50 calendars and a bounded window per call. */
@@ -51,7 +51,7 @@ interface EventsPage {
 }
 
 /** Stored instead of Google's id: rows can be matched to an event without keeping the id itself. */
-export const eventKey = (id: string) => createHash('sha256').update(id).digest('base64url').slice(0, 22);
+export { eventKey } from './keys';
 
 /** The series an event belongs to: its own id for single events and series masters. */
 const seriesOf = (e: GoogleEvent) => e.recurringEventId ?? e.id;

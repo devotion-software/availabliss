@@ -5,6 +5,7 @@
  */
 import { bearerFetch, HttpError, refreshIfNeeded } from './oauth';
 import type { CalendarAdapter, OAuthCredentials, PushChannel, RemoteBusy } from './types';
+import { eventKey } from './keys';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 /** Graph lets event subscriptions last at most 4230 minutes; stay under it. */
@@ -15,7 +16,7 @@ interface CalendarsResponse {
 }
 
 interface CalendarViewResponse {
-	value: { start: { dateTime: string }; end: { dateTime: string }; showAs: string; isCancelled: boolean }[];
+	value: { id: string; seriesMasterId?: string | null; start: { dateTime: string }; end: { dateTime: string }; showAs: string; isCancelled: boolean }[];
 	'@odata.nextLink'?: string;
 }
 
@@ -34,7 +35,7 @@ export const microsoft: CalendarAdapter<OAuthCredentials> = {
 			const params = new URLSearchParams({
 				startDateTime: from.toISOString(),
 				endDateTime: to.toISOString(),
-				$select: 'start,end,showAs,isCancelled',
+				$select: 'id,seriesMasterId,start,end,showAs,isCancelled',
 				$top: '500'
 			});
 			let next: string | undefined = `${GRAPH}/me/calendars/${encodeURIComponent(cal.externalId)}/calendarView?${params}`;
@@ -44,7 +45,8 @@ export const microsoft: CalendarAdapter<OAuthCredentials> = {
 				});
 				for (const e of page.value) {
 					if (e.isCancelled || e.showAs === 'free' || e.showAs === 'workingElsewhere') continue;
-					out.push({ calendarExternalId: cal.externalId, start: utc(e.start.dateTime), end: utc(e.end.dateTime) });
+					// Keyed by the series, so "not busy for every occurrence" can match them all.
+					out.push({ calendarExternalId: cal.externalId, eventKey: eventKey(e.seriesMasterId ?? e.id), start: utc(e.start.dateTime), end: utc(e.end.dateTime) });
 				}
 				next = page['@odata.nextLink'];
 			}

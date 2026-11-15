@@ -27,6 +27,23 @@ class BlocksRepository @Inject constructor(
         return call { api.getMyBusy(start, end) }.map { it.intervals }
     }
 
+    /** Marks a calendar event not busy: that occurrence, or ([series]) every occurrence. */
+    suspend fun ignoreBusy(interval: BusyInterval, series: Boolean): ApiResult<Unit> = call {
+        api.ignoreBusy(
+            dev.joeherbert.availabliss.core.network.model.BusyIgnoreRequest(
+                calendarId = interval.calendarId.orEmpty(),
+                eventKey = interval.eventKey.orEmpty(),
+                start = interval.start,
+                end = interval.end,
+                series = series,
+            ),
+        )
+        Unit
+    }
+
+    /** The event counts as busy again. */
+    suspend fun unignoreBusy(id: String): ApiResult<Unit> = call { api.unignoreBusy(id) }
+
     suspend fun blocks(): ApiResult<List<ManualBlock>> = call { api.getBlocks() }.map { it.blocks }
 
     suspend fun create(request: CreateBlockRequest): ApiResult<ManualBlock> = call { api.createBlock(request) }

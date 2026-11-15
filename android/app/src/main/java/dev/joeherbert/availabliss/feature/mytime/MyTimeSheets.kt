@@ -173,13 +173,20 @@ fun BlockTimeSheet(
 
 /**
  * "Busy from your calendar": synced busy time can't be edited here (only the busy range is
- * ever read), so point at the calendar itself or the calendar settings.
+ * ever read). It can be marked not busy (this occurrence, or every time it repeats), or a
+ * whole calendar can stop counting in the calendar settings.
  */
 @Composable
-fun CalendarBusySheet(info: CalendarBusyUi, onDismiss: () -> Unit, onOpenCalendars: () -> Unit) {
+fun CalendarBusySheet(
+    info: CalendarBusyUi,
+    onDismiss: () -> Unit,
+    onOpenCalendars: () -> Unit,
+    onIgnore: (series: Boolean) -> Unit = {},
+    onUnignore: () -> Unit = {},
+) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
-    AvBottomSheet(title = "Busy from your calendar", onDismissRequest = onDismiss) {
+    AvBottomSheet(title = if (info.ignored) "Marked not busy" else "Busy from your calendar", onDismissRequest = onDismiss) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -203,6 +210,16 @@ fun CalendarBusySheet(info: CalendarBusyUi, onDismiss: () -> Unit, onOpenCalenda
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(info.calendarName, style = type.bodyMedium, color = colors.ink)
                 Text(info.timeLabel, style = type.label.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+            }
+        }
+        if (info.ignored) {
+            Text("You said this doesn't make you busy, so your groups see you as free then.", style = type.label.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+            PrimaryButton("Count as busy again", onUnignore, loading = info.working, modifier = Modifier.fillMaxWidth())
+        } else if (info.interval?.calendarId != null) {
+            Text("Doesn't really make you busy? Your groups will see you as free then.", style = type.label.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+            PrimaryButton(if (info.recurring) "Not busy: just this one" else "Mark as not busy", { onIgnore(false) }, loading = info.working, modifier = Modifier.fillMaxWidth())
+            if (info.recurring) {
+                SecondaryButton(text = "Not busy: every time it repeats", onClick = { onIgnore(true) }, enabled = !info.working, modifier = Modifier.fillMaxWidth())
             }
         }
         Text(

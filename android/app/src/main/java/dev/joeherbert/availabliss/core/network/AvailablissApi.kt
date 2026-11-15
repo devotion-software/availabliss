@@ -94,6 +94,12 @@ interface AvailablissApi {
     @GET("api/v1/me/busy")
     suspend fun getMyBusy(@Query("from") from: String, @Query("to") to: String): BusyResponse
 
+    @POST("api/v1/me/busy/ignores")
+    suspend fun ignoreBusy(@Body body: dev.joeherbert.availabliss.core.network.model.BusyIgnoreRequest): dev.joeherbert.availabliss.core.network.model.BusyIgnoreResponse
+
+    @DELETE("api/v1/me/busy/ignores/{id}")
+    suspend fun unignoreBusy(@Path("id") id: String)
+
     @DELETE("api/v1/me")
     suspend fun deleteAccount()
 

@@ -137,11 +137,21 @@ export const deviceSyncSchema = z.object({
 		)
 		.max(200),
 	busy: z
-		.array(z.object({ calendarExternalId: trimmed(255), start: isoDateTime, end: isoDateTime }))
+		// eventKey: the app's hash of the event's series id, so a series can be marked not busy.
+		.array(z.object({ calendarExternalId: trimmed(255), start: isoDateTime, end: isoDateTime, eventKey: z.string().max(64).optional() }))
 		.max(20000)
 });
 
 export const calendarBusySchema = z.object({ busy: z.boolean() });
+
+/** "Not busy" for a calendar event: that occurrence (start/end), or its whole series. */
+export const busyIgnoreSchema = z.object({
+	calendarId: trimmed(36),
+	eventKey: z.string().max(64),
+	start: isoDateTime,
+	end: isoDateTime,
+	series: z.boolean().default(false)
+});
 
 const eventShape = {
 	title: trimmed(120),

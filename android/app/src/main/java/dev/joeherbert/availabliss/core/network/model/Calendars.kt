@@ -92,4 +92,4 @@ data class DeviceCalendar(
 )
 
 @Serializable
-data class DeviceBusy(val calendarExternalId: String, val start: String, val end: String)
+data class DeviceBusy(val calendarExternalId: String, val start: String, val end: String, val eventKey: String? = null)

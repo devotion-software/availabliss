@@ -132,6 +132,12 @@ export interface BusyInterval {
 	label: string | null;
 	calendarId: string | null;
 	blockId: string | null;
+	/** Calendar busy: the event's opaque key ('' when the calendar gives no ids). */
+	eventKey?: string;
+	/** Calendar busy: the event repeats (so "not busy" can cover every occurrence). */
+	recurring?: boolean;
+	/** Set when you've marked this event not busy: the id to undo it with. It doesn't count as busy. */
+	ignoreId?: string | null;
 }
 
 export interface CalendarConnection {

@@ -97,7 +97,10 @@
 	const labelOf = (i: BusyInterval) => i.label ?? 'Busy';
 
 	function describe(p: PlacedInterval): string {
-		const what = p.interval.source === 'calendar' ? `Busy from ${p.interval.label ?? 'a calendar'}` : `Blocked by you${p.interval.label ? `: ${p.interval.label}` : ''}`;
+		const what =
+			p.interval.source === 'calendar'
+				? `${p.interval.ignoreId ? 'Marked not busy, from' : 'Busy from'} ${p.interval.label ?? 'a calendar'}`
+				: `Blocked by you${p.interval.label ? `: ${p.interval.label}` : ''}`;
 		return `${what}, ${weekdayName(p.day, 'long')} ${clock(p.from)} to ${clock(p.to)}`;
 	}
 </script>
@@ -122,6 +125,7 @@
 						<button
 							type="button"
 							class="chip {interval.source}"
+							class:ignored={!!interval.ignoreId}
 							title={labelOf(interval)}
 							aria-label="{interval.source === 'manual' ? 'Edit' : 'About'} {labelOf(interval)}, all day {weekdayName(day, 'long')}"
 							onclick={() => onopen(interval)}>{labelOf(interval)}</button
@@ -155,6 +159,7 @@
 						<button
 							type="button"
 							class="event {p.interval.source}"
+							class:ignored={!!p.interval.ignoreId}
 							class:cont-before={p.continuesBefore}
 							class:cont-after={p.continuesAfter}
 							style={boxStyle(p)}
@@ -341,6 +346,12 @@
 	}
 	.event.calendar {
 		backdrop-filter: blur(6px);
+	}
+	/* Marked not busy: a faded dashed outline. */
+	.calendar.ignored {
+		background: transparent;
+		border: 1px dashed var(--busy-line);
+		opacity: 0.6;
 	}
 	.cont-before {
 		border-top-left-radius: 2px;

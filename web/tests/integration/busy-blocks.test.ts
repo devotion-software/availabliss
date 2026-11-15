@@ -95,7 +95,17 @@ describe('loadBusy', () => {
 		expect(summer.filter((b) => b.manual).map((b) => new Date(b.start).toISOString())).toEqual(['2031-03-31T17:00:00.000Z']);
 
 		const mine = await myBusy(me, from, to);
-		expect(mine[0]).toEqual({ start: '2031-03-03T09:00:00.000Z', end: '2031-03-03T17:00:00.000Z', source: 'calendar', label: 'Work', calendarId: work, blockId: null });
+		expect(mine[0]).toEqual({
+			start: '2031-03-03T09:00:00.000Z',
+			end: '2031-03-03T17:00:00.000Z',
+			source: 'calendar',
+			label: 'Work',
+			calendarId: work,
+			blockId: null,
+			eventKey: '',
+			recurring: false,
+			ignoreId: null
+		});
 		expect(mine[1]).toMatchObject({ source: 'manual', label: 'Gym', blockId: gym.id });
 	});
 

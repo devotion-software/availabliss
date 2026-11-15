@@ -102,7 +102,17 @@ struct MyTimeView: View {
             }
         }
         .sheet(item: $calendarBusy) { busy in
-            CalendarBusySheet(interval: busy.interval) { app.router.push(.calendars) }
+            CalendarBusySheet(interval: busy.interval) {
+                app.router.push(.calendars)
+            } onIgnore: { series in
+                let ok = await model.ignore(busy.interval, series: series)
+                if ok { toast = series ? "Not busy every time it repeats" : "Marked not busy" }
+                return ok
+            } onUnignore: {
+                let ok = await model.unignore(busy.interval)
+                if ok { toast = "Counts as busy again" }
+                return ok
+            }
         }
         .toast($toast)
         .confirmationDialog(

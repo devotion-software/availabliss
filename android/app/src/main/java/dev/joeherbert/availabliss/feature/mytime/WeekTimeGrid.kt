@@ -32,6 +32,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.joeherbert.availabliss.designsystem.component.dashedBorder
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -219,7 +221,7 @@ private fun AllDayRow(layout: WeekLayout, onIntervalClick: ((BusyInterval) -> Un
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .intervalStyle(interval.source, shape)
+                            .intervalStyle(interval.source, shape, interval.isIgnored)
                             .tapOnly(onIntervalClick?.let { { it(interval) } })
                             .padding(horizontal = 5.dp, vertical = 3.dp)
                             .clearAndSetSemantics {
@@ -334,7 +336,7 @@ private fun IntervalBox(p: PlacedInterval, compact: Boolean, showText: Boolean, 
     )
     Column(
         modifier
-            .intervalStyle(p.interval.source, shape)
+            .intervalStyle(p.interval.source, shape, p.interval.isIgnored)
             .tapOnly(onClick)
             .padding(start = if (manual) 5.dp else 6.dp, end = 4.dp, top = 3.dp, bottom = 3.dp)
             .clearAndSetSemantics {
@@ -371,9 +373,12 @@ private fun IntervalBox(p: PlacedInterval, compact: Boolean, showText: Boolean, 
 
 /** Blocked by you: accent stripes over surface. From a calendar: busy fill with a busy-line left edge. */
 @Composable
-private fun Modifier.intervalStyle(source: BusySource, shape: RoundedCornerShape): Modifier {
+private fun Modifier.intervalStyle(source: BusySource, shape: RoundedCornerShape, ignored: Boolean = false): Modifier {
     val colors = AvailablissTheme.colors
-    return if (source == BusySource.Manual) {
+    return if (ignored) {
+        // Marked not busy: a faded dashed outline.
+        alpha(0.6f).dashedBorder(colors.busyLine, shape)
+    } else if (source == BusySource.Manual) {
         clip(shape)
             .background(colors.surface)
             .stripes(colors.accentSoft, 6.dp, 12.dp)
@@ -403,6 +408,6 @@ private val BusyInterval.clickLabel: String
 private val BusyInterval.displayLabel: String get() = label?.takeIf { it.isNotBlank() } ?: "Busy"
 
 private fun BusyInterval.describe(): String = when (source) {
-    BusySource.Calendar -> "Busy from ${label?.takeIf { it.isNotBlank() } ?: "a calendar"}"
+    BusySource.Calendar -> "${if (isIgnored) "Marked not busy, from" else "Busy from"} ${label?.takeIf { it.isNotBlank() } ?: "a calendar"}"
     else -> "Blocked by you" + (label?.takeIf { it.isNotBlank() }?.let { ": $it" } ?: "")
 }

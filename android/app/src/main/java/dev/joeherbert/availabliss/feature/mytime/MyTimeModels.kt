@@ -29,7 +29,16 @@ sealed interface IntervalTap {
 }
 
 /** The "Busy from your calendar" sheet. */
-data class CalendarBusyUi(val calendarName: String, val timeLabel: String)
+data class CalendarBusyUi(
+    val calendarName: String,
+    val timeLabel: String,
+    /** The tapped interval, for "not busy" / "busy again". */
+    val interval: BusyInterval? = null,
+    val working: Boolean = false,
+) {
+    val ignored: Boolean get() = interval?.isIgnored == true
+    val recurring: Boolean get() = interval?.recurring == true
+}
 
 /** Resolves a tapped busy [interval] against the loaded [blocks]. */
 fun resolveIntervalTap(interval: BusyInterval, blocks: List<ManualBlock>, zone: ZoneId = DateTimes.zone): IntervalTap =
@@ -38,6 +47,7 @@ fun resolveIntervalTap(interval: BusyInterval, blocks: List<ManualBlock>, zone: 
             CalendarBusyUi(
                 calendarName = interval.label?.takeIf { it.isNotBlank() } ?: "A connected calendar",
                 timeLabel = calendarTimeLabel(interval, zone),
+                interval = interval,
             ),
         )
         else -> blocks.firstOrNull { it.id == interval.blockId }?.let(IntervalTap::EditBlock) ?: IntervalTap.MissingBlock

@@ -89,7 +89,13 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
     MyTimeContent(state = state, snackbar = snackbar, actions = actions)
 
     state.calendarBusy?.let { info ->
-        CalendarBusySheet(info, onDismiss = viewModel::closeCalendarBusy, onOpenCalendars = onOpenCalendars)
+        CalendarBusySheet(
+            info,
+            onDismiss = viewModel::closeCalendarBusy,
+            onOpenCalendars = onOpenCalendars,
+            onIgnore = viewModel::ignoreCalendarBusy,
+            onUnignore = viewModel::unignoreCalendarBusy,
+        )
     }
 
     state.draft?.let { draft ->

@@ -134,11 +134,29 @@ struct BusyInterval: Codable, Sendable, Hashable {
     let label: String?
     let calendarId: String?
     let blockId: String?
+    /// Calendar busy: the event's opaque key ('' when the calendar gives no ids).
+    var eventKey: String?
+    /// Calendar busy: the event repeats, so "not busy" can cover every occurrence.
+    var recurring: Bool?
+    /// Set when you've marked this event not busy (it doesn't count): the id to undo it with.
+    var ignoreId: String?
+
+    var isIgnored: Bool { ignoreId != nil }
 
     func overlaps(_ start: Date, _ end: Date) -> Bool {
         self.start < end && self.end > start
     }
 }
+
+struct BusyIgnoreBody: Encodable, Sendable {
+    let calendarId: String
+    let eventKey: String
+    let start: Date
+    let end: Date
+    let series: Bool
+}
+
+struct BusyIgnoreResponse: Decodable, Sendable { let id: String }
 
 struct BusyIntervalsResponse: Decodable, Sendable {
     let intervals: [BusyInterval]

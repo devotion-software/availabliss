@@ -17,7 +17,21 @@ data class BusyInterval(
     val label: String? = null,
     val calendarId: String? = null,
     val blockId: String? = null,
-)
+    /** Calendar busy: the event's opaque key ('' when the calendar gives no ids). */
+    val eventKey: String? = null,
+    /** Calendar busy: the event repeats, so "not busy" can cover every occurrence. */
+    val recurring: Boolean = false,
+    /** Set when you've marked this event not busy (it doesn't count): the id to undo it with. */
+    val ignoreId: String? = null,
+) {
+    val isIgnored: Boolean get() = ignoreId != null
+}
+
+@Serializable
+data class BusyIgnoreRequest(val calendarId: String, val eventKey: String, val start: String, val end: String, val series: Boolean)
+
+@Serializable
+data class BusyIgnoreResponse(val id: String)
 
 @Serializable
 data class BusyResponse(val intervals: List<BusyInterval>)

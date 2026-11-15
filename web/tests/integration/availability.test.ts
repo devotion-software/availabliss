@@ -130,7 +130,8 @@ describe('groupAvailability', () => {
 		const d = await groupDay(groupId, owner, '2031-03-04');
 		expect(d.date).toBe('2031-03-04');
 		const m = d.members.find((x) => x.userId === member)!;
-		expect(m).toEqual({ userId: member, pending: false, busy: [{ start: '2031-03-04T10:00:00.000Z', end: '2031-03-04T11:00:00.000Z', manual: true }] });
+		// Busy is just busy: a hand-marked block looks the same as calendar busy to others.
+		expect(m).toEqual({ userId: member, pending: false, busy: [{ start: '2031-03-04T10:00:00.000Z', end: '2031-03-04T11:00:00.000Z', manual: false }] });
 		expect(d.members.find((x) => x.userId === owner)?.pending).toBe(true);
 		expect(JSON.stringify(d)).not.toContain('Private');
 		expect(d.everyoneFree).toEqual([

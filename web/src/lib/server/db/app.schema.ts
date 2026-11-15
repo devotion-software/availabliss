@@ -131,6 +131,26 @@ export const busyIntervals = mysqlTable(
 	]
 );
 
+/**
+ * Calendar events a user said don't make them busy: one occurrence (`start` set) or every
+ * occurrence of the series (`start` null), matched on the calendar and the event's opaque key.
+ */
+export const busyIgnores = mysqlTable(
+	'busy_ignores',
+	{
+		id: id(),
+		userId: userRef(),
+		calendarId: varchar('calendar_id', { length: 36 })
+			.notNull()
+			.references(() => calendars.id, { onDelete: 'cascade' }),
+		eventKey: varchar('event_key', { length: 64 }).default('').notNull(),
+		start: farInstant('start'),
+		end: farInstant('end'),
+		createdAt: createdAt()
+	},
+	(t) => [index('busy_ignores_user_idx').on(t.userId), index('busy_ignores_event_idx').on(t.calendarId, t.eventKey)]
+);
+
 /** Busy time a user marked by hand ("My time"). */
 export const manualBlocks = mysqlTable(
 	'manual_blocks',

@@ -158,7 +158,7 @@
 </div>
 
 <BlockTimeSheet bind:open={sheetOpen} timeZone={tz} block={editing} defaultDay={sheetDay} defaultRange={sheetRange} onsaved={refresh} />
-<CalendarBusySheet bind:open={calendarOpen} interval={calendarInterval} />
+<CalendarBusySheet bind:open={calendarOpen} interval={calendarInterval} onchanged={refresh} />
 <ConfirmSheet
 	bind:open={confirmOpen}
 	title="Delete this block?"

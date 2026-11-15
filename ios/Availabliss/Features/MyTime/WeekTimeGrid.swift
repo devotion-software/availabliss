@@ -254,8 +254,9 @@ private struct BusyBox: View {
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
         .frame(height: max(14, height), alignment: .topLeading)
         .clipped()
-        .background { BusyFill(isManual: isManual, shape: shape) }
+        .background { BusyFill(isManual: isManual, isIgnored: piece.interval.isIgnored, shape: shape) }
         .clipShape(shape)
+        .opacity(piece.interval.isIgnored ? 0.55 : 1)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityAddTraits(.isButton)
@@ -263,7 +264,8 @@ private struct BusyBox: View {
 
     private var accessibilityText: String {
         let label = piece.interval.label
-        let what = isManual ? "Blocked by you\(label.map { ": \($0)" } ?? "")" : "Busy from \(label ?? "a calendar")"
+        let what = isManual ? "Blocked by you\(label.map { ": \($0)" } ?? "")"
+            : piece.interval.isIgnored ? "Marked not busy, from \(label ?? "a calendar")" : "Busy from \(label ?? "a calendar")"
         let edit = isManual ? "Edit: " : ""
         return "\(edit)\(what), \(Formatting.longDay(piece.day.startDate())) \(WeekLayout.clock(piece.from)) to \(WeekLayout.clock(piece.to))"
     }
@@ -287,8 +289,9 @@ private struct AllDayChip: View {
             .padding(.leading, isManual ? 5 : 6)
             .padding(.trailing, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background { BusyFill(isManual: isManual, shape: shape) }
+            .background { BusyFill(isManual: isManual, isIgnored: interval.isIgnored, shape: shape) }
             .clipShape(shape)
+            .opacity(interval.isIgnored ? 0.55 : 1)
             .contentShape(shape)
             .onTapGesture(perform: onTap)
             .accessibilityLabel(isManual ? "Edit: blocked by you all day, \(interval.label ?? "Busy")" : "Busy all day from \(interval.label ?? "a calendar")")
@@ -298,13 +301,17 @@ private struct AllDayChip: View {
 
 /// Manual: accent-soft stripes over surface with an accent border.
 /// Calendar: busy-bg with a busy-line border and a thicker leading edge.
+/// Marked not busy: just a dashed outline.
 private struct BusyFill<S: InsettableShape>: View {
     let isManual: Bool
+    var isIgnored = false
     let shape: S
     @Environment(\.theme) private var theme
 
     var body: some View {
-        if isManual {
+        if isIgnored {
+            shape.strokeBorder(theme.busyLine, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+        } else if isManual {
             ZStack {
                 shape.fill(theme.surface)
                 Stripes(color: theme.accentSoft, lineWidth: 6, spacing: 6).clipShape(shape)

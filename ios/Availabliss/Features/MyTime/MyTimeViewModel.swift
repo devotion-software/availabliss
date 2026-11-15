@@ -46,7 +46,7 @@ final class MyTimeViewModel {
     /// Busy intervals touching `day` (for the month view).
     func intervals(on day: CalendarDay) -> [BusyInterval] {
         let start = day.startDate(), end = day.adding(days: 1).startDate()
-        return intervals.filter { $0.overlaps(start, end) }
+        return intervals.filter { $0.overlaps(start, end) && !$0.isIgnored }
     }
 
     var recurringBlocks: [ManualBlock] { blocks.filter { $0.repeat != .none } }
@@ -118,6 +118,34 @@ final class MyTimeViewModel {
         mode = .week
         intervals = []
         await load()
+    }
+
+    /// Marks a calendar event not busy: this occurrence, or (`series`) every occurrence.
+    func ignore(_ interval: BusyInterval, series: Bool) async -> Bool {
+        guard let calendarId = interval.calendarId else { return false }
+        do {
+            _ = try await api.send(API.Me.ignoreBusy(BusyIgnoreBody(
+                calendarId: calendarId, eventKey: interval.eventKey ?? "", start: interval.start, end: interval.end, series: series
+            )))
+            await load()
+            return true
+        } catch {
+            self.error = error.userMessage
+            return false
+        }
+    }
+
+    /// The event counts as busy again.
+    func unignore(_ interval: BusyInterval) async -> Bool {
+        guard let id = interval.ignoreId else { return false }
+        do {
+            try await api.send(API.Me.unignoreBusy(id: id))
+            await load()
+            return true
+        } catch {
+            self.error = error.userMessage
+            return false
+        }
     }
 
     func remove(_ block: ManualBlock) async {

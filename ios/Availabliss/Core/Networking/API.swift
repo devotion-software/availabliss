@@ -12,6 +12,8 @@ enum API {
         static func busy(from: Date, to: Date) -> Endpoint<BusyIntervalsResponse> {
             .init(.get, "/me/busy", query: ["from": iso(from), "to": iso(to)])
         }
+        static func ignoreBusy(_ body: BusyIgnoreBody) -> Endpoint<BusyIgnoreResponse> { .init(.post, "/me/busy/ignores", body: body) }
+        static func unignoreBusy(id: String) -> Endpoint<EmptyResponse> { .init(.delete, "/me/busy/ignores/\(id.pathEncoded)") }
         static func delete() -> Endpoint<EmptyResponse> { .init(.delete, "/me") }
         static func upcoming() -> Endpoint<EventsResponse> { .init(.get, "/me/upcoming") }
         static func plan() -> Endpoint<Plan> { .init(.get, "/me/plan") }

@@ -104,6 +104,48 @@ class MyTimeViewModel @Inject constructor(
 
     fun closeCalendarBusy() = _state.update { it.copy(calendarBusy = null) }
 
+    /** Marks the open calendar event not busy: just it, or ([series]) every occurrence. */
+    fun ignoreCalendarBusy(series: Boolean) {
+        val info = _state.value.calendarBusy ?: return
+        val interval = info.interval ?: return
+        if (info.working) return
+        _state.update { it.copy(calendarBusy = info.copy(working = true)) }
+        viewModelScope.launch {
+            when (val result = blocksRepository.ignoreBusy(interval, series)) {
+                is ApiResult.Success -> {
+                    _state.update { it.copy(calendarBusy = null) }
+                    showMessage(if (series) "Not busy every time it repeats" else "Marked not busy")
+                    refresh()
+                }
+                is ApiResult.Failure -> {
+                    _state.update { it.copy(calendarBusy = info.copy(working = false)) }
+                    showMessage(result.error.message)
+                }
+            }
+        }
+    }
+
+    /** The open calendar event counts as busy again. */
+    fun unignoreCalendarBusy() {
+        val info = _state.value.calendarBusy ?: return
+        val id = info.interval?.ignoreId ?: return
+        if (info.working) return
+        _state.update { it.copy(calendarBusy = info.copy(working = true)) }
+        viewModelScope.launch {
+            when (val result = blocksRepository.unignoreBusy(id)) {
+                is ApiResult.Success -> {
+                    _state.update { it.copy(calendarBusy = null) }
+                    showMessage("Counts as busy again")
+                    refresh()
+                }
+                is ApiResult.Failure -> {
+                    _state.update { it.copy(calendarBusy = info.copy(working = false)) }
+                    showMessage(result.error.message)
+                }
+            }
+        }
+    }
+
     /** Optimistically removes [block] (every occurrence), restoring it on failure. */
     fun deleteBlock(block: ManualBlock) {
         val removedIntervals = intervals.filter { it.blockId == block.id }
