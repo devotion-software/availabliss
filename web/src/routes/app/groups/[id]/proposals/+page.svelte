@@ -34,6 +34,9 @@
 <div class="page">
 	<PageHeader
 	title="Proposals"
+	backHref="/app/groups/{data.group.id}"
+	backLabel="Back to calendar"
+	backOnPhoneOnly
 	crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Proposals' }]}
 >
 		{#snippet actions()}

@@ -3,6 +3,7 @@ package dev.joeherbert.availabliss.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -20,7 +21,9 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -36,9 +39,11 @@ import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.feature.activity.ActivityScreen
 import dev.joeherbert.availabliss.feature.appearance.AppearanceScreen
 import dev.joeherbert.availabliss.feature.calendars.CalendarsScreen
+import dev.joeherbert.availabliss.feature.chat.GroupChatTab
 import dev.joeherbert.availabliss.feature.events.EventEditorScreen
 import dev.joeherbert.availabliss.feature.events.EventsScreen
 import dev.joeherbert.availabliss.feature.group.GroupScreen
+import dev.joeherbert.availabliss.feature.group.GroupViewModel
 import dev.joeherbert.availabliss.feature.home.HomeScreen
 import dev.joeherbert.availabliss.feature.members.InviteScreen
 import dev.joeherbert.availabliss.feature.members.MembersScreen
@@ -46,7 +51,10 @@ import dev.joeherbert.availabliss.feature.mytime.MyTimeScreen
 import dev.joeherbert.availabliss.feature.newgroup.NewGroupScreen
 import dev.joeherbert.availabliss.feature.onboarding.RegionScreen
 import dev.joeherbert.availabliss.feature.proposal.CreateProposalScreen
+import dev.joeherbert.availabliss.feature.proposal.GroupProposalsTab
+import dev.joeherbert.availabliss.feature.proposal.GroupProposalsViewModel
 import dev.joeherbert.availabliss.feature.proposal.ProposalScreen
+import dev.joeherbert.availabliss.feature.timing.GroupTimingTab
 import dev.joeherbert.availabliss.feature.you.YouScreen
 
 private enum class MainTab { Groups, MyTime, Activity, You }
@@ -102,7 +110,7 @@ fun MainNavHost(root: RootViewModel) {
             composable<HomeRoute> {
                 HomeScreen(
                     onOpenGroup = { nav.navigate(GroupRoute(it)) },
-                    onOpenGroupChat = { nav.navigate(GroupRoute(it, GroupTab.Chat.name)) },
+                    onOpenGroupChat = { nav.openGroupSection(it, GroupChatRoute(it)) },
                     onNewGroup = { nav.navigate(NewGroupRoute) },
                     onOpenProfile = { nav.switchTab(YouRoute) },
                 )
@@ -118,18 +126,51 @@ fun MainNavHost(root: RootViewModel) {
                 )
             }
             composable<GroupRoute> { backStackEntry ->
-                val route = backStackEntry.toRoute<GroupRoute>()
+                val groupId = backStackEntry.toRoute<GroupRoute>().groupId
                 GroupScreen(
-                    initialTab = runCatching { GroupTab.valueOf(route.tab) }.getOrDefault(GroupTab.Calendar),
                     onBack = { nav.popBackStack() },
-                    onOpenMembers = { nav.navigate(MembersRoute(route.groupId)) },
+                    onOpenChat = { nav.navigate(GroupChatRoute(groupId)) },
+                    onOpenPlans = { nav.navigate(GroupPlansRoute(groupId)) },
+                    onOpenTiming = { nav.navigate(GroupTimingRoute(groupId)) },
+                    onOpenMembers = { nav.navigate(MembersRoute(groupId)) },
                     onOpenProposal = { nav.navigate(ProposalRoute(it)) },
-                    onCreateProposal = { p -> nav.navigate(CreateProposalRoute(route.groupId, p.start, p.end, p.allDay, p.title, p.note)) },
-                    onOpenEvents = { nav.navigate(EventsRoute(route.groupId)) },
-                    onOpenEvent = { nav.navigate(EventEditorRoute(route.groupId, eventId = it)) },
-                    onAddEvent = { start, end -> nav.navigate(EventEditorRoute(route.groupId, start, end)) },
+                    onCreateProposal = { p -> nav.navigate(CreateProposalRoute(groupId, p.start, p.end, p.allDay, p.title, p.note)) },
                 )
             }
+            // A group's sections. Each reuses state held by the group's calendar entry below it
+            // (see groupEntry) rather than loading the group twice.
+            composable<GroupChatRoute> { backStackEntry ->
+                val groupId = backStackEntry.toRoute<GroupChatRoute>().groupId
+                // While the chat shows, the calendar header's unread badge stays clear.
+                val groupEntry = remember(backStackEntry) { nav.groupEntry(groupId) }
+                if (groupEntry != null) {
+                    val shell: GroupViewModel = hiltViewModel(groupEntry)
+                    DisposableEffect(shell) {
+                        shell.onChatVisible(true)
+                        onDispose { shell.onChatVisible(false) }
+                    }
+                }
+                GroupChatTab(
+                    onBack = { nav.popBackStack() },
+                    onOpenProposal = { nav.navigate(ProposalRoute(it)) },
+                    onOpenEvent = { nav.navigate(EventEditorRoute(groupId, eventId = it)) },
+                    // Proposing starts from the calendar.
+                    onProposeTime = { nav.popBackStack() },
+                    onAddEvent = { nav.navigate(EventEditorRoute(groupId)) },
+                )
+            }
+            composable<GroupPlansRoute> { backStackEntry ->
+                val groupId = backStackEntry.toRoute<GroupPlansRoute>().groupId
+                // The calendar's Plans card already loads (and live-updates) these proposals.
+                val owner = remember(backStackEntry) { nav.groupEntry(groupId) } ?: backStackEntry
+                GroupProposalsTab(
+                    onBack = { nav.popBackStack() },
+                    onOpenProposal = { nav.navigate(ProposalRoute(it)) },
+                    onOpenEvents = { nav.navigate(EventsRoute(groupId)) },
+                    viewModel = hiltViewModel<GroupProposalsViewModel>(owner),
+                )
+            }
+            composable<GroupTimingRoute> { GroupTimingTab(onBack = { nav.popBackStack() }, onSaved = { nav.popBackStack() }) }
             composable<NewGroupRoute> {
                 NewGroupScreen(
                     onBack = { nav.popBackStack() },
@@ -211,7 +252,7 @@ internal fun NavHostController.open(link: DeepLink) {
     when (link) {
         is DeepLink.Invite -> navigateSingleTop(InviteRoute(link.token))
         is DeepLink.GroupCalendar -> navigateSingleTop(GroupRoute(link.groupId))
-        is DeepLink.GroupChat -> navigateSingleTop(GroupRoute(link.groupId, GroupTab.Chat.name))
+        is DeepLink.GroupChat -> openGroupSection(link.groupId, GroupChatRoute(link.groupId))
         is DeepLink.GroupEvents -> navigateSingleTop(EventsRoute(link.groupId))
         is DeepLink.Proposal -> navigateSingleTop(ProposalRoute(link.proposalId))
         is DeepLink.Calendars -> navigate(CalendarsRoute) { launchSingleTop = true }
@@ -231,3 +272,19 @@ private inline fun <reified T : Any> NavHostController.navigateSingleTop(route: 
     val top = currentBackStackEntry
     navigate(route) { launchSingleTop = top?.destination?.hasRoute<T>() == true && top.toRoute<T>() == route }
 }
+
+/**
+ * Opens one of a group's sections ([GroupChatRoute], [GroupPlansRoute], [GroupTimingRoute]) over
+ * that group's calendar, adding the calendar underneath first unless it's already the top screen,
+ * so back always lands on it. Does nothing if [section] is already showing.
+ */
+internal inline fun <reified T : Any> NavHostController.openGroupSection(groupId: String, section: T) {
+    val top = currentBackStackEntry
+    if (top?.destination?.hasRoute<T>() == true && top.toRoute<T>() == section) return
+    if (top?.destination?.hasRoute<GroupRoute>() != true || top.toRoute<GroupRoute>().groupId != groupId) navigate(GroupRoute(groupId))
+    navigate(section)
+}
+
+/** The back stack entry of [groupId]'s calendar, if it's open under the current screen. */
+private fun NavHostController.groupEntry(groupId: String): NavBackStackEntry? =
+    runCatching { getBackStackEntry<GroupRoute>() }.getOrNull()?.takeIf { it.toRoute<GroupRoute>().groupId == groupId }

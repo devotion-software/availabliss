@@ -10,7 +10,6 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.UserMessage
@@ -34,7 +33,6 @@ import dev.joeherbert.availabliss.core.network.model.ReceiptState
 import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
-import dev.joeherbert.availabliss.navigation.GroupRoute
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -131,7 +129,7 @@ class ChatViewModel @Inject constructor(
     liveEvents: LiveEvents,
 ) : ViewModel() {
 
-    private val groupId = savedStateHandle.toRoute<GroupRoute>().groupId
+    private val groupId = savedStateHandle.get<String>("groupId").orEmpty()
     private val data = MutableStateFlow(ChatData(group = groups.cachedGroup(groupId)))
     private val meId: String? get() = users.user.value?.id
 

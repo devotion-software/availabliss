@@ -46,7 +46,7 @@
 			<h1>{group.name}</h1>
 			<span>{others.length ? listNames(others) : 'Just you so far'}</span>
 		</div>
-		<IconButton href={calendarHref} icon="calendar" label="Group calendar" variant="plain" />
+		<span class="cal-link"><IconButton href={calendarHref} icon="calendar" label="Group calendar" variant="plain" /></span>
 	</header>
 
 	<MessageList {thread} {group} meId={data.user.id} />
@@ -65,18 +65,19 @@
 <ProposeSheet bind:open={proposeOpen} {group} meId={data.user.id} initial={null} />
 
 <style>
-	/* Phone: the conversation fills the space between the group's header (layout) and the main tab bar. */
+	/* Phone: its own screen over the calendar; the conversation fills the space down to the main tab bar. */
 	.chat {
-		height: calc(100dvh - 150px - var(--tabbar-space) - env(safe-area-inset-bottom) - env(safe-area-inset-top));
+		height: calc(100dvh - max(20px, env(safe-area-inset-top)) - var(--tabbar-space) - env(safe-area-inset-bottom));
 		min-height: 320px;
 		display: flex;
 		flex-direction: column;
 	}
-	.chat > .head {
+	/* Back already goes to the calendar on phones. */
+	.cal-link {
 		display: none;
 	}
 	.head {
-		margin: 0 12px;
+		margin: 0 0 10px;
 		border-radius: 24px;
 		padding: 8px 10px;
 		display: flex;
@@ -126,8 +127,8 @@
 			box-shadow: var(--glass-shadow);
 			overflow: hidden;
 		}
-		.chat > .head {
-			display: flex;
+		.cal-link {
+			display: contents;
 		}
 		.head {
 			margin: 12px 12px 0;

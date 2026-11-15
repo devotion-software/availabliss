@@ -3,7 +3,6 @@ package dev.joeherbert.availabliss.feature.proposal
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.ProposalsRepository
@@ -16,7 +15,7 @@ import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ProposalStatus
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardUi
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
-import dev.joeherbert.availabliss.navigation.GroupRoute
+import dev.joeherbert.availabliss.core.network.model.ResponseKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +26,16 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
 
-data class ProposalListItem(val id: String, val card: ProposalCardUi)
+/**
+ * A proposal row. [headline] / [detail] are the compact one-line forms the calendar's Plans card
+ * shows: "Pub quiz" / "Fri 13 Nov · 3 of 6 in · you're in".
+ */
+data class ProposalListItem(
+    val id: String,
+    val card: ProposalCardUi,
+    val headline: String = card.title,
+    val detail: String = card.status,
+)
 
 data class GroupProposalsUiState(
     val groupName: String = "",
@@ -35,7 +43,10 @@ data class GroupProposalsUiState(
     val error: String? = null,
     val open: List<ProposalListItem> = emptyList(),
     val confirmed: List<ProposalListItem> = emptyList(),
-)
+) {
+    /** Up to two for the calendar's Plans card: open proposals first, then the next confirmed plan. */
+    val highlights: List<ProposalListItem> get() = (open + confirmed.take(1)).take(2)
+}
 
 private data class ProposalsData(
     val proposals: List<Proposal> = emptyList(),
@@ -53,7 +64,8 @@ class GroupProposalsViewModel @Inject constructor(
     liveEvents: LiveEvents,
 ) : ViewModel() {
 
-    private val groupId = savedStateHandle.toRoute<GroupRoute>().groupId
+    // Shared by the group's calendar (its Plans card) and the Plans screen, so read the id by name.
+    private val groupId: String = savedStateHandle.get<String>("groupId").orEmpty()
     private val data = MutableStateFlow(ProposalsData(group = groups.cachedGroup(groupId)))
 
     val state: StateFlow<GroupProposalsUiState> = combine(data, users.user) { d, me -> d.toUi(me?.id) }
@@ -98,7 +110,23 @@ class GroupProposalsViewModel @Inject constructor(
         val directory = MemberDirectory(group?.members.orEmpty(), meId)
         val memberCount = group?.memberCount ?: 0
         val now = Instant.now()
-        fun item(p: Proposal) = ProposalListItem(p.id, ProposalFormatting.card(p, directory, memberCount))
+        fun item(p: Proposal): ProposalListItem {
+            val card = ProposalFormatting.card(p, directory, memberCount)
+            val title = p.title?.takeIf { it.isNotBlank() }
+            val status = if (p.status == ProposalStatus.Open) {
+                "${ProposalFormatting.acceptedCount(p)} of ${ProposalFormatting.totalCount(p, memberCount)} in"
+            } else {
+                "Confirmed"
+            }
+            val yours = when (p.responses.firstOrNull { it.userId == meId }?.response.takeIf { p.status == ProposalStatus.Open }) {
+                ResponseKind.Accepted -> "you're in"
+                ResponseKind.Declined -> "you can't make it"
+                ResponseKind.Pending -> "waiting on you"
+                else -> null
+            }
+            val detail = listOfNotNull(card.title.takeIf { title != null }, status, yours).joinToString(" · ")
+            return ProposalListItem(p.id, card, headline = title ?: card.title, detail = detail)
+        }
         val upcoming = proposals.filter { p -> endsInFuture(p.end, now) }
         return GroupProposalsUiState(
             groupName = group?.name.orEmpty(),

@@ -126,9 +126,12 @@ if tap("Lake District crew", last=True):
         snapshot("07-group-chat")
         adb("shell", "input", "keyevent", "KEYCODE_BACK")
         time.sleep(1)
-    for label, name in [("Proposals", "08-group-proposals"), ("Timing", "09-group-timing")]:
-        if tap(label):
+    # Plans and Timing live in the header's "More" menu and open over the calendar.
+    for label, name in [("Plans", "08-group-plans"), ("Timing", "09-group-timing")]:
+        if tap("More") and tap(label):
             snapshot(name)
+            adb("shell", "input", "keyevent", "KEYCODE_BACK")
+            time.sleep(1)
     for _ in range(3):
         if find("Your groups", 2) is not None:
             break

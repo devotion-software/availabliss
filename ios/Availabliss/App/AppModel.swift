@@ -16,6 +16,7 @@ final class AppModel {
     let push: PushManager
     let deviceCalendar: DeviceCalendarService
     let billing = Billing()
+    let groupDetails = GroupDetailStore()
 
     private(set) var unreadNotifications = 0
     /// Bumped when another account is merged into this one, so screens showing account data reload.

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { invalidate } from '$app/navigation';
+	import { goto, invalidate } from '$app/navigation';
 	import { live } from '#lib/client/live.svelte';
 	import { unread } from '#lib/client/unread.svelte';
 	import GroupSidebar from '#lib/components/groups/GroupSidebar.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
-	import Icon from '#lib/components/ui/Icon.svelte';
+	import Menu from '#lib/components/ui/Menu.svelte';
 	import { groupSubtitle, isAdminRole } from '#lib/client/members';
 
 	let { data, children } = $props();
@@ -14,16 +14,18 @@
 	const route = $derived(page.route.id ?? '');
 	const unreadChat = $derived(unread.count(data.groups.find((g) => g.id === data.group.id) ?? { id: data.group.id }));
 
-	// Phones: the group's header and section strip pinned at the top of its four sections.
-	const showNav = $derived(
-		['/app/groups/[id]', '/app/groups/[id]/chat', '/app/groups/[id]/proposals', '/app/groups/[id]/timing'].includes(route)
-	);
+	// Phones: the calendar is the group's home, with its header pinned at the top. Chat, Plans,
+	// Timing and Members open as their own screens, each with a way back to the calendar.
+	const showNav = $derived(route === '/app/groups/[id]');
 	const isAdmin = $derived(isAdminRole(data.group.role));
-	const tabs = $derived([
-		{ href: base, label: 'Calendar', icon: 'calendar' as const, current: route === '/app/groups/[id]' },
-		{ href: `${base}/chat`, label: 'Chat', icon: 'chat' as const, current: route.endsWith('/chat'), badge: unreadChat },
-		{ href: `${base}/proposals`, label: 'Proposals', icon: 'check-circle' as const, current: route.endsWith('/proposals') },
-		{ href: `${base}/timing`, label: 'Timing', icon: 'sliders' as const, current: route.endsWith('/timing') }
+	const more = $derived([
+		{ label: 'Plans', icon: 'check-circle' as const, onselect: () => goto(`${base}/proposals`) },
+		{ label: 'Timing', icon: 'sliders' as const, onselect: () => goto(`${base}/timing`) },
+		{
+			label: isAdmin ? 'Members and invites' : 'Members',
+			icon: isAdmin ? ('user-plus' as const) : ('users' as const),
+			onselect: () => goto(`${base}/members`)
+		}
 	]);
 
 	// Group details (name, members, roles, timing) change under us; refetch when they do.
@@ -46,25 +48,15 @@
 	</aside>
 	<div class="content">
 		{#if showNav}
-			<div class="phone-nav">
-				<header class="head">
-					<IconButton href="/app" icon="chevron-left" label="Back to groups" />
-					<div class="titles">
-						<h1>{data.group.name}</h1>
-						<span class="sub">{groupSubtitle(data.group)}</span>
-					</div>
-					<IconButton href="{base}/members" icon={isAdmin ? 'user-plus' : 'users'} label={isAdmin ? 'Members and invites' : 'Members'} />
-				</header>
-				<nav class="strip glass" aria-label="Group sections">
-					{#each tabs as t (t.href)}
-						<a href={t.href} class:on={t.current} aria-current={t.current ? 'page' : undefined}>
-							<Icon name={t.icon} size={14} />
-							<span>{t.label}</span>
-							{#if t.badge}<span class="badge" aria-label="{t.badge} unread">{t.badge > 99 ? '99+' : t.badge}</span>{/if}
-						</a>
-					{/each}
-				</nav>
-			</div>
+			<header class="phone-nav">
+				<IconButton href="/app" icon="chevron-left" label="Back to groups" />
+				<div class="titles">
+					<h1>{data.group.name}</h1>
+					<span class="sub">{groupSubtitle(data.group)}</span>
+				</div>
+				<IconButton href="{base}/chat" icon="chat" label={unreadChat ? `Chat, ${unreadChat} unread` : 'Chat'} badge={unreadChat} />
+				<Menu icon="more" label="More" items={more} />
+			</header>
 		{/if}
 		{@render children()}
 	</div>
@@ -83,16 +75,11 @@
 		top: 0;
 		z-index: 20;
 		display: flex;
-		flex-direction: column;
+		align-items: center;
 		gap: 10px;
 		margin: calc(-1 * max(20px, env(safe-area-inset-top))) calc(-1 * var(--gutter)) 12px;
 		padding: max(12px, env(safe-area-inset-top)) var(--gutter) 10px;
 		background: linear-gradient(var(--bg) 75%, transparent);
-	}
-	.head {
-		display: flex;
-		align-items: center;
-		gap: 10px;
 	}
 	.titles {
 		flex: 1;
@@ -100,7 +87,7 @@
 		display: flex;
 		flex-direction: column;
 	}
-	.head h1 {
+	.phone-nav h1 {
 		font-size: 22px;
 		font-weight: 700;
 		white-space: nowrap;
@@ -110,43 +97,6 @@
 	.sub {
 		font-size: 12px;
 		color: var(--muted);
-	}
-	.strip {
-		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-		gap: 4px;
-		padding: 4px;
-		border-radius: 16px;
-	}
-	.strip a {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 5px;
-		min-height: 36px;
-		border-radius: 12px;
-		font-size: 13px;
-		font-weight: 500;
-		color: var(--ink);
-		text-decoration: none;
-		white-space: nowrap;
-	}
-	.strip a.on {
-		background: var(--solid);
-		color: var(--on-solid);
-		font-weight: 600;
-	}
-	.badge {
-		min-width: 16px;
-		height: 16px;
-		padding: 0 5px;
-		border-radius: 8px;
-		background: var(--warn);
-		color: #1a1b3a;
-		font-size: 10px;
-		font-weight: 700;
-		line-height: 16px;
-		text-align: center;
 	}
 	.side {
 		display: none;

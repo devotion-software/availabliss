@@ -57,7 +57,7 @@ struct GroupsHomeView: View {
         .sheet(isPresented: $showsNewGroup) {
             NewGroupSheet(api: model.api, timezone: app.session.user?.timezone ?? TimeZone.current.identifier) { group in
                 Task { await model.load() }
-                app.router.push(.group(id: group.id, tab: .calendar))
+                app.router.push(.group(id: group.id))
             }
         }
         .errorAlert($model.error)
@@ -113,9 +113,12 @@ struct GroupsHomeView: View {
             LazyVStack(spacing: 10) {
                 ForEach(model.groups) { group in
                     Button {
-                        app.router.push(.group(id: group.id, tab: .calendar))
+                        app.router.push(.group(id: group.id))
                     } label: {
-                        GroupRow(group: group) { app.router.push(.group(id: group.id, tab: .chat)) }
+                        GroupRow(group: group) {
+                            app.router.push(.group(id: group.id))
+                            app.router.push(.groupSection(id: group.id, section: .chat))
+                        }
                     }
                     .buttonStyle(.pressable)
                 }

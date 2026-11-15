@@ -14,10 +14,14 @@ import kotlinx.serialization.Serializable
 @Serializable data object ActivityRoute
 @Serializable data object YouRoute
 
-/** Group shell with its own tab bar. [tab] is one of [GroupTab] names. */
-@Serializable data class GroupRoute(val groupId: String, val tab: String = GroupTab.Calendar.name)
+/** A group's calendar: its home screen, with the header's chat and "More" menu. */
+@Serializable data class GroupRoute(val groupId: String)
 
-enum class GroupTab { Calendar, Chat, Proposals, Timing }
+// A group's sections, pushed over its calendar (see MainNavHost.openGroupSection).
+@Serializable data class GroupChatRoute(val groupId: String)
+/** Proposals and events ("Plans"). */
+@Serializable data class GroupPlansRoute(val groupId: String)
+@Serializable data class GroupTimingRoute(val groupId: String)
 
 @Serializable data object NewGroupRoute
 @Serializable data class MembersRoute(val groupId: String)

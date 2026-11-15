@@ -99,6 +99,9 @@
 <div class="page">
 	<PageHeader
 	title="Timing"
+	backHref="/app/groups/{data.group.id}"
+	backLabel="Back to calendar"
+	backOnPhoneOnly
 	size="lg"
 	crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Timing' }]}
 >

@@ -66,7 +66,7 @@ struct OnboardingView: View {
             do {
                 try await app.session.update(UserPatch(onboarded: true))
                 if let createdGroup {
-                    app.router.groupsPath = [.group(id: createdGroup.id, tab: .calendar)]
+                    app.router.groupsPath = [.group(id: createdGroup.id)]
                 } else if opensMyTime {
                     app.router.tab = .myTime
                 }

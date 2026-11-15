@@ -28,7 +28,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.data.GroupsRepository
@@ -49,7 +48,6 @@ import dev.joeherbert.availabliss.designsystem.component.SegmentedControl
 import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
-import dev.joeherbert.availabliss.navigation.GroupRoute
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -76,7 +74,7 @@ class PreferencesViewModel @Inject constructor(
     private val users: UserRepository,
     liveEvents: LiveEvents,
 ) : ViewModel() {
-    private val groupId = savedStateHandle.toRoute<GroupRoute>().groupId
+    private val groupId = savedStateHandle.get<String>("groupId").orEmpty()
     private val _state = MutableStateFlow(PreferencesUiState())
     val state: StateFlow<PreferencesUiState> = _state.asStateFlow()
 

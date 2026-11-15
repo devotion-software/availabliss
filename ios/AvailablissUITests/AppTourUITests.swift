@@ -42,9 +42,16 @@ final class AppTourUITests: XCTestCase {
             settle(2)
             snapshot("04-group-month")
             tapIfPresent(app.buttons["Week"]) { snapshot("05-group-week") }
-            tapIfPresent(app.buttons["Chat"]) { snapshot("07-group-chat") }
-            tapIfPresent(app.buttons["Proposals"]) { snapshot("08-group-proposals") }
+            // Chat, Plans and Timing open over the calendar; back returns to it.
+            // The Chat label can carry an unread count ("Chat, 2 unread").
+            tapIfPresent(button(startingWith: "Chat")) { snapshot("07-group-chat") }
+            backToCalendar()
+            tapIfPresent(app.buttons["More"]) { snapshot("08-group-more") }
+            tapIfPresent(app.buttons["Plans"]) { snapshot("08-group-proposals") }
+            backToCalendar()
+            tapIfPresent(app.buttons["More"]) {}
             tapIfPresent(app.buttons["Timing"]) { snapshot("09-group-timing") }
+            backToCalendar()
             returnToGroups()
         } else {
             XCTFail("Seeded group 'Lake District crew' not found on the groups list")
@@ -83,6 +90,11 @@ final class AppTourUITests: XCTestCase {
             settle()
         }
         XCTAssertTrue(app.staticTexts["Your groups"].waitForExistence(timeout: 5), "Couldn't get back to the groups list")
+    }
+
+    /// Taps "Back to calendar" on a screen pushed over a group's calendar.
+    private func backToCalendar() {
+        tapIfPresent(app.buttons["Back to calendar"]) {}
     }
 
     /// Taps "Allow" on a system permission alert if one is showing.

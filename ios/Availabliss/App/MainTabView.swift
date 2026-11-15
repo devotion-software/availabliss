@@ -97,8 +97,10 @@ struct RouteDestination: View {
 
     var body: some View {
         switch route {
-        case .group(let id, let tab):
-            GroupContainerView(groupId: id, initialTab: tab, api: app.api)
+        case .group(let id):
+            GroupContainerView(groupId: id, section: nil, app: app)
+        case .groupSection(let id, let section):
+            GroupContainerView(groupId: id, section: section, app: app)
         case .proposal(let id):
             ProposalView(proposalId: id, api: app.api)
         case .members(let groupId):

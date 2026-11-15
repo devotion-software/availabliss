@@ -10,7 +10,6 @@ import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.live.LiveEvents
 import dev.joeherbert.availabliss.core.live.LivePayload
 import dev.joeherbert.availabliss.navigation.GroupRoute
-import dev.joeherbert.availabliss.navigation.GroupTab
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,8 +30,10 @@ data class GroupShellUiState(
 )
 
 /**
- * Shell of a group: loads the [dev.joeherbert.availabliss.core.network.model.Group] the tabs
- * share and tracks the chat unread badge while the chat isn't open.
+ * A group's header: loads the [dev.joeherbert.availabliss.core.network.model.Group] (cached in
+ * [GroupsRepository] for the sections pushed on top) and tracks the chat button's unread badge
+ * while the chat isn't open. Scoped to the [GroupRoute] entry; the chat screen reports its
+ * visibility through [onChatVisible].
  */
 @HiltViewModel
 class GroupViewModel @Inject constructor(
@@ -44,7 +45,7 @@ class GroupViewModel @Inject constructor(
 
     private val groupId = savedStateHandle.toRoute<GroupRoute>().groupId
     private val unread = MutableStateFlow(0)
-    private var currentTab: GroupTab = GroupTab.Calendar
+    private var chatVisible = false
 
     val uiState: StateFlow<GroupShellUiState> = combine(groups.group(groupId), unread) { group, count ->
         GroupShellUiState(
@@ -68,14 +69,14 @@ class GroupViewModel @Inject constructor(
             // Seed the badge from the groups list (refreshing it if it hasn't loaded yet).
             val summary = groups.groups.value ?: run { groups.refreshGroups(); groups.groups.value }
             val count = summary?.firstOrNull { it.id == groupId }?.unreadCount ?: 0
-            if (currentTab != GroupTab.Chat) unread.value = count
+            if (!chatVisible) unread.value = count
         }
         viewModelScope.launch {
             liveEvents.payloadsFor(groupId).collect { payload ->
                 when (payload) {
                     is LivePayload.MessageCreated -> {
                         val me = users.user.value?.id ?: users.user.filterNotNull().first().id
-                        if (currentTab != GroupTab.Chat && payload.message.authorId != me) unread.update { it + 1 }
+                        if (!chatVisible && payload.message.authorId != me) unread.update { it + 1 }
                     }
                     // The payload is the whole group: no need to refetch it.
                     is LivePayload.GroupUpdated -> groups.applyLiveUpdate(payload.group, users.user.value?.id)
@@ -86,9 +87,9 @@ class GroupViewModel @Inject constructor(
         viewModelScope.launch { liveEvents.reconnected.collect { groups.refreshGroup(groupId) } }
     }
 
-    fun onTabChanged(tab: GroupTab) {
-        currentTab = tab
+    fun onChatVisible(visible: Boolean) {
+        chatVisible = visible
         // Opening the chat sends "seen" receipts (GroupChatTab), so clear the badge.
-        if (tab == GroupTab.Chat) unread.value = 0
+        if (visible) unread.value = 0
     }
 }

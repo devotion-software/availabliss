@@ -17,9 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Spacer
-import dev.joeherbert.availabliss.feature.group.GroupTopBarHeight
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -42,28 +39,35 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
 
-/** The group's "Proposals" tab (shown above the group tab bar). */
+/** The group's proposals and events ("Plans" in the group menu), pushed over its calendar. */
 @Composable
 fun GroupProposalsTab(
+    onBack: () -> Unit,
     onOpenProposal: (String) -> Unit,
     onOpenEvents: () -> Unit,
     viewModel: GroupProposalsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    GroupProposalsContent(state, onOpenProposal, onOpenEvents, viewModel::refresh)
+    GroupProposalsContent(state, onBack, onOpenProposal, onOpenEvents, viewModel::refresh)
 }
 
 @Composable
 private fun GroupProposalsContent(
     state: GroupProposalsUiState,
+    onBack: () -> Unit,
     onOpenProposal: (String) -> Unit,
     onOpenEvents: () -> Unit,
     onRetry: () -> Unit,
 ) {
     AvailablissBackground(OrbLayout.Proposal) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            // Room for the group's pinned header and section strip (GroupScreen).
-            Spacer(Modifier.height(GroupTopBarHeight))
+            ScreenHeader(
+                title = "Proposals",
+                subtitle = state.groupName.ifBlank { null },
+                onBack = onBack,
+                backDescription = "Back to calendar",
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp),
+            )
             LazyColumn(
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = Spacing.tabBarClearance),
@@ -126,7 +130,7 @@ private fun GroupProposalsPreview() {
                 open = listOf(ProposalListItem("1", ProposalCardUi("NOV", "13", "Ana proposed a time", "Fri 13 – Sun 15 Nov", "4 of 6 accepted"))),
                 confirmed = listOf(ProposalListItem("2", ProposalCardUi("DEC", "4", "Tom proposed a time", "Fri 4 – Sun 6 Dec", "Everyone's in", ProposalCardTone.Confirmed))),
             ),
-            {}, {}, {},
+            {}, {}, {}, {},
         )
     }
 }

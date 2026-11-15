@@ -88,10 +88,10 @@ private const val PLANNER_UPGRADE_REASON = "AI planning is part of Pro: it picks
 /** Group availability: month / week / day (GroupCalendar.dc.html). */
 @Composable
 fun GroupCalendarTab(
-    onBack: () -> Unit,
-    onOpenMembers: () -> Unit,
     onOpenTiming: () -> Unit,
     onCreateProposal: (ProposalPrefill) -> Unit,
+    /** The group's Plans card, shown above the calendar (renders nothing when there are no plans). */
+    plans: @Composable () -> Unit = {},
     viewModel: GroupCalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -119,8 +119,6 @@ fun GroupCalendarTab(
     }
     GroupCalendarContent(
         state = state,
-        onBack = onBack,
-        onOpenMembers = onOpenMembers,
         onOpenTiming = onOpenTiming,
         onNudge = viewModel::nudge,
         onSelectView = viewModel::selectView,
@@ -144,14 +142,13 @@ fun GroupCalendarTab(
             null
         },
         snackbar = { AvSnackbarHost(snackbar) },
+        plans = plans,
     )
 }
 
 @Composable
 fun GroupCalendarContent(
     state: GroupCalendarUiState,
-    onBack: () -> Unit,
-    onOpenMembers: () -> Unit,
     onOpenTiming: () -> Unit,
     onNudge: () -> Unit,
     onSelectView: (CalendarView) -> Unit,
@@ -167,6 +164,7 @@ fun GroupCalendarContent(
     onProposeSpan: (String, String) -> Unit = { _, _ -> },
     /** "Plan with AI"; null hides it (not set up on this server, or nothing works yet). */
     onPlanWithAi: (() -> Unit)? = null,
+    plans: @Composable () -> Unit = {},
 ) {
     AvailablissBackground(OrbLayout.GroupCalendar) {
         Box(Modifier.fillMaxSize()) {
@@ -178,10 +176,11 @@ fun GroupCalendarContent(
                     .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = Spacing.tabBarClearance),
                 verticalArrangement = Arrangement.spacedBy(Spacing.l),
             ) {
-                // Room for the group's pinned header and section strip (GroupScreen).
+                // Room for the group's pinned header (GroupScreen).
                 Spacer(Modifier.height(GroupTopBarHeight - Spacing.screen))
                 state.syncBanner?.let { SyncBanner(it, state.nudging, onNudge) }
                 if (state.requirementSummary.isNotBlank()) TimingChip(state.requirementSummary, state.isAdmin, onOpenTiming)
+                plans()
                 HeadingRow(state, onSelectView, onPrevious, onNext)
                 state.coverageNote?.let { CoverageNote(it) }
                 state.error?.let { ErrorBanner(it, onRetry = onRetry) }
@@ -439,7 +438,7 @@ private fun GroupCalendarPreview() {
                 syncBanner = SyncBannerUi(4, 6, "2 people still to sync", "Leo and Jade haven't added busy times", true),
                 detail = DayDetailUi(LocalDate.of(2026, 11, 13), "Fri 13 – Sun 15 Nov", "Everyone synced is free from Fri 18:00", true, "Propose this weekend", Slot("", "", "")),
             ),
-            onBack = {}, onOpenMembers = {}, onOpenTiming = {}, onNudge = {}, onSelectView = {}, onSelectDate = {},
+            onOpenTiming = {}, onNudge = {}, onSelectView = {}, onSelectDate = {},
             onPrevious = {}, onNext = {}, onRetry = {}, onPropose = {},
         )
     }

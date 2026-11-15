@@ -79,7 +79,7 @@
 	});
 
 	const path = $derived(page.url.pathname);
-	// The main tab bar stays on every app screen, inside groups too (they add a section strip at the top).
+	// The main tab bar stays on every app screen, inside groups too.
 	const mainTabs = $derived(!/\/events\/new$/.test(path));
 	const tabs = $derived([
 		{ href: '/app', label: 'Groups', icon: 'groups' as const, current: path === '/app' || /^\/app\/(groups|proposals)\//.test(path) },

@@ -12,8 +12,10 @@
 		proposal: Proposal;
 		group: Group;
 		meId: string;
+		/** Tighter, without its own glass: for rows inside another card (the calendar's Plans card). */
+		compact?: boolean;
 	}
-	let { proposal, group, meId }: Props = $props();
+	let { proposal, group, meId, compact = false }: Props = $props();
 
 	const fmt = useFormat();
 	const members = $derived(memberMap(group));
@@ -25,7 +27,7 @@
 	const by = $derived(proposal.createdBy === meId ? 'You' : memberLabel(members, proposal.createdBy, meId, { first: true }));
 </script>
 
-<a class="row glass" href="/app/proposals/{proposal.id}" class:muted={proposal.status !== 'open'}>
+<a class="row" class:glass={!compact} class:compact href="/app/proposals/{proposal.id}" class:muted={proposal.status !== 'open'}>
 	<span class="date" class:confirmed={proposal.status === 'confirmed'} aria-hidden="true">
 		<span class="mon">{monthShort(day).toUpperCase()}</span>
 		<span class="num">{dayNumber(day)}</span>
@@ -124,6 +126,28 @@
 	}
 	.row :global(.chev) {
 		color: var(--muted);
+	}
+	.compact {
+		border-radius: 16px;
+		padding: 8px;
+		gap: 10px;
+	}
+	.compact:hover {
+		transform: none;
+		background: var(--surface);
+	}
+	.compact.muted {
+		opacity: 1;
+	}
+	.compact .date {
+		width: 40px;
+		height: 44px;
+	}
+	.compact .num {
+		font-size: 17px;
+	}
+	.compact .when {
+		font-size: 14px;
 	}
 	.clash {
 		color: var(--warn-ink);

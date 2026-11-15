@@ -5,14 +5,15 @@ enum AppTab: Hashable, CaseIterable {
     case groups, myTime, activity, you
 }
 
-/// Tabs inside a group (the group's own floating tab bar).
-enum GroupTab: Hashable, CaseIterable {
-    case calendar, chat, proposals, timing
+/// A group's screens pushed over its calendar (the group's home).
+enum GroupSection: Hashable, CaseIterable {
+    case chat, plans, timing
 }
 
 /// Every pushable screen.
 enum AppRoute: Hashable {
-    case group(id: String, tab: GroupTab)
+    case group(id: String)
+    case groupSection(id: String, section: GroupSection)
     case proposal(id: String)
     case members(groupId: String)
     case appearance
@@ -75,10 +76,10 @@ final class Router {
             pendingInvite = InviteToken(token: token)
         case .group(let id):
             tab = .groups
-            groupsPath = [.group(id: id, tab: .calendar)]
+            groupsPath = [.group(id: id)]
         case .groupChat(let id):
             tab = .groups
-            groupsPath = [.group(id: id, tab: .chat)]
+            groupsPath = [.group(id: id), .groupSection(id: id, section: .chat)]
         case .proposal(let id):
             tab = .groups
             groupsPath = [.proposal(id: id)]

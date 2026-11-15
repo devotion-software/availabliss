@@ -33,6 +33,7 @@ struct GroupAvailabilityView: View {
                     }
                 }
                 TimingChip(summary: group.requirementSummary, action: onOpenTiming)
+                GroupPlansCard(detail: detail, group: group)
                 headingRow
                 if let gaps = model.availability?.checkedUntil, !gaps.isEmpty {
                     CoverageNote(gaps: gaps, group: group, me: app.session.user?.id)

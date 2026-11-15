@@ -3,7 +3,6 @@ package dev.joeherbert.availabliss.feature.timing
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.GroupsRepository
@@ -12,7 +11,6 @@ import dev.joeherbert.availabliss.core.data.TemplatesRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiError
 import dev.joeherbert.availabliss.core.network.ApiResult
-import dev.joeherbert.availabliss.navigation.GroupRoute
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,7 +44,7 @@ class GroupTimingViewModel @Inject constructor(
     regions: RegionsRepository,
 ) : ViewModel() {
 
-    private val groupId = savedStateHandle.toRoute<GroupRoute>().groupId
+    private val groupId = savedStateHandle.get<String>("groupId").orEmpty()
     private val _uiState = MutableStateFlow(GroupTimingUiState())
     val uiState: StateFlow<GroupTimingUiState> = _uiState.asStateFlow()
 

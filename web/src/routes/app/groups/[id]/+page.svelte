@@ -26,6 +26,7 @@
 	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
 	import Breadcrumbs from '#lib/components/ui/Breadcrumbs.svelte';
 	import ChatPanel from '#lib/components/chat/ChatPanel.svelte';
+	import PlansCard from '#lib/components/proposals/PlansCard.svelte';
 
 	let { data } = $props();
 
@@ -251,6 +252,7 @@
 				<span class="timing-text"><strong>{lengthLabel(group.requirement)}</strong> · {detailLabel(group.requirement)}</span>
 				<Icon name="pencil" size={15} class="muted" />
 			</a>
+			<PlansCard {group} meId={data.user.id} />
 		</div>
 		{/if}
 
@@ -314,7 +316,7 @@
 			onselect={selectSlot}
 			onplan={aiPlanner?.available ? openPlanner : undefined}
 		/>
-		<!-- Only mounted on desktop: it loads and subscribes to the chat. Phones use the Chat tab. -->
+		<!-- Only mounted on desktop: it loads and subscribes to the chat. Phones open the chat from the header. -->
 		{#if isDesktop.matches}
 			<div class="desk-only">
 				<ChatPanel {group} me={data.user} onpropose={() => propose(null)} />

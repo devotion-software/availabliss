@@ -1,56 +1,52 @@
 import SwiftUI
 
-/// A group with its own floating tab bar: Calendar · Chat · Proposals · Timing.
-/// Chat is full-screen (its composer replaces the tab bar), as in the concept.
+/// A group's screens: its calendar (the group's home), and Chat / Plans / Timing pushed over it.
+/// Each is its own route, and they all share one `GroupDetailModel` from `GroupDetailStore`,
+/// so pushing a section doesn't load or subscribe to the group again.
 struct GroupContainerView: View {
+    let section: GroupSection?
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var detail: GroupDetailModel
-    @State private var tab: GroupTab
 
-    init(groupId: String, initialTab: GroupTab, api: APIClient) {
-        _detail = State(initialValue: GroupDetailModel(groupId: groupId, api: api))
-        _tab = State(initialValue: initialTab)
+    init(groupId: String, section: GroupSection?, app: AppModel) {
+        self.section = section
+        _detail = State(initialValue: app.groupDetails.model(for: groupId, api: app.api, live: app.live))
     }
 
     var body: some View {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let group = detail.group {
-                    GroupTopBar(group: group, tab: $tab, unreadCount: detail.unreadCount)
+                    GroupTopBar(group: group, section: section, unreadCount: detail.unreadCount)
                 }
             }
-            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: tab)
             .foregroundStyle(theme.ink)
             .chromeless()
-            .task { await detail.load() }
-            .task(id: detail.groupId) {
-                for await event in app.live.events(forGroup: detail.groupId) {
-                    await detail.apply(event)
-                    if event.kind == .messageCreated, tab != .chat { detail.unreadCount += 1 }
-                }
+            .task { await detail.start() }
+            .onAppear {
+                guard section == .chat else { return }
+                detail.isChatVisible = true
+                detail.unreadCount = 0
             }
-            .onChange(of: tab) { _, newTab in if newTab == .chat { detail.unreadCount = 0 } }
+            .onDisappear { if section == .chat { detail.isChatVisible = false } }
     }
 
     @ViewBuilder
     private var content: some View {
         if let group = detail.group {
-            // Each tab fades in (the container animates `tab` changes).
-            SwiftUI.Group {
-                switch tab {
-                case .calendar:
-                    GroupAvailabilityView(detail: detail, group: group, onOpenTiming: { tab = .timing })
-                case .chat:
-                    ChatView(detail: detail, group: group)
-                case .proposals:
-                    GroupPlansView(detail: detail, group: group)
-                case .timing:
-                    TimingEditorView(detail: detail, group: group, onDone: { tab = .calendar })
-                }
+            switch section {
+            case nil:
+                GroupAvailabilityView(detail: detail, group: group, onOpenTiming: {
+                    app.router.push(.groupSection(id: group.id, section: .timing))
+                })
+            case .chat:
+                ChatView(detail: detail, group: group)
+            case .plans:
+                GroupPlansView(detail: detail, group: group)
+            case .timing:
+                TimingEditorView(detail: detail, group: group, onDone: { app.router.pop() })
             }
-            .id(tab)
-            .transition(.opacity)
         } else if let error = detail.loadError {
             VStack {
                 ScreenHeader(title: "Group", onBack: { app.router.pop() })
@@ -66,53 +62,23 @@ struct GroupContainerView: View {
                 .screenBackground(OrbLayout.groupCalendar)
         }
     }
-
 }
 
-/// Header shared by the group's tabs: back, name + "6 members · you're an admin", invite.
-struct GroupHeader: View {
+/// Pinned at the top of a group's screens. On the calendar: back to groups, name, role, Chat and More
+/// (Plans, Timing, Members). On a pushed section: back to the calendar, with the group's name.
+private struct GroupTopBar: View {
     let group: Group
+    let section: GroupSection?
+    let unreadCount: Int
     @Environment(AppModel.self) private var app
 
     var body: some View {
-        ScreenHeader(title: group.name, subtitle: subtitle, titleSize: 22, backLabel: "Back to groups", onBack: { app.router.pop() }) {
-            IconButton(systemImage: canInvite ? "person.badge.plus" : "person.2", label: canInvite ? "Members and invites" : "Members") {
-                app.router.push(.members(groupId: group.id))
+        SwiftUI.Group {
+            if let section {
+                ScreenHeader(title: group.name, titleSize: 22, backLabel: "Back to calendar", onBack: { app.router.pop() })
+            } else {
+                GroupHeader(group: group, unreadCount: unreadCount)
             }
-        }
-    }
-
-    /// Only owners and admins can invite, so only they see the "add person" icon.
-    private var canInvite: Bool { group.role != .member }
-
-    private var subtitle: String {
-        let members = Formatting.plural(group.memberCount, "member")
-        switch group.role {
-        case .owner: return "\(members) · you're the owner"
-        case .admin: return "\(members) · you're an admin"
-        case .member: return members
-        }
-    }
-}
-
-/// Pinned at the top of a group: back, name, members, and the section strip.
-private struct GroupTopBar: View {
-    let group: Group
-    @Binding var tab: GroupTab
-    let unreadCount: Int
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        VStack(spacing: 10) {
-            GroupHeader(group: group)
-            HStack(spacing: 4) {
-                item(.calendar, "Calendar", "calendar")
-                item(.chat, "Chat", "bubble.left")
-                item(.proposals, "Proposals", "checkmark.circle")
-                item(.timing, "Timing", "slider.horizontal.3")
-            }
-            .padding(4)
-            .glass(cornerRadius: 16, shadow: false)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -124,31 +90,74 @@ private struct GroupTopBar: View {
             .ignoresSafeArea(edges: .top)
         }
     }
+}
 
-    private func item(_ value: GroupTab, _ title: String, _ systemImage: String) -> some View {
-        let isOn = tab == value
-        return Button {
-            tab = value
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: systemImage).font(.system(size: 13, weight: .semibold))
-                Text(title).bodyFont(13, isOn ? .semibold : .medium, relativeTo: .caption).lineLimit(1).minimumScaleFactor(0.8)
-                if value == .chat, unreadCount > 0 {
-                    Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
-                        .font(AppFont.body(10, .bold, relativeTo: .caption2))
-                        .foregroundStyle(Color(hex: 0x1A1B3A))
-                        .padding(.horizontal, 5)
-                        .frame(minWidth: 16, minHeight: 16)
-                        .background(Capsule().fill(theme.warn))
-                }
+/// The calendar's header: back, name + "6 members · you're an admin", Chat (with unread badge) and More.
+private struct GroupHeader: View {
+    let group: Group
+    let unreadCount: Int
+    @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        ScreenHeader(title: group.name, subtitle: subtitle, titleSize: 22, backLabel: "Back to groups", onBack: { app.router.pop() }) {
+            HStack(spacing: 8) {
+                chatButton
+                moreMenu
             }
-            .foregroundStyle(isOn ? theme.onSolid : theme.ink)
-            .frame(maxWidth: .infinity, minHeight: 36)
-            .background { if isOn { RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.solid) } }
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(unreadCount > 0 && value == .chat ? "\(title), \(unreadCount) unread" : title)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+
+    private var chatButton: some View {
+        IconButton(systemImage: "bubble.left", label: unreadCount > 0 ? "Chat, \(unreadCount) unread" : "Chat") {
+            app.router.push(.groupSection(id: group.id, section: .chat))
+        }
+        .overlay(alignment: .topTrailing) {
+            if unreadCount > 0 {
+                Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
+                    .font(AppFont.body(10, .bold, relativeTo: .caption2))
+                    .foregroundStyle(Color(hex: 0x1A1B3A))
+                    .padding(.horizontal, 5)
+                    .frame(minWidth: 18, minHeight: 18)
+                    .background(Capsule().fill(theme.warn))
+                    .offset(x: 3, y: -3)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button { app.router.push(.groupSection(id: group.id, section: .plans)) } label: {
+                Label("Plans", systemImage: "checkmark.circle")
+            }
+            Button { app.router.push(.groupSection(id: group.id, section: .timing)) } label: {
+                Label("Timing", systemImage: "slider.horizontal.3")
+            }
+            Button { app.router.push(.members(groupId: group.id)) } label: {
+                Label(canInvite ? "Members and invites" : "Members", systemImage: canInvite ? "person.badge.plus" : "person.2")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(theme.ink)
+                .frame(width: 44, height: 44)
+                .glass(in: Circle(), shadow: false)
+                .contentShape(Circle())
+        }
+        .accessibilityLabel("More")
+    }
+
+    /// Only owners and admins can invite.
+    private var canInvite: Bool { group.role != .member }
+
+    private var subtitle: String {
+        let members = Formatting.plural(group.memberCount, "member")
+        switch group.role {
+        case .owner: return "\(members) · you're the owner"
+        case .admin: return "\(members) · you're an admin"
+        case .member: return members
+        }
     }
 }

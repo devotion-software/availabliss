@@ -1,14 +1,12 @@
 import SwiftUI
 
-/// The group's "Proposals" tab: open proposals, confirmed / added events, and Add event.
+/// The group's Plans screen (titled "Proposals"): open proposals, confirmed / added events, and Add event.
+/// The lists live on the shared `GroupDetailModel`, which keeps them in sync with live updates.
 struct GroupPlansView: View {
     let detail: GroupDetailModel
     let group: Group
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
-    @State private var proposals: [Proposal] = []
-    @State private var events: [GroupEvent] = []
-    @State private var isLoading = true
     @State private var editingEvent: EventEditorSheet.Target?
     @State private var error: String?
 
@@ -21,7 +19,7 @@ struct GroupPlansView: View {
                     Button { editingEvent = .new } label: { Label("Add event", systemImage: "plus") }
                         .buttonStyle(.glassPill)
                 }
-                if isLoading {
+                if !detail.plansLoaded {
                     StatusView(kind: .loading)
                 } else {
                     proposalsSection
@@ -33,16 +31,8 @@ struct GroupPlansView: View {
             .padding(.bottom, 16)
         }
         .screenBackground(OrbLayout.proposal)
-        .task { await load() }
+        .task { if !detail.plansLoaded { await load() } }
         .refreshable { await load() }
-        .task(id: group.id) {
-            for await event in app.live.events(forGroup: group.id) {
-                switch event.kind {
-                case .proposalCreated, .proposalUpdated, .proposalConfirmed, .eventChanged, .reconnected: await load()
-                default: break
-                }
-            }
-        }
         .sheet(item: $editingEvent) { target in
             EventEditorSheet(groupId: group.id, target: target, api: detail.api) { _ in Task { await load() } }
         }
@@ -51,7 +41,7 @@ struct GroupPlansView: View {
 
     @ViewBuilder
     private var proposalsSection: some View {
-        let open = proposals.filter { $0.status == .open }
+        let open = detail.proposals.filter { $0.status == .open }
         if open.isEmpty {
             StatusView(kind: .empty(title: "Nothing proposed yet", message: "Pick a day that works on the calendar and propose it.", systemImage: "checkmark.circle"))
                 .glass(cornerRadius: 24)
@@ -67,9 +57,9 @@ struct GroupPlansView: View {
 
     @ViewBuilder
     private var eventsSection: some View {
-        if !events.isEmpty {
+        if !detail.events.isEmpty {
             Text("Coming up").displayFont(19, .semibold).padding(.top, 6).accessibilityAddTraits(.isHeader)
-            ForEach(events) { event in
+            ForEach(detail.events) { event in
                 EventRow(event: event, canEdit: event.createdBy == app.session.user?.id || group.role.isAdmin) {
                     editingEvent = .edit(event)
                 }
@@ -78,15 +68,107 @@ struct GroupPlansView: View {
     }
 
     private func load() async {
-        defer { isLoading = false }
         do {
-            async let proposalList = detail.api.send(API.Proposals.list(groupId: group.id))
-            async let eventList = detail.api.send(API.Events.list(groupId: group.id, from: Calendar.current.startOfDay(for: Date())))
-            proposals = try await proposalList.proposals.sorted { $0.start < $1.start }
-            events = try await eventList.events.sorted { $0.start < $1.start }
+            try await detail.loadPlans()
         } catch where !error.isCancellation {
             self.error = error.userMessage
         } catch {}
+    }
+}
+
+/// "Plans" on the group's calendar: open proposals first, then the next event (two at most), and See all.
+/// Shows nothing when there's nothing planned.
+struct GroupPlansCard: View {
+    let detail: GroupDetailModel
+    let group: Group
+    @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
+
+    private enum Item: Identifiable {
+        case proposal(Proposal), event(GroupEvent)
+        var id: String {
+            switch self {
+            case .proposal(let proposal): "proposal-\(proposal.id)"
+            case .event(let event): "event-\(event.id)"
+            }
+        }
+    }
+
+    private var items: [Item] {
+        let open = detail.proposals.filter { $0.status == .open }.map(Item.proposal)
+        let next = detail.events.prefix(1).map(Item.event)
+        return Array((open + next).prefix(2))
+    }
+
+    var body: some View {
+        let items = items
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Plans").displayFont(17, .semibold, relativeTo: .headline).accessibilityAddTraits(.isHeader)
+                    Spacer()
+                    Button("See all", action: openPlans)
+                        .bodyFont(13, .semibold, relativeTo: .subheadline)
+                        .foregroundStyle(theme.accentInk)
+                        .frame(minHeight: 32)
+                        .accessibilityLabel("See all plans")
+                }
+                ForEach(items) { item in
+                    switch item {
+                    case .proposal(let proposal):
+                        row(date: proposal.start, title: proposal.title ?? Formatting.span(start: proposal.start, end: proposal.end, allDay: proposal.allDay), detail: status(of: proposal), action: needsReply(proposal) ? "Reply" : nil) {
+                            app.router.push(.proposal(id: proposal.id))
+                        }
+                    case .event(let event):
+                        row(date: event.start, title: event.title, detail: Formatting.span(start: event.start, end: event.end, allDay: event.allDay), action: nil, onTap: openPlans)
+                    }
+                }
+            }
+            .padding(12)
+            .glass(cornerRadius: 22)
+        }
+    }
+
+    private func row(date: Date, title: String, detail: String, action: String?, onTap: @escaping () -> Void) -> some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                DateBlock(date: date)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).bodyFont(15, .semibold).lineLimit(1)
+                    Text(detail).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if let action {
+                    Text(action).bodyFont(13, .semibold, relativeTo: .subheadline).foregroundStyle(theme.accentInk)
+                } else {
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.muted)
+                }
+            }
+            .foregroundStyle(theme.ink)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressable)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// "3 of 5 in · you're in".
+    private func status(of proposal: Proposal) -> String {
+        let count = "\(proposal.acceptedCount) of \(group.members.count) in"
+        guard let me = app.session.user?.id, let mine = proposal.response(for: me)?.response else { return count }
+        switch mine {
+        case .accepted: return "\(count) · you're in"
+        case .declined: return "\(count) · you can't make it"
+        case .pending: return count
+        }
+    }
+
+    private func needsReply(_ proposal: Proposal) -> Bool {
+        guard let me = app.session.user?.id else { return false }
+        return proposal.response(for: me)?.response == .pending
+    }
+
+    private func openPlans() {
+        app.router.push(.groupSection(id: group.id, section: .plans))
     }
 }
 
