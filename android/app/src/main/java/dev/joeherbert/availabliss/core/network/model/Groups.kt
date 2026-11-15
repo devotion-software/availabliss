@@ -103,11 +103,25 @@ data class MemberRoleRequest(val role: Role)
 @Serializable
 data class NudgeResponse(val nudged: Int)
 
+/** No emails: a link anyone can use. Emails: one invite each, emailed, only for that person. */
 @Serializable
-data class CreateInviteRequest(val email: String? = null)
+data class CreateInviteRequest(val emails: List<String>? = null)
 
 @Serializable
-data class InviteLink(val token: String, val url: String, val expiresAt: String)
+data class InviteLink(
+    val token: String,
+    val url: String,
+    val expiresAt: String,
+    /** Every invite the request made (one per email). */
+    val invites: List<GroupInvite> = emptyList(),
+)
+
+/** An invite that can still be used: a link anyone can use (`email == null`), or one emailed to a person. */
+@Serializable
+data class GroupInvite(val id: String, val email: String? = null, val url: String, val expiresAt: String)
+
+@Serializable
+data class GroupInvitesResponse(val invites: List<GroupInvite>)
 
 @Serializable
 data class InvitePreview(
@@ -115,6 +129,8 @@ data class InvitePreview(
     val inviterName: String,
     val memberCount: Int,
     val expiresAt: String,
+    /** Who an emailed invite is for; null for a link anyone can use. */
+    val email: String? = null,
 )
 
 @Serializable

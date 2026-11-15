@@ -9,6 +9,7 @@ import dev.joeherbert.availabliss.core.network.model.CreateInviteRequest
 import dev.joeherbert.availabliss.core.network.model.DayAvailability
 import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.GroupSummary
+import dev.joeherbert.availabliss.core.network.model.GroupInvite
 import dev.joeherbert.availabliss.core.network.model.InviteLink
 import dev.joeherbert.availabliss.core.network.model.InvitePreview
 import dev.joeherbert.availabliss.core.network.model.Member
@@ -89,8 +90,13 @@ class GroupsRepository @Inject constructor(
 
     suspend fun nudge(groupId: String): ApiResult<Int> = call { api.nudge(groupId) }.map { it.nudged }
 
-    suspend fun createInvite(groupId: String, email: String? = null): ApiResult<InviteLink> =
-        call { api.createInvite(groupId, CreateInviteRequest(email?.takeIf { it.isNotBlank() })) }
+    /** No emails: a link anyone can use. Emails: one invite each, emailed, only for that person. */
+    suspend fun createInvite(groupId: String, emails: List<String> = emptyList()): ApiResult<InviteLink> =
+        call { api.createInvite(groupId, CreateInviteRequest(emails.takeIf { it.isNotEmpty() })) }
+
+    suspend fun invites(groupId: String): ApiResult<List<GroupInvite>> = call { api.invites(groupId).invites }
+
+    suspend fun revokeInvite(groupId: String, inviteId: String): ApiResult<Unit> = call { api.revokeInvite(groupId, inviteId) }
 
     suspend fun invite(token: String): ApiResult<InvitePreview> = call { api.getInvite(token) }
 

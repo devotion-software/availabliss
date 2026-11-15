@@ -7,6 +7,8 @@ import {
 	acceptInvite,
 	createGroup,
 	createInvite,
+	listInvites,
+	revokeInvite,
 	deleteGroup,
 	getGroup,
 	groupIdsFor,
@@ -207,6 +209,31 @@ describe('invites', () => {
 		expect((await apiError(previewInvite(token))).code).toBe('not_found');
 		expect((await apiError(acceptInvite(token, joiner))).code).toBe('not_found');
 		expect((await apiError(previewInvite('not-a-real-token'))).code).toBe('not_found');
+	});
+
+	test('emailed invites: only that address can join, once; listed until then and revocable', async () => {
+		const invitee = await fx.user({ email: `it-invitee-${Date.now()}@test.availabliss.invalid` });
+		const inviteeEmail = (await db.query.user.findFirst({ where: (u, { eq }) => eq(u.id, invitee) }))!.email;
+		const { id, token } = await createInvite(groupId, owner, inviteeEmail.toUpperCase());
+		expect(await previewInvite(token)).toMatchObject({ email: inviteeEmail });
+		expect((await listInvites(groupId, owner)).map((i) => i.id)).toContain(id);
+		expect((await apiError(listInvites(groupId, member))).code).toBe('forbidden');
+
+		// Someone else signed in can't use it.
+		const other = await fx.user();
+		expect((await apiError(acceptInvite(token, other))).code).toBe('forbidden');
+		expect(await roleIn(groupId, other)).toBeNull();
+
+		expect(await acceptInvite(token, invitee)).toEqual({ groupId, joined: true });
+		// Used up: gone from the list and the link no longer works.
+		expect((await listInvites(groupId, owner)).map((i) => i.id)).not.toContain(id);
+		expect((await apiError(previewInvite(token))).code).toBe('not_found');
+
+		const link = await createInvite(groupId, owner, null);
+		expect((await apiError(revokeInvite(groupId, link.id, member))).code).toBe('forbidden');
+		await revokeInvite(groupId, link.id, owner);
+		expect((await apiError(previewInvite(link.token))).code).toBe('not_found');
+		expect((await apiError(revokeInvite(groupId, link.id, owner))).code).toBe('not_found');
 	});
 });
 

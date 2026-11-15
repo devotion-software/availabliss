@@ -128,13 +128,27 @@ struct InviteLink: Decodable, Sendable {
     let token: String
     let url: URL
     let expiresAt: Date
+    /// Every invite the request made (one per email).
+    var invites: [GroupInvite]?
 }
 
-struct CreateInviteBody: Encodable, Sendable { var email: String? }
+/// An invite that can still be used: a link anyone can use (`email == nil`), or one emailed to a person.
+struct GroupInvite: Decodable, Sendable, Identifiable, Hashable {
+    let id: String
+    let email: String?
+    let url: URL
+    let expiresAt: Date
+}
+
+struct GroupInvitesResponse: Decodable, Sendable { let invites: [GroupInvite] }
+
+struct CreateInviteBody: Encodable, Sendable { var emails: [String]? }
 
 struct InvitePreview: Decodable, Sendable {
     let groupName: String
     let inviterName: String
     let memberCount: Int
     let expiresAt: Date
+    /// Who an emailed invite is for; nil for a link anyone can use.
+    var email: String?
 }

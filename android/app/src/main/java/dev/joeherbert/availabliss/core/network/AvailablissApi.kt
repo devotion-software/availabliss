@@ -32,6 +32,7 @@ import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.core.network.model.GroupsResponse
 import dev.joeherbert.availabliss.core.network.model.HolidaysResponse
+import dev.joeherbert.availabliss.core.network.model.GroupInvitesResponse
 import dev.joeherbert.availabliss.core.network.model.InviteLink
 import dev.joeherbert.availabliss.core.network.model.InvitePreview
 import dev.joeherbert.availabliss.core.network.model.ManualBlock
@@ -200,6 +201,12 @@ interface AvailablissApi {
 
     @POST("api/v1/groups/{id}/invites")
     suspend fun createInvite(@Path("id") groupId: String, @Body body: CreateInviteRequest): InviteLink
+
+    @GET("api/v1/groups/{id}/invites")
+    suspend fun invites(@Path("id") groupId: String): GroupInvitesResponse
+
+    @DELETE("api/v1/groups/{id}/invites/{inviteId}")
+    suspend fun revokeInvite(@Path("id") groupId: String, @Path("inviteId") inviteId: String)
 
     @GET("api/v1/invites/{token}")
     suspend fun getInvite(@Path("token") token: String): InvitePreview

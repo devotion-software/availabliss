@@ -1,11 +1,11 @@
-import { and, asc, eq, gt, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
 import type { Group, Member, Requirement, Role, TileColor } from '#lib/types';
 import { TILE_COLORS } from '#lib/types';
 import { monogram } from '#lib/monogram';
 import { db } from './db';
 import { requireCanCreateGroup } from './billing';
 import { groupInvites, groupMembers, groups, user } from './db/schema';
-import { forbidden, notFound } from './http';
+import { ApiError, forbidden, notFound } from './http';
 import { newId, newToken } from './ids';
 import { requirementSummary } from './availability/labels';
 import { defaultRequirement } from './requirements';
@@ -199,10 +199,38 @@ export async function removeMember(groupId: string, actorId: string, targetId: s
 
 export async function createInvite(groupId: string, userId: string, email: string | null) {
 	await requireMember(groupId, userId, 'admin');
+	const id = newId();
 	const token = newToken();
 	const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-	await db.insert(groupInvites).values({ id: newId(), groupId, token, email, createdBy: userId, expiresAt });
-	return { token, expiresAt };
+	await db.insert(groupInvites).values({ id, groupId, token, email: email?.trim().toLowerCase() ?? null, createdBy: userId, expiresAt });
+	return { id, token, expiresAt };
+}
+
+/** A group's invites that can still be used, newest first (admins only). */
+export async function listInvites(groupId: string, userId: string) {
+	await requireMember(groupId, userId, 'admin');
+	const rows = await db
+		.select({
+			id: groupInvites.id,
+			token: groupInvites.token,
+			email: groupInvites.email,
+			expiresAt: groupInvites.expiresAt,
+			createdAt: groupInvites.createdAt,
+			inviterName: user.name,
+			inviterEmail: user.email
+		})
+		.from(groupInvites)
+		.innerJoin(user, eq(user.id, groupInvites.createdBy))
+		.where(and(eq(groupInvites.groupId, groupId), gt(groupInvites.expiresAt, new Date())))
+		.orderBy(desc(groupInvites.createdAt));
+	return rows;
+}
+
+/** Revokes an invite so its link stops working (admins only). */
+export async function revokeInvite(groupId: string, inviteId: string, userId: string) {
+	await requireMember(groupId, userId, 'admin');
+	const [result] = await db.delete(groupInvites).where(and(eq(groupInvites.id, inviteId), eq(groupInvites.groupId, groupId)));
+	if (result.affectedRows === 0) throw notFound('Invite not found');
 }
 
 async function liveInvite(token: string) {
@@ -224,7 +252,9 @@ export async function previewInvite(token: string) {
 		groupName: group.name,
 		inviterName: displayName(inviter),
 		memberCount: members.length,
-		expiresAt: invite.expiresAt.toISOString()
+		expiresAt: invite.expiresAt.toISOString(),
+		// Who an emailed invite is for (null for a link anyone can use): prefills sign-in.
+		email: invite.email
 	};
 }
 
@@ -234,8 +264,19 @@ export async function previewInvite(token: string) {
  */
 export async function acceptInvite(token: string, userId: string): Promise<{ groupId: string; joined: boolean }> {
 	const invite = await liveInvite(token);
+	// An emailed invite is only for the person it was sent to, and is used up once they join.
+	if (invite.email) {
+		const me = await db.query.user.findFirst({ where: eq(user.id, userId), columns: { email: true } });
+		if (me?.email.toLowerCase() !== invite.email.toLowerCase()) {
+			throw new ApiError(
+				'forbidden',
+				`This invite was sent to ${invite.email}, but you're signed in as ${me?.email ?? 'someone else'}. Sign in with ${invite.email} to join.`
+			);
+		}
+	}
 	const [result] = await db.insert(groupMembers).ignore().values({ groupId: invite.groupId, userId, role: 'member' });
 	const joined = result.affectedRows > 0;
+	if (invite.email) await db.delete(groupInvites).where(eq(groupInvites.id, invite.id));
 	if (joined) await refreshCoverage([userId]);
 	return { groupId: invite.groupId, joined };
 }

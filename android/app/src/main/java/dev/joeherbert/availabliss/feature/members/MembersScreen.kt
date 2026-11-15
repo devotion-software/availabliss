@@ -28,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -92,6 +94,7 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
             onShareLink = viewModel::shareInviteLink,
             onEmailChange = viewModel::onInviteEmailChange,
             onSendEmail = viewModel::sendEmailInvite,
+            onRevokeInvite = viewModel::revokeInvite,
             onPromote = { viewModel.setRole(it, Role.Admin) },
             onDemote = { viewModel.setRole(it, Role.Member) },
             onRemove = viewModel::requestRemove,
@@ -118,6 +121,7 @@ data class MembersActions(
     val onShareLink: () -> Unit = {},
     val onEmailChange: (String) -> Unit = {},
     val onSendEmail: () -> Unit = {},
+    val onRevokeInvite: (InviteUi) -> Unit = {},
     val onPromote: (MemberUi) -> Unit = {},
     val onDemote: (MemberUi) -> Unit = {},
     val onRemove: (MemberUi) -> Unit = {},
@@ -148,46 +152,8 @@ fun MembersContent(state: MembersUiState, snackbar: SnackbarHostState, actions: 
             ) {
                 state.error?.let { ErrorBanner(it, onRetry = actions.onRetry) }
 
-                GlassPanel(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("Invite people", style = type.cardTitle, color = colors.ink)
-                        Text(
-                            "Anyone with the link can join and add their busy times.",
-                            style = type.caption.copy(fontWeight = FontWeight.Normal),
-                            color = colors.muted,
-                        )
-                    }
-                    PrimaryButton(
-                        text = "Share invite link",
-                        onClick = actions.onShareLink,
-                        icon = AvIcons.Share,
-                        height = 50.dp,
-                        shape = Shapes.control,
-                        loading = state.creatingLink,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                        AvTextField(
-                            value = state.inviteEmail,
-                            onValueChange = actions.onEmailChange,
-                            label = "Or invite by email",
-                            placeholder = "friend@example.com",
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Send,
-                            onImeAction = actions.onSendEmail,
-                            height = 48.dp,
-                            shape = Shapes.controlSmall,
-                            modifier = Modifier.weight(1f),
-                        )
-                        SecondaryButton(
-                            text = "Send",
-                            onClick = actions.onSendEmail,
-                            height = 48.dp,
-                            shape = Shapes.controlSmall,
-                            enabled = state.inviteEmail.contains('@') && !state.sendingEmail,
-                        )
-                    }
-                }
+                // Only owners and admins can invite.
+                if (state.isAdmin) InviteCard(state, actions)
 
                 SectionLabel("${state.members.size} members", Modifier.padding(start = 4.dp))
                 if (state.loading && state.members.isEmpty()) {
@@ -316,5 +282,74 @@ private fun MembersPreview() {
             snackbar = SnackbarHostState(),
             actions = MembersActions(),
         )
+    }
+}
+
+/** Two ways in: a link anyone can use, or invites emailed to particular people that only they can accept; then the live invites. */
+@Composable
+private fun InviteCard(state: MembersUiState, actions: MembersActions) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    GlassPanel(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
+        Text("Invite people", style = type.cardTitle, color = colors.ink)
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Share a link", style = type.bodySmallStrong, color = colors.ink)
+            Text("Anyone with the link can join.", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+        }
+        PrimaryButton(
+            text = "Share invite link",
+            onClick = actions.onShareLink,
+            icon = AvIcons.Share,
+            height = 50.dp,
+            shape = Shapes.control,
+            loading = state.creatingLink,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        RowDivider()
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Or limit to these emails", style = type.bodySmallStrong, color = colors.ink)
+            Text(
+                "We'll email each person their own invite. Only someone signed in with that address can join.",
+                style = type.caption.copy(fontWeight = FontWeight.Normal),
+                color = colors.muted,
+            )
+        }
+        AvTextField(
+            value = state.inviteEmail,
+            onValueChange = actions.onEmailChange,
+            label = "Email addresses",
+            placeholder = "sam@example.com, priya@example.com",
+            keyboardType = KeyboardType.Email,
+            imeAction = ImeAction.Send,
+            onImeAction = actions.onSendEmail,
+            height = 48.dp,
+            shape = Shapes.controlSmall,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        SecondaryButton(
+            text = if (state.sendingEmail) "Sending…" else "Send invites",
+            onClick = actions.onSendEmail,
+            height = 44.dp,
+            shape = Shapes.controlSmall,
+            enabled = state.inviteEmail.contains('@') && !state.sendingEmail,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (state.invites.isNotEmpty()) {
+            RowDivider()
+            Text("Invites", style = type.bodySmallStrong, color = colors.ink)
+            Column {
+                state.invites.forEachIndexed { index, invite ->
+                    if (index > 0) RowDivider()
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(if (invite.isLink) AvIcons.Link else AvIcons.Mail, null, tint = colors.accentInk, modifier = Modifier.size(18.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(invite.title, style = type.bodySmallStrong, color = colors.ink, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                            Text(invite.status, style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                        }
+                        TextAction("Revoke", onClick = { actions.onRevokeInvite(invite) }, color = colors.warnInk)
+                    }
+                }
+            }
+        }
     }
 }

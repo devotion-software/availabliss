@@ -1,5 +1,5 @@
 import { api, type Fetch } from './api';
-import type { Group, GroupSummary, Member, Requirement, TileColor } from '#lib/types';
+import type { Group, GroupInvite, GroupSummary, Member, Requirement, TileColor } from '#lib/types';
 
 export interface GroupInput {
 	name: string;
@@ -11,6 +11,8 @@ export interface Invite {
 	token: string;
 	url: string;
 	expiresAt: string;
+	/** Every invite the request made (one per email). */
+	invites: GroupInvite[];
 }
 
 export interface InvitePreview {
@@ -18,6 +20,8 @@ export interface InvitePreview {
 	inviterName: string;
 	memberCount: number;
 	expiresAt: string;
+	/** Who an emailed invite is for; null for a link anyone can use. */
+	email: string | null;
 }
 
 export const listGroups = (fetch?: Fetch) => api.get<{ groups: GroupSummary[] }>('/groups', { fetch }).then((r) => r.groups);
@@ -33,7 +37,11 @@ export const removeMember = (groupId: string, userId: string) => api.del(`/group
 
 export const nudgeGroup = (groupId: string) => api.post<{ nudged: number }>(`/groups/${groupId}/nudge`);
 
-export const createInvite = (groupId: string, email?: string) =>
-	api.post<Invite>(`/groups/${groupId}/invites`, email ? { email } : {});
+/** No emails: a link anyone can use. Emails: one invite each, emailed, only for that person. */
+export const createInvite = (groupId: string, emails: string[] = []) =>
+	api.post<Invite>(`/groups/${groupId}/invites`, emails.length ? { emails } : {});
+export const listInvites = (groupId: string, fetch?: Fetch) =>
+	api.get<{ invites: GroupInvite[] }>(`/groups/${groupId}/invites`, { fetch }).then((r) => r.invites);
+export const revokeInvite = (groupId: string, inviteId: string) => api.del(`/groups/${groupId}/invites/${inviteId}`);
 export const getInvite = (token: string, fetch?: Fetch) => api.get<InvitePreview>(`/invites/${token}`, { fetch });
 export const acceptInvite = (token: string) => api.post<Group>(`/invites/${token}/accept`);

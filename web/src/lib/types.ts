@@ -307,6 +307,17 @@ export interface LiveEvent {
 	payload: unknown;
 }
 
+/** An invite that can still be used (`GET /groups/:id/invites`). */
+export interface GroupInvite {
+	id: string;
+	/** Who it was emailed to (only they can join with it), or null for a link anyone can use. */
+	email: string | null;
+	url: string;
+	expiresAt: string;
+	createdAt: string;
+	invitedBy: string;
+}
+
 export interface ApiErrorBody {
 	message: string;
 	code: 'unauthorized' | 'forbidden' | 'not_found' | 'validation_error' | 'conflict' | 'upgrade_required' | 'rate_limited' | 'server_error';

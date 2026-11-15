@@ -387,9 +387,19 @@ interface ManualBlock {
 | PATCH 👑 | `/groups/:id/members/:userId` | `{ role: 'admin' \| 'member' }` | `Member` |
 | DELETE 👑/self | `/groups/:id/members/:userId` | | `204` (self = leave) |
 | POST 👑 | `/groups/:id/nudge` | | `{ nudged: number }` (push/email to unsynced members, rate limited to once per 12h) |
-| POST 👑 | `/groups/:id/invites` | `{ email?: string }` | `{ token, url, expiresAt }` |
-| GET | `/invites/:token` | | `{ groupName, inviterName, memberCount, expiresAt }` |
-| POST 🔒 | `/invites/:token/accept` | | `Group` |
+| GET 👑 | `/groups/:id/invites` | | `{ invites: GroupInvite[] }` (live ones, newest first) |
+| POST 👑 | `/groups/:id/invites` | `{ emails?: string[] (≤ 20), email?: string }` | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |
+| DELETE 👑 | `/groups/:id/invites/:inviteId` | | 204 (the link stops working) |
+| GET | `/invites/:token` | | `{ groupName, inviterName, memberCount, expiresAt, email: string \| null }` |
+| POST 🔒 | `/invites/:token/accept` | | `Group` (403 if the invite was emailed to a different address) |
+
+With no emails, an invite is a link anyone can use until it expires (14 days). With emails, each
+address gets its own emailed invite that only someone signed in with that address can accept; it's
+used up once they join.
+
+```ts
+interface GroupInvite { id: string; email: string | null; url: string; expiresAt: string; createdAt: string; invitedBy: string }
+```
 
 ### Availability
 

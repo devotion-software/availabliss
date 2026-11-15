@@ -97,8 +97,13 @@ enum API {
             .init(.get, "/groups/\(groupId.pathEncoded)/conflicts", query: ["start": iso(start), "end": iso(end)])
         }
         static func nudge(groupId: String) -> Endpoint<NudgeResponse> { .init(.post, "/groups/\(groupId.pathEncoded)/nudge") }
-        static func createInvite(groupId: String, email: String? = nil) -> Endpoint<InviteLink> {
-            .init(.post, "/groups/\(groupId.pathEncoded)/invites", body: CreateInviteBody(email: email))
+        /// No emails: a link anyone can use. Emails: one invite each, emailed, only for that person.
+        static func createInvite(groupId: String, emails: [String] = []) -> Endpoint<InviteLink> {
+            .init(.post, "/groups/\(groupId.pathEncoded)/invites", body: CreateInviteBody(emails: emails.isEmpty ? nil : emails))
+        }
+        static func invites(groupId: String) -> Endpoint<GroupInvitesResponse> { .init(.get, "/groups/\(groupId.pathEncoded)/invites") }
+        static func revokeInvite(groupId: String, inviteId: String) -> Endpoint<EmptyResponse> {
+            .init(.delete, "/groups/\(groupId.pathEncoded)/invites/\(inviteId.pathEncoded)")
         }
     }
 

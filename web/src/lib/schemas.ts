@@ -88,7 +88,11 @@ export const updateGroupSchema = createGroupSchema.partial();
 
 export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
 
-export const inviteSchema = z.object({ email: z.email().optional() });
+/** No email: a link anyone can use. `emails` (or one `email`): one invite each, only that person can join. */
+export const inviteSchema = z.object({
+	email: z.email().optional(),
+	emails: z.array(z.email()).max(20, 'Invite up to 20 people at a time').optional()
+});
 
 const blockShape = {
 	start: isoDateTime,
