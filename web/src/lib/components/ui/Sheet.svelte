@@ -18,8 +18,10 @@
 		onclose?: () => void;
 		children: Snippet;
 		footer?: Snippet;
+		/** Shown between the title and the description, e.g. a step indicator. */
+		lead?: Snippet;
 	}
-	let { open = $bindable(), title, description, placement = 'auto', width = 480, onclose, children, footer }: Props = $props();
+	let { open = $bindable(), title, description, placement = 'auto', width = 480, onclose, children, footer, lead }: Props = $props();
 
 	const uid = $props.id();
 	const phone = new MediaQuery('(max-width: 639px)');
@@ -73,6 +75,7 @@
 			<header>
 				<div class="titles">
 					<h2 id="sheet-title-{uid}">{title}</h2>
+					{#if lead}{@render lead()}{/if}
 					{#if description}<p id="sheet-desc-{uid}">{description}</p>{/if}
 				</div>
 				<IconButton icon="x" label="Close" variant="line" size={40} iconSize={14} onclick={close} />

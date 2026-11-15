@@ -181,8 +181,8 @@ fun NewGroupContent(
                 .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            ScreenHeader(title = "New group", subtitle = "Name it and pick a colour. Timing comes next.", onBack = onBack)
             StepDots(total = 2, step = 1)
+            ScreenHeader(title = "New group", subtitle = "Name it and pick a colour. Timing comes next.", onBack = onBack)
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Spacing.l),
@@ -258,6 +258,7 @@ fun NewGroupContent(
 fun NewGroupTimingContent(state: NewGroupUiState, editor: TimingEditorUiState, actions: TimingActions, onCreate: () -> Unit) {
     AvailablissBackground(OrbLayout.Timing) {
         Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
+            Box(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp)) { StepDots(total = 2, step = 2) }
             ScreenHeader(
                 title = "When are you looking for?",
                 subtitle = "Fine-tune the timing for ${state.name.trim()}. You can change it later.",
@@ -274,7 +275,6 @@ fun NewGroupTimingContent(state: NewGroupUiState, editor: TimingEditorUiState, a
                     .navigationBarsPadding(),
                 verticalArrangement = Arrangement.spacedBy(Spacing.l),
             ) {
-                StepDots(total = 2, step = 2)
                 TimingEditorSections(editor, canEdit = true, actions = actions)
                 SaveTemplateRow(state.templateSave, actions.onSaveTemplate, bottomClearance = 170.dp)
             }

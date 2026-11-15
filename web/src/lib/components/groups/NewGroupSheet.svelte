@@ -141,6 +141,9 @@
 	description={atLimit ? undefined : step === 1 ? 'Name it and pick a colour. Timing comes next.' : `Fine-tune the timing for ${name.trim()}. You can change it later.`}
 	width={step === 2 && !atLimit ? 640 : 480}
 >
+	{#snippet lead()}
+		{#if !atLimit}<StepDots total={2} step={step === 1 ? 1 : 2} />{/if}
+	{/snippet}
 	{#if atLimit}
 		<div class="limit">
 			<span class="limit-icon"><Icon name="groups" size={22} /></span>
@@ -153,7 +156,6 @@
 		</div>
 	{:else if step === 1}
 		<form class="form" onsubmit={next} novalidate>
-			<StepDots total={2} step={1} />
 			<div class="name-row">
 				<GroupTile monogram={tileLetters} {color} size={50} />
 				<TextField label="Group name" bind:value={name} placeholder="e.g. Lake District crew" maxlength={80} {error} autofocus />
@@ -188,7 +190,6 @@
 		</form>
 	{:else}
 		<div class="form">
-			<StepDots total={2} step={2} />
 			<RequirementsEditor bind:requirement country={user.country} />
 			<SaveTemplate {requirement} onsaved={(t) => (templates = [...templates, t])} />
 		</div>

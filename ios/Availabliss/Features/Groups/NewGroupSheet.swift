@@ -67,10 +67,10 @@ struct NewGroupSheet: View {
 
     @ViewBuilder
     private var details: some View {
+        StepDots(current: 0, total: 2)
         Text("Name it and pick a colour. Timing comes next.")
             .bodyFont(14)
             .foregroundStyle(theme.muted)
-        StepDots(current: 0, total: 2)
         HStack(spacing: 14) {
             GroupTile(monogram: monogram, colorToken: color, size: 56, cornerRadius: 18)
             InputField(placeholder: "e.g. Lake District crew", text: $name)
@@ -133,10 +133,10 @@ struct NewGroupSheet: View {
 
     @ViewBuilder
     private var timingStep: some View {
+        StepDots(current: 1, total: 2)
         Text("Fine-tune the timing for \(trimmedName). You can change it later.")
             .bodyFont(14)
             .foregroundStyle(theme.muted)
-        StepDots(current: 1, total: 2)
         TimingForm(model: timing)
         SaveTemplateRow(requirement: timing.draft, api: api, toast: $toast) { templates.append($0) }
     }
