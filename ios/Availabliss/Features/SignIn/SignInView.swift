@@ -5,6 +5,8 @@ struct SignInView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var model: SignInViewModel?
+    /// Where the email / code field is, so a tap anywhere else puts the keyboard away.
+    @State private var inputFrame: CGRect = .zero
     private let auth: AuthService
 
     init(auth: AuthService) {
@@ -13,17 +15,24 @@ struct SignInView: View {
 
     var body: some View {
         GeometryReader { proxy in
+            // Sized to fit one screen; it only scrolls on the smallest phones or with large text.
+            let size = HeroSize(height: proxy.size.height)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     brand
-                    hero.padding(.top, 72)
-                    Spacer(minLength: 40)
-                    if let model { SignInForm(model: model) }
+                    Spacer(minLength: 20).frame(maxHeight: 64)
+                    hero(size)
+                    Spacer(minLength: 20)
+                    if let model { SignInForm(model: model, inputFrame: $inputFrame) }
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 48)
-                .padding(.bottom, 28)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
                 .frame(minHeight: proxy.size.height, alignment: .top)
+                .contentShape(Rectangle())
+                .onTapGesture(coordinateSpace: .global) { location in
+                    if !inputFrame.contains(location) { Self.dismissKeyboard() }
+                }
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -47,25 +56,43 @@ struct SignInView: View {
         .accessibilityLabel("Availabliss")
     }
 
-    private var hero: some View {
-        VStack(alignment: .leading, spacing: 14) {
+    /// Smaller headline on shorter screens, and no strapline on the shortest.
+    private struct HeroSize {
+        let titleSize: CGFloat
+        let showsStrapline: Bool
+        init(height: CGFloat) {
+            titleSize = height < 740 ? 36 : 44
+            showsStrapline = height >= 640
+        }
+    }
+
+    private func hero(_ size: HeroSize) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Find the time that works for everyone.")
-                .displayFont(44, .heavy, relativeTo: .largeTitle)
+                .displayFont(size.titleSize, .heavy, relativeTo: .largeTitle)
                 .lineSpacing(-4)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-            Text("Connect your calendar once. We'll find the overlap, and nobody has to say \u{201C}what about Thursday?\u{201D} again.")
-                .bodyFont(16)
-                .lineSpacing(3)
-                .foregroundStyle(theme.muted)
-                .frame(maxWidth: 300, alignment: .leading)
+            if size.showsStrapline {
+                Text("Connect your calendar once. We'll find the overlap, and nobody has to say \u{201C}what about Thursday?\u{201D} again.")
+                    .bodyFont(15)
+                    .lineSpacing(2)
+                    .foregroundStyle(theme.muted)
+                    .frame(maxWidth: 300, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+
+    private static func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 
 /// The glass card at the bottom: email/code step, provider buttons and the privacy note.
 private struct SignInForm: View {
     @Bindable var model: SignInViewModel
+    @Binding var inputFrame: CGRect
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -93,6 +120,7 @@ private struct SignInForm: View {
                 .autocorrectionDisabled()
                 .submitLabel(.send)
                 .onSubmit { Task { await model.sendCode() } }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { inputFrame = $0 }
             Button {
                 Task { await model.sendCode() }
             } label: {
@@ -114,6 +142,7 @@ private struct SignInForm: View {
             }
             OneTimeCodeField(code: $model.code, length: SignInViewModel.codeLength, isBusy: model.busyMethod == .email)
                 .onChange(of: model.code) { _, _ in Task { await model.codeChanged() } }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { inputFrame = $0 }
             Button("Use a different email") { model.useDifferentEmail() }
                 .buttonStyle(.textAction)
                 .frame(maxWidth: .infinity)

@@ -37,6 +37,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -108,14 +111,25 @@ fun SignInContent(
 ) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
+    val focusManager = LocalFocusManager.current
     AvailablissBackground(OrbLayout.SignIn) {
-        BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
+                // A tap anywhere outside the fields puts the keyboard away (fields and buttons consume their own taps).
+                .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
+        ) {
+            // Sized to fit one screen; it only scrolls on the smallest phones or with large text.
+            val short = maxHeight < 720.dp
             Column(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = maxHeight)
                     .verticalScroll(rememberScrollState())
-                    .padding(start = 24.dp, end = 24.dp, top = 44.dp, bottom = 28.dp),
+                    .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column {
@@ -123,11 +137,11 @@ fun SignInContent(
                         VennLogo(40.dp)
                         Text("Availabliss", style = type.headlineSmall, color = colors.ink)
                     }
-                    Spacer(Modifier.height(56.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Spacer(Modifier.height(if (short) 24.dp else 48.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
                             "Find the time that works for everyone.",
-                            style = type.hero,
+                            style = if (short) type.hero.copy(fontSize = type.hero.fontSize * 0.82f, lineHeight = type.hero.lineHeight * 0.82f) else type.hero,
                             color = colors.ink,
                             modifier = Modifier.semantics { heading() },
                         )
@@ -142,7 +156,7 @@ fun SignInContent(
 
                 Column(
                     Modifier
-                        .padding(top = 32.dp)
+                        .padding(top = 20.dp)
                         .fillMaxWidth()
                         .glass(RoundedCornerShape(30.dp))
                         .padding(20.dp),
