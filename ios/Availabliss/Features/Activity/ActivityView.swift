@@ -131,7 +131,7 @@ private struct NotificationRow: View {
         case .proposalCreated: "checkmark.circle"
         case .proposalConfirmed: "party.popper"
         case .nudge: "hand.wave"
-        case .inviteAccepted: "person.badge.plus"
+        case .inviteAccepted, .inviteReceived: "person.badge.plus"
         case .message: "bubble.left"
         case .eventCreated: "calendar.badge.plus"
         case .unknown: "bell"

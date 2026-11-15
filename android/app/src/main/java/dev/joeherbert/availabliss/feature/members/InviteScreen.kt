@@ -102,7 +102,17 @@ fun InviteContent(state: InviteUiState, onBack: () -> Unit, onJoin: () -> Unit, 
                         )
                         Spacer(Modifier.height(2.dp))
                         val invited = state.invitedOtherEmail
-                        if (invited != null) {
+                        val invitedUsername = state.invitedOtherUsername
+                        if (invitedUsername != null) {
+                            // An invite sent by username is only for that person.
+                            Text(
+                                "This invite was sent to @$invitedUsername, but you're signed in as ${state.signedInEmail}. Sign in as @$invitedUsername to join.",
+                                style = type.body,
+                                color = colors.warnInk,
+                                modifier = Modifier.fillMaxWidth().clip(Shapes.row).background(colors.warnBg).padding(12.dp),
+                            )
+                            PrimaryButton("Switch account", onSwitchAccount, modifier = Modifier.fillMaxWidth())
+                        } else if (invited != null) {
                             // An emailed invite is only for that address.
                             Text(
                                 "This invite was sent to $invited, but you're signed in as ${state.signedInEmail}. Sign in with $invited to join.",

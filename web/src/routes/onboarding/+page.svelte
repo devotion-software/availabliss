@@ -10,6 +10,9 @@
 	import TextField from '#lib/components/ui/TextField.svelte';
 	import Logo from '#lib/components/ui/Logo.svelte';
 	import StepDots from '#lib/components/onboarding/StepDots.svelte';
+	import UsernameField from '#lib/components/settings/UsernameField.svelte';
+	import { ApiError } from '#lib/client/api';
+	import { normalizeUsername } from '#lib/usernames';
 	import RegionFields from '#lib/components/region/RegionFields.svelte';
 	import { regionFromUser, regionPatch, type RegionValue } from '#lib/components/region/region';
 
@@ -19,6 +22,10 @@
 	let region = $state<RegionValue>(regionFromUser((() => data.user)()));
 	// Email sign-up creates accounts without a name, so ask for one here.
 	let name = $state((() => data.user.name)());
+	// Every account starts with one made from its name or email; this is the chance to pick their own.
+	let username = $state((() => data.user.username ?? '')());
+	let usernameReady = $state(false);
+	let usernameError = $state<string | null>(null);
 	let busy = $state(false);
 
 	// First visit: fill in what we can guess from the browser and the request.
@@ -37,14 +44,16 @@
 
 	async function next(e: SubmitEvent) {
 		e.preventDefault();
-		if (!name.trim()) return;
+		if (!name.trim() || !usernameReady) return;
 		busy = true;
+		usernameError = null;
 		try {
-			await updateMe({ ...regionPatch(region), name: name.trim() });
+			await updateMe({ ...regionPatch(region), name: name.trim(), username: normalizeUsername(username) });
 			await invalidateAll();
 			await goto('/onboarding/calendars');
 		} catch (err) {
-			toasts.error(err);
+			if (err instanceof ApiError && err.code === 'conflict') usernameError = err.message;
+			else toasts.error(err);
 		} finally {
 			busy = false;
 		}
@@ -60,18 +69,19 @@
 
 <div class="intro">
 	<h1>About you</h1>
-	<p>Your name is how your groups see you. Your region sets bank holidays, school holidays and the time zone we show times in.</p>
+	<p>Your name is how your groups see you, and your username lets people invite you without your email. Your region sets bank holidays, school holidays and the time zone we show times in.</p>
 </div>
 
 <form class="form" onsubmit={next}>
-	<GlassPanel as="section" padding="16px">
+	<GlassPanel as="section" padding="16px" gap={12}>
 		<TextField label="Your name" placeholder="First and last name" bind:value={name} autocomplete="name" maxlength={80} required />
+		<UsernameField bind:value={username} current={data.user.username} bind:ready={usernameReady} error={usernameError} />
 	</GlassPanel>
 	<GlassPanel as="section" padding="16px">
 		<RegionFields bind:value={region} />
 	</GlassPanel>
 	<span class="spacer"></span>
-	<Button type="submit" size="lg" block loading={busy} disabled={!name.trim()}>Continue</Button>
+	<Button type="submit" size="lg" block loading={busy} disabled={!name.trim() || !usernameReady}>Continue</Button>
 	<button type="button" class="link" onclick={signOutAndLeave}>Not you? Sign out</button>
 </form>
 

@@ -19,6 +19,8 @@
 	const wrongAccount = $derived(
 		!!data.user && !!data.invite?.email && data.user.email.toLowerCase() !== data.invite.email.toLowerCase()
 	);
+	// An invite sent by username is only for that account.
+	const wrongUsername = $derived(!!data.user && !!data.invite?.username && data.user.username !== data.invite.username);
 	const signInHref = $derived(
 		`/signin?next=${encodeURIComponent(`/invite/${data.token}`)}${data.invite?.email ? `&email=${encodeURIComponent(data.invite.email)}` : ''}`
 	);
@@ -70,6 +72,12 @@
 					with {data.invite.email} to join.
 				</p>
 				<Button variant="accent" size="lg" block loading={switching} onclick={switchAccount}>Sign in as {data.invite.email}</Button>
+			{:else if wrongUsername}
+				<p class="wrong" role="alert">
+					This invite was sent to <strong>@{data.invite.username}</strong>, but you're signed in as
+					<strong>{data.user?.username ? `@${data.user.username}` : data.user?.email}</strong>. Sign in as @{data.invite.username} to join.
+				</p>
+				<Button variant="accent" size="lg" block loading={switching} onclick={switchAccount}>Sign in with another account</Button>
 			{:else if data.user}
 				<Button variant="accent" size="lg" block loading={joining} onclick={join}>Join group</Button>
 			{:else}

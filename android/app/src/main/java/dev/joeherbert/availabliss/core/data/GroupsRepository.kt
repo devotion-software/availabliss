@@ -90,9 +90,12 @@ class GroupsRepository @Inject constructor(
 
     suspend fun nudge(groupId: String): ApiResult<Int> = call { api.nudge(groupId) }.map { it.nudged }
 
-    /** No emails: a link anyone can use. Emails: one invite each, emailed, only for that person. */
-    suspend fun createInvite(groupId: String, emails: List<String> = emptyList()): ApiResult<InviteLink> =
-        call { api.createInvite(groupId, CreateInviteRequest(emails.takeIf { it.isNotEmpty() })) }
+    /**
+     * Neither: a link anyone can use. Emails: one invite each, emailed, only for that person.
+     * Usernames: one invite each, to the person's Activity, only for them.
+     */
+    suspend fun createInvite(groupId: String, emails: List<String> = emptyList(), usernames: List<String> = emptyList()): ApiResult<InviteLink> =
+        call { api.createInvite(groupId, CreateInviteRequest(emails.takeIf { it.isNotEmpty() }, usernames.takeIf { it.isNotEmpty() })) }
 
     suspend fun preferences(groupId: String): ApiResult<List<dev.joeherbert.availabliss.core.network.model.GroupPreference>> =
         call { api.preferences(groupId).preferences }

@@ -20,6 +20,8 @@ import dev.joeherbert.availabliss.core.network.model.LinkedAccounts
 import dev.joeherbert.availabliss.core.network.model.MergeCandidate
 import dev.joeherbert.availabliss.core.network.model.Plan
 import dev.joeherbert.availabliss.core.network.model.User
+import dev.joeherbert.availabliss.feature.common.UsernameEditor
+import dev.joeherbert.availabliss.feature.common.UsernameFieldState
 import dev.joeherbert.availabliss.feature.timing.Templates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +36,7 @@ import javax.inject.Inject
 data class YouUiState(
     val user: User? = null,
     val appearance: Appearance = Appearance(),
-    /** Non-null while the edit-name sheet is open. */
+    /** Non-null while the edit-profile sheet (name and username) is open. */
     val nameDraft: String? = null,
     val uploadingPhoto: Boolean = false,
     val savingName: Boolean = false,
@@ -98,6 +100,10 @@ class YouViewModel @Inject constructor(
         YouUiState(linkableProviders = setOf(LinkProviders.APPLE, LinkProviders.GOOGLE).filter(accounts::canLink).toSet()),
     )
     val state: StateFlow<YouUiState> = _state.asStateFlow()
+
+    /** The username in the edit-profile sheet, checked as it's typed. */
+    private val usernameEditor = UsernameEditor(viewModelScope, users::checkUsername)
+    val username: StateFlow<UsernameFieldState> = usernameEditor.state
 
     init {
         viewModelScope.launch { plans.plan.collect { plan -> _state.update { it.copy(plan = plan) } } }
@@ -163,7 +169,12 @@ class YouViewModel @Inject constructor(
     }
     // endregion
 
-    fun startEditingName() = _state.update { it.copy(nameDraft = it.user?.name.orEmpty()) }
+    fun startEditingName() {
+        usernameEditor.reset(_state.value.user?.username)
+        _state.update { it.copy(nameDraft = it.user?.name.orEmpty()) }
+    }
+
+    fun onUsernameChange(value: String) = usernameEditor.onChange(value)
 
     fun onNameChange(value: String) = _state.update { it.copy(nameDraft = value.take(80)) }
 
@@ -191,16 +202,28 @@ class YouViewModel @Inject constructor(
 
     fun photoUnreadable() = _state.update { it.copy(message = UserMessage("Couldn't read that photo.")) }
 
+    /** Saves the edit-profile sheet: the name, and the username if it changed. */
     fun saveName() {
         val draft = _state.value.nameDraft?.trim().orEmpty()
-        if (draft.isEmpty() || _state.value.savingName) return
+        val username = username.value
+        if (draft.isEmpty() || !username.canSave || _state.value.savingName) return
+        val newUsername = username.normalized.takeIf { username.changed && it.isNotEmpty() }
         viewModelScope.launch {
             _state.update { it.copy(savingName = true) }
-            val result = users.update { set("name", draft) }
+            val result = users.update {
+                set("name", draft)
+                newUsername?.let { set("username", it) }
+            }
+            if (result is ApiResult.Success) usernameEditor.saved(result.value.username)
             _state.update {
                 when (result) {
                     is ApiResult.Success -> it.copy(savingName = false, nameDraft = null)
-                    is ApiResult.Failure -> it.copy(savingName = false, message = UserMessage(result.error.message))
+                    // A taken or invalid username shows on its field.
+                    is ApiResult.Failure -> if (newUsername != null && usernameEditor.onSaveError(result.error)) {
+                        it.copy(savingName = false)
+                    } else {
+                        it.copy(savingName = false, message = UserMessage(result.error.message))
+                    }
                 }
             }
         }

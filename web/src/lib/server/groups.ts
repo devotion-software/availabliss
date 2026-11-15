@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/mysql-core';
 import type { Group, Member, Requirement, Role, TileColor } from '#lib/types';
 import { TILE_COLORS } from '#lib/types';
 import { monogram } from '#lib/monogram';
@@ -197,23 +198,28 @@ export async function removeMember(groupId: string, actorId: string, targetId: s
 
 // ─── Invites ──────────────────────────────────────────────────────────────
 
-export async function createInvite(groupId: string, userId: string, email: string | null) {
+/** An invite: a link anyone can use, or (with `email` or `invitedUserId`) one only that person can join with. */
+export async function createInvite(groupId: string, userId: string, email: string | null, invitedUserId: string | null = null) {
 	await requireMember(groupId, userId, 'admin');
 	const id = newId();
 	const token = newToken();
 	const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-	await db.insert(groupInvites).values({ id, groupId, token, email: email?.trim().toLowerCase() ?? null, createdBy: userId, expiresAt });
+	await db
+		.insert(groupInvites)
+		.values({ id, groupId, token, email: email?.trim().toLowerCase() ?? null, invitedUserId, createdBy: userId, expiresAt });
 	return { id, token, expiresAt };
 }
 
 /** A group's invites that can still be used, newest first (admins only). */
 export async function listInvites(groupId: string, userId: string) {
 	await requireMember(groupId, userId, 'admin');
+	const invitee = alias(user, 'invitee');
 	const rows = await db
 		.select({
 			id: groupInvites.id,
 			token: groupInvites.token,
 			email: groupInvites.email,
+			username: invitee.username,
 			expiresAt: groupInvites.expiresAt,
 			createdAt: groupInvites.createdAt,
 			inviterName: user.name,
@@ -221,6 +227,7 @@ export async function listInvites(groupId: string, userId: string) {
 		})
 		.from(groupInvites)
 		.innerJoin(user, eq(user.id, groupInvites.createdBy))
+		.leftJoin(invitee, eq(invitee.id, groupInvites.invitedUserId))
 		.where(and(eq(groupInvites.groupId, groupId), gt(groupInvites.expiresAt, new Date())))
 		.orderBy(desc(groupInvites.createdAt));
 	return rows;
@@ -254,7 +261,11 @@ export async function previewInvite(token: string) {
 		memberCount: members.length,
 		expiresAt: invite.expiresAt.toISOString(),
 		// Who an emailed invite is for (null for a link anyone can use): prefills sign-in.
-		email: invite.email
+		email: invite.email,
+		// Who it was sent to by username, or null.
+		username: invite.invitedUserId
+			? ((await db.query.user.findFirst({ where: eq(user.id, invite.invitedUserId), columns: { username: true } }))?.username ?? null)
+			: null
 	};
 }
 
@@ -274,9 +285,14 @@ export async function acceptInvite(token: string, userId: string): Promise<{ gro
 			);
 		}
 	}
+	if (invite.invitedUserId && invite.invitedUserId !== userId) {
+		const invitee = await db.query.user.findFirst({ where: eq(user.id, invite.invitedUserId), columns: { username: true } });
+		const who = invitee?.username ? `@${invitee.username}` : 'someone else';
+		throw new ApiError('forbidden', `This invite was sent to ${who}. Sign in as ${who} to join.`);
+	}
 	const [result] = await db.insert(groupMembers).ignore().values({ groupId: invite.groupId, userId, role: 'member' });
 	const joined = result.affectedRows > 0;
-	if (invite.email) await db.delete(groupInvites).where(eq(groupInvites.id, invite.id));
+	if (invite.email || invite.invitedUserId) await db.delete(groupInvites).where(eq(groupInvites.id, invite.id));
 	if (joined) await refreshCoverage([userId]);
 	return { groupId: invite.groupId, joined };
 }

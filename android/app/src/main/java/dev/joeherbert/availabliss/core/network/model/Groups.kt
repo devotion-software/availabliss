@@ -103,9 +103,12 @@ data class MemberRoleRequest(val role: Role)
 @Serializable
 data class NudgeResponse(val nudged: Int)
 
-/** No emails: a link anyone can use. Emails: one invite each, emailed, only for that person. */
+/**
+ * Neither: a link anyone can use. Emails: one invite each, emailed, only for that person.
+ * Usernames: one invite each, to the person's Activity, only for them. At most 20 people in all.
+ */
 @Serializable
-data class CreateInviteRequest(val emails: List<String>? = null)
+data class CreateInviteRequest(val emails: List<String>? = null, val usernames: List<String>? = null)
 
 @Serializable
 data class InviteLink(
@@ -116,9 +119,18 @@ data class InviteLink(
     val invites: List<GroupInvite> = emptyList(),
 )
 
-/** An invite that can still be used: a link anyone can use (`email == null`), or one emailed to a person. */
+/** An invite that can still be used: a link anyone can use ([isLink]), or one for a person (by email or username). */
 @Serializable
-data class GroupInvite(val id: String, val email: String? = null, val url: String, val expiresAt: String)
+data class GroupInvite(
+    val id: String,
+    val email: String? = null,
+    /** Who it was sent to by username (no "@"). */
+    val username: String? = null,
+    val url: String,
+    val expiresAt: String,
+) {
+    val isLink: Boolean get() = email == null && username == null
+}
 
 @Serializable
 data class GroupInvitesResponse(val invites: List<GroupInvite>)
@@ -131,6 +143,8 @@ data class InvitePreview(
     val expiresAt: String,
     /** Who an emailed invite is for; null for a link anyone can use. */
     val email: String? = null,
+    /** Who an invite sent by username is for (no "@"); null otherwise. */
+    val username: String? = null,
 )
 
 @Serializable

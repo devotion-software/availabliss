@@ -2,6 +2,8 @@
 	import { z } from 'zod';
 	import type { GroupInvite } from '#lib/types';
 	import { createInvite, listInvites, revokeInvite } from '#lib/client/groups';
+	import { checkUsername } from '#lib/client/usernames';
+	import { normalizeUsername, usernameProblem } from '#lib/usernames';
 	import { useFormat } from '#lib/client/format';
 	import { toasts } from '#lib/client/toast.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
@@ -9,8 +11,8 @@
 	import TextField from '#lib/components/ui/TextField.svelte';
 
 	/**
-	 * Invite people, two ways: a link anyone can use, or invites emailed to particular people that
-	 * only they can accept. Lists the invites still live, with Revoke. Admin-only.
+	 * Invite people, two ways: a link anyone can use, or invites for particular people (by email
+	 * or username) that only they can accept. Lists the invites still live, with Revoke. Admin-only.
 	 */
 	interface Props {
 		groupId: string;
@@ -22,13 +24,13 @@
 	let invites = $state<GroupInvite[]>([]);
 	let creating = $state(false);
 	let copied = $state(false);
-	let emailsText = $state('');
-	let emailError = $state<string | null>(null);
+	let peopleText = $state('');
+	let peopleError = $state<string | null>(null);
 	let sending = $state(false);
 	const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
 
 	// The newest link anyone can use.
-	const link = $derived(invites.find((i) => i.email === null) ?? null);
+	const link = $derived(invites.find((i) => i.email === null && i.username === null) ?? null);
 
 	$effect(() => {
 		const id = groupId;
@@ -69,26 +71,45 @@
 		}
 	}
 
-	/** "a@x.com, b@y.com" (commas, spaces or new lines) → the addresses, or the first bad one. */
-	function parseEmails(text: string): { emails: string[]; bad: string | null } {
+	/** An "@" after the first character makes it an email address; anything else is a username. */
+	const isEmailish = (p: string) => p.indexOf('@') > 0;
+
+	/** "sam@example.com, @priya" (commas, spaces or new lines) → the emails and usernames, or why one's no good. */
+	function parsePeople(text: string): { emails: string[]; usernames: string[]; bad: string | null } {
 		const parts = text.split(/[\s,;]+/).map((p) => p.trim()).filter(Boolean);
-		const bad = parts.find((p) => !z.email().safeParse(p).success) ?? null;
-		return { emails: [...new Set(parts.map((p) => p.toLowerCase()))], bad };
+		const emails = new Set<string>();
+		const usernames = new Set<string>();
+		for (const p of parts) {
+			if (isEmailish(p)) {
+				if (!z.email().safeParse(p).success) return { emails: [], usernames: [], bad: `“${p}” isn’t a valid email address` };
+				emails.add(p.toLowerCase());
+			} else {
+				const u = normalizeUsername(p);
+				if (usernameProblem(u)) return { emails: [], usernames: [], bad: `“${p}” isn’t an email address or a username` };
+				usernames.add(u);
+			}
+		}
+		return { emails: [...emails], usernames: [...usernames], bad: null };
 	}
 
-	async function sendEmails(e: SubmitEvent) {
+	async function sendInvites(e: SubmitEvent) {
 		e.preventDefault();
-		const { emails, bad } = parseEmails(emailsText);
-		if (bad) return void (emailError = `“${bad}” isn’t a valid email address`);
-		if (!emails.length) return void (emailError = 'Enter at least one email address');
-		if (emails.length > 20) return void (emailError = 'Invite up to 20 people at a time');
-		emailError = null;
+		const { emails, usernames, bad } = parsePeople(peopleText);
+		if (bad) return void (peopleError = bad);
+		if (!emails.length && !usernames.length) return void (peopleError = 'Enter an email address or username');
+		if (emails.length + usernames.length > 20) return void (peopleError = 'Invite up to 20 people at a time');
+		peopleError = null;
 		sending = true;
 		try {
-			const made = await createInvite(groupId, emails);
-			invites = [...made.invites, ...invites.filter((i) => !emails.includes(i.email ?? ''))];
-			toasts.success(emails.length === 1 ? `Invite sent to ${emails[0]}` : `Invites sent to ${emails.length} people`);
-			emailsText = '';
+			// Say who's missing before sending anything.
+			const found = await Promise.all(usernames.map((u) => checkUsername(u)));
+			const missing = found.find((c) => !c.user);
+			if (missing) return void (peopleError = `No one has the username @${missing.username}`);
+			const made = await createInvite(groupId, emails, usernames);
+			invites = [...made.invites, ...invites.filter((i) => !emails.includes(i.email ?? '') && !usernames.includes(i.username ?? ''))];
+			const names = [...emails, ...found.map((c) => c.user!.name.trim() || `@${c.username}`)];
+			toasts.success(names.length === 1 ? `Invite sent to ${names[0]}` : `Invites sent to ${names.length} people`);
+			peopleText = '';
 		} catch (err) {
 			toasts.error(err);
 		} finally {
@@ -100,13 +121,16 @@
 		try {
 			await revokeInvite(groupId, invite.id);
 			invites = invites.filter((i) => i.id !== invite.id);
-			toasts.success(invite.email ? `Invite for ${invite.email} revoked` : 'Link revoked: it no longer works');
+			const who = inviteeLabel(invite);
+			toasts.success(who ? `Invite for ${who} revoked` : 'Link revoked: it no longer works');
 		} catch (err) {
 			toasts.error(err);
 		}
 	}
 
 	const expiry = (i: GroupInvite) => `expires ${fmt.current.dayLong(i.expiresAt)}`;
+	/** Who an invite is for, or null for a link anyone can use. */
+	const inviteeLabel = (i: GroupInvite) => i.email ?? (i.username ? `@${i.username}` : null);
 </script>
 
 <section class="invite glass" aria-labelledby="invite-h">
@@ -129,16 +153,18 @@
 		{/if}
 	</div>
 
-	<form class="way emails" onsubmit={sendEmails} novalidate>
-		<h3>Or limit to these emails</h3>
-		<p class="lead">We'll email each person their own invite. Only someone signed in with that address can join.</p>
+	<form class="way emails" onsubmit={sendInvites} novalidate>
+		<h3>Or invite particular people</h3>
+		<p class="lead">Each person gets their own invite, by email or in the app. Only they can join with it.</p>
 		<TextField
-			label="Email addresses"
+			label="Emails or usernames"
 			type="text"
 			autocomplete="off"
-			placeholder="sam@example.com, priya@example.com"
-			bind:value={emailsText}
-			error={emailError}
+			autocapitalize="none"
+			spellcheck={false}
+			placeholder="sam@example.com, @priya"
+			bind:value={peopleText}
+			error={peopleError}
 		/>
 		<Button type="submit" variant="secondary" icon="mail" loading={sending}>Send invites</Button>
 	</form>
@@ -150,10 +176,10 @@
 				{#each invites as i (i.id)}
 					<li>
 						<span class="who">
-							<span class="name">{i.email ?? 'Invite link'}</span>
-							<span class="sub">{i.email ? `Invited · invite ${expiry(i)}` : `Anyone with the link · ${expiry(i)}`}</span>
+							<span class="name">{inviteeLabel(i) ?? 'Invite link'}</span>
+							<span class="sub">{inviteeLabel(i) ? `Invited · invite ${expiry(i)}` : `Anyone with the link · ${expiry(i)}`}</span>
 						</span>
-						<IconButton icon="x" label={i.email ? `Revoke the invite for ${i.email}` : 'Revoke this link'} variant="plain" size={36} onclick={() => revoke(i)} />
+						<IconButton icon="x" label={inviteeLabel(i) ? `Revoke the invite for ${inviteeLabel(i)}` : 'Revoke this link'} variant="plain" size={36} onclick={() => revoke(i)} />
 					</li>
 				{/each}
 			</ul>

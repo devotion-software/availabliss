@@ -7,6 +7,7 @@ export function toPublicUser(u: AuthUser): User {
 		id: u.id,
 		name: u.name,
 		email: u.email,
+		username: u.username ?? null,
 		image: u.image ?? null,
 		themeMode: THEME_MODES.find((m) => m === u.themeMode) ?? 'system',
 		colorTheme: COLOR_THEMES.find((t) => t === u.colorTheme) ?? 'dawn',

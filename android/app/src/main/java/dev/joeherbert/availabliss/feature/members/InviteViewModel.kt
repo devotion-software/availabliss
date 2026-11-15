@@ -39,6 +39,8 @@ data class InviteUiState(
     /** The invite was emailed to this address, and you're signed in as [signedInEmail]: you can't use it. */
     val invitedOtherEmail: String? = null,
     val signedInEmail: String = "",
+    /** The invite was sent to this username (no "@"), and it isn't yours: you can't use it. */
+    val invitedOtherUsername: String? = null,
 )
 
 @HiltViewModel
@@ -67,12 +69,14 @@ class InviteViewModel @Inject constructor(
                     val expires = DateTimes.parseInstant(p.expiresAt)
                     val expired = expires != null && expires.isBefore(Instant.now())
                     val mine = users.user.value?.email.orEmpty()
+                    val myUsername = users.user.value?.username
                     _state.update {
                         it.copy(
                             loading = false,
                             invalid = expired,
                             invitedOtherEmail = p.email?.takeIf { invited -> !invited.equals(mine, ignoreCase = true) },
                             signedInEmail = mine,
+                            invitedOtherUsername = p.username?.takeIf { invited -> !invited.equals(myUsername, ignoreCase = true) },
                             preview = InvitePreviewUi(
                                 groupName = p.groupName,
                                 inviterName = p.inviterName,

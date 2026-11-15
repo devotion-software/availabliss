@@ -8,6 +8,7 @@ export const markNotificationsRead = (ids?: string[]) => api.post('/notification
 
 /** Where tapping a notification should take you. */
 export function notificationHref(n: AppNotification): string {
+	if (n.kind === 'invite.received' && n.data.token) return `/invite/${n.data.token}`;
 	if (n.data.proposalId) return `/app/proposals/${n.data.proposalId}`;
 	if (n.groupId && (n.kind === 'message' || n.data.messageId)) return `/app/groups/${n.groupId}/chat`;
 	if (n.groupId) return `/app/groups/${n.groupId}`;

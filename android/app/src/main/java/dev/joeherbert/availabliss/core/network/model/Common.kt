@@ -62,6 +62,8 @@ data class User(
     val id: String,
     val name: String,
     val email: String,
+    /** Lowercase, no "@". Every account gets one at sign-up; null only briefly for older accounts. */
+    val username: String? = null,
     val image: String? = null,
     val themeMode: ThemeMode = ThemeMode.System,
     val colorTheme: ColorTheme = ColorTheme.Dawn,
@@ -70,6 +72,28 @@ data class User(
     val schoolAuthority: String? = null,
     val timezone: String = "Europe/London",
     val onboarded: Boolean = false,
+)
+
+/** Someone found by username, to invite them. */
+@Serializable
+data class UserSummary(
+    val id: String,
+    val username: String,
+    val name: String,
+    val image: String? = null,
+)
+
+/** `GET /usernames/:username`. */
+@Serializable
+data class UsernameCheck(
+    /** As the server normalized it. */
+    val username: String,
+    /** Why it can't be used as written ("At least 3 characters" …). */
+    val problem: String? = null,
+    /** Valid, and nobody else has it (true if it's already yours). */
+    val available: Boolean = false,
+    /** Who has it (you included). */
+    val user: UserSummary? = null,
 )
 
 @Serializable

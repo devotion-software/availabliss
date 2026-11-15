@@ -44,7 +44,7 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
 
 /**
  * Text input from the concept: 48–50dp, `surface` fill, `line-2` border, radius 14–16.
- * [label] renders above (13 / 600 muted).
+ * [label] renders above (13 / 600 muted), [error] below in the warning colour.
  */
 @Composable
 fun AvTextField(
@@ -65,6 +65,10 @@ fun AvTextField(
     enabled: Boolean = true,
     textStyle: TextStyle = AvailablissTheme.type.bodyLarge,
     focusRequester: FocusRequester? = null,
+    /** Fixed text before the value, e.g. "@" for a username. */
+    prefix: String? = null,
+    /** Shown at the end of the field, e.g. a status icon. */
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = AvailablissTheme.colors
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -84,18 +88,25 @@ fun AvTextField(
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .semantics { label?.let { contentDescription = it } },
             decorationBox = { inner ->
-                Box(
+                Row(
                     Modifier
                         .fillMaxWidth()
                         .defaultMinSize(minHeight = height)
                         .clip(shape)
                         .background(colors.surface)
                         .border(1.dp, if (error != null) colors.warn else colors.line2, shape)
-                        .padding(horizontal = 16.dp, vertical = if (singleLine) 0.dp else 12.dp),
-                    contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart,
+                        .padding(start = 16.dp, end = if (trailing != null) 12.dp else 16.dp, top = if (singleLine) 0.dp else 12.dp, bottom = if (singleLine) 0.dp else 12.dp),
+                    verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (value.isEmpty()) Text(placeholder, style = textStyle, color = colors.muted.copy(alpha = 0.7f))
-                    inner()
+                    Row(Modifier.weight(1f), verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top) {
+                        prefix?.let { Text(it, style = textStyle, color = colors.muted) }
+                        Box(Modifier.weight(1f), contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart) {
+                            if (value.isEmpty()) Text(placeholder, style = textStyle, color = colors.muted.copy(alpha = 0.7f))
+                            inner()
+                        }
+                    }
+                    trailing?.invoke()
                 }
             },
         )

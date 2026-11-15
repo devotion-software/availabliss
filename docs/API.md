@@ -80,6 +80,7 @@ out. Some endpoints have tighter limits of their own:
 | `PUT /calendars/device` | 30 / minute |
 | `POST /groups` | 20 / hour |
 | `POST /groups/:id/invites` | 30 / hour |
+| `GET /usernames/:username` | 60 / minute |
 | `POST /groups/:id/messages` | 30 / minute |
 | `GET /groups/:id/availability[/day]` | 120 / minute |
 | `POST /requirements/preview` | 120 / minute |
@@ -103,6 +104,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  username: string | null;       // lowercase, no "@"; every account gets one when it's created (null only briefly for older accounts)
   image: string | null;
   themeMode: ThemeMode;
   colorTheme: ColorTheme;
@@ -212,7 +214,8 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/me` | | `User` |
-| PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded'>>` | `User` |
+| PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'username' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded'>>` | `User` (`409` if the username is taken) |
+| GET 🔒 | `/usernames/:username` | | `UsernameCheck`: whether it can be yours, and who has it (to invite them) |
 | GET 🔒 | `/me/busy?from&to` (ISO instants, `to` after `from`, at most 120 days apart) | | `{ intervals: BusyInterval[] }` (own merged busy time; `label` is only ever returned to the owner) |
 | PUT 🔒 | `/me/avatar` | the image bytes (JPEG / PNG / WebP / HEIC, ≤ 10 MB) with its `image/*` content type | `User` (`image` is the new picture, shrunk to fit 512 px) |
 | DELETE 🔒 | `/me/avatar` | | `User` (no picture: initials) |
@@ -230,6 +233,19 @@ interface BusyInterval {
   eventKey?: string;        // opaque key of the event / its series ('' if the calendar gives no ids)
   recurring?: boolean;      // the event repeats, so "not busy" can cover every occurrence
   ignoreId?: string | null; // set when you've marked it not busy (it doesn't count as busy for anyone)
+}
+```
+
+Usernames are 3–20 characters: lowercase letters, numbers, `_` and `.` (a dot can't come first,
+last or twice in a row). They're sent with or without a leading `@`, in any case, and stored lowercase.
+
+```ts
+interface UserSummary { id: string; username: string; name: string; image: string | null }
+interface UsernameCheck {
+  username: string;          // as normalized
+  problem: string | null;    // why it can't be used as written ("At least 3 characters" …)
+  available: boolean;        // valid, and nobody else has it
+  user: UserSummary | null;  // who has it (you included)
 }
 ```
 
@@ -401,20 +417,23 @@ interface ManualBlock {
 | POST 🔒 | `/groups/:id/preferences` | `{ kind: 'dates', from, to }` or `{ kind: 'weekly', days?: Weekday[], window?: { from, to } \| null }` | `GroupPreference` |
 | DELETE 🔒 | `/groups/:id/preferences/:prefId` | | 204 (your own only) |
 | GET 👑 | `/groups/:id/invites` | | `{ invites: GroupInvite[] }` (live ones, newest first) |
-| POST 👑 | `/groups/:id/invites` | `{ emails?: string[] (≤ 20), email?: string }` | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |
+| POST 👑 | `/groups/:id/invites` | `{ emails?: string[], usernames?: string[], email?: string }` (≤ 20 people) | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |
 | DELETE 👑 | `/groups/:id/invites/:inviteId` | | 204 (the link stops working) |
-| GET | `/invites/:token` | | `{ groupName, inviterName, memberCount, expiresAt, email: string \| null }` |
-| POST 🔒 | `/invites/:token/accept` | | `Group` (403 if the invite was emailed to a different address) |
+| GET | `/invites/:token` | | `{ groupName, inviterName, memberCount, expiresAt, email: string \| null, username: string \| null }` |
+| POST 🔒 | `/invites/:token/accept` | | `Group` (403 if the invite was for a different address or username) |
 
 With no emails, an invite is a link anyone can use until it expires (14 days). With emails, each
 address gets its own emailed invite that only someone signed in with that address can accept; it's
-used up once they join.
+used up once they join. With usernames, each person gets their own invite in Activity (an
+`invite.received` notification and a push, `data: { token }`) that only they can accept; it's used
+up once they join. A username nobody has is `404`, and someone already in the group is `409`,
+before any invite is sent.
 
 ```ts
 // Preferred times are guidelines: they never block a date. Availability marks the slots and
 // `match` days they fit with `preferredBy: string[]` (user ids).
 interface GroupPreference { id: string; userId: string; kind: 'dates' | 'weekly'; from: string | null; to: string | null; days: Weekday[]; window: { from: string; to: string } | null; label: string }
-interface GroupInvite { id: string; email: string | null; url: string; expiresAt: string; createdAt: string; invitedBy: string }
+interface GroupInvite { id: string; email: string | null; username: string | null; url: string; expiresAt: string; createdAt: string; invitedBy: string }
 ```
 
 ### Availability
@@ -581,7 +600,7 @@ Native apps keep this open while foregrounded and rely on push otherwise.
 ```ts
 interface Notification {
   id: string; groupId: string | null;
-  kind: 'proposal.created' | 'proposal.confirmed' | 'nudge' | 'invite.accepted' | 'message' | 'event.created';
+  kind: 'proposal.created' | 'proposal.confirmed' | 'nudge' | 'invite.accepted' | 'invite.received' | 'message' | 'event.created';
   title: string; body: string;
   data: Record<string, string>;        // e.g. { proposalId }
   readAt: string | null; createdAt: string;
@@ -595,7 +614,8 @@ interface Notification {
 | POST 🔒 | `/devices` | `{ platform: 'ios' \| 'android', token, name? }` | `204` (registers APNs / FCM token) |
 | DELETE 🔒 | `/devices/:token` | | `204` |
 
-Push payloads carry `{ kind, groupId, proposalId?, eventId?, messageId? }` so the app
+Push payloads carry `{ kind, groupId, proposalId?, eventId?, messageId?, token? }` (`token`: an
+`invite.received` invite, opened like `/invite/:token`) so the app
 can deep link. On iOS these keys are **top-level** in the APNs payload, next to
 `aps`; on Android they are the FCM `data` map. Android notification channel id = `kind`.
 

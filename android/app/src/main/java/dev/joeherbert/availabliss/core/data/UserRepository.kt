@@ -11,6 +11,7 @@ import dev.joeherbert.availabliss.core.network.onSuccess
 import dev.joeherbert.availabliss.core.network.model.ColorTheme
 import dev.joeherbert.availabliss.core.network.model.ThemeMode
 import dev.joeherbert.availabliss.core.network.model.User
+import dev.joeherbert.availabliss.core.network.model.UsernameCheck
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -90,6 +91,9 @@ class UserRepository @Inject constructor(
     }
 
     suspend fun deleteAccount(): ApiResult<Unit> = call { api.deleteAccount() }
+
+    /** `GET /usernames/:username`: whether it can be yours, and who has it. */
+    suspend fun checkUsername(username: String): ApiResult<UsernameCheck> = call { api.checkUsername(username) }
 
     /** Uploads a new profile picture (JPEG), or removes it with null. */
     suspend fun setAvatar(jpeg: ByteArray?): ApiResult<User> {

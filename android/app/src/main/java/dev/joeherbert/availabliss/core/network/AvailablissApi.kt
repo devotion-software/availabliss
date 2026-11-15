@@ -110,6 +110,10 @@ interface AvailablissApi {
     @DELETE("api/v1/me")
     suspend fun deleteAccount()
 
+    /** Whether [username] can be yours, and who has it (to invite them). 60 / minute: debounce typing. */
+    @GET("api/v1/usernames/{username}")
+    suspend fun checkUsername(@Path("username") username: String): dev.joeherbert.availabliss.core.network.model.UsernameCheck
+
     @GET("api/v1/me/upcoming")
     suspend fun getUpcoming(): EventsResponse
     // endregion

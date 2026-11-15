@@ -165,7 +165,7 @@ private struct FirstGroupStep: View {
     }
 }
 
-/// Step 4: invite people to the new group, by link or by email.
+/// Step 4: invite people to the new group, by link, email or username.
 private struct InvitePeopleStep: View {
     let group: Group
     let api: APIClient
@@ -173,7 +173,6 @@ private struct InvitePeopleStep: View {
     @Environment(\.theme) private var theme
     @Environment(\.onboardingSteps) private var steps
     @State private var model: MembersViewModel
-    @State private var emails = ""
 
     init(group: Group, api: APIClient, onDone: @escaping () -> Void) {
         self.group = group
@@ -214,23 +213,19 @@ private struct InvitePeopleStep: View {
                     }
                 }
                 GlassPanel(cornerRadius: 24) {
-                    Text("Or invite by email").bodyFont(15, .semibold)
+                    Text("Or invite by email or username").bodyFont(15, .semibold)
                     Text("Each person gets their own invite; only they can use it.")
                         .bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
-                    InputField(placeholder: "sam@example.com, priya@example.com", text: $emails, height: 48, cornerRadius: 14)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    InviteRecipientsField(draft: model.draft)
                     Button {
-                        let text = emails
-                        Task { if await model.sendInvites(to: text) { emails = "" } }
+                        Task { await model.sendInvites() }
                     } label: {
-                        LoadingLabel(title: "Send invites", systemImage: "envelope", isLoading: model.isSendingInvites)
+                        LoadingLabel(title: "Send invites", systemImage: "paperplane", isLoading: model.isSendingInvites)
                     }
                     .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
-                    .disabled(!emails.contains("@") || model.isSendingInvites)
-                    if !model.invites.filter({ $0.email != nil }).isEmpty {
-                        Text("Invited: \(model.invites.compactMap(\.email).joined(separator: ", "))")
+                    .disabled(model.draft.isEmpty || model.draft.isAdding || model.isSendingInvites)
+                    if !model.personalInvites.isEmpty {
+                        Text("Invited: \(model.personalInvites.compactMap(\.recipient).joined(separator: ", "))")
                             .bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
                     }
                 }

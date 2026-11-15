@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { COLOR_THEMES, REPEATS, RESPONSE_KINDS, THEME_MODES, TILE_COLORS, type Weekday } from './types';
 import { isValidZone } from './timezone';
+import { normalizeUsername, usernameProblem } from './usernames';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -65,6 +66,16 @@ export const requirementSchema = z.object({
 	timezone
 });
 
+/** Typed with or without "@", in any case; stored lowercase. */
+const username = z
+	.string()
+	.max(64)
+	.transform(normalizeUsername)
+	.superRefine((v, ctx) => {
+		const problem = usernameProblem(v);
+		if (problem) ctx.addIssue({ code: 'custom', message: problem });
+	});
+
 export const updateMeSchema = z
 	.object({
 		name: trimmed(80),
@@ -74,7 +85,8 @@ export const updateMeSchema = z
 		subdivision: z.string().max(10).nullable(),
 		schoolAuthority: z.string().max(64).nullable(),
 		timezone,
-		onboarded: z.boolean()
+		onboarded: z.boolean(),
+		username
 	})
 	.partial();
 
@@ -88,11 +100,17 @@ export const updateGroupSchema = createGroupSchema.partial();
 
 export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
 
-/** No email: a link anyone can use. `emails` (or one `email`): one invite each, only that person can join. */
-export const inviteSchema = z.object({
-	email: z.email().optional(),
-	emails: z.array(z.email()).max(20, 'Invite up to 20 people at a time').optional()
-});
+/**
+ * Nothing: a link anyone can use. `emails` (or one `email`) and `usernames`: one invite each,
+ * only that person can join.
+ */
+export const inviteSchema = z
+	.object({
+		email: z.email().optional(),
+		emails: z.array(z.email()).max(20, 'Invite up to 20 people at a time').optional(),
+		usernames: z.array(username).max(20, 'Invite up to 20 people at a time').optional()
+	})
+	.refine((i) => (i.emails?.length ?? 0) + (i.usernames?.length ?? 0) <= 20, { message: 'Invite up to 20 people at a time' });
 
 const blockShape = {
 	start: isoDateTime,

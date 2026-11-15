@@ -11,6 +11,8 @@ final class MembersViewModel {
     private(set) var isSendingInvites = false
     var error: String?
     var toast: String?
+    /// The emails and usernames about to be invited.
+    let draft: InviteDraft
 
     let groupId: String
     private let api: APIClient
@@ -18,6 +20,7 @@ final class MembersViewModel {
     init(groupId: String, api: APIClient) {
         self.groupId = groupId
         self.api = api
+        self.draft = InviteDraft(api: api)
     }
 
     var isAdmin: Bool { group?.role.isAdmin ?? false }
@@ -29,7 +32,10 @@ final class MembersViewModel {
     }
 
     /// The newest link anyone can use.
-    var link: GroupInvite? { invites.first { $0.email == nil } }
+    var link: GroupInvite? { invites.first(where: \.isLink) }
+
+    /// Invites made for particular people (by email or username).
+    var personalInvites: [GroupInvite] { invites.filter { !$0.isLink } }
 
     func load() async {
         do {
@@ -51,22 +57,24 @@ final class MembersViewModel {
         }
     }
 
-    /// Emails each address its own invite. Returns false (with `error` set) if any address is invalid.
-    func sendInvites(to text: String) async -> Bool {
-        let parts = text.split(whereSeparator: { $0 == "," || $0 == ";" || $0.isWhitespace }).map { $0.lowercased() }
-        let emails = Array(NSOrderedSet(array: parts)) as? [String] ?? parts
-        if let bad = emails.first(where: { !Self.looksLikeEmail($0) }) {
-            error = "\u{201C}\(bad)\u{201D} isn\u{2019}t a valid email address."
-            return false
-        }
-        guard !emails.isEmpty else { return false }
+    /// Adds whatever's still typed, then invites everyone in `draft`: emails get an emailed invite,
+    /// usernames one in their Activity. Returns false (with the reason shown) if anything failed.
+    func sendInvites() async -> Bool {
+        guard await draft.add() else { return false }
+        let emails = draft.emails
+        let usernames = draft.usernames
+        guard !emails.isEmpty || !usernames.isEmpty, !isSendingInvites else { return false }
         isSendingInvites = true
         defer { isSendingInvites = false }
         do {
-            let made = try await api.send(API.Groups.createInvite(groupId: groupId, emails: emails))
-            invites.removeAll { invite in emails.contains(invite.email ?? "") }
+            let made = try await api.send(API.Groups.createInvite(groupId: groupId, emails: emails, usernames: usernames))
+            invites.removeAll { invite in
+                invite.email.map(emails.contains) == true || invite.username.map(usernames.contains) == true
+            }
             invites.insert(contentsOf: made.invites ?? [], at: 0)
-            toast = emails.count == 1 ? "Invite sent to \(emails[0])" : "Invites sent to \(emails.count) people"
+            let count = emails.count + usernames.count
+            toast = count == 1 ? "Invite sent to \(emails.first ?? "@\(usernames[0])")" : "Invites sent to \(count) people"
+            draft.clear()
             return true
         } catch {
             self.error = error.userMessage
@@ -78,14 +86,10 @@ final class MembersViewModel {
         do {
             try await api.send(API.Groups.revokeInvite(groupId: groupId, inviteId: invite.id))
             invites.removeAll { $0.id == invite.id }
-            toast = invite.email.map { "Invite for \($0) revoked" } ?? "Link revoked: it no longer works"
+            toast = invite.recipient.map { "Invite for \($0) revoked" } ?? "Link revoked: it no longer works"
         } catch {
             self.error = error.userMessage
         }
-    }
-
-    private static func looksLikeEmail(_ text: String) -> Bool {
-        text.wholeMatch(of: /[^@\s]+@[^@\s]+\.[^@\s]+/) != nil
     }
 
     func setRole(_ role: Role, for member: Member) async {

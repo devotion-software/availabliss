@@ -34,7 +34,7 @@ class PushNotifier @Inject constructor(
         // Chat messages for a group share one notification (see [chatStyle]); everything else gets its own.
         val chatGroupId = data["groupId"]?.takeIf { channel == Channel.Message && it.isNotBlank() }
         val id = chatGroupId?.let { "message:$it".hashCode() }
-            ?: (data["messageId"] ?: data["proposalId"] ?: data["eventId"] ?: data["groupId"] ?: title).hashCode()
+            ?: (data["messageId"] ?: data["proposalId"] ?: data["eventId"] ?: data["token"] ?: data["groupId"] ?: title).hashCode()
         val pending = PendingIntent.getActivity(
             context,
             id,

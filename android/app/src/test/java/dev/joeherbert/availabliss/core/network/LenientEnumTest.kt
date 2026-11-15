@@ -14,9 +14,10 @@ class LenientEnumTest {
     fun `notification kinds decode by wire value and unknown kinds fall back`() {
         val body = """{"unread":2,"notifications":[
             {"id":"1","kind":"proposal.confirmed","title":"t","body":"b","createdAt":"2026-11-03T10:00:00Z"},
-            {"id":"2","kind":"poll.closed","title":"t","body":"b","createdAt":"2026-11-03T10:00:00Z"}]}"""
+            {"id":"2","kind":"poll.closed","title":"t","body":"b","createdAt":"2026-11-03T10:00:00Z"},
+            {"id":"3","kind":"invite.received","title":"t","body":"b","data":{"token":"abc"},"createdAt":"2026-11-03T10:00:00Z"}]}"""
         val kinds = json.decodeFromString(NotificationsResponse.serializer(), body).notifications.map { it.kind }
-        assertEquals(listOf(NotificationKind.ProposalConfirmed, NotificationKind.Unknown), kinds)
+        assertEquals(listOf(NotificationKind.ProposalConfirmed, NotificationKind.Unknown, NotificationKind.InviteReceived), kinds)
     }
 
     @Test

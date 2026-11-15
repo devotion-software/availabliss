@@ -18,6 +18,8 @@
     <string name="channel_nudges_description">Reminders to add your busy times</string>
     <string name="channel_invites_name">Group joins</string>
     <string name="channel_invites_description">When someone accepts your invite</string>
+    <string name="channel_invite_received_name">Invites</string>
+    <string name="channel_invite_received_description">When someone invites you to a group</string>
     <!-- The device owner in a chat notification. -->
     <string name="notification_you">You</string>
 </resources>

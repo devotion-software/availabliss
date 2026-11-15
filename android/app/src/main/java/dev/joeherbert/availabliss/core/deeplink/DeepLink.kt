@@ -81,16 +81,19 @@ sealed interface DeepLink {
             else -> null
         }
 
-        /** Push payload `data`: `{ kind, groupId, proposalId?, eventId?, messageId? }`. */
+        /** Push payload `data`: `{ kind, groupId, proposalId?, eventId?, messageId?, token? }`. */
         fun fromPushData(data: Map<String, String>): DeepLink? {
             val groupId = data["groupId"]?.takeIf { it.isNotBlank() }
             val proposalId = data["proposalId"]?.takeIf { it.isNotBlank() }
+            val token = data["token"]?.takeIf { it.isNotBlank() }
             return when (data["kind"]) {
                 "proposal.created", "proposal.confirmed" ->
                     proposalId?.let(::Proposal) ?: groupId?.let(::GroupCalendar)
                 "message" -> groupId?.let(::GroupChat)
                 "event.created" -> groupId?.let(::GroupEvents)
                 "invite.accepted" -> groupId?.let(::GroupCalendar)
+                // Someone invited you by username: open the invite, as `/invite/:token` does.
+                "invite.received" -> token?.let(::Invite) ?: Activity
                 "nudge" -> MyTime
                 else -> proposalId?.let(::Proposal) ?: groupId?.let(::GroupCalendar) ?: Activity
             }

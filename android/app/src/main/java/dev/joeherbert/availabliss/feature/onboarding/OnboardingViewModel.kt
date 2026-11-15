@@ -11,6 +11,9 @@ import dev.joeherbert.availabliss.core.deeplink.DeepLink
 import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.TileColor
+import dev.joeherbert.availabliss.feature.common.InviteRecipient
+import dev.joeherbert.availabliss.feature.common.InviteRecipients
+import dev.joeherbert.availabliss.feature.common.InviteRecipientsState
 import dev.joeherbert.availabliss.feature.timing.RequirementPresets
 import dev.joeherbert.availabliss.feature.timing.TimingPreset
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,7 +41,6 @@ data class OnboardingUiState(
     // Invite people
     val inviteLink: String? = null,
     val creatingLink: Boolean = false,
-    val inviteEmails: String = "",
     val sendingInvites: Boolean = false,
     val invited: List<String> = emptyList(),
     /** Invite link to hand to the share sheet; cleared via [OnboardingViewModel.onShareHandled]. */
@@ -59,6 +61,10 @@ class OnboardingViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(OnboardingUiState(steps = if (deepLinks.pending.value is DeepLink.Invite) 2 else 4))
     val state: StateFlow<OnboardingUiState> = _state.asStateFlow()
+
+    /** Who to invite, by email or username. */
+    private val recipients = InviteRecipients(viewModelScope, users::checkUsername, selfId = { users.user.value?.id })
+    val inviteRecipients: StateFlow<InviteRecipientsState> = recipients.state
 
     private var markBusyByHand = false
 
@@ -110,19 +116,27 @@ class OnboardingViewModel @Inject constructor(
 
     fun onShareHandled() = _state.update { it.copy(pendingShareUrl = null) }
 
-    fun onInviteEmailsChange(value: String) = _state.update { it.copy(inviteEmails = value) }
+    fun onInviteDraftChange(value: String) = recipients.onDraftChange(value)
 
+    fun addInviteRecipient() = recipients.add()
+
+    fun removeInviteRecipient(recipient: InviteRecipient) = recipients.remove(recipient)
+
+    /** Invites everyone added (and anything still typed): emails get an email, usernames an invite in Activity. */
     fun sendInvites() {
         val id = _state.value.createdGroupId ?: return
         if (_state.value.sendingInvites) return
-        val emails = _state.value.inviteEmails.split(',', ';', ' ', '\n').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.distinct()
-        emails.firstOrNull { !EMAIL.matches(it) }?.let { bad -> return _state.update { it.copy(message = UserMessage("“$bad” isn’t a valid email address")) } }
-        if (emails.isEmpty()) return
         _state.update { it.copy(sendingInvites = true) }
         viewModelScope.launch {
-            when (val result = groups.createInvite(id, emails)) {
-                is ApiResult.Success -> _state.update {
-                    it.copy(sendingInvites = false, inviteEmails = "", invited = (it.invited + emails).distinct(), message = UserMessage(if (emails.size == 1) "Invite sent to ${emails.first()}" else "Invites sent to ${emails.size} people"))
+            val r = if (recipients.addDraft()) recipients.state.value else null
+            if (r == null || r.recipients.isEmpty()) return@launch _state.update { it.copy(sendingInvites = false) }
+            val labels = r.labels
+            when (val result = groups.createInvite(id, r.emails, r.usernames)) {
+                is ApiResult.Success -> {
+                    recipients.clear()
+                    _state.update {
+                        it.copy(sendingInvites = false, invited = (it.invited + labels).distinct(), message = UserMessage(if (labels.size == 1) "Invite sent to ${labels.first()}" else "Invites sent to ${labels.size} people"))
+                    }
                 }
                 is ApiResult.Failure -> _state.update { it.copy(sendingInvites = false, message = UserMessage(result.error.message)) }
             }
@@ -149,8 +163,4 @@ class OnboardingViewModel @Inject constructor(
 
     fun onMessageShown(message: UserMessage) =
         _state.update { if (it.message?.id == message.id) it.copy(message = null) else it }
-
-    private companion object {
-        val EMAIL = Regex("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")
-    }
 }

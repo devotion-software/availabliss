@@ -224,6 +224,7 @@ private fun NotificationKind.icon(): ImageVector = when (this) {
     NotificationKind.ProposalConfirmed -> AvIcons.Check
     NotificationKind.Nudge -> AvIcons.Clock
     NotificationKind.InviteAccepted -> AvIcons.AddPerson
+    NotificationKind.InviteReceived -> AvIcons.AddPerson
     NotificationKind.Message -> AvIcons.Chat
     NotificationKind.EventCreated -> AvIcons.CalendarAdd
     NotificationKind.Unknown -> AvIcons.Bell

@@ -46,6 +46,8 @@ enum ColorTheme: String, Codable, Sendable, CaseIterable, TolerantDecodable {
 struct User: Codable, Sendable, Identifiable, Equatable {
     let id: String
     var name: String
+    /// Lowercase, without the "@". Every account gets one when it's made (nil only briefly for older ones).
+    var username: String?
     var email: String
     var image: String?
     var themeMode: ThemeMode
@@ -64,6 +66,8 @@ struct User: Codable, Sendable, Identifiable, Equatable {
 /// Body for `PATCH /me`. Only non-nil fields are sent, except in a region update (see `region`).
 struct UserPatch: Encodable, Sendable {
     var name: String?
+    /// Any case, with or without "@": the server normalizes it (409 if it's taken).
+    var username: String?
     var themeMode: ThemeMode?
     var colorTheme: ColorTheme?
     var country: String?
@@ -77,6 +81,7 @@ struct UserPatch: Encodable, Sendable {
 
     init(
         name: String? = nil,
+        username: String? = nil,
         themeMode: ThemeMode? = nil,
         colorTheme: ColorTheme? = nil,
         country: String? = nil,
@@ -86,6 +91,7 @@ struct UserPatch: Encodable, Sendable {
         onboarded: Bool? = nil
     ) {
         self.name = name
+        self.username = username
         self.themeMode = themeMode
         self.colorTheme = colorTheme
         self.country = country
@@ -105,6 +111,7 @@ struct UserPatch: Encodable, Sendable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(name, forKey: .name)
+        try container.encodeIfPresent(username, forKey: .username)
         try container.encodeIfPresent(themeMode, forKey: .themeMode)
         try container.encodeIfPresent(colorTheme, forKey: .colorTheme)
         if replacesRegion {
@@ -121,7 +128,7 @@ struct UserPatch: Encodable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case name, themeMode, colorTheme, country, subdivision, schoolAuthority, timezone, onboarded
+        case name, username, themeMode, colorTheme, country, subdivision, schoolAuthority, timezone, onboarded
     }
 }
 

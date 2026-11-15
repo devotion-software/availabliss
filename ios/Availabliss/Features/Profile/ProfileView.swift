@@ -11,6 +11,7 @@ struct ProfileView: View {
     @State private var error: String?
     @State private var toast: String?
     @State private var editsName = false
+    @State private var editsUsername = false
     @State private var photoItem: PhotosPickerItem?
     @State private var showsPhotoPicker = false
     @State private var isUploadingPhoto = false
@@ -49,6 +50,9 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $editsName) {
             EditNameSheet(initialName: app.session.user?.name ?? "") { toast = "Name updated" }
+        }
+        .sheet(isPresented: $editsUsername) {
+            EditUsernameSheet(api: app.api, current: app.session.user?.username) { toast = "Username updated" }
         }
         .errorAlert($error)
         .toast($toast)
@@ -109,6 +113,14 @@ struct ProfileView: View {
                 } else {
                     Text(name).displayFont(24, .bold).lineLimit(2).accessibilityAddTraits(.isHeader)
                 }
+                Button { editsUsername = true } label: {
+                    Text(app.session.user?.username.map { "@\($0)" } ?? "Choose a username")
+                        .bodyFont(14, .semibold, relativeTo: .subheadline)
+                        .foregroundStyle(theme.accentInk)
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Change your username")
                 Text(app.session.user?.email ?? "").bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -206,6 +218,56 @@ private struct SettingsRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Change the username people can invite you by.
+private struct EditUsernameSheet: View {
+    let current: String?
+    let onSaved: () -> Void
+    @Environment(AppModel.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    @State private var model: UsernameFieldModel
+    @State private var isSaving = false
+    @State private var error: String?
+
+    init(api: APIClient, current: String?, onSaved: @escaping () -> Void) {
+        self.current = current
+        self.onSaved = onSaved
+        _model = State(initialValue: UsernameFieldModel(api: api))
+    }
+
+    var body: some View {
+        BottomSheet(title: "Your username") {
+            UsernameField(model: model, focusOnAppear: true)
+                .onSubmit { Task { await save() } }
+            Text("People can invite you to groups with it instead of your email.")
+                .bodyFont(13, relativeTo: .subheadline)
+                .foregroundStyle(.secondary)
+            Button {
+                Task { await save() }
+            } label: {
+                LoadingLabel(title: "Save", isLoading: isSaving)
+            }
+            .buttonStyle(.filled(.primary, height: 54, cornerRadius: 18))
+            .disabled(!model.hasChanges || !model.canSave || isSaving)
+        }
+        .onAppear { model.prefill(current) }
+        .errorAlert($error)
+    }
+
+    private func save() async {
+        guard let username = model.patchValue, model.canSave, !isSaving else { return }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            let user = try await app.session.update(UserPatch(username: username))
+            model.saved(user.username)
+            onSaved()
+            dismiss()
+        } catch {
+            if !model.handleSaveError(error) { self.error = error.userMessage }
+        }
     }
 }
 

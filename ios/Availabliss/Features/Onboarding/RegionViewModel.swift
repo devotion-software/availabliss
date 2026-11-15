@@ -14,6 +14,8 @@ final class RegionViewModel {
     var timezone = TimeZone.current.identifier
     /// Asked for during onboarding (email sign-up creates accounts without one).
     var name = ""
+    /// Also onboarding: prefilled with the username the account was given.
+    let username: UsernameFieldModel
     private(set) var isLoading = false
     private(set) var isSaving = false
     var error: String?
@@ -22,6 +24,7 @@ final class RegionViewModel {
 
     init(api: APIClient) {
         self.api = api
+        self.username = UsernameFieldModel(api: api)
     }
 
     var countryName: String? { countries.first { $0.code == country }?.name }
@@ -38,6 +41,7 @@ final class RegionViewModel {
         isLoading = true
         defer { isLoading = false }
         if name.isEmpty { name = user?.name ?? "" }
+        username.prefill(user?.username)
         do {
             async let countriesRequest = api.send(API.Regions.countries())
             if let user, user.country != nil {
@@ -67,17 +71,21 @@ final class RegionViewModel {
 
     var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    /// Saves the region, and the name too when `includingName`.
+    /// Saves the region, and the name and username too when `includingName`.
     func save(session: SessionStore, includingName: Bool = false) async -> Bool {
         isSaving = true
         defer { isSaving = false }
         do {
             var patch = UserPatch.region(country: country, subdivision: subdivision, schoolAuthority: schoolAuthority, timezone: timezone)
-            if includingName { patch.name = trimmedName }
-            try await session.update(patch)
+            if includingName {
+                patch.name = trimmedName
+                patch.username = username.patchValue
+            }
+            let user = try await session.update(patch)
+            if includingName { username.saved(user.username) }
             return true
         } catch {
-            self.error = error.userMessage
+            if !(includingName && username.handleSaveError(error)) { self.error = error.userMessage }
             return false
         }
     }

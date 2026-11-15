@@ -13,6 +13,8 @@ export const user = mysqlTable("user", {
   id: varchar("id", { length: 36 }).primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
+  // Lowercase handle people can invite by. Null only until one is assigned (see assignUsername).
+  username: varchar("username", { length: 32 }).unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
   createdAt: timestamp("created_at", { fsp: 3 }).defaultNow().notNull(),

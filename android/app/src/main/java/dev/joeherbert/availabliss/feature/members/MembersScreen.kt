@@ -65,6 +65,8 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
+import dev.joeherbert.availabliss.feature.common.InviteRecipient
+import dev.joeherbert.availabliss.feature.common.InviteRecipientsField
 
 /** Members & invites for one group. */
 @Composable
@@ -92,8 +94,10 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
         MembersActions(
             onBack = { currentOnBack() },
             onShareLink = viewModel::shareInviteLink,
-            onEmailChange = viewModel::onInviteEmailChange,
-            onSendEmail = viewModel::sendEmailInvite,
+            onInviteDraftChange = viewModel::onInviteDraftChange,
+            onAddRecipient = viewModel::addInviteRecipient,
+            onRemoveRecipient = viewModel::removeInviteRecipient,
+            onSendInvites = viewModel::sendInvites,
             onRevokeInvite = viewModel::revokeInvite,
             onPromote = { viewModel.setRole(it, Role.Admin) },
             onDemote = { viewModel.setRole(it, Role.Member) },
@@ -119,8 +123,10 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
 data class MembersActions(
     val onBack: () -> Unit = {},
     val onShareLink: () -> Unit = {},
-    val onEmailChange: (String) -> Unit = {},
-    val onSendEmail: () -> Unit = {},
+    val onInviteDraftChange: (String) -> Unit = {},
+    val onAddRecipient: () -> Unit = {},
+    val onRemoveRecipient: (InviteRecipient) -> Unit = {},
+    val onSendInvites: () -> Unit = {},
     val onRevokeInvite: (InviteUi) -> Unit = {},
     val onPromote: (MemberUi) -> Unit = {},
     val onDemote: (MemberUi) -> Unit = {},
@@ -285,7 +291,7 @@ private fun MembersPreview() {
     }
 }
 
-/** Two ways in: a link anyone can use, or invites emailed to particular people that only they can accept; then the live invites. */
+/** Two ways in: a link anyone can use, or invites for particular people (by email or username) that only they can accept; then the live invites. */
 @Composable
 private fun InviteCard(state: MembersUiState, actions: MembersActions) {
     val colors = AvailablissTheme.colors
@@ -307,31 +313,29 @@ private fun InviteCard(state: MembersUiState, actions: MembersActions) {
         )
         RowDivider()
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Or limit to these emails", style = type.bodySmallStrong, color = colors.ink)
+            Text("Or invite particular people", style = type.bodySmallStrong, color = colors.ink)
             Text(
-                "We'll email each person their own invite. Only someone signed in with that address can join.",
+                "Add their email or username. Emails get their own invite by email, usernames in Activity. Only that person can join.",
                 style = type.caption.copy(fontWeight = FontWeight.Normal),
                 color = colors.muted,
             )
         }
-        AvTextField(
-            value = state.inviteEmail,
-            onValueChange = actions.onEmailChange,
-            label = "Email addresses",
-            placeholder = "sam@example.com, priya@example.com",
-            keyboardType = KeyboardType.Email,
-            imeAction = ImeAction.Send,
-            onImeAction = actions.onSendEmail,
+        InviteRecipientsField(
+            state = state.recipients,
+            onDraftChange = actions.onInviteDraftChange,
+            onAdd = actions.onAddRecipient,
+            onRemove = actions.onRemoveRecipient,
+            label = "Emails or usernames",
             height = 48.dp,
             shape = Shapes.controlSmall,
             modifier = Modifier.fillMaxWidth(),
         )
         SecondaryButton(
-            text = if (state.sendingEmail) "Sending…" else "Send invites",
-            onClick = actions.onSendEmail,
+            text = if (state.sendingInvites) "Sending…" else "Send invites",
+            onClick = actions.onSendInvites,
             height = 44.dp,
             shape = Shapes.controlSmall,
-            enabled = state.inviteEmail.contains('@') && !state.sendingEmail,
+            enabled = state.recipients.canSend && !state.sendingInvites,
             modifier = Modifier.fillMaxWidth(),
         )
         if (state.invites.isNotEmpty()) {
@@ -341,7 +345,7 @@ private fun InviteCard(state: MembersUiState, actions: MembersActions) {
                 state.invites.forEachIndexed { index, invite ->
                     if (index > 0) RowDivider()
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Icon(if (invite.isLink) AvIcons.Link else AvIcons.Mail, null, tint = colors.accentInk, modifier = Modifier.size(18.dp))
+                        Icon(if (invite.isLink) AvIcons.Link else if (invite.byUsername) AvIcons.Person else AvIcons.Mail, null, tint = colors.accentInk, modifier = Modifier.size(18.dp))
                         Column(Modifier.weight(1f)) {
                             Text(invite.title, style = type.bodySmallStrong, color = colors.ink, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                             Text(invite.status, style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)

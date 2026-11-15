@@ -9,6 +9,8 @@ import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.getOrNull
 import dev.joeherbert.availabliss.core.network.model.NamedCode
+import dev.joeherbert.availabliss.feature.common.UsernameEditor
+import dev.joeherbert.availabliss.feature.common.UsernameFieldState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -82,6 +84,10 @@ class RegionViewModel @Inject constructor(
     private val _state = MutableStateFlow(RegionUiState())
     val state: StateFlow<RegionUiState> = _state.asStateFlow()
 
+    /** Your username, asked for alongside your name during onboarding. */
+    private val usernameEditor = UsernameEditor(viewModelScope, users::checkUsername)
+    val username: StateFlow<UsernameFieldState> = usernameEditor.state
+
     init {
         load()
     }
@@ -90,6 +96,7 @@ class RegionViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
             val user = users.user.value
+            usernameEditor.prefill(user?.username)
             var country = user?.country
             var subdivision = user?.subdivision
             var timezone = user?.timezone ?: ZoneId.systemDefault().id
@@ -153,13 +160,16 @@ class RegionViewModel @Inject constructor(
 
     fun onNameChange(value: String) = _state.update { it.copy(name = value.take(80)) }
 
+    fun onUsernameChange(value: String) = usernameEditor.onChange(value)
+
     fun useDeviceTimezone() = _state.update { it.copy(timezone = ZoneId.systemDefault().id) }
 
-    /** Saves the region, and the name too when [includingName] (onboarding). */
+    /** Saves the region, and the name and username too when [includingName] (onboarding). */
     fun save(includingName: Boolean = false) {
         val s = _state.value
         val country = s.country ?: return
-        if (s.saving || (includingName && s.name.isBlank())) return
+        val username = username.value
+        if (s.saving || (includingName && (s.name.isBlank() || !username.canSave))) return
         viewModelScope.launch {
             _state.update { it.copy(saving = true) }
             val result = users.update {
@@ -168,11 +178,18 @@ class RegionViewModel @Inject constructor(
                 set("schoolAuthority", s.schoolAuthority)
                 set("timezone", s.timezone)
                 if (includingName) set("name", s.name.trim())
+                if (includingName && username.changed && username.normalized.isNotEmpty()) set("username", username.normalized)
             }
+            if (result is ApiResult.Success) usernameEditor.saved(result.value.username)
             _state.update {
                 when (result) {
                     is ApiResult.Success -> it.copy(saving = false, saved = true)
-                    is ApiResult.Failure -> it.copy(saving = false, message = UserMessage(result.error.message))
+                    // A taken or invalid username shows on its field.
+                    is ApiResult.Failure -> if (includingName && username.changed && usernameEditor.onSaveError(result.error)) {
+                        it.copy(saving = false)
+                    } else {
+                        it.copy(saving = false, message = UserMessage(result.error.message))
+                    }
                 }
             }
         }

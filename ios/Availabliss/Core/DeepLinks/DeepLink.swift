@@ -38,9 +38,11 @@ enum DeepLink: Equatable, Sendable {
         }
     }
 
-    /// Maps push / notification `data` (`{ kind, groupId, proposalId?, eventId?, messageId? }`).
+    /// Maps push / notification `data` (`{ kind, groupId, proposalId?, eventId?, messageId?, token? }`).
     init?(data: [String: String]) {
-        if let proposalId = data["proposalId"], !proposalId.isEmpty {
+        if data["kind"] == AppNotification.Kind.inviteReceived.rawValue, let token = data["token"], !token.isEmpty {
+            self = .invite(token: token)
+        } else if let proposalId = data["proposalId"], !proposalId.isEmpty {
             self = .proposal(id: proposalId)
         } else if let groupId = data["groupId"], !groupId.isEmpty {
             self = data["kind"] == "message" || data["messageId"] != nil ? .groupChat(id: groupId) : .group(id: groupId)

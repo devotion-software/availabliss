@@ -70,6 +70,8 @@ export interface User {
 	id: string;
 	name: string;
 	email: string;
+	/** Lowercase, without the "@". */
+	username: string | null;
 	image: string | null;
 	themeMode: ThemeMode;
 	colorTheme: ColorTheme;
@@ -296,6 +298,7 @@ export const NOTIFICATION_KINDS = [
 	'proposal.confirmed',
 	'nudge',
 	'invite.accepted',
+	'invite.received',
 	'message',
 	'event.created'
 ] as const;
@@ -336,10 +339,30 @@ export interface GroupInvite {
 	id: string;
 	/** Who it was emailed to (only they can join with it), or null for a link anyone can use. */
 	email: string | null;
+	/** Who it was sent to by username (only they can join with it), or null. */
+	username: string | null;
 	url: string;
 	expiresAt: string;
 	createdAt: string;
 	invitedBy: string;
+}
+
+/** Someone found by username (GET /usernames/:username). */
+export interface UserSummary {
+	id: string;
+	username: string;
+	name: string;
+	image: string | null;
+}
+
+export interface UsernameCheck {
+	username: string;
+	/** Why it can't be used as written, or null. */
+	problem: string | null;
+	/** Free to take (valid and nobody has it, or it's already yours). */
+	available: boolean;
+	/** Who has it, when someone does (you included). */
+	user: UserSummary | null;
 }
 
 export interface ApiErrorBody {

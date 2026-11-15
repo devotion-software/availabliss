@@ -204,6 +204,8 @@ export const groupInvites = mysqlTable(
 			.references(() => groups.id, { onDelete: 'cascade' }),
 		token: varchar('token', { length: 64 }).notNull().unique(),
 		email: varchar('email', { length: 255 }),
+		// Invited by username: only this account can join with it.
+		invitedUserId: varchar('invited_user_id', { length: 36 }).references(() => user.id, { onDelete: 'cascade' }),
 		createdBy: userRef('created_by'),
 		expiresAt: instant('expires_at').notNull(),
 		createdAt: createdAt()

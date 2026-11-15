@@ -20,6 +20,13 @@ struct InviteAcceptView: View {
         return invited
     }
 
+    /// Likewise an invite sent by username is only for that account.
+    private var invitedOtherUsername: String? {
+        guard let invited = preview?.username, let user = app.session.user,
+              invited.caseInsensitiveCompare(user.username ?? "") != .orderedSame else { return nil }
+        return invited
+    }
+
     var body: some View {
         BottomSheet(title: "You're invited") {
             if let preview {
@@ -47,6 +54,21 @@ struct InviteAcceptView: View {
                         Task { await switchAccount() }
                     } label: {
                         LoadingLabel(title: "Sign in as \(invited)", isLoading: isSwitching)
+                    }
+                    .buttonStyle(.primary)
+                    .disabled(isSwitching)
+                } else if let invited = invitedOtherUsername {
+                    Text("This invite was sent to @\(invited), but you\u{2019}re signed in as \(app.session.user?.username.map { "@\($0)" } ?? "someone else"). Sign in as @\(invited) to join.")
+                        .bodyFont(14)
+                        .foregroundStyle(theme.warnInk)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(theme.warnBg))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        Task { await switchAccount() }
+                    } label: {
+                        LoadingLabel(title: "Switch account", isLoading: isSwitching)
                     }
                     .buttonStyle(.primary)
                     .disabled(isSwitching)

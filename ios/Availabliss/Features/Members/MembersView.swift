@@ -6,7 +6,6 @@ struct MembersView: View {
     @Environment(\.theme) private var theme
     @State private var model: MembersViewModel
     @State private var confirmation: Confirmation?
-    @State private var inviteEmail = ""
 
     private enum Confirmation: Identifiable {
         case remove(Member), leave, delete
@@ -85,8 +84,8 @@ struct MembersView: View {
         return role == .owner || (role == .admin && member.role == .member)
     }
 
-    /// Two ways in: a link anyone can use, or invites emailed to particular people that only they
-    /// can accept. Then the invites still live, each with Revoke.
+    /// Two ways in: a link anyone can use, or invites for particular people (by email or username)
+    /// that only they can accept. Then the invites still live, each with Revoke.
     private var inviteCard: some View {
         GlassPanel(cornerRadius: 24) {
             Text("Invite people").sectionLabelStyle()
@@ -110,23 +109,18 @@ struct MembersView: View {
             }
             Rectangle().fill(theme.line).frame(height: 1).padding(.vertical, 4)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Or limit to these emails").bodyFont(15, .semibold)
-                Text("We\u{2019}ll email each person their own invite. Only someone signed in with that address can join.")
+                Text("Or invite particular people").bodyFont(15, .semibold)
+                Text("Add an email or a username. Each person gets their own invite, and only they can use it.")
                     .bodyFont(13, relativeTo: .subheadline)
                     .foregroundStyle(theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            InputField(placeholder: "sam@example.com, priya@example.com", text: $inviteEmail, height: 48, cornerRadius: 14)
-                .keyboardType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.send)
-                .onSubmit(sendInvites)
+            InviteRecipientsField(draft: model.draft)
             Button(action: sendInvites) {
-                LoadingLabel(title: "Send invites", systemImage: "envelope", isLoading: model.isSendingInvites)
+                LoadingLabel(title: "Send invites", systemImage: "paperplane", isLoading: model.isSendingInvites)
             }
             .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
-            .disabled(!inviteEmail.contains("@") || model.isSendingInvites)
+            .disabled(model.draft.isEmpty || model.draft.isAdding || model.isSendingInvites)
             if !model.invites.isEmpty {
                 Rectangle().fill(theme.line).frame(height: 1).padding(.vertical, 4)
                 Text("Invites").bodyFont(15, .semibold)
@@ -141,8 +135,7 @@ struct MembersView: View {
     }
 
     private func sendInvites() {
-        let text = inviteEmail
-        Task { if await model.sendInvites(to: text) { inviteEmail = "" } }
+        Task { await model.sendInvites() }
     }
 
     private var dangerZone: some View {
@@ -196,7 +189,7 @@ private struct MemberRow: View {
     }
 }
 
-/// "sam@example.com · Invited · invite expires Saturday 28 November" with Revoke.
+/// "sam@example.com" / "@sam" · "Invited · invite expires Saturday 28 November" with Revoke.
 private struct InviteRow: View {
     let invite: GroupInvite
     let revoke: () -> Void
@@ -204,13 +197,13 @@ private struct InviteRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: invite.email == nil ? "link" : "envelope")
+            Image(systemName: icon)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(theme.accentInk)
                 .frame(width: 30, height: 30)
                 .background(RoundedRectangle(cornerRadius: 9).fill(theme.accentSoft))
             VStack(alignment: .leading, spacing: 1) {
-                Text(invite.email ?? invite.url.absoluteString)
+                Text(invite.recipient ?? invite.url.absoluteString)
                     .bodyFont(14, .semibold)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -221,13 +214,18 @@ private struct InviteRow: View {
                 .bodyFont(13, .semibold, relativeTo: .subheadline)
                 .foregroundStyle(theme.warnInk)
                 .frame(minHeight: 44)
-                .accessibilityLabel(invite.email.map { "Revoke the invite for \($0)" } ?? "Revoke this link")
+                .accessibilityLabel(invite.recipient.map { "Revoke the invite for \($0)" } ?? "Revoke this link")
         }
         .frame(minHeight: 56)
     }
 
+    private var icon: String {
+        if invite.username != nil { return "person" }
+        return invite.email == nil ? "link" : "envelope"
+    }
+
     private var status: String {
         let expires = invite.expiresAt.formatted(.dateTime.weekday(.wide).day().month(.wide))
-        return invite.email == nil ? "Anyone with the link · expires \(expires)" : "Invited · invite expires \(expires)"
+        return invite.isLink ? "Anyone with the link · expires \(expires)" : "Invited · invite expires \(expires)"
     }
 }

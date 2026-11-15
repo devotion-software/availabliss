@@ -19,6 +19,7 @@
 		'proposal.confirmed': 'sparkle',
 		nudge: 'megaphone',
 		'invite.accepted': 'user-plus',
+		'invite.received': 'user-plus',
 		message: 'chat',
 		'event.created': 'calendar-plus'
 	};

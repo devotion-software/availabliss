@@ -40,6 +40,12 @@ enum API {
         static func deleteTemplate(id: String) -> Endpoint<EmptyResponse> { .init(.delete, "/me/templates/\(id.pathEncoded)") }
     }
 
+    // MARK: Usernames
+    enum Usernames {
+        /// Whether it can be yours, and who has it (to invite them). Rate limited: debounce typing.
+        static func check(_ username: String) -> Endpoint<UsernameCheck> { .init(.get, "/usernames/\(username.pathEncoded)") }
+    }
+
     // MARK: Regions & holidays
     enum Regions {
         static func countries() -> Endpoint<CountriesResponse> { .init(.get, "/regions/countries") }
@@ -106,9 +112,13 @@ enum API {
             .init(.get, "/groups/\(groupId.pathEncoded)/conflicts", query: ["start": iso(start), "end": iso(end)])
         }
         static func nudge(groupId: String) -> Endpoint<NudgeResponse> { .init(.post, "/groups/\(groupId.pathEncoded)/nudge") }
-        /// No emails: a link anyone can use. Emails: one invite each, emailed, only for that person.
-        static func createInvite(groupId: String, emails: [String] = []) -> Endpoint<InviteLink> {
-            .init(.post, "/groups/\(groupId.pathEncoded)/invites", body: CreateInviteBody(emails: emails.isEmpty ? nil : emails))
+        /// No one: a link anyone can use. Emails / usernames: one invite each, only for that person
+        /// (emailed, or sent to their Activity). 404 for a username nobody has, 409 if they're in already.
+        static func createInvite(groupId: String, emails: [String] = [], usernames: [String] = []) -> Endpoint<InviteLink> {
+            .init(.post, "/groups/\(groupId.pathEncoded)/invites", body: CreateInviteBody(
+                emails: emails.isEmpty ? nil : emails,
+                usernames: usernames.isEmpty ? nil : usernames
+            ))
         }
         static func preferences(groupId: String) -> Endpoint<GroupPreferencesResponse> { .init(.get, "/groups/\(groupId.pathEncoded)/preferences") }
         static func addPreference(groupId: String, _ body: NewGroupPreference) -> Endpoint<GroupPreference> {

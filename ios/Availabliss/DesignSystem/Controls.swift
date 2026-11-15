@@ -204,6 +204,19 @@ struct InputField: View {
             .foregroundStyle(theme.ink)
             .focused($isFocused)
             .padding(.horizontal, 16)
+            .inputChrome(isFocused: isFocused, height: height, cornerRadius: cornerRadius)
+    }
+}
+
+/// `InputField`'s look (surface fill, hairline border, accent focus ring) for custom fields.
+private struct InputChrome: ViewModifier {
+    let isFocused: Bool
+    let height: CGFloat
+    let cornerRadius: CGFloat
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        content
             .frame(minHeight: height)
             .background(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).fill(theme.surface))
             .overlay(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).strokeBorder(theme.line2, lineWidth: 1))
@@ -214,5 +227,11 @@ struct InputField: View {
                     .opacity(isFocused ? 1 : 0)
             )
             .animation(.easeOut(duration: 0.15), value: isFocused)
+    }
+}
+
+extension View {
+    func inputChrome(isFocused: Bool, height: CGFloat = 50, cornerRadius: CGFloat = 16) -> some View {
+        modifier(InputChrome(isFocused: isFocused, height: height, cornerRadius: cornerRadius))
     }
 }

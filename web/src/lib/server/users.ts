@@ -1,10 +1,11 @@
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import type { ColorTheme, ThemeMode, User } from '#lib/types';
 import { COLOR_THEMES, THEME_MODES } from '#lib/types';
-import { db } from './db';
+import { db, isDuplicateKey } from './db';
 import { groupMembers, groups, user } from './db/schema';
-import { notFound } from './http';
+import { ApiError, notFound } from './http';
 import { publishToGroup } from './realtime';
+import { assignUsername } from './usernames';
 import { onMemberLeft } from './proposals';
 
 type UserRow = typeof user.$inferSelect;
@@ -16,6 +17,7 @@ export const toUser = (row: UserRow): User => ({
 	id: row.id,
 	name: row.name,
 	email: row.email,
+	username: row.username,
 	image: row.image ?? null,
 	themeMode: oneOf<ThemeMode>(THEME_MODES, row.themeMode, 'system'),
 	colorTheme: oneOf<ColorTheme>(COLOR_THEMES, row.colorTheme, 'dawn'),
@@ -29,13 +31,31 @@ export const toUser = (row: UserRow): User => ({
 export async function getMe(userId: string): Promise<User> {
 	const row = await db.query.user.findFirst({ where: eq(user.id, userId) });
 	if (!row) throw notFound('Account not found');
+	if (!row.username) row.username = await assignUsername(userId);
 	return toUser(row);
 }
 
-export type UserPatch = Partial<Pick<User, 'name' | 'themeMode' | 'colorTheme' | 'country' | 'subdivision' | 'schoolAuthority' | 'timezone' | 'onboarded'>>;
+export type UserPatch = Partial<
+	Pick<User, 'name' | 'themeMode' | 'colorTheme' | 'country' | 'subdivision' | 'schoolAuthority' | 'timezone' | 'onboarded'> & {
+		username: string;
+	}
+>;
+
+const usernameTaken = () => new ApiError('conflict', "That username's taken. Try another.");
 
 export async function updateMe(userId: string, patch: UserPatch): Promise<User> {
-	if (Object.keys(patch).length) await db.update(user).set(patch).where(eq(user.id, userId));
+	if (patch.username) {
+		const holder = await db.query.user.findFirst({ where: eq(user.username, patch.username), columns: { id: true } });
+		if (holder && holder.id !== userId) throw usernameTaken();
+	}
+	if (Object.keys(patch).length) {
+		try {
+			await db.update(user).set(patch).where(eq(user.id, userId));
+		} catch (err) {
+			if (isDuplicateKey(err)) throw usernameTaken();
+			throw err;
+		}
+	}
 	return getMe(userId);
 }
 

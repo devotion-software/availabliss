@@ -22,6 +22,8 @@ export interface InvitePreview {
 	expiresAt: string;
 	/** Who an emailed invite is for; null for a link anyone can use. */
 	email: string | null;
+	/** Who it was sent to by username, or null. */
+	username: string | null;
 }
 
 export const listGroups = (fetch?: Fetch) => api.get<{ groups: GroupSummary[] }>('/groups', { fetch }).then((r) => r.groups);
@@ -37,9 +39,15 @@ export const removeMember = (groupId: string, userId: string) => api.del(`/group
 
 export const nudgeGroup = (groupId: string) => api.post<{ nudged: number }>(`/groups/${groupId}/nudge`);
 
-/** No emails: a link anyone can use. Emails: one invite each, emailed, only for that person. */
-export const createInvite = (groupId: string, emails: string[] = []) =>
-	api.post<Invite>(`/groups/${groupId}/invites`, emails.length ? { emails } : {});
+/**
+ * Nobody: a link anyone can use. Emails and usernames: one invite each (emailed, or sent to their
+ * Activity), only for that person.
+ */
+export const createInvite = (groupId: string, emails: string[] = [], usernames: string[] = []) =>
+	api.post<Invite>(`/groups/${groupId}/invites`, {
+		...(emails.length && { emails }),
+		...(usernames.length && { usernames })
+	});
 export const listInvites = (groupId: string, fetch?: Fetch) =>
 	api.get<{ invites: GroupInvite[] }>(`/groups/${groupId}/invites`, { fetch }).then((r) => r.invites);
 export const revokeInvite = (groupId: string, inviteId: string) => api.del(`/groups/${groupId}/invites/${inviteId}`);

@@ -36,6 +36,8 @@ export const RULES: Rule[] = [
 	{ name: 'availability', method: 'GET', path: /^\/api\/v1\/groups\/[^/]+\/availability(\/day)?$/, max: 120, windowSeconds: MINUTE },
 	{ name: 'preview', method: 'POST', path: /^\/api\/v1\/requirements\/preview$/, max: 120, windowSeconds: MINUTE },
 	{ name: 'ai-planner', method: 'POST', path: /^\/api\/v1\/groups\/[^/]+\/planner$/, max: 20, windowSeconds: HOUR },
+	// Typed as you go, but shouldn't be a way to list everyone's usernames.
+	{ name: 'username-check', method: 'GET', path: /^\/api\/v1\/usernames\/[^/]+$/, max: 60, windowSeconds: MINUTE },
 	{ name: 'region-detect', method: 'GET', path: /^\/api\/v1\/regions\/detect$/, max: 30, windowSeconds: MINUTE, perIp: true }
 ];
 

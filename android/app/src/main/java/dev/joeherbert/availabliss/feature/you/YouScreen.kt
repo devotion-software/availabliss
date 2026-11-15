@@ -76,6 +76,7 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import dev.joeherbert.availabliss.feature.calendars.IconTile
 import dev.joeherbert.availabliss.feature.plan.UpgradeSheet
+import dev.joeherbert.availabliss.feature.common.UsernameField
 
 @Composable
 fun YouScreen(
@@ -86,6 +87,7 @@ fun YouScreen(
     viewModel: YouViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val username by viewModel.username.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // Credential Manager sheets run in this scope so the ViewModel never holds the Activity.
     val scope = rememberCoroutineScope()
@@ -138,16 +140,18 @@ fun YouScreen(
         AvSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.tabBarClearance))
     }
 
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     state.nameDraft?.let { draft ->
-        AvBottomSheet(title = "Your name", onDismissRequest = viewModel::cancelEditingName) {
-            Text("This is how you appear to your groups.", style = AvailablissTheme.type.body, color = AvailablissTheme.colors.muted)
-            AvTextField(value = draft, onValueChange = viewModel::onNameChange, placeholder = "Your name", imeAction = ImeAction.Done, onImeAction = viewModel::saveName)
+        AvBottomSheet(title = "Your profile", onDismissRequest = viewModel::cancelEditingName) {
+            Text("Your name is how you appear to your groups. People can invite you by your username.", style = AvailablissTheme.type.body, color = AvailablissTheme.colors.muted)
+            AvTextField(value = draft, onValueChange = viewModel::onNameChange, label = "Your name", placeholder = "Your name", imeAction = ImeAction.Next, onImeAction = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) })
+            UsernameField(username, viewModel::onUsernameChange, Modifier.fillMaxWidth(), onImeAction = viewModel::saveName)
             PrimaryButton(
                 "Save",
                 viewModel::saveName,
                 height = 52.dp,
                 shape = Shapes.control,
-                enabled = draft.isNotBlank(),
+                enabled = draft.isNotBlank() && username.canSave,
                 loading = state.savingName,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -306,9 +310,10 @@ private fun ProfileCard(user: User, onEditName: () -> Unit, uploading: Boolean, 
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(user.name, style = AvailablissTheme.type.titleLarge, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                user.username?.let { Text("@$it", style = AvailablissTheme.type.bodySmallStrong, color = colors.accentInk, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 Text(user.email, style = AvailablissTheme.type.labelRegular, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            GlassIconButton(AvIcons.Pencil, "Edit your name", onEditName, iconSize = 18.dp)
+            GlassIconButton(AvIcons.Pencil, "Edit your name and username", onEditName, iconSize = 18.dp)
         }
     }
 }
@@ -397,7 +402,7 @@ private fun YouPreview() {
         AvailablissBackground(OrbLayout.Main) {
             YouContent(
                 state = YouUiState(
-                    user = User(id = "u1", name = "Sam Taylor", email = "sam@example.com", country = "GB", subdivision = "GB-ENG"),
+                    user = User(id = "u1", name = "Sam Taylor", email = "sam@example.com", username = "samtaylor", country = "GB", subdivision = "GB-ENG"),
                     accounts = LinkedAccounts(
                         linked = listOf(LinkedAccount(LinkProviders.APPLE, "2026-10-01T09:00:00Z")),
                         available = listOf(LinkProviders.APPLE, LinkProviders.GOOGLE),

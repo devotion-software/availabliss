@@ -2,7 +2,7 @@ import { api, type Fetch } from './api';
 import type { BusyInterval, User } from '#lib/types';
 
 export type MePatch = Partial<
-	Pick<User, 'name' | 'themeMode' | 'colorTheme' | 'country' | 'subdivision' | 'schoolAuthority' | 'timezone' | 'onboarded'>
+	Pick<User, 'name' | 'themeMode' | 'colorTheme' | 'country' | 'subdivision' | 'schoolAuthority' | 'timezone' | 'onboarded'> & { username: string }
 >;
 
 export const getMe = (fetch?: Fetch) => api.get<User>('/me', { fetch });

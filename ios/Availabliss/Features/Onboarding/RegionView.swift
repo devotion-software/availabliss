@@ -26,40 +26,49 @@ struct RegionView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header
-            VStack(alignment: .leading, spacing: 6) {
-                Text(isOnboarding ? "About you" : "Where are you?")
-                    .displayFont(30, .bold)
-                    .accessibilityAddTraits(.isHeader)
-                Text(isOnboarding
-                     ? "Your name is how your groups see you. Your region sets bank holidays and school term dates."
-                     : "We use this for bank holidays and school term dates, so your groups can plan around them.")
-                    .bodyFont(14)
-                    .foregroundStyle(theme.muted)
-            }
-            if isOnboarding {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Your name").sectionLabelStyle()
-                    InputField(placeholder: "First and last name", text: $model.name)
-                        .textContentType(.name)
-                        .textInputAutocapitalization(.words)
-                        .submitLabel(.done)
+                    Text(isOnboarding ? "About you" : "Where are you?")
+                        .displayFont(30, .bold)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(isOnboarding
+                         ? "Your name is how your groups see you, and people can invite you by your username. Your region sets bank holidays and school term dates."
+                         : "We use this for bank holidays and school term dates, so your groups can plan around them.")
+                        .bodyFont(14)
+                        .foregroundStyle(theme.muted)
                 }
+                if isOnboarding {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Your name").sectionLabelStyle()
+                        InputField(placeholder: "First and last name", text: $model.name)
+                            .textContentType(.name)
+                            .textInputAutocapitalization(.words)
+                            .submitLabel(.done)
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Username").sectionLabelStyle()
+                        UsernameField(model: model.username)
+                    }
+                }
+                fields
             }
-            fields
-            Spacer(minLength: 0)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom) {
             Button {
                 Task { await save() }
             } label: {
                 LoadingLabel(title: isOnboarding ? "Continue" : "Save", isLoading: model.isSaving)
             }
             .buttonStyle(.filled(.primary, height: 54, cornerRadius: 18))
-            .disabled(model.country == nil || model.isSaving || (isOnboarding && model.trimmedName.isEmpty))
+            .disabled(model.country == nil || model.isSaving || (isOnboarding && (model.trimmedName.isEmpty || !model.username.canSave)))
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 24)
         .screenBackground(OrbLayout.calendars)
         .foregroundStyle(theme.ink)
         .chromeless()

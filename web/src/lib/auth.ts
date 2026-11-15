@@ -8,6 +8,7 @@ import * as schema from './server/db/schema';
 import { androidPasskeyOrigins, env } from './server/env';
 import { sendOtpEmail } from './server/email';
 import { kv } from './server/redis';
+import { assignUsername } from './server/usernames';
 
 const rpID = new URL(env.baseUrl).hostname;
 
@@ -64,6 +65,14 @@ export const auth = betterAuth({
 		}
 	},
 	databaseHooks: {
+		user: {
+			create: {
+				// Everyone gets a username straight away (changed in the sign-up wizard or Settings).
+				async after(created) {
+					await assignUsername(created.id);
+				}
+			}
+		},
 		account: {
 			create: {
 				// Linking Google (or signing up with it) gives a profile photo: use it when the
@@ -82,6 +91,7 @@ export const auth = betterAuth({
 	},
 	user: {
 		additionalFields: {
+			username: { type: 'string', required: false, input: false },
 			themeMode: { type: 'string', required: false, defaultValue: 'system', input: false },
 			colorTheme: { type: 'string', required: false, defaultValue: 'dawn', input: false },
 			country: { type: 'string', required: false, input: false },

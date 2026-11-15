@@ -61,6 +61,8 @@ import dev.joeherbert.availabliss.feature.calendars.CalendarSourcesViewModel
 import dev.joeherbert.availabliss.feature.calendars.ConnectCalendarSheet
 import dev.joeherbert.availabliss.feature.calendars.PendingUrlEffect
 import dev.joeherbert.availabliss.feature.calendars.rememberCalendarPermissionRequest
+import dev.joeherbert.availabliss.feature.common.InviteRecipientsField
+import dev.joeherbert.availabliss.feature.common.UsernameField
 
 /** The sign-up wizard: about you, calendars, your first group, invite people. */
 @Composable
@@ -72,6 +74,8 @@ fun OnboardingScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val region by regionViewModel.state.collectAsStateWithLifecycle()
     val sources by sourcesViewModel.state.collectAsStateWithLifecycle()
+    val username by regionViewModel.username.collectAsStateWithLifecycle()
+    val recipients by viewModel.inviteRecipients.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     val requestPermission = rememberCalendarPermissionRequest(
         blocked = sources.permissionBlocked,
@@ -123,12 +127,12 @@ fun OnboardingScreen(
                     steps = state.steps,
                     onBack = null,
                     title = "About you",
-                    subtitle = "Your name is how your groups see you. Your region sets bank holidays and school term dates.",
+                    subtitle = "Your name is how your groups see you, and people can invite you by your username. Your region sets bank holidays and school term dates.",
                     footer = {
                         PrimaryButton(
                             "Continue",
                             { regionViewModel.save(includingName = true) },
-                            enabled = region.canSave && region.name.isNotBlank(),
+                            enabled = region.canSave && region.name.isNotBlank() && username.canSave,
                             loading = region.saving,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -142,6 +146,7 @@ fun OnboardingScreen(
                         capitalization = KeyboardCapitalization.Words,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    UsernameField(username, regionViewModel::onUsernameChange, Modifier.fillMaxWidth())
                     RegionForm(region, regionViewModel::openPicker, regionViewModel::useDeviceTimezone)
                 }
                 OnboardingStep.Calendars -> OnboardingPage(
@@ -234,19 +239,19 @@ fun OnboardingScreen(
                         PrimaryButton("Share invite link", viewModel::shareLink, icon = AvIcons.Share, loading = state.creatingLink, modifier = Modifier.fillMaxWidth())
                     }
                     GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Or invite by email", style = AvailablissTheme.type.bodySmallStrong, color = AvailablissTheme.colors.ink)
-                        Text("Each person gets their own invite; only they can use it.", style = AvailablissTheme.type.caption, color = AvailablissTheme.colors.muted)
-                        AvTextField(
-                            value = state.inviteEmails,
-                            onValueChange = viewModel::onInviteEmailsChange,
-                            placeholder = "sam@example.com, priya@example.com",
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
+                        Text("Or invite particular people", style = AvailablissTheme.type.bodySmallStrong, color = AvailablissTheme.colors.ink)
+                        Text("Add their email or username. Each person gets their own invite; only they can use it.", style = AvailablissTheme.type.caption, color = AvailablissTheme.colors.muted)
+                        InviteRecipientsField(
+                            state = recipients,
+                            onDraftChange = viewModel::onInviteDraftChange,
+                            onAdd = viewModel::addInviteRecipient,
+                            onRemove = viewModel::removeInviteRecipient,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         SecondaryButton(
                             if (state.sendingInvites) "Sending…" else "Send invites",
                             viewModel::sendInvites,
-                            enabled = state.inviteEmails.contains('@') && !state.sendingInvites,
+                            enabled = recipients.canSend && !state.sendingInvites,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         if (state.invited.isNotEmpty()) {

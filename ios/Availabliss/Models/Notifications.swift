@@ -7,6 +7,8 @@ struct AppNotification: Decodable, Sendable, Identifiable, Equatable {
         case proposalConfirmed = "proposal.confirmed"
         case nudge
         case inviteAccepted = "invite.accepted"
+        /// Someone invited you by username: `data.token` opens the invite.
+        case inviteReceived = "invite.received"
         case message
         case eventCreated = "event.created"
         case unknown

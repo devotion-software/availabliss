@@ -21,6 +21,9 @@ import kotlinx.coroutines.launch
 import dev.joeherbert.availabliss.core.network.model.GroupInvite
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.getOrNull
+import dev.joeherbert.availabliss.feature.common.InviteRecipient
+import dev.joeherbert.availabliss.feature.common.InviteRecipients
+import dev.joeherbert.availabliss.feature.common.InviteRecipientsState
 import javax.inject.Inject
 
 data class MemberUi(
@@ -45,8 +48,16 @@ sealed interface ConfirmAction {
     data object DeleteGroup : ConfirmAction
 }
 
-/** "sam@example.com" + "Invited · invite expires Saturday 28 November", or the link. */
-data class InviteUi(val id: String, val title: String, val status: String, val isLink: Boolean, val url: String)
+/** "sam@example.com" / "@sam" + "Invited · invite expires Saturday 28 November", or the link. */
+data class InviteUi(
+    val id: String,
+    val title: String,
+    val status: String,
+    val isLink: Boolean,
+    val url: String,
+    /** Sent to someone's username (to their Activity), not emailed. */
+    val byUsername: Boolean = false,
+)
 
 data class MembersUiState(
     val groupName: String = "",
@@ -54,12 +65,12 @@ data class MembersUiState(
     val myRole: Role? = null,
     val loading: Boolean = true,
     val error: String? = null,
-    /** Addresses to invite, as typed (commas, spaces or new lines between them). */
-    val inviteEmail: String = "",
+    /** Who to invite, by email or username. */
+    val recipients: InviteRecipientsState = InviteRecipientsState(),
     /** Live invites, newest first (admins only). */
     val invites: List<InviteUi> = emptyList(),
     val creatingLink: Boolean = false,
-    val sendingEmail: Boolean = false,
+    val sendingInvites: Boolean = false,
     /** Invite URL to hand to the share sheet; cleared via [MembersViewModel.onShareHandled]. */
     val pendingShareUrl: String? = null,
     val confirm: ConfirmAction? = null,
@@ -85,7 +96,10 @@ class MembersViewModel @Inject constructor(
     private val _state = MutableStateFlow(MembersUiState())
     val state: StateFlow<MembersUiState> = _state.asStateFlow()
 
+    private val recipients = InviteRecipients(viewModelScope, users::checkUsername, selfId = { users.user.value?.id })
+
     init {
+        viewModelScope.launch { recipients.state.collect { r -> _state.update { it.copy(recipients = r) } } }
         viewModelScope.launch {
             combine(groups.group(groupId), users.user) { group, user -> group to user?.id }.collect { (group, meId) ->
                 if (group != null) _state.update { it.withGroup(group, meId) }
@@ -142,30 +156,35 @@ class MembersViewModel @Inject constructor(
 
     fun onShareHandled() = _state.update { it.copy(pendingShareUrl = null) }
 
-    fun onInviteEmailChange(text: String) = _state.update { it.copy(inviteEmail = text) }
+    fun onInviteDraftChange(text: String) = recipients.onDraftChange(text)
 
-    /** Emails each address its own invite; only someone signed in with that address can join. */
-    fun sendEmailInvite() {
-        if (_state.value.sendingEmail) return
-        val emails = _state.value.inviteEmail.split(',', ';', ' ', '\n', '\t').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.distinct()
-        val bad = emails.firstOrNull { !EMAIL.matches(it) }
-        when {
-            bad != null -> return showMessage("“$bad” isn’t a valid email address")
-            emails.isEmpty() -> return
-            emails.size > 20 -> return showMessage("Invite up to 20 people at a time")
-        }
-        _state.update { it.copy(sendingEmail = true) }
+    fun addInviteRecipient() = recipients.add()
+
+    fun removeInviteRecipient(recipient: InviteRecipient) = recipients.remove(recipient)
+
+    /**
+     * Invites everyone added (and anything still typed): each email gets its own emailed
+     * invite, each username an invite in their Activity. Only that person can join.
+     */
+    fun sendInvites() {
+        if (_state.value.sendingInvites) return
+        _state.update { it.copy(sendingInvites = true) }
         viewModelScope.launch {
-            when (val result = groups.createInvite(groupId, emails)) {
-                is ApiResult.Success -> _state.update { s ->
-                    s.copy(
-                        sendingEmail = false,
-                        inviteEmail = "",
-                        invites = result.value.invites.map(::inviteUi) + s.invites.filterNot { it.title in emails },
-                        message = UserMessage(if (emails.size == 1) "Invite sent to ${emails.first()}" else "Invites sent to ${emails.size} people"),
-                    )
+            val r = if (recipients.addDraft()) recipients.state.value else null
+            if (r == null || r.recipients.isEmpty()) return@launch _state.update { it.copy(sendingInvites = false) }
+            val labels = r.labels
+            when (val result = groups.createInvite(groupId, r.emails, r.usernames)) {
+                is ApiResult.Success -> {
+                    recipients.clear()
+                    _state.update { s ->
+                        s.copy(
+                            sendingInvites = false,
+                            invites = result.value.invites.map(::inviteUi) + s.invites.filterNot { it.title in labels },
+                            message = UserMessage(if (labels.size == 1) "Invite sent to ${labels.first()}" else "Invites sent to ${labels.size} people"),
+                        )
+                    }
                 }
-                is ApiResult.Failure -> _state.update { it.copy(sendingEmail = false, message = UserMessage(result.error.message)) }
+                is ApiResult.Failure -> _state.update { it.copy(sendingInvites = false, message = UserMessage(result.error.message)) }
             }
         }
     }
@@ -188,10 +207,11 @@ class MembersViewModel @Inject constructor(
         val expires = DateTimes.localDateTime(invite.expiresAt)?.let { DateTimes.longDay(it.toLocalDate()) }.orEmpty()
         return InviteUi(
             id = invite.id,
-            title = invite.email ?: invite.url,
-            status = if (invite.email == null) "Anyone with the link · expires $expires" else "Invited · invite expires $expires",
-            isLink = invite.email == null,
+            title = invite.email ?: invite.username?.let { "@$it" } ?: invite.url,
+            status = if (invite.isLink) "Anyone with the link · expires $expires" else "Invited · invite expires $expires",
+            isLink = invite.isLink,
             url = invite.url,
+            byUsername = invite.email == null && invite.username != null,
         )
     }
     // endregion
@@ -240,10 +260,6 @@ class MembersViewModel @Inject constructor(
     fun messageShown(message: UserMessage) = _state.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 
     private fun showMessage(text: String) = _state.update { it.copy(message = UserMessage(text)) }
-
-    private companion object {
-        val EMAIL = Regex("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")
-    }
 
     private fun MembersUiState.withGroup(group: Group, meId: String?): MembersUiState {
         val myRole = group.members.firstOrNull { it.userId == meId }?.role ?: group.role

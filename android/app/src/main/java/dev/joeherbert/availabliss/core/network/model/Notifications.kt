@@ -11,6 +11,8 @@ enum class NotificationKind(override val wire: String) : WireEnum {
     ProposalConfirmed("proposal.confirmed"),
     Nudge("nudge"),
     InviteAccepted("invite.accepted"),
+    /** Someone invited you by username; `data.token` is the invite. */
+    InviteReceived("invite.received"),
     Message("message"),
     EventCreated("event.created"),
 

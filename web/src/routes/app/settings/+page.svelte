@@ -17,11 +17,17 @@
 	import SignInMethodsSection from '#lib/components/settings/SignInMethodsSection.svelte';
 	import PlanSection from '#lib/components/settings/PlanSection.svelte';
 	import TemplatesSection from '#lib/components/settings/TemplatesSection.svelte';
+	import UsernameField from '#lib/components/settings/UsernameField.svelte';
+	import { ApiError } from '#lib/client/api';
+	import { normalizeUsername } from '#lib/usernames';
 
 	let { data } = $props();
 
 	// Form copies, seeded from the saved account.
 	let name = $state((() => data.user.name)());
+	let username = $state((() => data.user.username ?? '')());
+	let usernameReady = $state(false);
+	let usernameError = $state<string | null>(null);
 	let region = $state<RegionValue>(regionFromUser((() => data.user)()));
 	let savingName = $state(false);
 	let savingRegion = $state(false);
@@ -29,6 +35,7 @@
 	let confirmDelete = $state(false);
 
 	const nameDirty = $derived(name.trim() !== data.user.name);
+	const usernameDirty = $derived(normalizeUsername(username) !== (data.user.username ?? ''));
 
 	let uploading = $state(false);
 	async function pickPhoto(e: Event) {
@@ -67,14 +74,18 @@
 			nameError = 'Your name can’t be empty';
 			return;
 		}
+		if (usernameDirty && !usernameReady) return;
 		savingName = true;
 		nameError = null;
+		usernameError = null;
 		try {
-			await updateMe({ name: name.trim() });
+			await updateMe({ ...(nameDirty && { name: name.trim() }), ...(usernameDirty && { username: normalizeUsername(username) }) });
 			await invalidateAll();
-			toasts.success('Name saved');
+			username = data.user.username ?? '';
+			toasts.success('Profile saved');
 		} catch (err) {
-			toasts.error(err);
+			if (err instanceof ApiError && err.code === 'conflict') usernameError = err.message;
+			else toasts.error(err);
 		} finally {
 			savingName = false;
 		}
@@ -133,7 +144,10 @@
 					</div>
 					<TextField label="Name" bind:value={name} autocomplete="name" maxlength={80} error={nameError} />
 				</div>
-				{#if nameDirty}<Button type="submit" size="sm" loading={savingName}>Save name</Button>{/if}
+				<UsernameField bind:value={username} current={data.user.username} bind:ready={usernameReady} error={usernameError} />
+				{#if nameDirty || usernameDirty}
+					<Button type="submit" size="sm" loading={savingName} disabled={usernameDirty && !usernameReady}>Save</Button>
+				{/if}
 			</GlassPanel>
 
 			<div class="appearance">
