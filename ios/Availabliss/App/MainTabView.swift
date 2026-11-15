@@ -39,12 +39,27 @@ struct MainTabView: View {
     private func tabStack<Root: View>(path: Binding<[AppRoute]>, @ViewBuilder root: () -> Root) -> some View {
         NavigationStack(path: path) {
             root()
+                .modifier(FadeInOnAppear())
                 .safeAreaInset(edge: .bottom, spacing: 0) { TabBarSpacer() }
                 .navigationDestination(for: AppRoute.self) { route in
                     RouteDestination(route: route)
                 }
         }
         .toolbar(.hidden, for: .tabBar)
+    }
+}
+
+/// Fades a tab's screen in each time it's shown, so switching tabs isn't an abrupt cut.
+private struct FadeInOnAppear: ViewModifier {
+    @State private var isShown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isShown || reduceMotion ? 1 : 0)
+            .offset(y: isShown || reduceMotion ? 0 : 6)
+            .onAppear { withAnimation(.easeOut(duration: 0.22)) { isShown = true } }
+            .onDisappear { isShown = false }
     }
 }
 

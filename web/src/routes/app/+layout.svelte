@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { page } from '$app/state';
-	import { invalidate } from '$app/navigation';
+	import { invalidate, onNavigate } from '$app/navigation';
 	import { live, type LivePayloads } from '#lib/client/live.svelte';
 	import { activity } from '#lib/client/activity.svelte';
 	import { unread } from '#lib/client/unread.svelte';
@@ -13,6 +13,18 @@
 	import UpgradeSheet from '#lib/components/plan/UpgradeSheet.svelte';
 
 	let { data, children } = $props();
+
+	// A short cross-fade between pages where the browser supports view transitions (and motion is welcome).
+	onNavigate((navigation) => {
+		if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		if (navigation.from?.url.pathname === navigation.to?.url.pathname) return;
+		return new Promise((resolve) => {
+			document.startViewTransition(async () => {
+				resolve();
+				await navigation.complete;
+			});
+		});
+	});
 
 	// The new-group sheet validates with #lib/schemas (zod), so it's loaded the first
 	// time it opens rather than with every /app page, then stays mounted. It mounts

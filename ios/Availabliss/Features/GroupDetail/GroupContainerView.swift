@@ -37,16 +37,21 @@ struct GroupContainerView: View {
     @ViewBuilder
     private var content: some View {
         if let group = detail.group {
-            switch tab {
-            case .calendar:
-                GroupAvailabilityView(detail: detail, group: group, onOpenTiming: { tab = .timing })
-            case .chat:
-                ChatView(detail: detail, group: group, onBack: { tab = .calendar }, onShowCalendar: { tab = .calendar })
-            case .proposals:
-                GroupPlansView(detail: detail, group: group)
-            case .timing:
-                TimingEditorView(detail: detail, group: group, onDone: { tab = .calendar })
+            // Each tab fades in (the container animates `tab` changes).
+            SwiftUI.Group {
+                switch tab {
+                case .calendar:
+                    GroupAvailabilityView(detail: detail, group: group, onOpenTiming: { tab = .timing })
+                case .chat:
+                    ChatView(detail: detail, group: group, onBack: { tab = .calendar }, onShowCalendar: { tab = .calendar })
+                case .proposals:
+                    GroupPlansView(detail: detail, group: group)
+                case .timing:
+                    TimingEditorView(detail: detail, group: group, onDone: { tab = .calendar })
+                }
             }
+            .id(tab)
+            .transition(.opacity)
         } else if let error = detail.loadError {
             VStack {
                 ScreenHeader(title: "Group", onBack: { app.router.pop() })

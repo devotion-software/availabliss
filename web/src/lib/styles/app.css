@@ -161,3 +161,9 @@ svg {
 		scroll-behavior: auto !important;
 	}
 }
+
+/* Page changes inside the app cross-fade quickly (see onNavigate in routes/app/+layout.svelte). */
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation-duration: 0.18s;
+}
