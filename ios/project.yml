@@ -83,6 +83,8 @@ targets:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         # App configuration read by AppConfig.swift

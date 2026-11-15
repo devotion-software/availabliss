@@ -39,7 +39,7 @@ struct MainTabView: View {
     private func tabStack<Root: View>(path: Binding<[AppRoute]>, @ViewBuilder root: () -> Root) -> some View {
         NavigationStack(path: path) {
             root()
-                .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: TabBar<AppTab>.reservedHeight) }
+                .safeAreaInset(edge: .bottom, spacing: 0) { TabBarSpacer() }
                 .navigationDestination(for: AppRoute.self) { route in
                     RouteDestination(route: route)
                 }

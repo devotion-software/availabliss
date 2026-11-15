@@ -61,12 +61,16 @@ enum TabBadge: Equatable {
 
 /// The floating glass tab bar (66pt tall, radius 24, 20pt from the edges). On phones with a
 /// home indicator it sits down in the indicator's safe area, 20pt from the bottom edge.
+/// In landscape (compact height) it's shorter and centred at a narrower width.
 struct TabBar<Value: Hashable>: View {
     @Binding var selection: Value
     let items: [TabItem<Value>]
     @Environment(\.theme) private var theme
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
-    static var height: CGFloat { 66 }
+    private var isCompact: Bool { verticalSizeClass == .compact }
+
+    static func height(compact: Bool) -> CGFloat { compact ? 50 : 66 }
 
     /// Space from the bottom of the safe area to the bar's bottom edge (negative = into it).
     static var bottomPadding: CGFloat {
@@ -77,7 +81,7 @@ struct TabBar<Value: Hashable>: View {
     }
 
     /// Room a screen under the bar should leave at the bottom of the safe area.
-    static var reservedHeight: CGFloat { height + bottomPadding + 8 }
+    static func reservedHeight(compact: Bool) -> CGFloat { height(compact: compact) + bottomPadding + 8 }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -86,8 +90,9 @@ struct TabBar<Value: Hashable>: View {
             }
         }
         .padding(.horizontal, 6)
-        .frame(height: Self.height)
-        .glass(cornerRadius: 24)
+        .frame(height: Self.height(compact: isCompact))
+        .glass(cornerRadius: isCompact ? 20 : 24)
+        .frame(maxWidth: isCompact ? 480 : .infinity)
         .padding(.horizontal, 20)
         .padding(.bottom, Self.bottomPadding)
     }
@@ -97,13 +102,13 @@ struct TabBar<Value: Hashable>: View {
         return Button {
             selection = item.value
         } label: {
-            VStack(spacing: 3) {
+            VStack(spacing: isCompact ? 1 : 3) {
                 Image(systemName: item.systemImage)
-                    .font(.system(size: 19, weight: .regular))
-                    .frame(height: 24)
+                    .font(.system(size: isCompact ? 16 : 19, weight: .regular))
+                    .frame(height: isCompact ? 20 : 24)
                     .overlay(alignment: .topTrailing) { badge(item.badge) }
                 Text(item.title)
-                    .bodyFont(11, isOn ? .semibold : .medium, relativeTo: .caption2)
+                    .bodyFont(isCompact ? 10 : 11, isOn ? .semibold : .medium, relativeTo: .caption2)
             }
             .foregroundStyle(isOn ? theme.accentInk : theme.muted)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -141,6 +146,15 @@ struct TabBar<Value: Hashable>: View {
         case .dot: "\(item.title), new activity"
         case .count(let count): "\(item.title), \(count) unread"
         }
+    }
+}
+
+/// Clear space at the bottom of a screen for the floating tab bar, sized for the orientation.
+struct TabBarSpacer: View {
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    var body: some View {
+        Color.clear.frame(height: TabBar<Int>.reservedHeight(compact: verticalSizeClass == .compact))
     }
 }
 
