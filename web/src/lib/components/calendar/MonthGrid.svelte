@@ -83,11 +83,11 @@
 				{@const day = date ? days.get(date) : undefined}
 				{#if !date || !day}
 					<span class="cell empty" aria-hidden="true"></span>
-				{:else if day.status === 'hidden'}
-					<!-- Days that can't be part of any slot (e.g. already past) stay as quiet placeholders. -->
+				{:else if day.status === 'hidden' || date < today}
+					<!-- Days that can't be part of any slot (outside the timing, or past) stay as quiet placeholders. -->
 					<span class="cell hidden-day" class:today={date === today} aria-hidden="true">
 						<span class="num">{dayNumber(date)}</span>
-						<span class="note">{date === today ? 'Today' : ''}</span>
+						<span class="note">{date === today ? 'Today' : date < today ? 'Past' : ''}</span>
 					</span>
 				{:else}
 					<button

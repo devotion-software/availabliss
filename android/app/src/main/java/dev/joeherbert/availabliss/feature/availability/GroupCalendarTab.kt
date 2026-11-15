@@ -371,8 +371,9 @@ private fun DetailCard(
                 Text(detail.title, style = AvailablissTheme.type.cardTitle, color = colors.ink)
                 Text(detail.subtitle, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
             }
-            StatusPill(if (detail.works) "Works" else "Doesn’t fit", if (detail.works) PillTone.Mint else PillTone.Neutral)
+            StatusPill(if (detail.works) "Works" else if (detail.past) "Past" else "Doesn’t fit", if (detail.works) PillTone.Mint else PillTone.Neutral)
         }
+        if (detail.past) return@Column
         if (state.dayLoading && state.timelineRows.isEmpty()) LoadingIndicator()
         else if (state.timelineRows.isNotEmpty() || state.everyone.isNotEmpty()) DayTimelineRows(state.everyone, state.timelineRows)
         val slot = detail.slot

@@ -103,8 +103,10 @@ fun MonthGrid(
                 val hasSelected = week.any { it?.selected == true }
                 Row(Modifier.fillMaxWidth().zIndex(if (hasSelected) 1f else 0f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     week.forEach { cell ->
-                        if (cell == null || cell.state == CellState.Hidden) {
+                        if (cell == null) {
                             Spacer(Modifier.weight(1f).height(54.dp))
+                        } else if (cell.state == CellState.Hidden) {
+                            HiddenCell(cell, Modifier.weight(1f))
                         } else {
                             MonthCell(cell, onClick = { onSelect(cell.date) }, modifier = Modifier.weight(1f).zIndex(if (cell.selected) 1f else 0f))
                         }
@@ -143,6 +145,27 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
     ) {
         Text(cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp, color = fg)
         Text(cell.note, style = AvailablissTheme.type.micro, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** A day outside the group's timing, or already past: a quiet placeholder ("Past", "Today"). */
+@Composable
+private fun HiddenCell(cell: MonthCellUi, modifier: Modifier = Modifier) {
+    val colors = AvailablissTheme.colors
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier
+            .height(54.dp)
+            .alpha(0.35f)
+            .clip(shape)
+            .background(colors.surface)
+            .border(1.dp, colors.glassBorder, shape)
+            .semantics { contentDescription = cell.accessibilityLabel }
+            .padding(horizontal = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+    ) {
+        Text(cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp, color = colors.ink)
+        Text(cell.note, style = AvailablissTheme.type.micro, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

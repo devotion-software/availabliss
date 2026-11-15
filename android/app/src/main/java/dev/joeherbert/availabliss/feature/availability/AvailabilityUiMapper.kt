@@ -46,6 +46,8 @@ data class DayDetailUi(
     val slot: Slot?,
     /** The day doesn't work for everyone but can still be proposed (the proposal warns who's busy). */
     val canProposeAnyway: Boolean = false,
+    /** The day has gone: nothing to plan, so no timeline or Propose. */
+    val past: Boolean = false,
 )
 
 /**
@@ -120,7 +122,8 @@ object AvailabilityUiMapper {
         selected: LocalDate?,
         today: LocalDate,
     ): MonthCellUi {
-        val state = when (day?.status) {
+        // Past days look like days outside the group's timing.
+        val state = if (date.isBefore(today)) CellState.Hidden else when (day?.status) {
             DayStatus.Match -> CellState.Match
             DayStatus.Busy -> CellState.Busy
             DayStatus.Hidden -> CellState.Hidden
@@ -141,6 +144,7 @@ object AvailabilityUiMapper {
             state == CellState.Match -> "all free"
             state == CellState.Busy && busyNames.size == 1 -> "${busyNames.first()} busy"
             state == CellState.Busy && busyNames.size > 1 -> "${busyNames.size} busy"
+            date.isBefore(today) -> "Past"
             day?.holiday != null -> day.holiday
             date == today -> "Today"
             else -> ""
@@ -149,7 +153,7 @@ object AvailabilityUiMapper {
         val stateLabel = when (state) {
             CellState.Match -> "works for everyone"
             CellState.Busy -> if (busyNames.isEmpty()) "someone's busy" else "${busyNames.joinNames()} busy"
-            CellState.Hidden -> "outside the timing"
+            CellState.Hidden -> if (date.isBefore(today)) "in the past" else "outside the timing"
             CellState.Free -> "free"
         }
         return MonthCellUi(
@@ -167,7 +171,7 @@ object AvailabilityUiMapper {
         val local = availability?.let(::localSlots)?.firstOrNull { it.covers(date) }
         val dayTitle = if (date == today) "Today · ${DateTimes.shortDay(date)}" else DateTimes.shortDay(date)
         val holiday = day?.holiday?.let { " · $it" }.orEmpty()
-        if (local != null) {
+        if (local != null && !date.isBefore(today)) {
             val from = if (local.start.toLocalTime() == LocalTime.MIDNIGHT) DateTimes.shortDay(local.start.toLocalDate())
             else "${DateTimes.shortWeekday(DateTimes.apiWeekday(local.start.toLocalDate()))} ${DateTimes.time(local.start)}"
             val noun = group?.requirement?.slotNoun() ?: "time"
@@ -181,6 +185,7 @@ object AvailabilityUiMapper {
             )
         }
         val busy = day?.busyMemberIds.orEmpty().map { name(group, it, meId) }
+        if (date.isBefore(today)) return DayDetailUi(date, dayTitle, "This day is in the past", works = false, proposeLabel = null, slot = null, past = true)
         val subtitle = when {
             day == null -> "No availability for this day yet"
             day.status == DayStatus.Hidden -> "Outside the group's timing"

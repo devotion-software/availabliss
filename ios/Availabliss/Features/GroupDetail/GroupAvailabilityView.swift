@@ -341,6 +341,7 @@ private struct MonthGrid: View {
     }
 
     private func note(for date: CalendarDay) -> String {
+        if date < .today() { return "Past" }
         guard let info = model.day(date) else { return "" }
         switch info.status {
         case .match:
@@ -369,12 +370,15 @@ private struct DayCell: View {
     let action: () -> Void
     @Environment(\.theme) private var theme
 
+    /// Past days look like days outside the group's timing.
+    private var isPast: Bool { date < .today() }
+
     var body: some View {
-        let status = info?.status ?? .hidden
+        let status = isPast ? .hidden : (info?.status ?? .hidden)
         Button(action: action) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(date.day)").font(AppFont.body(compact ? 15 : 17, .semibold, relativeTo: .body))
-                if !compact || status == .match {
+                if !compact || status == .match || isPast {
                     Text(note).bodyFont(compact ? 9 : 11, .semibold, relativeTo: .caption2).lineLimit(1)
                 }
             }
@@ -423,7 +427,7 @@ private struct DayCell: View {
         case .match: return "\(base), works for everyone"
         case .busy: return "\(base), \(note)"
         case .free: return note.isEmpty ? base : "\(base), \(note)"
-        case .hidden: return "\(base), outside the group's timing"
+        case .hidden: return isPast ? "\(base), in the past" : "\(base), outside the group's timing"
         }
     }
 }
@@ -436,9 +440,11 @@ private struct DayDetailCard: View {
     let propose: (ProposalDraft) -> Void
     @Environment(\.theme) private var theme
 
+    private var isPast: Bool { model.selectedDay < .today() }
+
     var body: some View {
         let slot = model.slot(for: model.selectedDay)
-        let works = slot != nil && model.day(model.selectedDay)?.status == .match
+        let works = !isPast && slot != nil && model.day(model.selectedDay)?.status == .match
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -446,15 +452,17 @@ private struct DayDetailCard: View {
                     Text(subtitle(works: works, slot: slot)).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
                 }
                 Spacer()
-                StatusPill(text: works ? "Works" : "Doesn\u{2019}t fit", tone: works ? .mint : .neutral)
+                StatusPill(text: works ? "Works" : (isPast ? "Past" : "Doesn\u{2019}t fit"), tone: works ? .mint : .neutral)
             }
-            if let detail = model.dayDetails[model.selectedDay] {
+            if isPast {
+                // Nothing to plan on a day that's gone.
+            } else if let detail = model.dayDetails[model.selectedDay] {
                 DayTimeline(detail: detail, date: model.selectedDay, group: group, me: me)
                     .padding(.vertical, 2)
             } else {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 90)
             }
-            proposeButton(works: works, slot: slot)
+            if !isPast { proposeButton(works: works, slot: slot) }
         }
         .padding(14)
         .glass(cornerRadius: 22)
@@ -484,6 +492,7 @@ private struct DayDetailCard: View {
     }
 
     private func subtitle(works: Bool, slot: Slot?) -> String {
+        if isPast { return "This day is in the past" }
         guard let info = model.day(model.selectedDay) else { return "Outside the search range" }
         if works, let slot { return "Everyone synced is free from \(Formatting.shortDay(slot.start)) \(Formatting.time(slot.start))" }
         switch info.status {

@@ -27,12 +27,15 @@
 	const free = $derived(detail?.everyoneFree[0] ?? null);
 
 	const fmt = useFormat();
-	const works = $derived(day?.status === 'match' && slot !== null);
+	// Past days look like days outside the timing: nothing to plan.
+	const past = $derived(date < fmt.current.today());
+	const works = $derived(!past && day?.status === 'match' && slot !== null);
 	const title = $derived.by(() => {
 		const label = slot && works ? slot.label : formatDayKey(date);
 		return date === fmt.current.today() && !works ? `Today · ${label}` : label;
 	});
 	const sub = $derived.by(() => {
+		if (past) return 'This day is in the past';
 		if (!day) return '';
 		let text = '';
 		if (works && slot) {
@@ -53,9 +56,11 @@
 			<h3>{title}</h3>
 			<span class="sub">{sub}</span>
 		</div>
-		<StatusPill tone={works ? 'mint' : 'neutral'}>{works ? 'Works' : 'Doesn’t fit'}</StatusPill>
+		<StatusPill tone={works ? 'mint' : 'neutral'}>{works ? 'Works' : past ? 'Past' : 'Doesn’t fit'}</StatusPill>
 	</div>
-	{#if detail}
+	{#if past}
+		<!-- Nothing to plan on a day that's gone. -->
+	{:else if detail}
 		<DayTimeline day={detail} {members} {meId} showDate={false} />
 	{:else if day && day.status !== 'hidden'}
 		<div class="loading"><Spinner size={18} label="Loading who's free" /></div>
@@ -63,11 +68,11 @@
 	<div class="actions">
 		{#if works && slot}
 			<Button variant="accent" size="sm" class="act" onclick={() => onpropose(slot)}>Propose this {noun}</Button>
-		{:else if free}
+		{:else if free && !past}
 			<Button variant="accent" size="sm" class="act" onclick={() => onpropose({ start: free.start, end: free.end, label: '' })}
 				>Propose {fmt.current.time(free.start)} – {fmt.current.time(free.end)}</Button
 			>
-		{:else if onproposeday && (day?.status === 'busy' || day?.status === 'free')}
+		{:else if !past && onproposeday && (day?.status === 'busy' || day?.status === 'free')}
 			<Button variant="secondary" size="sm" class="act" onclick={() => onproposeday(date)}>Propose anyway</Button>
 		{/if}
 	</div>
