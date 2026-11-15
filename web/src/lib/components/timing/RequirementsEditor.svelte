@@ -178,12 +178,15 @@
 	</section>
 
 	<section class="glass list">
-		<SettingRow
-			name="Bank holidays"
-			sub="{regionLabel ? `${regionLabel} · ` : ''}treat like a weekend day"
-			bind:checked={requirement.bankHolidays}
-			disabled={readonly}
-		/>
+		<!-- With every day allowed (none picked means any), bank holidays are already included. -->
+		{#if requirement.length.type === 'span' || (requirement.days.length > 0 && new Set(requirement.days).size < 7)}
+			<SettingRow
+				name="Bank holidays"
+				sub="{regionLabel ? `${regionLabel} · ` : ''}treat like a weekend day"
+				bind:checked={requirement.bankHolidays}
+				disabled={readonly}
+			/>
+		{/if}
 		<SettingRow
 			name="School holidays only"
 			sub={authorityName ?? (requirement.customSchoolHolidays.length ? 'Custom term dates' : 'Choose whose term dates')}

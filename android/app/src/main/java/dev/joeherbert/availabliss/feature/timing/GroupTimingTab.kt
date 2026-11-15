@@ -322,13 +322,16 @@ private fun StartsEndsSection(state: TimingEditorUiState, canEdit: Boolean, draf
 private fun ExtrasSection(state: TimingEditorUiState, canEdit: Boolean, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
     val colors = AvailablissTheme.colors
     Column(Modifier.fillMaxWidth().glass(Shapes.card).padding(horizontal = 16.dp, vertical = 4.dp)) {
-        ToggleRow(
-            title = "Bank holidays",
-            subtitle = state.bankSubtitle,
-            checked = draft.bankHolidays,
-            onCheckedChange = { if (canEdit) actions.onBankHolidays(it) },
-        )
-        RowDivider()
+        // With every day allowed (none picked means any), bank holidays are already included.
+        if (draft.isSpan || (draft.days.isNotEmpty() && draft.days.toSet().size < 7)) {
+            ToggleRow(
+                title = "Bank holidays",
+                subtitle = state.bankSubtitle,
+                checked = draft.bankHolidays,
+                onCheckedChange = { if (canEdit) actions.onBankHolidays(it) },
+            )
+            RowDivider()
+        }
         ToggleRow(
             title = "School holidays only",
             subtitle = state.schoolSubtitle,

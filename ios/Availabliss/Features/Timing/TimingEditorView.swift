@@ -158,12 +158,15 @@ struct TimingForm: View {
 
     private var extrasSection: some View {
         VStack(spacing: 0) {
-            Toggle(isOn: $model.draft.bankHolidays) {
-                ToggleLabel(title: "Bank holidays", subtitle: "Treat like a weekend day · owner's region")
+            // With every day allowed, bank holidays are already included.
+            if !model.allowsEveryDay {
+                Toggle(isOn: $model.draft.bankHolidays) {
+                    ToggleLabel(title: "Bank holidays", subtitle: "Treat like a weekend day · owner's region")
+                }
+                .toggleStyle(.glassSwitch)
+                .frame(minHeight: 60)
+                Rectangle().fill(theme.line).frame(height: 1)
             }
-            .toggleStyle(.glassSwitch)
-            .frame(minHeight: 60)
-            Rectangle().fill(theme.line).frame(height: 1)
             Toggle(isOn: $model.draft.schoolHolidaysOnly) {
                 ToggleLabel(title: "School holidays only", subtitle: model.authorityName.map { "\($0) term dates" } ?? "Choose whose term dates")
             }

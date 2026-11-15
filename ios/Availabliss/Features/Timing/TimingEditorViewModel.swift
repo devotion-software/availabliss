@@ -51,6 +51,9 @@ final class TimingEditorViewModel {
     var customKind: CustomLengthKind { CustomLengthKind(draft.length) }
     var isSpan: Bool { if case .span = draft.length { true } else { false } }
 
+    /// Any day of the week can match (none picked means any), so bank holidays need no switch.
+    var allowsEveryDay: Bool { !isSpan && (draft.days.isEmpty || Set(draft.days).count >= 7) }
+
     var authorityName: String? { authorities.first { $0.id == draft.schoolAuthority }?.name }
 
     // MARK: Length
