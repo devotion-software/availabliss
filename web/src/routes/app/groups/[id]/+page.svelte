@@ -183,8 +183,8 @@
 	}
 
 	let proposeOpen = $state(false);
-	let proposeInitial = $state<(Slot & { title?: string; note?: string }) | { day: string } | null>(null);
-	function propose(slot: (Slot & { title?: string; note?: string }) | { day: string } | null) {
+	let proposeInitial = $state<(Slot & { title?: string; note?: string; allDay?: boolean }) | { day: string } | null>(null);
+	function propose(slot: (Slot & { title?: string; note?: string; allDay?: boolean }) | { day: string } | null) {
 		proposeInitial = slot;
 		proposeOpen = true;
 	}
@@ -211,6 +211,9 @@
 	// Mount one layout's pieces, not both. Until hydrated, both render and CSS picks.
 	const isDesktop = layoutQuery(DESKTOP);
 	const desk = $derived(isDesktop.matches !== false);
+	// Narrow phones in portrait: the week as cards.
+	const narrow = layoutQuery('(max-width: 599px)');
+	const phoneWidth = $derived(narrow.matches === true);
 	const phone = $derived(isDesktop.matches !== true);
 
 	function selectSlot(slot: Slot) {
@@ -282,7 +285,7 @@
 
 			<CoverageNote gaps={availability.checkedUntil ?? []} {members} meId={data.user.id} />
 
-			<div class="cal-body" class:boxed={view === 'week'}>
+			<div class="cal-body" class:boxed={view === 'week' && !(!desk && phoneWidth)}>
 			{#if view === 'month'}
 				{#if phone}
 					<span class="phone-only">
@@ -295,7 +298,8 @@
 					</span>
 				{/if}
 			{:else}
-				<WeekGrid dates={week} days={weekDays} {members} {selected} onselect={select} />
+				<!-- Phones get a card per day; the time grid needs a wider screen. -->
+				<WeekGrid dates={week} days={weekDays} {members} {selected} onselect={select} cards={!desk && phoneWidth} />
 			{/if}
 			</div>
 		</section>

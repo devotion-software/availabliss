@@ -18,7 +18,7 @@
 		meId: string;
 		/** "weekend", "evening", … for "Propose this weekend". */
 		noun: string;
-		onpropose: (slot: Slot) => void;
+		onpropose: (slot: Slot & { allDay?: boolean }) => void;
 		/** Propose a day that doesn't work for everyone (the proposal sheet warns who's busy). */
 		onproposeday?: (date: string) => void;
 	}
@@ -69,8 +69,14 @@
 		{#if works && slot}
 			<Button variant="accent" size="sm" class="act" onclick={() => onpropose(slot)}>Propose this {noun}</Button>
 		{:else if free && !past}
-			<Button variant="accent" size="sm" class="act" onclick={() => onpropose({ start: free.start, end: free.end, label: '' })}
-				>Propose {fmt.current.time(free.start)} – {fmt.current.time(free.end)}</Button
+			{@const toMidnight = fmt.current.dayKey(free.end) !== date}
+			{@const allDay = toMidnight && fmt.current.dayKey(free.start) === date && fmt.current.time(free.start) === '00:00'}
+			<Button
+				variant="accent"
+				size="sm"
+				class="act"
+				onclick={() => onpropose({ start: free.start, end: free.end, label: '', ...(allDay && { allDay: true }) })}
+				>{allDay ? 'Propose all day' : `Propose ${fmt.current.time(free.start)} – ${toMidnight ? 'midnight' : fmt.current.time(free.end)}`}</Button
 			>
 		{:else if !past && onproposeday && (day?.status === 'busy' || day?.status === 'free')}
 			<Button variant="secondary" size="sm" class="act" onclick={() => onproposeday(date)}>Propose anyway</Button>

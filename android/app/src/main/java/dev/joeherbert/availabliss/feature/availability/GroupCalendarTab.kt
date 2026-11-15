@@ -25,6 +25,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
+import dev.joeherbert.availabliss.designsystem.component.availability.WeekCards
 import androidx.compose.ui.Modifier
 import dev.joeherbert.availabliss.designsystem.component.swipeToStep
 import dev.joeherbert.availabliss.core.common.DateTimes
@@ -188,7 +191,12 @@ fun GroupCalendarContent(
                     when (view) {
                         CalendarView.Month -> MonthSection(state, onSelectDate, onPlanWithAi)
                         CalendarView.Week -> if (state.weekLoading && state.weekColumns.isEmpty()) LoadingIndicator()
-                        else WeekGrid(state.weekColumns, onSelectColumn = { i -> state.weekDates.getOrNull(i)?.let(onSelectDate) })
+                        // The time grid needs width: cards in portrait, the grid in landscape.
+                        else if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                            WeekGrid(state.weekColumns, onSelectColumn = { i -> state.weekDates.getOrNull(i)?.let(onSelectDate) })
+                        } else {
+                            WeekCards(state.weekColumns, onSelectColumn = { i -> state.weekDates.getOrNull(i)?.let(onSelectDate) })
+                        }
                     }
                 }
                 // The selected day: whether it works, who's free when, and Propose.
@@ -395,7 +403,14 @@ private fun DetailCard(
                 modifier = Modifier.fillMaxWidth(),
             )
             free != null -> PrimaryButton(
-                text = "Propose ${DateTimes.localDateTime(free.first)?.let(DateTimes::time).orEmpty()} – ${DateTimes.localDateTime(free.second)?.let(DateTimes::time).orEmpty()}",
+                text = run {
+                    val start = DateTimes.localDateTime(free.first)
+                    val end = DateTimes.localDateTime(free.second)
+                    val toMidnight = end != null && end.toLocalDate().isAfter(detail.date)
+                    val allDay = toMidnight && start != null && (start.toLocalDate().isBefore(detail.date) || start.toLocalTime() == java.time.LocalTime.MIDNIGHT)
+                    if (allDay) "Propose all day"
+                    else "Propose ${start?.let(DateTimes::time).orEmpty()} – ${if (toMidnight) "midnight" else end?.let(DateTimes::time).orEmpty()}"
+                },
                 onClick = { onProposeSpan(free.first, free.second) },
                 style = ButtonStyle.Accent,
                 height = 44.dp,

@@ -14,8 +14,10 @@
 		onselect?: (date: string) => void;
 		/** The day whose detail shows under the grid. */
 		selected?: string;
+		/** Phones in portrait: a card per day instead of the time grid, which needs the width. */
+		cards?: boolean;
 	}
-	let { dates, days, members, onselect, selected }: Props = $props();
+	let { dates, days, members, onselect, selected, cards = false }: Props = $props();
 
 	const fmt = useFormat();
 	const tz = $derived(fmt.current.timeZone);
@@ -74,6 +76,32 @@
 	}
 </script>
 
+{#if cards}
+	<ul class="cards" aria-label="Days this week">
+		{#each dates as d (d)}
+			{@const day = days.get(d)}
+			{@const parts = day ? blocks(d, day) : []}
+			{@const free = parts.filter((b) => b.free)}
+			{@const busy = parts.filter((b) => !b.free)}
+			<li>
+				<button type="button" class="card glass" class:on={d === selected} aria-pressed={d === selected} onclick={() => onselect?.(d)}>
+					<span class="date">{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span>
+					<span class="info">
+						<span class="what" class:free={free.length > 0}>
+							{#if day === undefined}Loading…{:else if day === null}Outside the timing{:else}{free[0]?.label ?? "No time when everyone's free"}{/if}
+						</span>
+						{#if busy.length}<span class="who">{busy[0].label} busy</span>{/if}
+						<span class="strip" aria-hidden="true">
+							{#each [...busy, ...free] as b (b.from + (b.free ? 'f' : 'b'))}
+								<i class:free={b.free} style:left="{pct(b.from, axis)}%" style:width="{pct(b.to, axis) - pct(b.from, axis)}%"></i>
+							{/each}
+						</span>
+					</span>
+				</button>
+			</li>
+		{/each}
+	</ul>
+{:else}
 <div class="week" style:--cols={dates.length}>
 	<div class="row heads">
 		<span></span>
@@ -121,8 +149,74 @@
 		{/each}
 	</div>
 </div>
+{/if}
 
 <style>
+	.cards {
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.card {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 12px;
+		border-radius: 18px;
+		text-align: left;
+		color: var(--ink);
+	}
+	.card.on {
+		outline: 2px solid var(--ink);
+		outline-offset: -2px;
+	}
+	.date {
+		width: 56px;
+		flex: none;
+		font-size: 14px;
+		font-weight: 650;
+	}
+	.info {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+	.what {
+		font-size: 14px;
+		font-weight: 600;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.what.free {
+		color: var(--accent-ink);
+	}
+	.who {
+		font-size: 12px;
+		color: var(--muted);
+	}
+	.strip {
+		position: relative;
+		height: 8px;
+		border-radius: 4px;
+		background: var(--line);
+		overflow: hidden;
+	}
+	.strip i {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		min-width: 3px;
+		border-radius: 4px;
+		background: color-mix(in srgb, var(--ink) 32%, transparent);
+	}
+	.strip i.free {
+		background: var(--accent);
+	}
 	.week {
 		display: flex;
 		flex-direction: column;

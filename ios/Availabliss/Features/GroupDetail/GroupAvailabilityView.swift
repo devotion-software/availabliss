@@ -7,6 +7,7 @@ struct GroupAvailabilityView: View {
     let onOpenTiming: () -> Void
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var model: GroupAvailabilityViewModel
     @State private var proposalDraft: ProposalDraft?
     /// The optional AI planner: offered only when the server has it set up; Pro to use.
@@ -162,7 +163,9 @@ struct GroupAvailabilityView: View {
             SwiftUI.Group {
                 switch model.mode {
                 case .month: MonthGrid(model: model, group: group, me: app.session.user?.id)
-                case .week: WeekGrid(model: model, group: group)
+                // The time grid needs width: cards in portrait, the grid in landscape.
+                case .week:
+                    if verticalSizeClass == .compact { WeekGrid(model: model, group: group) } else { WeekCards(model: model, group: group) }
                 }
             }
             // Swipe sideways for the previous / next month or week.
@@ -488,8 +491,13 @@ private struct DayDetailCard: View {
             }
             .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))
         } else if let free = model.dayDetails[day]?.everyoneFree.first {
-            Button("Propose \(Formatting.time(free.start)) – \(Formatting.time(free.end))") {
-                propose(ProposalDraft(start: free.start, end: free.end, allDay: false))
+            let nextDay = day.adding(days: 1).startDate()
+            let allDay = free.start <= day.startDate() && free.end >= nextDay
+            let end = free.end >= nextDay ? "midnight" : Formatting.time(free.end)
+            Button(allDay ? "Propose all day" : "Propose \(Formatting.time(free.start)) – \(end)") {
+                propose(allDay
+                    ? ProposalDraft(start: day.startDate(), end: nextDay, allDay: true)
+                    : ProposalDraft(start: free.start, end: free.end, allDay: false))
             }
             .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))
         } else if let status = model.day(day)?.status, status == .busy || status == .free {

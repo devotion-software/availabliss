@@ -136,6 +136,115 @@ private struct WeekColumn: View {
     }
 }
 
+// MARK: - Week cards
+
+/// Week view in portrait: a card per day saying when everyone's free, with a 24-hour strip
+/// (everyone free in accent, someone busy in grey). Tap a card for the day's detail below.
+struct WeekCards: View {
+    let model: GroupAvailabilityViewModel
+    let group: Group
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ForEach(model.weekDays, id: \.self) { day in
+                WeekDayCard(day: day, detail: model.dayDetails[day], status: model.day(day)?.status, group: group, isSelected: day == model.selectedDay)
+                    .onTapGesture { withAnimation(.spring(response: 0.3)) { model.pick(day) } }
+                    .accessibilityAddTraits(day == model.selectedDay ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+    }
+}
+
+private struct WeekDayCard: View {
+    let day: CalendarDay
+    let detail: DayAvailability?
+    let status: AvailabilityDay.Status?
+    let group: Group
+    let isSelected: Bool
+    private let axis = TimeAxis(startHour: 0, endHour: 24)
+    @Environment(\.theme) private var theme
+
+    private var isPast: Bool { day < .today() }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(spacing: 0) {
+                Text(Weekday.short(day.weekday())).bodyFont(11, .semibold, relativeTo: .caption2).foregroundStyle(theme.muted)
+                Text("\(day.day)").displayFont(20, .bold).monospacedDigit()
+            }
+            .frame(width: 40)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(summary)
+                    .bodyFont(14, .semibold)
+                    .foregroundStyle(hasFree ? theme.accentInk : theme.ink)
+                    .lineLimit(1)
+                if let busy = busyLine {
+                    Text(busy).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted).lineLimit(1)
+                }
+                strip
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(cornerRadius: 18, shadow: false)
+        .overlay {
+            if isSelected { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(theme.ink, lineWidth: 2) }
+        }
+        .opacity(isPast || status == .hidden ? 0.5 : 1)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private var hasFree: Bool { !(detail?.everyoneFree.isEmpty ?? true) && !isPast }
+
+    private var summary: String {
+        if isPast { return "Past" }
+        guard let detail else { return status == .hidden ? "Outside the timing" : "Loading\u{2026}" }
+        guard let first = detail.everyoneFree.first else {
+            return status == .hidden ? "Outside the timing" : "No time when everyone\u{2019}s free"
+        }
+        let wholeDay = axis.fraction(first.start, on: day) == 0 && axis.fraction(first.end, on: day) == 1
+        if wholeDay { return "Everyone free all day" }
+        let end = first.end >= day.adding(days: 1).startDate() ? "late" : Formatting.time(first.end)
+        let more = detail.everyoneFree.count > 1 ? " +\(detail.everyoneFree.count - 1) more" : ""
+        return "Everyone free \(Formatting.time(first.start)) – \(end)\(more)"
+    }
+
+    private var busyLine: String? {
+        guard let detail, !isPast else { return nil }
+        let names = detail.members.filter { !$0.busy.isEmpty }.map { group.member($0.userId)?.firstName ?? "Someone" }
+        guard !names.isEmpty else { return nil }
+        return "\(Formatting.list(names)) busy some of the day"
+    }
+
+    /// The day's 24 hours: someone busy in grey, everyone free in accent.
+    private var strip: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(theme.line)
+                if let detail {
+                    ForEach(BusyMerge.segments(detail.members), id: \.self) { segment in
+                        bar(segment.start, segment.end, width: width, color: theme.busyFill)
+                    }
+                    ForEach(detail.everyoneFree, id: \.self) { span in
+                        bar(span.start, span.end, width: width, color: theme.accent)
+                    }
+                }
+            }
+        }
+        .frame(height: 8)
+        .accessibilityHidden(true)
+    }
+
+    private func bar(_ start: Date, _ end: Date, width: CGFloat, color: Color) -> some View {
+        let left = axis.fraction(start, on: day) * width
+        let right = axis.fraction(end, on: day) * width
+        return Capsule().fill(color).frame(width: max(3, right - left)).offset(x: left)
+    }
+}
+
 // MARK: - Day
 
 /// Who's free on one day: an "Everyone" row, then each member's busy blocks (dashed = not

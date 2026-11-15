@@ -125,6 +125,60 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
     }
 }
 
+/**
+ * Week view in portrait: a card per day saying when everyone's free, with a strip of the
+ * day (everyone free in accent, someone busy in grey). The time grid needs landscape's width.
+ */
+@Composable
+fun WeekCards(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelectColumn: ((Int) -> Unit)? = null) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        columns.forEachIndexed { index, column ->
+            val free = column.blocks.filter { it.free }
+            val busy = column.blocks.filterNot { it.free }
+            val shape = RoundedCornerShape(18.dp)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .then(if (column.selected) Modifier.border(2.dp, colors.ink, shape) else Modifier)
+                    .glass(shape, shadow = false)
+                    .clip(shape)
+                    .then(if (onSelectColumn != null) Modifier.clickable(role = Role.Button, onClickLabel = "Show who's free") { onSelectColumn(index) } else Modifier)
+                    .semantics { contentDescription = column.accessibilityLabel }
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                Text(column.label, style = type.bodySmallStrong, color = colors.ink, modifier = Modifier.width(56.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        free.firstOrNull()?.label ?: "No time when everyone's free",
+                        style = type.bodySmallStrong,
+                        color = if (free.isEmpty()) colors.ink else colors.accentInk,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    busy.firstOrNull()?.let { Text("${it.label} busy", style = type.caption, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    BoxWithConstraints(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(colors.line)) {
+                        val w = maxWidth
+                        (busy + free).forEach { block ->
+                            Box(
+                                Modifier
+                                    .offset(x = w * block.start)
+                                    .width((w * (block.end - block.start)).coerceAtLeast(3.dp))
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (block.free) colors.accent else colors.ink.copy(alpha = 0.32f)),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Preview(widthDp = 390)
 @Composable
 private fun WeekGridPreview() {
