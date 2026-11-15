@@ -35,7 +35,7 @@ struct TemplatesSection: View {
         }
         .padding(16)
         .glass(cornerRadius: 24)
-        .task(id: app.accountVersion) { await load() }
+        .task(id: [app.accountVersion, app.templatesVersion]) { await load() }
         .confirmationDialog(
             "Delete this template?",
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),

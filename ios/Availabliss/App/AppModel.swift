@@ -20,6 +20,8 @@ final class AppModel {
     private(set) var unreadNotifications = 0
     /// Bumped when another account is merged into this one, so screens showing account data reload.
     private(set) var accountVersion = 0
+    /// Bumped when a timing template is saved, so the You screen's list reloads.
+    private(set) var templatesVersion = 0
     @ObservationIgnored private var liveTask: Task<Void, Never>?
 
     init(config: AppConfig = .load()) {
@@ -96,6 +98,8 @@ final class AppModel {
     func open(_ link: DeepLink) {
         router.open(link)
     }
+
+    func templatesChanged() { templatesVersion += 1 }
 
     /// Another account was merged into this one: reload the user and everything that depends on it.
     func accountMerged() async {
