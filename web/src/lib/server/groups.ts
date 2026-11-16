@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/mysql-core';
 import type { Group, Member, Requirement, Role, TileColor } from '#lib/types';
 import { TILE_COLORS } from '#lib/types';
@@ -225,7 +225,7 @@ export async function createInvite(groupId: string, userId: string, email: strin
 	return { id, token, expiresAt };
 }
 
-/** A group's invites that can still be used, newest first (admins only). */
+/** A group's invites that can still be used (unexpired; each is single-use), newest first (admins only). */
 export async function listInvites(groupId: string, userId: string) {
 	await requireMember(groupId, userId, 'admin');
 	const invitee = alias(user, 'invitee');
@@ -307,8 +307,24 @@ export async function acceptInvite(token: string, userId: string): Promise<{ gro
 	}
 	const [result] = await db.insert(groupMembers).ignore().values({ groupId: invite.groupId, userId, role: 'member' });
 	const joined = result.affectedRows > 0;
-	if (invite.email || invite.invitedUserId) await db.delete(groupInvites).where(eq(groupInvites.id, invite.id));
-	if (joined) await refreshCoverage([userId]);
+	if (joined) {
+		// Every invite is single-use: once someone joins with it, it's gone. Any other invite
+		// to the group sent to them (by email or username) goes too.
+		const me = await db.query.user.findFirst({ where: eq(user.id, userId), columns: { email: true } });
+		await db
+			.delete(groupInvites)
+			.where(
+				and(
+					eq(groupInvites.groupId, invite.groupId),
+					or(
+						eq(groupInvites.id, invite.id),
+						eq(groupInvites.invitedUserId, userId),
+						me ? sql`lower(${groupInvites.email}) = ${me.email.toLowerCase()}` : undefined
+					)
+				)
+			);
+		await refreshCoverage([userId]);
+	}
 	return { groupId: invite.groupId, joined };
 }
 

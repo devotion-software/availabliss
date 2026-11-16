@@ -214,7 +214,7 @@ class MembersViewModel @Inject constructor(
         return InviteUi(
             id = invite.id,
             title = invite.email ?: invite.username?.let { "@$it" } ?: invite.url,
-            status = if (invite.isLink) "Anyone with the link · expires $expires" else "Invited · invite expires $expires",
+            status = if (invite.isLink) "Link for one person · expires $expires" else "Invited · invite expires $expires",
             isLink = invite.isLink,
             url = invite.url,
             byUsername = invite.email == null && invite.username != null,

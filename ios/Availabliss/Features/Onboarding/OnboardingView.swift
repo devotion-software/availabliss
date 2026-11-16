@@ -215,7 +215,7 @@ private struct InvitePeopleStep: View {
                 }
                 GlassPanel(cornerRadius: 24) {
                     Text("Share a link").bodyFont(15, .semibold)
-                    Text("Anyone with the link can join.").bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
+                    Text("One person can join with each link.").bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
                     if let link = model.link {
                         ShareLink(item: link.url, subject: Text("Join \(group.name) on Availabliss"),
                                   message: Text("Join \(group.name) on Availabliss so we can find a time that works.")) {

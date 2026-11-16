@@ -188,26 +188,33 @@ describe('invites', () => {
 		expect(days).toBeLessThanOrEqual(14);
 	});
 
-	test('preview, accept (idempotent) and expiry', async () => {
-		const { token } = await createInvite(groupId, owner, null);
+	test('preview, accept (single-use) and expiry', async () => {
+		const { id, token } = await createInvite(groupId, owner, null);
 		expect(await previewInvite(token)).toMatchObject({ groupName: 'Invites', inviterName: 'Owner Person', memberCount: 2 });
 
-		expect(await acceptInvite(token, joiner)).toEqual({ groupId, joined: true });
-		expect(await acceptInvite(token, joiner)).toEqual({ groupId, joined: false });
-		expect(await roleIn(groupId, joiner)).toBe('member');
-		// Accepting as an existing admin/owner doesn't demote them.
+		// Accepting as an existing admin/owner doesn't demote them, and doesn't use the invite up.
 		expect(await acceptInvite(token, owner)).toEqual({ groupId, joined: false });
 		expect(await roleIn(groupId, owner)).toBe('owner');
 
-		// Two taps at once: one joins, the other is a no-op instead of a 500.
+		expect(await acceptInvite(token, joiner)).toEqual({ groupId, joined: true });
+		expect(await roleIn(groupId, joiner)).toBe('member');
+		// Used up: gone from the list, and the link no longer works.
+		expect((await listInvites(groupId, owner)).map((i) => i.id)).not.toContain(id);
+		expect((await apiError(acceptInvite(token, joiner))).code).toBe('not_found');
+
+		// Two taps at once: one joins; the other is a no-op or finds it used, never a 500.
 		const racer = await fx.user();
-		const both = await Promise.all([acceptInvite(token, racer), acceptInvite(token, racer)]);
-		expect(both.filter((r) => r.joined)).toHaveLength(1);
+		const race = await createInvite(groupId, owner, null);
+		const both = await Promise.allSettled([acceptInvite(race.token, racer), acceptInvite(race.token, racer)]);
+		expect(both.filter((r) => r.status === 'fulfilled' && r.value.joined)).toHaveLength(1);
+		for (const r of both) if (r.status === 'rejected') expect(r.reason.code).toBe('not_found');
 		expect(await roleIn(groupId, racer)).toBe('member');
 
-		await db.update(groupInvites).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(groupInvites.token, token));
-		expect((await apiError(previewInvite(token))).code).toBe('not_found');
-		expect((await apiError(acceptInvite(token, joiner))).code).toBe('not_found');
+		const late = await createInvite(groupId, owner, null);
+		await db.update(groupInvites).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(groupInvites.token, late.token));
+		const token2 = late.token;
+		expect((await apiError(previewInvite(token2))).code).toBe('not_found');
+		expect((await apiError(acceptInvite(token2, joiner))).code).toBe('not_found');
 		expect((await apiError(previewInvite('not-a-real-token'))).code).toBe('not_found');
 	});
 
@@ -228,6 +235,16 @@ describe('invites', () => {
 		// Used up: gone from the list and the link no longer works.
 		expect((await listInvites(groupId, owner)).map((i) => i.id)).not.toContain(id);
 		expect((await apiError(previewInvite(token))).code).toBe('not_found');
+
+		// Joining any other way clears invites sent to you by email or username.
+		const later = await fx.user({ email: `it-later-${Date.now()}@test.availabliss.invalid` });
+		const laterEmail = (await db.query.user.findFirst({ where: (u, { eq }) => eq(u.id, later) }))!.email;
+		const emailed = await createInvite(groupId, owner, laterEmail);
+		const shared = await createInvite(groupId, owner, null);
+		expect(await acceptInvite(shared.token, later)).toEqual({ groupId, joined: true });
+		const left = (await listInvites(groupId, owner)).map((i) => i.id);
+		expect(left).not.toContain(emailed.id);
+		expect(left).not.toContain(shared.id);
 
 		const link = await createInvite(groupId, owner, null);
 		expect((await apiError(revokeInvite(groupId, link.id, member))).code).toBe('forbidden');

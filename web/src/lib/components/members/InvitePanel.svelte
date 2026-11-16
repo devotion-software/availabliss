@@ -2,6 +2,7 @@
 	import { z } from 'zod';
 	import type { GroupInvite } from '#lib/types';
 	import { createInvite, listInvites, revokeInvite } from '#lib/client/groups';
+	import { live } from '#lib/client/live.svelte';
 	import { checkUsername } from '#lib/client/usernames';
 	import { normalizeUsername, usernameProblem } from '#lib/usernames';
 	import { useFormat } from '#lib/client/format';
@@ -34,9 +35,20 @@
 
 	$effect(() => {
 		const id = groupId;
-		listInvites(id)
-			.then((list) => id === groupId && (invites = list))
-			.catch(() => {});
+		const load = () =>
+			listInvites(id)
+				.then((list) => id === groupId && (invites = list))
+				.catch(() => {});
+		load();
+		// Someone joining uses up their invite: refetch so it leaves the list.
+		const off = live.on(['member.changed'], (e) => {
+			if (e.groupId === id) load();
+		});
+		const offReconnect = live.onReconnect(load);
+		return () => {
+			off();
+			offReconnect();
+		};
 	});
 
 	async function makeLink() {
@@ -138,7 +150,7 @@
 
 	<div class="way">
 		<h3>Share a link</h3>
-		<p class="lead">Anyone with the link can join.</p>
+		<p class="lead">One person can join with each link.</p>
 		{#if link}
 			<div class="link">
 				<label class="sr-only" for="invite-url">Invite link</label>
@@ -177,7 +189,7 @@
 					<li>
 						<span class="who">
 							<span class="name">{inviteeLabel(i) ?? 'Invite link'}</span>
-							<span class="sub">{inviteeLabel(i) ? `Invited · invite ${expiry(i)}` : `Anyone with the link · ${expiry(i)}`}</span>
+							<span class="sub">{inviteeLabel(i) ? `Invited · invite ${expiry(i)}` : `Link for one person · ${expiry(i)}`}</span>
 						</span>
 						<IconButton icon="x" label={inviteeLabel(i) ? `Revoke the invite for ${inviteeLabel(i)}` : 'Revoke this link'} variant="plain" size={36} onclick={() => revoke(i)} />
 					</li>

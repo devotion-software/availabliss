@@ -251,7 +251,7 @@ fun OnboardingScreen(
                 ) {
                     GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Share a link", style = AvailablissTheme.type.bodySmallStrong, color = AvailablissTheme.colors.ink)
-                        Text("Anyone with the link can join.", style = AvailablissTheme.type.caption, color = AvailablissTheme.colors.muted)
+                        Text("One person can join with each link.", style = AvailablissTheme.type.caption, color = AvailablissTheme.colors.muted)
                         PrimaryButton("Share invite link", viewModel::shareLink, icon = AvIcons.Share, loading = state.creatingLink, modifier = Modifier.fillMaxWidth())
                     }
                     GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

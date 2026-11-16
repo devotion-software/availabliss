@@ -56,6 +56,12 @@ struct MembersView: View {
         .foregroundStyle(theme.ink)
         .chromeless()
         .task { await model.load() }
+        // Someone joining uses up their invite: reload so it leaves the list.
+        .task(id: model.groupId) {
+            for await event in app.live.events(forGroup: model.groupId) {
+                if event.kind == .memberChanged || event.kind == .reconnected { await model.load() }
+            }
+        }
         .confirmationDialog(confirmationTitle, isPresented: Binding(get: { confirmation != nil }, set: { if !$0 { confirmation = nil } }), titleVisibility: .visible, presenting: confirmation) { item in
             switch item {
             case .remove(let member):
@@ -149,7 +155,7 @@ struct MembersView: View {
             Text("Invite people").sectionLabelStyle()
             VStack(alignment: .leading, spacing: 4) {
                 Text("Share a link").bodyFont(15, .semibold)
-                Text("Anyone with the link can join.").bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
+                Text("One person can join with each link.").bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
             }
             if let link = model.link {
                 ShareLink(item: link.url, subject: Text("Join \(model.group?.name ?? "my group") on Availabliss"),
@@ -284,6 +290,6 @@ private struct InviteRow: View {
 
     private var status: String {
         let expires = invite.expiresAt.formatted(.dateTime.weekday(.wide).day().month(.wide))
-        return invite.isLink ? "Anyone with the link · expires \(expires)" : "Invited · invite expires \(expires)"
+        return invite.isLink ? "Link for one person · expires \(expires)" : "Invited · invite expires \(expires)"
     }
 }

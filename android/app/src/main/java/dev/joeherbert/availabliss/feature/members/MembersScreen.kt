@@ -375,7 +375,7 @@ private fun InviteCard(state: MembersUiState, actions: MembersActions) {
         Text("Invite people", style = type.cardTitle, color = colors.ink)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text("Share a link", style = type.bodySmallStrong, color = colors.ink)
-            Text("Anyone with the link can join.", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+            Text("One person can join with each link.", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
         }
         PrimaryButton(
             text = "Share invite link",

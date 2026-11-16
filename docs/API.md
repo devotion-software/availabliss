@@ -419,7 +419,7 @@ interface ManualBlock {
 | GET 🔒 | `/groups/:id/preferences` | | `{ preferences: GroupPreference[] }` (every member's) |
 | POST 🔒 | `/groups/:id/preferences` | `{ kind: 'dates', from, to }` or `{ kind: 'weekly', days?: Weekday[], window?: { from, to } \| null }` | `GroupPreference` |
 | DELETE 🔒 | `/groups/:id/preferences/:prefId` | | 204 (your own only) |
-| GET 👑 | `/groups/:id/invites` | | `{ invites: GroupInvite[] }` (live ones, newest first) |
+| GET 👑 | `/groups/:id/invites` | | `{ invites: GroupInvite[] }` (live ones, newest first; every invite is single-use, and joining also removes any other invites to that group sent to you) |
 | POST 👑 | `/groups/:id/invites` | `{ emails?: string[], usernames?: string[], email?: string }` (≤ 20 people) | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |
 | DELETE 👑 | `/groups/:id/invites/:inviteId` | | 204 (the link stops working) |
 | GET | `/invites/:token` | | `{ groupName, inviterName, memberCount, expiresAt, email: string \| null, username: string \| null }` |
