@@ -57,14 +57,14 @@ struct DateRangeInput: View {
     }
 
     private func side(label: String, date: Date, dateField: Field, timeField: Field) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .center, spacing: 4) {
             chip(Formatting.shortDay(date), field: dateField, font: .body15, accessibility: "\(label), \(Formatting.longDay(date))")
             if !allDay {
                 chip(Formatting.time(date), field: timeField, font: .display22, accessibility: "\(label == "Starts" ? "Start" : "End") time, \(Formatting.time(date))")
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private enum ChipFont { case body15, display22 }

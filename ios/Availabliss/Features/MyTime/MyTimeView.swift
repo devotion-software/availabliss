@@ -9,7 +9,6 @@ struct MyTimeView: View {
     @State private var draft: BlockDraft?
     @State private var calendarBusy: CalendarBusyItem?
     @State private var toast: String?
-    @State private var showBlockOptions = false
     /// Month (the default) or the agenda list, remembered on the device.
     @AppStorage("myTime.view") private var view: ViewMode = .month
     @State private var month = CalendarDay.today().firstOfMonth
@@ -57,15 +56,6 @@ struct MyTimeView: View {
                 }
             }
         }
-        .confirmationDialog("Block time", isPresented: $showBlockOptions, titleVisibility: .visible) {
-            Button(eveningIsTomorrow ? "Tomorrow evening" : "This evening") {
-                let today = CalendarDay.today()
-                draft = BlockDraft(day: eveningIsTomorrow ? today.adding(days: 1) : today, range: (18 * 60, DayLayout.dayMinutes))
-            }
-            Button("All day…") { draft = BlockDraft(day: .today(), when: .allDay, pickDate: true) }
-            Button("Away for a few days…") { draft = BlockDraft(day: .today(), when: .days, pickDate: true) }
-            Button("Something else…") { draft = BlockDraft(day: .today()) }
-        }
         .sheet(item: $draft) { $0.sheet(model: model) }
         .sheet(item: $calendarBusy) { busy in
             CalendarBusySheet(interval: busy.interval) {
@@ -112,7 +102,7 @@ struct MyTimeView: View {
                     }
                 }
                 Button {
-                    showBlockOptions = true
+                    draft = BlockDraft(day: .today())
                 } label: {
                     LoadingLabel(title: "Block time", systemImage: "plus")
                 }
@@ -159,9 +149,6 @@ struct MyTimeView: View {
             }
         }
     }
-
-    /// Past 18:00 the evening preset means tomorrow's.
-    private var eveningIsTomorrow: Bool { Calendar.current.component(.hour, from: Date()) >= 18 }
 
     /// Your repeating blocks, one row each.
     @ViewBuilder
