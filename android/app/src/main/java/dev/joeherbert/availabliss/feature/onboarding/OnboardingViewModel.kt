@@ -14,7 +14,9 @@ import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.feature.common.InviteRecipient
 import dev.joeherbert.availabliss.feature.common.InviteRecipients
 import dev.joeherbert.availabliss.feature.common.InviteRecipientsState
+import dev.joeherbert.availabliss.feature.timing.CustomKind
 import dev.joeherbert.availabliss.feature.timing.RequirementPresets
+import dev.joeherbert.availabliss.feature.timing.TimingDraft
 import dev.joeherbert.availabliss.feature.timing.TimingPreset
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +36,11 @@ data class OnboardingUiState(
     val message: UserMessage? = null,
     // First group
     val groupName: String = "",
-    val preset: TimingPreset = TimingPreset.Weekend,
+    /** Only the length is chosen here ("More options" opens the custom length); the rest stays default. */
+    val draft: TimingDraft = RequirementPresets.applyPreset(
+        RequirementPresets.defaultDraft(DateTimes.today(), ZoneId.systemDefault().id),
+        TimingPreset.Weekend,
+    ),
     val color: TileColor = TileColor.entries.random(),
     val creating: Boolean = false,
     val createdGroupId: String? = null,
@@ -83,7 +89,23 @@ class OnboardingViewModel @Inject constructor(
     // region First group
     fun onGroupNameChange(value: String) = _state.update { it.copy(groupName = value.take(80)) }
 
-    fun onPresetChange(preset: TimingPreset) = _state.update { it.copy(preset = preset) }
+    /** "More options" (Custom) starts at hours, like iOS, rather than a span that looks like the weekend. */
+    fun onPresetChange(preset: TimingPreset) = _state.update {
+        val draft = when {
+            preset != TimingPreset.Custom -> RequirementPresets.applyPreset(it.draft, preset)
+            it.draft.preset == TimingPreset.Custom -> it.draft
+            else -> RequirementPresets.applyCustomKind(it.draft, CustomKind.Hours)
+        }
+        it.copy(draft = draft)
+    }
+
+    fun onCustomKind(kind: CustomKind) = _state.update { it.copy(draft = RequirementPresets.applyCustomKind(it.draft, kind)) }
+
+    fun onDuration(deltaMinutes: Int) = _state.update { it.copy(draft = RequirementPresets.changeDuration(it.draft, deltaMinutes)) }
+
+    fun onDayCount(delta: Int) = _state.update { it.copy(draft = RequirementPresets.changeDayCount(it.draft, delta)) }
+
+    fun onWeeksLater(following: Boolean) = _state.update { it.copy(draft = RequirementPresets.setWeeksLater(it.draft, following)) }
 
     fun createGroup() {
         val s = _state.value
@@ -91,7 +113,7 @@ class OnboardingViewModel @Inject constructor(
         _state.update { it.copy(creating = true) }
         viewModelScope.launch {
             val timezone = users.user.value?.timezone ?: ZoneId.systemDefault().id
-            val draft = RequirementPresets.applyPreset(RequirementPresets.defaultDraft(DateTimes.today(), timezone), s.preset)
+            val draft = s.draft.copy(timezone = timezone)
             when (val result = groups.create(s.groupName.trim(), s.color, draft.toRequirement())) {
                 is ApiResult.Success -> _state.update { it.copy(creating = false, createdGroupId = result.value.id, step = OnboardingStep.Invite) }
                 is ApiResult.Failure -> _state.update { it.copy(creating = false, message = UserMessage(result.error.message)) }

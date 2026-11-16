@@ -88,20 +88,11 @@ class TimingEditor(
 
     fun selectCustomKind(kind: CustomKind) = edit { RequirementPresets.applyCustomKind(it, kind) }
 
-    fun changeDuration(deltaMinutes: Int) = edit { d ->
-        val l = d.length as? RequirementLength.Duration ?: return@edit d
-        RequirementPresets.withLength(d, RequirementLength.Duration((l.minutes + deltaMinutes).coerceIn(30, 12 * 60)))
-    }
+    fun changeDuration(deltaMinutes: Int) = edit { RequirementPresets.changeDuration(it, deltaMinutes) }
 
-    fun changeDayCount(delta: Int) = edit { d ->
-        val l = d.length as? RequirementLength.Days ?: return@edit d
-        RequirementPresets.withLength(d, RequirementLength.Days((l.count + delta).coerceIn(1, 31)))
-    }
+    fun changeDayCount(delta: Int) = edit { RequirementPresets.changeDayCount(it, delta) }
 
-    fun setWeeksLater(following: Boolean) = edit { d ->
-        val l = d.length as? RequirementLength.Span ?: return@edit d
-        RequirementPresets.withLength(d, l.copy(weeksLater = if (following) 1 else 0), null)
-    }
+    fun setWeeksLater(following: Boolean) = edit { RequirementPresets.setWeeksLater(it, following) }
 
     fun toggleDay(day: Int) = edit { d ->
         if (d.isSpan) d else d.copy(days = if (day in d.days) d.days - day else d.days + day)

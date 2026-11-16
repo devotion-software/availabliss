@@ -248,7 +248,8 @@ private struct WeekdayToggle: View {
 }
 
 /// Steppers for a custom length.
-private struct CustomLengthEditor: View {
+/// Hours / days / day-to-day, for a length none of the presets cover. Also used by the sign-up wizard.
+struct CustomLengthEditor: View {
     @Bindable var model: TimingEditorViewModel
     @Environment(\.theme) private var theme
 

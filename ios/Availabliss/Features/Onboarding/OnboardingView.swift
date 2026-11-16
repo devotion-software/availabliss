@@ -87,10 +87,20 @@ private struct FirstGroupStep: View {
     @Environment(\.theme) private var theme
     @Environment(\.onboardingSteps) private var steps
     @State private var name = ""
-    @State private var preset: TimingPreset = .weekend
+    /// Just the length is chosen here; the rest of the timing keeps its defaults until later.
+    @State private var timing: TimingEditorViewModel
     @State private var color = ["t1", "t2", "t3", "t4", "t5"].randomElement() ?? "t1"
     @State private var isSaving = false
     @State private var error: String?
+
+    init(api: APIClient, timezone: String, onCreated: @escaping (Group) -> Void, onSkip: @escaping () -> Void, onBack: @escaping () -> Void) {
+        self.api = api
+        self.timezone = timezone
+        self.onCreated = onCreated
+        self.onSkip = onSkip
+        self.onBack = onBack
+        _timing = State(initialValue: TimingEditorViewModel(draft: TimingEditorViewModel.fresh(.weekend, timezone: timezone), api: api))
+    }
 
     private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -116,11 +126,21 @@ private struct FirstGroupStep: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("What are you planning?").sectionLabelStyle()
                     FlowLayout(spacing: 8) {
-                        ForEach(TimingPreset.allCases.filter { $0 != .custom }) { option in
-                            Chip(label: option.label, isOn: preset == option, height: 40, fontSize: 14) { preset = option }
+                        ForEach(TimingPreset.allCases) { option in
+                            Chip(
+                                label: option == .custom ? "More options" : option.label,
+                                isOn: timing.preset == option,
+                                height: 40,
+                                fontSize: 14
+                            ) { timing.choose(option) }
                         }
                     }
+                    if timing.preset == .custom {
+                        CustomLengthEditor(model: timing)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
+                .animation(.spring(response: 0.35, dampingFraction: 0.85), value: timing.preset)
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -157,8 +177,7 @@ private struct FirstGroupStep: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            let requirement = TimingEditorViewModel.fresh(preset, timezone: timezone)
-            onCreated(try await api.send(API.Groups.create(CreateGroupBody(name: trimmed, color: color, requirement: requirement))))
+            onCreated(try await api.send(API.Groups.create(CreateGroupBody(name: trimmed, color: color, requirement: timing.draft))))
         } catch {
             self.error = error.userMessage
         }

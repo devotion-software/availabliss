@@ -1,11 +1,12 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { TILE_COLORS, type TileColor } from '#lib/types';
 	import { createGroup } from '#lib/client/groups';
 	import { updateMe } from '#lib/client/me';
 	import { browserTimeZone, todayIn } from '#lib/client/dates';
-	import { defaultRequirement, PRESETS, type PresetId } from '#lib/client/requirements';
+	import { applyPreset, defaultRequirement, PRESETS, type PresetId } from '#lib/client/requirements';
 	import { toasts } from '#lib/client/toast.svelte';
 	import { monogram } from '#lib/monogram';
 	import Button from '#lib/components/ui/Button.svelte';
@@ -14,23 +15,37 @@
 	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';
 	import StepDots from '#lib/components/onboarding/StepDots.svelte';
+	import CustomLength from '#lib/components/timing/CustomLength.svelte';
 
 	/** Step 3 of the sign-up wizard: your first group. Skippable. */
 	let { data } = $props();
 
 	let name = $state('');
 	let preset = $state<PresetId>('weekend');
+	/** Only the length is chosen here; the rest of the timing keeps its defaults until later. */
+	const tz = untrack(() => data.user.timezone) || browserTimeZone();
+	let requirement = $state(defaultRequirement(tz, todayIn(tz), 'weekend'));
+	/** "More options": every preset, plus a custom length. */
+	let more = $state(false);
 	const color: TileColor = TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)];
 	let busy = $state<'create' | 'skip' | null>(null);
-	const choices = PRESETS.filter((p) => ['2h', 'evening', 'day', 'weekend', 'week'].includes(p.id));
+	const COMMON: PresetId[] = ['2h', 'evening', 'day', 'weekend', 'week'];
+	const choices = $derived(more ? PRESETS : PRESETS.filter((p) => COMMON.includes(p.id)));
+
+	function pick(id: PresetId) {
+		preset = id;
+		if (id === 'custom') {
+			// Start custom at hours rather than a span that looks like the weekend.
+			if (requirement.length.type === 'span') requirement = { ...requirement, length: { type: 'duration', minutes: 180 }, window: { from: '08:00', to: '23:00' } };
+		} else requirement = applyPreset(requirement, id);
+	}
 
 	async function create(e: SubmitEvent) {
 		e.preventDefault();
 		if (!name.trim()) return;
 		busy = 'create';
 		try {
-			const tz = data.user.timezone || browserTimeZone();
-			const group = await createGroup({ name: name.trim(), color, requirement: defaultRequirement(tz, todayIn(tz), preset) });
+			const group = await createGroup({ name: name.trim(), color, requirement: $state.snapshot(requirement) });
 			await goto(`/onboarding/invite?group=${group.id}`);
 		} catch (err) {
 			toasts.error(err);
@@ -71,9 +86,15 @@
 		<legend class="eyebrow">What are you planning?</legend>
 		<div class="chips">
 			{#each choices as c (c.id)}
-				<Chip selected={preset === c.id} onclick={() => (preset = c.id)}>{c.label}</Chip>
+				<Chip selected={preset === c.id} onclick={() => pick(c.id)}>{c.label}</Chip>
 			{/each}
+			{#if !more}
+				<Chip selected={false} onclick={() => (more = true)}>More options</Chip>
+			{/if}
 		</div>
+		{#if preset === 'custom'}
+			<div class="custom"><CustomLength bind:requirement /></div>
+		{/if}
 	</fieldset>
 	<span class="spacer"></span>
 	<Button type="submit" size="lg" block loading={busy === 'create'} disabled={!name.trim() || !!busy}>Create group</Button>
@@ -125,6 +146,11 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
+	}
+	.custom {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
 	}
 	.spacer {
 		flex: 1;

@@ -134,6 +134,24 @@ object RequirementPresets {
         return draft.copy(preset = TimingPreset.Custom, customKind = kind, length = length, window = window)
     }
 
+    /** The custom editor's hours stepper: [deltaMinutes] more or less, 30 minutes to 12 hours. */
+    fun changeDuration(draft: TimingDraft, deltaMinutes: Int): TimingDraft {
+        val l = draft.length as? RequirementLength.Duration ?: return draft
+        return withLength(draft, RequirementLength.Duration((l.minutes + deltaMinutes).coerceIn(30, 12 * 60)))
+    }
+
+    /** The custom editor's days stepper: 1 to 31 days in a row. */
+    fun changeDayCount(draft: TimingDraft, delta: Int): TimingDraft {
+        val l = draft.length as? RequirementLength.Days ?: return draft
+        return withLength(draft, RequirementLength.Days((l.count + delta).coerceIn(1, 31)))
+    }
+
+    /** A span that ends the following week (Tue → the Thursday after next), or the same week. */
+    fun setWeeksLater(draft: TimingDraft, following: Boolean): TimingDraft {
+        val l = draft.length as? RequirementLength.Span ?: return draft
+        return withLength(draft, l.copy(weeksLater = if (following) 1 else 0), null)
+    }
+
     /** Re-detects the chip after an edit (e.g. changing the evening's start makes it Custom). */
     fun withLength(draft: TimingDraft, length: RequirementLength, window: TimeWindow? = draft.window): TimingDraft {
         val detected = detect(length, window)

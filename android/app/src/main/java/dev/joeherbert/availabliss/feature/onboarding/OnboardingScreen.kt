@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.joeherbert.availabliss.feature.timing.CustomLengthEditor
 import dev.joeherbert.availabliss.feature.timing.TimingPreset
 import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.Chip
@@ -213,9 +214,24 @@ fun OnboardingScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        TimingPreset.entries.filter { it != TimingPreset.Custom }.forEach { preset ->
-                            Chip(preset.label, selected = state.preset == preset, onClick = { viewModel.onPresetChange(preset) }, height = 40.dp)
+                        TimingPreset.entries.forEach { preset ->
+                            Chip(
+                                if (preset == TimingPreset.Custom) "More options" else preset.label,
+                                selected = state.draft.preset == preset,
+                                onClick = { viewModel.onPresetChange(preset) },
+                                height = 40.dp,
+                            )
                         }
+                    }
+                    if (state.draft.preset == TimingPreset.Custom) {
+                        CustomLengthEditor(
+                            state.draft,
+                            enabled = true,
+                            onCustomKind = viewModel::onCustomKind,
+                            onDuration = viewModel::onDuration,
+                            onDayCount = viewModel::onDayCount,
+                            onWeeksLater = viewModel::onWeeksLater,
+                        )
                     }
                 }
                 OnboardingStep.Invite -> OnboardingPage(

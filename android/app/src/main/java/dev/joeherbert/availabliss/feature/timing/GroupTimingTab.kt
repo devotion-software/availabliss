@@ -232,24 +232,37 @@ private fun LengthSection(draft: TimingDraft, enabled: Boolean, actions: TimingA
             }
         }
         if (draft.preset == TimingPreset.Custom) {
-            SegmentedControl(
-                segments = CustomKind.entries.map { Segment(it, it.label) },
-                selected = draft.customKind,
-                onSelect = { if (enabled) actions.onCustomKind(it) },
-                style = SegmentedStyle.Inset,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            when (val l = draft.length) {
-                is RequirementLength.Duration -> Stepper(TimingLabels.duration(l.minutes), "duration", enabled, onMinus = { actions.onDuration(-30) }, onPlus = { actions.onDuration(30) })
-                is RequirementLength.Days -> Stepper(TimingLabels.days(l.count), "number of days", enabled, onMinus = { actions.onDayCount(-1) }, onPlus = { actions.onDayCount(1) })
-                is RequirementLength.Span -> ToggleRow(
-                    title = "Ends the following week",
-                    subtitle = "e.g. Tue → the Thursday after next",
-                    checked = l.weeksLater == 1,
-                    onCheckedChange = { if (enabled) actions.onWeeksLater(it) },
-                )
-            }
+            CustomLengthEditor(draft, enabled, actions.onCustomKind, actions.onDuration, actions.onDayCount, actions.onWeeksLater)
         }
+    }
+}
+
+/** Hours / days / span, for a length none of the presets cover. Also used by the sign-up wizard. */
+@Composable
+internal fun CustomLengthEditor(
+    draft: TimingDraft,
+    enabled: Boolean,
+    onCustomKind: (CustomKind) -> Unit,
+    onDuration: (Int) -> Unit,
+    onDayCount: (Int) -> Unit,
+    onWeeksLater: (Boolean) -> Unit,
+) {
+    SegmentedControl(
+        segments = CustomKind.entries.map { Segment(it, it.label) },
+        selected = draft.customKind,
+        onSelect = { if (enabled) onCustomKind(it) },
+        style = SegmentedStyle.Inset,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    when (val l = draft.length) {
+        is RequirementLength.Duration -> Stepper(TimingLabels.duration(l.minutes), "duration", enabled, onMinus = { onDuration(-30) }, onPlus = { onDuration(30) })
+        is RequirementLength.Days -> Stepper(TimingLabels.days(l.count), "number of days", enabled, onMinus = { onDayCount(-1) }, onPlus = { onDayCount(1) })
+        is RequirementLength.Span -> ToggleRow(
+            title = "Ends the following week",
+            subtitle = "e.g. Tue → the Thursday after next",
+            checked = l.weeksLater == 1,
+            onCheckedChange = { if (enabled) onWeeksLater(it) },
+        )
     }
 }
 
