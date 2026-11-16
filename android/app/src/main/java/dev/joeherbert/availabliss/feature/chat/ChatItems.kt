@@ -68,7 +68,6 @@ fun buildChatItems(
     memberCount: Int,
     proposals: Map<String, Proposal>,
     events: Map<String, GroupEvent>,
-    isAdmin: Boolean,
     today: LocalDate = DateTimes.today(),
 ): List<ChatItem> {
     val items = mutableListOf<ChatItem>()
@@ -88,7 +87,7 @@ fun buildChatItems(
                 items += ChatItem.System(m.id, m.body.orEmpty())
 
             m.kind == MessageKind.Poll && m.poll != null ->
-                items += ChatItem.PollItem(m.id, m.poll.toUi(directory, own || isAdmin, title = if (own) "Your poll" else "Poll by $authorName"), own, m.authorId?.let(directory::avatar))
+                items += ChatItem.PollItem(m.id, m.poll.toUi(directory, canClose = own, title = if (own) "Your poll" else "Poll by $authorName"), own, m.authorId?.let(directory::avatar))
 
             m.kind == MessageKind.Proposal && m.proposalId != null -> {
                 val p = proposals[m.proposalId]

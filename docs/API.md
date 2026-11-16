@@ -567,7 +567,7 @@ interface MessageInfo {
 | POST 🔒 | `/groups/:id/messages/receipts` | `{ upTo: messageId, state: 'delivered' \| 'seen' }` | `204` |
 | GET 🔒 | `/messages/:id/info` | | `MessageInfo` (author only) |
 | POST 🔒 | `/polls/:id/vote` | `{ optionIds: string[] }` (empty = remove vote) | `Poll` |
-| POST 🔒 | `/polls/:id/close` | | `Poll` (poll author or admin) |
+| POST 🔒 | `/polls/:id/close` | | `Poll` (only the poll's author) |
 
 ### Live updates
 

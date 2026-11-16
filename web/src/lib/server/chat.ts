@@ -78,8 +78,8 @@ export async function vote(pollId: string, userId: string, picked: string[]): Pr
 
 export async function closePoll(pollId: string, userId: string): Promise<Poll> {
 	const row = await pollGroup(pollId);
-	const role = await requireMember(row.groupId, userId);
-	if (row.createdBy !== userId && role === 'member') throw forbidden('Only the poll author or an admin can close it');
+	await requireMember(row.groupId, userId);
+	if (row.createdBy !== userId) throw forbidden('Only the person who made the poll can close it');
 	await db.update(polls).set({ closedAt: new Date() }).where(eq(polls.id, pollId));
 	const updated = await getPoll(pollId);
 	await publishToGroup(row.groupId, 'poll.updated', updated);

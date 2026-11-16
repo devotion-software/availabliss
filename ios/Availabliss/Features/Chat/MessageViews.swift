@@ -42,7 +42,7 @@ struct MessageRow: View {
         case .poll:
             if let poll = message.poll {
                 VStack(alignment: .trailing, spacing: 4) {
-                    PollCard(poll: poll, me: me, title: isMine ? "Your poll" : "Poll by \(author?.firstName ?? "Someone")", canClose: isMine || group.role.isAdmin, model: model)
+                    PollCard(poll: poll, me: me, title: isMine ? "Your poll" : "Poll by \(author?.firstName ?? "Someone")", canClose: isMine, model: model)
                     if isMine, isLatestOwn, let receipt = message.receipt {
                         ReadReceipt(receipt: receipt, group: group, action: openInfo)
                     }

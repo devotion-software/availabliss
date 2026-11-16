@@ -133,7 +133,7 @@
 						mine={item.mine}
 						authorName={m.authorId ? members.get(m.authorId)?.name : undefined}
 						{compact}
-						canClose={item.mine || admin}
+						canClose={item.mine}
 						onvote={(ids) => thread.vote(m.poll!.id, ids)}
 						onclose={() => thread.closePoll(m.poll!.id)}
 					/>

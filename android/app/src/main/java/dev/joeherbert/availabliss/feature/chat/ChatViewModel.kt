@@ -460,7 +460,6 @@ class ChatViewModel @Inject constructor(
         memberCount = group?.memberCount ?: 0,
         proposals = proposals,
         events = events,
-        isAdmin = group?.role?.isAdmin == true,
     ).asReversed()
 
     private fun ChatData.toUi(items: List<ChatItem>, me: String?): ChatUiState {

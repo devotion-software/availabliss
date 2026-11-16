@@ -144,6 +144,8 @@ describe('chat', () => {
 		expect((await apiError(closePoll(poll.id, outsider))).code).toBe('not_found');
 		const other = await sendPoll(groupId, owner, { question: 'When?', options: ['Sat', 'Sun'], multi: true });
 		expect((await apiError(closePoll(other.poll!.id, member))).code).toBe('forbidden');
+		// Not even the group's owner can close someone else's poll.
+		expect((await apiError(closePoll(poll.id, owner))).code).toBe('forbidden');
 		expect((await vote(other.poll!.id, member, other.poll!.options.map((o) => o.id))).options.every((o) => o.voterIds.includes(member))).toBe(true);
 
 		expect((await closePoll(poll.id, member)).closed).toBe(true);
