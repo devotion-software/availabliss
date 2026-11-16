@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -205,7 +206,8 @@ private fun HeatCell(cell: MonthDayUi, onClick: () -> Unit, modifier: Modifier =
     val (fill, fg) = levelColors(level, colors)
     // On a filled cell, today's pill is inverted.
     val strong = level >= 2
-    Column(
+    // The number alone is centred; the dot hangs just below it.
+    Box(
         modifier
             .height(CellHeight)
             .alpha(if (cell.past) 0.4f else 1f)
@@ -220,8 +222,7 @@ private fun HeatCell(cell: MonthDayUi, onClick: () -> Unit, modifier: Modifier =
                     onClick(label = "See the day") { onClick(); true }
                 }
             },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             cell.date.dayOfMonth.toString(),
@@ -238,7 +239,7 @@ private fun HeatCell(cell: MonthDayUi, onClick: () -> Unit, modifier: Modifier =
         // Your own block that day.
         Box(
             Modifier
-                .padding(top = 5.dp)
+                .offset(y = 16.dp)
                 .size(4.dp)
                 .clip(CircleShape)
                 .background(if (!cell.hasBlock) Color.Transparent else if (strong) colors.onAccent else colors.accentInk),

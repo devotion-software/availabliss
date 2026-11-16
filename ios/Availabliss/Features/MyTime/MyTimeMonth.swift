@@ -154,7 +154,8 @@ private struct HeatCell: View {
         let isToday = day == .today()
         let onAccent = level >= 2
         Button(action: action) {
-            VStack(spacing: 3) {
+            // The number alone is centred; the dot hangs just below it.
+            ZStack {
                 Text("\(day.day)")
                     .font(AppFont.body(15, .semibold, relativeTo: .body))
                     .monospacedDigit()
@@ -164,6 +165,7 @@ private struct HeatCell: View {
                 Circle()
                     .fill(onAccent ? theme.onAccent : theme.accent)
                     .frame(width: 4, height: 4)
+                    .offset(y: 14)
                     .opacity(!isPast && summary?.hasOwnBlock == true ? 1 : 0)
             }
             .frame(maxWidth: .infinity, minHeight: 46, maxHeight: 46)

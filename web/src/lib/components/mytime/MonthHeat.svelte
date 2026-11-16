@@ -175,7 +175,6 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 3px;
 		border: 1px solid transparent;
 		color: var(--ink);
 		font-variant-numeric: tabular-nums;
@@ -200,7 +199,11 @@
 		padding: 3px 6px;
 		border-radius: 999px;
 	}
+	/* Out of the flow so the number alone is centred, hanging just below it. */
 	.dot {
+		position: absolute;
+		top: calc(50% + 12px);
+		left: calc(50% - 2px);
 		width: 4px;
 		height: 4px;
 		border-radius: 50%;
