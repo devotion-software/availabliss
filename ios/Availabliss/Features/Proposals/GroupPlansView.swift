@@ -13,21 +13,17 @@ struct GroupPlansView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("Proposals").displayFont(19, .semibold).accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    Button { editingEvent = .new } label: { Label("Add event", systemImage: "plus") }
-                        .buttonStyle(.glassPill)
-                }
                 if !detail.plansLoaded {
                     StatusView(kind: .loading)
-                } else if detail.proposals.contains(where: { $0.status == .open }) || detail.events.isEmpty {
-                    proposalsSection
-                    eventsSection
                 } else {
-                    // Everything's settled: what's coming up first, then a quiet note.
+                    // What's coming up first, then proposals (or a quiet note when everything's settled).
                     eventsSection
-                    nothingWaiting
+                    proposalsHeader
+                    if detail.proposals.contains(where: { $0.status == .open }) || detail.events.isEmpty {
+                        proposalsSection
+                    } else {
+                        nothingWaiting
+                    }
                 }
             }
             .padding(.horizontal, 20)
@@ -41,6 +37,16 @@ struct GroupPlansView: View {
             EventEditorSheet(groupId: group.id, target: target, api: detail.api) { _ in Task { await load() } }
         }
         .errorAlert($error)
+    }
+
+    private var proposalsHeader: some View {
+        HStack {
+            Text("Proposals").displayFont(19, .semibold).accessibilityAddTraits(.isHeader)
+            Spacer()
+            Button { editingEvent = .new } label: { Label("Add event", systemImage: "plus") }
+                .buttonStyle(.glassPill)
+        }
+        .padding(.top, detail.events.isEmpty ? 0 : 6)
     }
 
     @ViewBuilder
@@ -73,7 +79,6 @@ struct GroupPlansView: View {
         .padding(.horizontal, 16)
         .frame(minHeight: 52)
         .glass(cornerRadius: 18)
-        .padding(.top, 6)
     }
 
     @ViewBuilder
