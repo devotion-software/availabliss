@@ -22,11 +22,18 @@ struct MessageRow: View {
     var body: some View {
         switch message.kind {
         case .system:
-            Text(message.body ?? "")
-                .bodyFont(12, relativeTo: .caption)
-                .foregroundStyle(theme.muted)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
+            // A confirmed proposal ("Everyone's in for …") gets a celebratory banner once its event is loaded.
+            if let id = message.eventId, let event = model.events[id] {
+                ConfirmedBanner(event: event, messageId: message.id, isRecent: Date.now.timeIntervalSince(message.createdAt) < 24 * 3600) {
+                    if let proposalId = event.proposalId { openProposal(proposalId) }
+                }
+            } else {
+                Text(message.body ?? "")
+                    .bodyFont(12, relativeTo: .caption)
+                    .foregroundStyle(theme.muted)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
         case .text:
             if message.isDeleted {
                 if isMine {
@@ -330,5 +337,170 @@ private struct EventMessageCard: View {
         }
         .padding(12)
         .glass(cornerRadius: 20)
+    }
+}
+
+/// "Everyone's in": a confirmed plan, celebrated in the chat. Bursts confetti the first time a
+/// recent one appears in this session.
+private struct ConfirmedBanner: View {
+    let event: GroupEvent
+    let messageId: String
+    let isRecent: Bool
+    let open: () -> Void
+    @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var burst = 0
+
+    /// Banners that have already burst this session.
+    @MainActor private static var burstIds = Set<String>()
+
+    private var when: String {
+        let span = Formatting.span(start: event.start, end: event.end, allDay: event.allDay)
+        return event.location.map { "\(span) \u{00B7} \($0)" } ?? span
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: open) {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 18, weight: .heavy))
+                        .foregroundStyle(theme.onAccent)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(theme.ok))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Everyone\u{2019}s in").bodyFont(12, .semibold, relativeTo: .caption).foregroundStyle(theme.okInk)
+                        Text(event.title).displayFont(17, .bold, relativeTo: .headline).foregroundStyle(theme.ink).lineLimit(2)
+                        Text(when).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted).lineLimit(2)
+                    }
+                    .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Everyone\u{2019}s in. \(event.title), \(when)")
+            .accessibilityAddTraits(event.proposalId == nil ? [] : .isButton)
+            AddToCalendarButton(event: event, height: 40)
+        }
+        .padding(14)
+        .background {
+            ZStack(alignment: .topTrailing) {
+                shape.fill(theme.surface)
+                shape.fill(theme.okBg)
+                ConfettiSprinkle().padding(.top, 8).padding(.trailing, 12)
+            }
+        }
+        .overlay(shape.strokeBorder(theme.ok.opacity(0.35), lineWidth: 1))
+        .clipShape(shape)
+        .overlay(alignment: .top) {
+            ConfettiBurst(trigger: burst).allowsHitTesting(false).accessibilityHidden(true)
+        }
+        .zIndex(1)
+        .sensoryFeedback(.success, trigger: burst)
+        .onAppear {
+            guard isRecent, !reduceMotion, !Self.burstIds.contains(messageId) else { return }
+            Self.burstIds.insert(messageId)
+            burst += 1
+        }
+    }
+}
+
+/// The colours confetti is cut from.
+private extension Theme {
+    var confetti: [Color] { [accent, ok, warn, tile("t4"), tile("t2")] }
+}
+
+/// A few still bits of confetti in the banner's corner.
+private struct ConfettiSprinkle: View {
+    @Environment(\.theme) private var theme
+    private static let bits: [(x: CGFloat, y: CGFloat, angle: Double, round: Bool)] = [
+        (0, 4, 20, false), (-22, 18, -35, true), (-44, 2, 60, false), (-10, 34, 75, false),
+        (-60, 26, -15, true), (-34, 44, 40, false), (-78, 10, 10, false), (4, 54, -50, true),
+    ]
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            ForEach(Array(Self.bits.enumerated()), id: \.offset) { index, bit in
+                let color = theme.confetti[index % theme.confetti.count]
+                SwiftUI.Group {
+                    if bit.round { Circle().fill(color).frame(width: 5, height: 5) } else { RoundedRectangle(cornerRadius: 1.5).fill(color).frame(width: 4, height: 9) }
+                }
+                .rotationEffect(.degrees(bit.angle))
+                .offset(x: bit.x, y: bit.y)
+            }
+        }
+        .frame(width: 90, height: 64, alignment: .topTrailing)
+        .opacity(0.6)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A one-off burst: pieces fly up and out from the top centre, then fall and fade.
+private struct ConfettiBurst: View {
+    let trigger: Int
+    @Environment(\.theme) private var theme
+    @State private var start: Date?
+
+    private struct Piece {
+        let vx: Double, vy: Double, spin: Double, size: CGSize, round: Bool, color: Int
+    }
+    private static let duration = 1.6
+    private static let pieces: [Piece] = (0..<36).map { i in
+        var rng = SeededRandom(seed: UInt64(i) &* 2654435761 &+ 7)
+        let angle = Double.pi * (1.1 + 0.8 * rng.next())   // up and out
+        let speed = 260 + 260 * rng.next()
+        return Piece(
+            vx: cos(angle) * speed, vy: sin(angle) * speed,
+            spin: (rng.next() - 0.5) * 1440,
+            size: rng.next() < 0.3 ? CGSize(width: 6, height: 6) : CGSize(width: 6, height: 10),
+            round: rng.next() < 0.3, color: i
+        )
+    }
+
+    var body: some View {
+        TimelineView(.animation(paused: start == nil)) { context in
+            Canvas { canvas, size in
+                guard let start else { return }
+                let t = context.date.timeIntervalSince(start)
+                guard t < Self.duration else { return }
+                let origin = CGPoint(x: size.width / 2, y: 160)  // just inside the banner's top (the canvas starts 140 above it)
+                let colors = theme.confetti
+                for piece in Self.pieces {
+                    let x = origin.x + piece.vx * t
+                    let y = origin.y + piece.vy * t + 0.5 * 900 * t * t
+                    var ctx = canvas
+                    ctx.opacity = max(0, 1 - t / Self.duration)
+                    ctx.translateBy(x: x, y: y)
+                    ctx.rotate(by: .degrees(piece.spin * t))
+                    let rect = CGRect(x: -piece.size.width / 2, y: -piece.size.height / 2, width: piece.size.width, height: piece.size.height)
+                    let path = piece.round ? Path(ellipseIn: rect) : Path(roundedRect: rect, cornerRadius: 1.5)
+                    ctx.fill(path, with: .color(colors[piece.color % colors.count]))
+                }
+            }
+        }
+        .frame(height: 360)
+        .offset(y: -140)
+        .onChange(of: trigger) { _, _ in
+            start = .now
+            Task {
+                try? await Task.sleep(for: .seconds(Self.duration))
+                start = nil
+            }
+        }
+    }
+}
+
+/// Small deterministic generator so the burst looks the same every time.
+private struct SeededRandom {
+    var state: UInt64
+    init(seed: UInt64) { state = seed == 0 ? 0x9E3779B97F4A7C15 : seed }
+    mutating func next() -> Double {
+        state ^= state << 13
+        state ^= state >> 7
+        state ^= state << 17
+        return Double(state % 10_000) / 10_000
     }
 }
