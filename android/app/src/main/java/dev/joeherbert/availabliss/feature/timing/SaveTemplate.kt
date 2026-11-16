@@ -89,7 +89,8 @@ class TemplateSaver(
 
 /**
  * "Save this timing as a template": a quiet action that opens an inline name field.
- * [suggestion] prefills the name (e.g. the group's).
+ * [suggestion] prefills the name (e.g. the group's). When the timing is already one of
+ * your templates ([savedAs] is its name), says so instead of offering to save it again.
  */
 @Composable
 fun SaveTemplateRow(
@@ -99,6 +100,7 @@ fun SaveTemplateRow(
     suggestion: String = "",
     /** Height of whatever floats over the bottom of the scroller (a save bar), kept clear when the form opens. */
     bottomClearance: Dp = 0.dp,
+    savedAs: String? = null,
 ) {
     val colors = AvailablissTheme.colors
     var naming by rememberSaveable { mutableStateOf(false) }
@@ -110,6 +112,17 @@ fun SaveTemplateRow(
             seenSaves = state.savedCount
             naming = false
         }
+    }
+    if (!naming && savedAs != null) {
+        Row(
+            modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(AvIcons.Check, null, tint = colors.muted, modifier = Modifier.size(16.dp))
+            Text("Saved as the template “$savedAs”", style = AvailablissTheme.type.bodySmallStrong, color = colors.muted)
+        }
+        return
     }
     if (!naming) {
         Row(

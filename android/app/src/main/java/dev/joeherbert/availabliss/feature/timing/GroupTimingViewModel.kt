@@ -11,9 +11,12 @@ import dev.joeherbert.availabliss.core.data.TemplatesRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiError
 import dev.joeherbert.availabliss.core.network.ApiResult
+import dev.joeherbert.availabliss.core.network.getOrNull
+import dev.joeherbert.availabliss.core.network.model.RequirementTemplate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -27,6 +30,8 @@ data class GroupTimingUiState(
     val dirty: Boolean = false,
     /** "Save this timing as a template" (anyone can: it's a personal copy). */
     val templateSave: TemplateSaveState = TemplateSaveState(),
+    /** Name of your template with this exact timing, if there is one (then it isn't offered again). */
+    val savedAsTemplate: String? = null,
     val saving: Boolean = false,
     /** Set after a successful save; the screen navigates and calls [GroupTimingViewModel.savedHandled]. */
     val saved: Boolean = false,
@@ -39,7 +44,7 @@ data class GroupTimingUiState(
 class GroupTimingViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val groups: GroupsRepository,
-    templates: TemplatesRepository,
+    private val templates: TemplatesRepository,
     users: UserRepository,
     regions: RegionsRepository,
 ) : ViewModel() {
@@ -51,12 +56,24 @@ class GroupTimingViewModel @Inject constructor(
     val editor = TimingEditor(viewModelScope, groups, users, regions).apply { canEdit = false }
     private var original: TimingDraft? = null
 
-    private val templateSaver = TemplateSaver(viewModelScope, templates, onMessage = { text -> _uiState.update { it.copy(message = UserMessage(text)) } })
+    /** Your templates, to tell whether the timing shown is already one. */
+    private val savedTemplates = MutableStateFlow<List<RequirementTemplate>>(emptyList())
+
+    private val templateSaver = TemplateSaver(
+        viewModelScope,
+        templates,
+        onMessage = { text -> _uiState.update { it.copy(message = UserMessage(text)) } },
+        onSaved = { saved -> savedTemplates.update { it + saved } },
+    )
 
     init {
         viewModelScope.launch {
-            editor.state.collect { e -> _uiState.update { it.copy(editor = e, dirty = e != null && e.draft != original) } }
+            combine(editor.state, savedTemplates) { e, list -> e to list }.collect { (e, list) ->
+                val match = e?.let { Templates.matching(list, it.draft.toRequirement()) }
+                _uiState.update { it.copy(editor = e, dirty = e != null && e.draft != original, savedAsTemplate = match?.name) }
+            }
         }
+        viewModelScope.launch { templates.list().getOrNull()?.let { savedTemplates.value = it } }
         viewModelScope.launch { templateSaver.state.collect { t -> _uiState.update { it.copy(templateSave = t) } } }
         load()
     }

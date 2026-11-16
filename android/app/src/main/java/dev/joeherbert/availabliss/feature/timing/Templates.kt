@@ -2,6 +2,7 @@ package dev.joeherbert.availabliss.feature.timing
 
 import dev.joeherbert.availabliss.core.network.model.DateRange
 import dev.joeherbert.availabliss.core.network.model.Requirement
+import dev.joeherbert.availabliss.core.network.model.RequirementTemplate
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -27,6 +28,23 @@ object Templates {
             timezone = timezone,
         )
     }
+
+    /**
+     * True when [a] and [b] are the same timing, ignoring when the search range starts
+     * (its length still counts) and the time zone: a template's range moves to "today"
+     * when it's used. Mirrors web `sameTiming`.
+     */
+    fun sameTiming(a: Requirement, b: Requirement): Boolean {
+        fun normalized(r: Requirement): Requirement {
+            val length = ChronoUnit.DAYS.between(LocalDate.parse(r.range.from), LocalDate.parse(r.range.to))
+            return r.copy(range = DateRange("", length.toString()), days = r.days.toSortedSet().toList(), timezone = "")
+        }
+        return runCatching { normalized(a) == normalized(b) }.getOrDefault(false)
+    }
+
+    /** The template with the same timing as [requirement], if one was saved. */
+    fun matching(templates: List<RequirementTemplate>, requirement: Requirement): RequirementTemplate? =
+        templates.firstOrNull { sameTiming(it.requirement, requirement) }
 
     /** "Saved “X”. Pick it next time you create a group." */
     fun savedMessage(name: String) = "Saved “$name”. Pick it next time you create a group."

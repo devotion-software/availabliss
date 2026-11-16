@@ -27,3 +27,34 @@ export function requirementFromTemplate(template: Pick<RequirementTemplate, 'req
 		timezone: timeZone
 	};
 }
+
+/** Key-order-independent JSON, so a timing from the server compares equal to the same one built here. */
+function stable(value: unknown): string {
+	if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
+	if (value && typeof value === 'object') {
+		const entries = Object.entries(value as Record<string, unknown>)
+			.filter(([, v]) => v !== undefined)
+			.sort(([a], [b]) => (a < b ? -1 : 1));
+		return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stable(v)}`).join(',')}}`;
+	}
+	return JSON.stringify(value ?? null);
+}
+
+/**
+ * True when `a` and `b` are the same timing, ignoring when the search range
+ * starts (its length still counts) and the time zone: a template's range moves
+ * to "today" when it's used. Mirrors `Requirement.isSameTiming` on iOS and Android.
+ */
+export function sameTiming(a: Requirement, b: Requirement): boolean {
+	const normalize = (r: Requirement) => ({
+		...r,
+		range: daysBetween(r.range.from, r.range.to),
+		days: [...new Set(r.days)].sort((x, y) => x - y),
+		timezone: ''
+	});
+	return stable(normalize(a)) === stable(normalize(b));
+}
+
+/** The template with the same timing as `requirement`, if one was saved. */
+export const matchingTemplate = (templates: RequirementTemplate[], requirement: Requirement) =>
+	templates.find((t) => sameTiming(t.requirement, requirement));

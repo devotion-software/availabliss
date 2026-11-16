@@ -23,6 +23,31 @@ struct RequirementTemplate: Codable, Sendable, Identifiable, Equatable {
     }
 }
 
+extension Requirement {
+    /// True when this is the same timing as `other`, ignoring when the search range starts (its
+    /// length still counts) and the time zone: a template's range moves to "today" when it's used.
+    /// Mirrors `sameTiming` in web/src/lib/client/templates.ts.
+    func isSameTiming(as other: Requirement, calendar: Calendar = .current) -> Bool {
+        func normalized(_ r: Requirement) -> Requirement {
+            var r = r
+            let length = calendar.dateComponents([.day], from: r.range.from.startDate(calendar: calendar), to: r.range.to.startDate(calendar: calendar)).day ?? 0
+            let anchor = CalendarDay(year: 2000, month: 1, day: 1)
+            r.range = DateRange(from: anchor, to: anchor.adding(days: length, calendar: calendar))
+            r.days = Array(Set(r.days)).sorted()
+            r.timezone = ""
+            return r
+        }
+        return normalized(self) == normalized(other)
+    }
+}
+
+extension Array where Element == RequirementTemplate {
+    /// The template with the same timing as `requirement`, if one was saved.
+    func matching(_ requirement: Requirement) -> RequirementTemplate? {
+        first { $0.requirement.isSameTiming(as: requirement) }
+    }
+}
+
 struct TemplatesResponse: Decodable, Sendable { let templates: [RequirementTemplate] }
 
 struct CreateTemplateBody: Encodable, Sendable {

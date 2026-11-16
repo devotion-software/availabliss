@@ -276,7 +276,7 @@ fun NewGroupTimingContent(state: NewGroupUiState, editor: TimingEditorUiState, a
                 verticalArrangement = Arrangement.spacedBy(Spacing.l),
             ) {
                 TimingEditorSections(editor, canEdit = true, actions = actions)
-                SaveTemplateRow(state.templateSave, actions.onSaveTemplate, bottomClearance = 170.dp)
+                SaveTemplateRow(state.templateSave, actions.onSaveTemplate, bottomClearance = 170.dp, savedAs = state.savedAsTemplate)
             }
         }
         Column(

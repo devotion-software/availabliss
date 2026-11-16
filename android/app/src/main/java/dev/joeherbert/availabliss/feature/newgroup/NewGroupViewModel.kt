@@ -53,6 +53,8 @@ data class NewGroupUiState(
     val createdGroupId: String? = null,
 ) {
     val canContinue: Boolean get() = name.isNotBlank()
+    /** Name of your template with the timing shown, if there is one (then it isn't offered again). */
+    val savedAsTemplate: String? get() = editor?.let { Templates.matching(templates, it.draft.toRequirement()) }?.name
     val canCreate: Boolean get() = name.isNotBlank() && editor != null && !creating
 
     /** Preview monogram, e.g. "Lake District crew" → "LD" (the server assigns the real one). */
