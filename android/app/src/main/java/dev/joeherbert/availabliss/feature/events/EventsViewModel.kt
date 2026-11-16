@@ -3,7 +3,6 @@ package dev.joeherbert.availabliss.feature.events
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
 import dev.joeherbert.availabliss.core.common.DateTimes
@@ -18,7 +17,6 @@ import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.core.network.model.Role
 import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
 import dev.joeherbert.availabliss.feature.common.AddToCalendarState
-import dev.joeherbert.availabliss.navigation.EventsRoute
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -71,7 +69,8 @@ class EventsViewModel @Inject constructor(
     liveEvents: LiveEvents,
 ) : ViewModel() {
 
-    private val groupId = savedStateHandle.toRoute<EventsRoute>().groupId
+    // Used by the Events screen and the group's Plans screen, so read the id by name.
+    private val groupId: String = savedStateHandle.get<String>("groupId").orEmpty()
     private val data = MutableStateFlow(EventsData())
 
     val state: StateFlow<EventsUiState> = combine(data, addToCalendar.state) { d, cal -> d.toUi(cal) }

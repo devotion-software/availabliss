@@ -153,8 +153,9 @@ fun DeleteEventDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Uni
     )
 }
 
+/** A group event: date tile, title, time, place, and Add to calendar while it's coming up. */
 @Composable
-private fun EventRow(row: EventRowUi, past: Boolean, onOpen: () -> Unit, onAddToCalendar: () -> Unit, onDelete: () -> Unit) {
+internal fun EventRow(row: EventRowUi, past: Boolean, onOpen: () -> Unit, onAddToCalendar: () -> Unit, onDelete: () -> Unit) {
     val colors = AvailablissTheme.colors
     GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.row, contentPadding = PaddingValues(12.dp), onClick = onOpen, onClickLabel = "Open ${row.title}") {
         row.image?.let { CoverPhoto(it, aspectRatio = 2.4f) }

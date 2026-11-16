@@ -183,7 +183,8 @@ fun MainNavHost(root: RootViewModel) {
                 GroupProposalsTab(
                     onBack = { nav.popBackStack() },
                     onOpenProposal = { nav.navigate(ProposalRoute(it)) },
-                    onOpenEvents = { nav.navigate(EventsRoute(groupId)) },
+                    onOpenEvent = { nav.navigate(EventEditorRoute(groupId, eventId = it)) },
+                    onAddEvent = { nav.navigate(EventEditorRoute(groupId)) },
                     viewModel = hiltViewModel<GroupProposalsViewModel>(owner),
                 )
             }

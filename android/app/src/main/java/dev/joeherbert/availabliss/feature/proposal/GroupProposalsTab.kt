@@ -2,6 +2,25 @@ package dev.joeherbert.availabliss.feature.proposal
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
+import dev.joeherbert.availabliss.designsystem.component.GlassPillButton
+import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
+import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
+import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
+import dev.joeherbert.availabliss.feature.common.CalendarPickerRow
+import dev.joeherbert.availabliss.feature.events.DeleteEventDialog
+import dev.joeherbert.availabliss.feature.events.EventRow
+import dev.joeherbert.availabliss.feature.events.EventRowUi
+import dev.joeherbert.availabliss.feature.events.EventsUiState
+import dev.joeherbert.availabliss.feature.events.EventsViewModel
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +36,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -39,31 +57,63 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
 
-/** The group's proposals and events ("Plans" in the group menu), pushed over its calendar. */
+/**
+ * The group's Plans screen, matching iOS: what's coming up first (events, with Add to calendar),
+ * then the Proposals heading with Add event and the open proposals — or a quiet note when
+ * everything's settled.
+ */
 @Composable
 fun GroupProposalsTab(
     onBack: () -> Unit,
     onOpenProposal: (String) -> Unit,
-    onOpenEvents: () -> Unit,
+    onOpenEvent: (String) -> Unit,
+    onAddEvent: () -> Unit,
     viewModel: GroupProposalsViewModel = hiltViewModel(),
+    eventsViewModel: EventsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    GroupProposalsContent(state, onBack, onOpenProposal, onOpenEvents, viewModel::refresh)
+    val events by eventsViewModel.state.collectAsStateWithLifecycle()
+    val snackbar = rememberSnackbarHostState()
+    UserMessageEffect(events.message, snackbar, eventsViewModel::onMessageShown)
+    AddToCalendarEffect(events.calendar, eventsViewModel::onIntentHandled)
+    GroupProposalsContent(
+        state = state,
+        events = events,
+        onBack = onBack,
+        onOpenProposal = onOpenProposal,
+        onOpenEvent = onOpenEvent,
+        onAddEvent = onAddEvent,
+        onRetry = {
+            viewModel.refresh()
+            eventsViewModel.refresh()
+        },
+        onAddToCalendar = eventsViewModel::onAddToCalendar,
+        onSelectCalendar = eventsViewModel::onSelectCalendar,
+        onDeleteEvent = eventsViewModel::onDelete,
+    )
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) { AvSnackbarHost(snackbar, Modifier.navigationBarsPadding()) }
 }
 
 @Composable
 private fun GroupProposalsContent(
     state: GroupProposalsUiState,
+    events: EventsUiState,
     onBack: () -> Unit,
     onOpenProposal: (String) -> Unit,
-    onOpenEvents: () -> Unit,
+    onOpenEvent: (String) -> Unit,
+    onAddEvent: () -> Unit,
     onRetry: () -> Unit,
+    onAddToCalendar: (String) -> Unit,
+    onSelectCalendar: (Long) -> Unit,
+    onDeleteEvent: (String) -> Unit,
 ) {
+    var confirmDelete by remember { mutableStateOf<EventRowUi?>(null) }
+    val loaded = !(state.loading && state.open.isEmpty() && state.confirmed.isEmpty()) &&
+        !(events.loading && events.upcoming.isEmpty() && events.past.isEmpty())
     AvailablissBackground(OrbLayout.Proposal) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             ScreenHeader(
-                title = "Proposals",
-                subtitle = state.groupName.ifBlank { null },
+                title = state.groupName.ifBlank { events.groupName.ifBlank { "Plans" } },
                 onBack = onBack,
                 backDescription = "Back to calendar",
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp),
@@ -73,48 +123,78 @@ private fun GroupProposalsContent(
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = Spacing.tabBarClearance),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                state.error?.let { item { ErrorBanner(it, onRetry = onRetry) } }
-                if (state.loading && state.open.isEmpty() && state.confirmed.isEmpty()) item { LoadingIndicator() }
-                if (!state.loading && state.error == null && state.open.isEmpty() && state.confirmed.isEmpty()) {
-                    item {
+                (state.error ?: events.error)?.let { item { ErrorBanner(it, onRetry = onRetry) } }
+                if (!loaded) {
+                    item { LoadingIndicator() }
+                    return@LazyColumn
+                }
+                // Coming up.
+                if (events.upcoming.isNotEmpty()) {
+                    item { Heading("Coming up") }
+                    if (events.calendar.selectedCalendar != null) {
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                SectionLabel("Add to")
+                                CalendarPickerRow(events.calendar, onSelectCalendar)
+                            }
+                        }
+                    }
+                    items(events.upcoming, key = { "event-" + it.id }) { row ->
+                        EventRow(row, past = false, onOpen = { onOpenEvent(row.id) }, onAddToCalendar = { onAddToCalendar(row.id) }, onDelete = { confirmDelete = row })
+                    }
+                }
+                // Proposals, with Add event.
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = if (events.upcoming.isEmpty()) 0.dp else 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Heading("Proposals", Modifier.weight(1f))
+                        GlassPillButton("Add event", onAddEvent, icon = AvIcons.Plus)
+                    }
+                }
+                when {
+                    state.open.isNotEmpty() ->
+                        items(state.open, key = { it.id }) { ProposalCard(it.card, onClick = { onOpenProposal(it.id) }) }
+                    events.upcoming.isEmpty() -> item {
                         EmptyState(
-                            title = "No proposals yet",
-                            body = "Pick a time that works on the calendar and propose it to the group.",
+                            title = "Nothing proposed yet",
+                            body = "Pick a day that works on the calendar and propose it.",
                             icon = AvIcons.ProposalCheck,
                         )
                     }
+                    else -> item { NothingWaiting() }
                 }
-                if (state.open.isNotEmpty()) {
-                    item { SectionLabel("Waiting for replies") }
-                    items(state.open, key = { it.id }) { ProposalCard(it.card, onClick = { onOpenProposal(it.id) }) }
-                }
-                if (state.confirmed.isNotEmpty()) {
-                    item { SectionLabel("Confirmed", Modifier.padding(top = 6.dp)) }
-                    items(state.confirmed, key = { it.id }) { ProposalCard(it.card, onClick = { onOpenProposal(it.id) }, actionLabel = "View") }
-                }
-                item { EventsRow(onOpenEvents) }
             }
         }
+    }
+    confirmDelete?.let { row ->
+        DeleteEventDialog(row.title, onConfirm = { onDeleteEvent(row.id); confirmDelete = null }, onDismiss = { confirmDelete = null })
     }
 }
 
 @Composable
-private fun EventsRow(onClick: () -> Unit) {
+private fun Heading(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = AvailablissTheme.type.titleSmall,
+        color = AvailablissTheme.colors.ink,
+        modifier = modifier.semantics { heading() },
+    )
+}
+
+/** Everything's settled: nothing waiting on replies. */
+@Composable
+private fun NothingWaiting() {
     val colors = AvailablissTheme.colors
     GlassPanel(
-        Modifier.fillMaxWidth().padding(top = 6.dp),
+        Modifier.fillMaxWidth().heightIn(min = 52.dp),
         shape = Shapes.row,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
-        onClick = onClick,
-        onClickLabel = "Open events",
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(AvIcons.Calendar, null, tint = colors.accentInk, modifier = Modifier.size(20.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Events", style = AvailablissTheme.type.bodyMedium, color = colors.ink)
-                Text("Plans added to this group", style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
-            }
-            Icon(AvIcons.Forward, null, tint = colors.muted, modifier = Modifier.size(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(AvIcons.ProposalCheck, null, tint = colors.muted, modifier = Modifier.size(16.dp))
+            Text("No dates waiting for confirmation", style = AvailablissTheme.type.body, color = colors.muted)
         }
     }
 }
@@ -124,13 +204,18 @@ private fun EventsRow(onClick: () -> Unit) {
 private fun GroupProposalsPreview() {
     AvailablissPreviewTheme {
         GroupProposalsContent(
-            GroupProposalsUiState(
+            state = GroupProposalsUiState(
                 groupName = "Lake District crew",
                 loading = false,
                 open = listOf(ProposalListItem("1", ProposalCardUi("NOV", "13", "Ana proposed a time", "Fri 13 – Sun 15 Nov", "4 of 6 accepted"))),
                 confirmed = listOf(ProposalListItem("2", ProposalCardUi("DEC", "4", "Tom proposed a time", "Fri 4 – Sun 6 Dec", "Everyone's in", ProposalCardTone.Confirmed))),
             ),
-            {}, {}, {}, {},
+            events = EventsUiState(
+                loading = false,
+                upcoming = listOf(EventRowUi("e1", "Book club", "Thu 26 Nov · from 18:00", "Hana's", "NOV", "26", canDelete = true, added = false)),
+            ),
+            onBack = {}, onOpenProposal = {}, onOpenEvent = {}, onAddEvent = {}, onRetry = {},
+            onAddToCalendar = {}, onSelectCalendar = {}, onDeleteEvent = {},
         )
     }
 }
