@@ -127,6 +127,13 @@
       "when": 1794857807290,
       "tag": "0017_strange_doctor_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1794867658642,
+      "tag": "0018_reread_for_event_titles",
+      "breakpoints": true
     }
   ]
 }
