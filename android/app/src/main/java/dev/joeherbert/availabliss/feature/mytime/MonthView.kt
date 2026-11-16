@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
-import dev.joeherbert.availabliss.designsystem.component.availability.todayPill
 import dev.joeherbert.availabliss.designsystem.component.swipeToStep
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvWeights
@@ -204,7 +203,6 @@ private fun HeatCell(cell: MonthDayUi, onClick: () -> Unit, modifier: Modifier =
     val colors = AvailablissTheme.colors
     val level = if (cell.past) 0 else cell.level
     val (fill, fg) = levelColors(level, colors)
-    // On a filled cell, today's pill is inverted.
     val strong = level >= 2
     // The number alone is centred; the dot hangs just below it.
     Box(
@@ -214,6 +212,8 @@ private fun HeatCell(cell: MonthDayUi, onClick: () -> Unit, modifier: Modifier =
             .clip(CellShape)
             .background(colors.surface)
             .then(if (fill != null) Modifier.background(fill) else Modifier.border(1.dp, colors.glassBorder, CellShape))
+            // Today: a ring around the cell, readable on any fill.
+            .then(if (cell.today) Modifier.border(2.5.dp, colors.ink, CellShape) else Modifier)
             .then(if (cell.past) Modifier else Modifier.clickable(role = Role.Button, onClick = onClick))
             .clearAndSetSemantics {
                 contentDescription = cell.accessibility
@@ -229,12 +229,7 @@ private fun HeatCell(cell: MonthDayUi, onClick: () -> Unit, modifier: Modifier =
             fontSize = 15.sp,
             lineHeight = 15.sp,
             fontWeight = AvWeights.Display650,
-            color = when {
-                !cell.today -> fg
-                strong -> colors.accentInk
-                else -> colors.onAccent
-            },
-            modifier = Modifier.todayPill(cell.today, if (strong) colors.onAccent else colors.accent),
+            color = if (cell.today && level == 0) colors.ink else fg,
         )
         // Your own block that day.
         Box(

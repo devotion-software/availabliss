@@ -235,15 +235,12 @@
 	.past {
 		opacity: 0.4;
 	}
-	/* Today: the number on an accent pill, inverted on a cell already strong with the accent. */
-	.today .num {
-		background: var(--accent);
-		color: var(--on-accent);
+	/* Today: a ring around the cell, readable on any fill. */
+	.cell.today {
+		box-shadow: inset 0 0 0 2.5px var(--ink);
 	}
-	.today.l2 .num,
-	.today.l3 .num {
-		background: var(--on-accent);
-		color: var(--accent);
+	.cell.today.l0 {
+		color: var(--ink);
 	}
 
 	.legend {

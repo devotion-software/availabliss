@@ -139,7 +139,7 @@ struct MyTimeMonth: View {
     }
 }
 
-/// One day of the month, filled by how free it is, with today's date on a pill and a dot when
+/// One day of the month, filled by how free it is, with a ring round today and a dot when
 /// you've blocked time yourself.
 private struct HeatCell: View {
     let day: CalendarDay
@@ -159,9 +159,7 @@ private struct HeatCell: View {
                 Text("\(day.day)")
                     .font(AppFont.body(15, .semibold, relativeTo: .body))
                     .monospacedDigit()
-                    // Today's number sits on a pill: accent text on it when the cell is accent, else on-accent.
-                    .foregroundStyle(isToday ? (onAccent ? theme.accent : theme.onAccent) : onAccent ? theme.onAccent : level == 0 ? theme.muted : theme.ink)
-                    .todayMark(day, onAccent: onAccent)
+                    .foregroundStyle(onAccent ? theme.onAccent : level == 0 && !isToday ? theme.muted : theme.ink)
                 Circle()
                     .fill(onAccent ? theme.onAccent : theme.accent)
                     .frame(width: 4, height: 4)
@@ -170,6 +168,12 @@ private struct HeatCell: View {
             }
             .frame(maxWidth: .infinity, minHeight: 46, maxHeight: 46)
             .background(HeatFill(level: level, isPast: isPast))
+            // Today: a ring around the cell, readable on any fill.
+            .overlay {
+                if isToday {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(theme.ink, lineWidth: 2.5)
+                }
+            }
             .opacity(isPast ? 0.4 : 1)
             .contentShape(Rectangle())
         }
