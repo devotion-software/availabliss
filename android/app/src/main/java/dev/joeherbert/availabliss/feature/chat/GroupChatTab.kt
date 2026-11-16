@@ -50,6 +50,7 @@ import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.chat.BubbleAction
 import dev.joeherbert.availabliss.designsystem.component.chat.ChatComposer
 import dev.joeherbert.availabliss.designsystem.component.chat.ChatMeta
+import dev.joeherbert.availabliss.designsystem.component.chat.ConfirmedBanner
 import dev.joeherbert.availabliss.designsystem.component.chat.MessageBubble
 import dev.joeherbert.availabliss.designsystem.component.chat.PollCard
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCard
@@ -62,6 +63,9 @@ import dev.joeherbert.availabliss.designsystem.theme.AvWeights
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
+import dev.joeherbert.availabliss.feature.common.AddToCalendarButton
+import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
@@ -84,6 +88,7 @@ data class ChatActions(
     val onEditMessage: (messageId: String) -> Unit = {},
     val onDeleteMessage: (messageId: String) -> Unit = {},
     val onCancelEdit: () -> Unit = {},
+    val onAddToCalendar: (eventId: String) -> Unit = {},
     /** Set when the chat wasn't opened over its group's calendar: the header's group name opens it. */
     val onOpenGroup: (() -> Unit)? = null,
 )
@@ -103,6 +108,7 @@ fun GroupChatTab(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
+    AddToCalendarEffect(state.calendar, viewModel::onCalendarIntentHandled)
     LifecycleResumeEffect(Unit) {
         viewModel.onVisibilityChanged(true)
         onPauseOrDispose { viewModel.onVisibilityChanged(false) }
@@ -141,6 +147,7 @@ fun GroupChatTab(
             onEditMessage = viewModel::startEdit,
             onDeleteMessage = viewModel::requestDelete,
             onCancelEdit = viewModel::cancelEdit,
+            onAddToCalendar = viewModel::onAddToCalendar,
             onOpenGroup = onOpenGroup,
         )
     }
@@ -270,14 +277,14 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
     ) {
         items(state.items, key = { it.key }, contentType = { it::class }) { item ->
-            ChatRow(item, actions)
+            ChatRow(item, actions, state.calendar.added)
         }
         if (state.loadingOlder) item(key = "loading-older") { LoadingIndicator() }
     }
 }
 
 @Composable
-private fun ChatRow(item: ChatItem, actions: ChatActions) {
+private fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<String>) {
     when (item) {
         is ChatItem.Day -> ChatMeta(item.label)
         is ChatItem.System -> ChatMeta(item.text)
@@ -312,6 +319,20 @@ private fun ChatRow(item: ChatItem, actions: ChatActions) {
             onClick = { item.proposalId?.let(actions.onOpenProposal) ?: actions.onOpenEvent(item.eventId) },
             actionLabel = "View",
         )
+        is ChatItem.Confirmed -> ConfirmedBanner(
+            title = item.title,
+            detail = item.detail,
+            onClick = item.proposalId?.let { id -> { actions.onOpenProposal(id) } },
+            // Above its neighbours, so the confetti burst can spill over them.
+            modifier = Modifier.zIndex(1f),
+            burstKey = item.id.takeIf { item.recent },
+        ) {
+            AddToCalendarButton(
+                added = item.eventId in addedToCalendar,
+                onClick = { actions.onAddToCalendar(item.eventId) },
+                height = 40.dp,
+            )
+        }
         is ChatItem.PollItem -> Box(Modifier.fillMaxWidth(), contentAlignment = if (item.own) Alignment.CenterEnd else Alignment.CenterStart) {
             PollCard(
                 poll = item.poll,
@@ -345,6 +366,7 @@ private fun GroupChatPreview() {
                 membersSummary = "Ana, Priya, Tom and 3 others",
                 loading = false,
                 items = listOf(
+                    ChatItem.Confirmed("m5", "e1", "p1", "Lake District weekend", "Fri 13 – Sun 15 Nov · Ambleside", recent = false),
                     ChatItem.Receipt("m3", "Seen by 3 of 5", true, listOf(AvatarPerson("a", "Ana"), priya)),
                     ChatItem.Text("m3", "I'll book somewhere to stay. Vote below", own = true, author = null, showAvatar = false, accessibilityLabel = "", canEdit = true),
                     ChatItem.Text("m4", "You deleted this message", own = true, author = null, showAvatar = false, accessibilityLabel = "Message deleted", deleted = true),

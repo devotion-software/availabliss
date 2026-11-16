@@ -33,6 +33,9 @@ import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ReceiptState
 import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
+import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
+import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
+import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -98,6 +101,8 @@ data class ChatUiState(
     val editing: Boolean = false,
     /** Non-null while "Delete this message?" is showing. */
     val confirmDeleteId: String? = null,
+    /** Add to calendar on "Everyone's in" banners (`added` holds event ids added this session). */
+    val calendar: AddToCalendarState = AddToCalendarState(),
     val message: UserMessage? = null,
 )
 
@@ -140,6 +145,7 @@ class ChatViewModel @Inject constructor(
     private val proposals: ProposalsRepository,
     private val events: EventsRepository,
     private val users: UserRepository,
+    private val addToCalendar: AddToCalendarDelegate,
     liveEvents: LiveEvents,
 ) : ViewModel() {
 
@@ -165,7 +171,7 @@ class ChatViewModel @Inject constructor(
         meIds,
     ) { inputs, me -> inputs.toItems(me) }.flowOn(Dispatchers.Default)
 
-    val state: StateFlow<ChatUiState> = combine(data, items, meIds) { d, items, me -> d.toUi(items, me) }
+    val state: StateFlow<ChatUiState> = combine(data, items, meIds, addToCalendar.state) { d, items, me, cal -> d.toUi(items, me, cal) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     /**
@@ -178,6 +184,7 @@ class ChatViewModel @Inject constructor(
 
     init {
         load()
+        viewModelScope.launch { addToCalendar.loadCalendars() }
         viewModelScope.launch {
             liveEvents.payloadsFor(groupId).collect { onLive(it) }
         }
@@ -532,6 +539,16 @@ class ChatViewModel @Inject constructor(
     fun closeInfo() = data.update { it.copy(infoSheet = null) }
     // endregion
 
+    // region Add to calendar
+    fun onAddToCalendar(eventId: String) {
+        val event = data.value.events[eventId] ?: return
+        val draft = CalendarEventDraft.from(event) ?: return
+        viewModelScope.launch { addToCalendar.add(eventId, draft) }
+    }
+
+    fun onCalendarIntentHandled() = addToCalendar.onIntentHandled()
+    // endregion
+
     fun onMessageShown(message: UserMessage) = data.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 
     private fun ItemInputs.toItems(me: String?): List<ChatItem> = buildChatItems(
@@ -542,7 +559,7 @@ class ChatViewModel @Inject constructor(
         events = events,
     ).asReversed()
 
-    private fun ChatData.toUi(items: List<ChatItem>, me: String?): ChatUiState {
+    private fun ChatData.toUi(items: List<ChatItem>, me: String?, cal: AddToCalendarState): ChatUiState {
         val g = group
         val others = g?.members.orEmpty().filter { it.userId != me }.map { it.name.firstName() }
         return ChatUiState(
@@ -561,6 +578,7 @@ class ChatViewModel @Inject constructor(
             pollDraft = pollDraft,
             editing = editing != null,
             confirmDeleteId = confirmDeleteId,
+            calendar = cal,
             info = infoSheet?.let { sheet ->
                 sheet.toUi(messages.firstOrNull { it.id == sheet.messageId }, MemberDirectory(g?.members.orEmpty(), me))
             },

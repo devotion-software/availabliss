@@ -13,6 +13,8 @@ import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardTone
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardUi
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
 import dev.joeherbert.availabliss.feature.proposal.ProposalFormatting
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 
 /** One row of the chat list. [key] is stable for LazyColumn. */
@@ -46,6 +48,22 @@ sealed interface ChatItem {
         override val key get() = id
     }
 
+    /**
+     * "Everyone's in": the system message posted when a proposal is confirmed, once its
+     * event has loaded. [recent] (sent within the last day) lets it play the confetti burst.
+     */
+    data class Confirmed(
+        val id: String,
+        val eventId: String,
+        val proposalId: String?,
+        val title: String,
+        /** "Thu 26 Nov · from 18:00 · Priya's flat" */
+        val detail: String,
+        val recent: Boolean,
+    ) : ChatItem {
+        override val key get() = id
+    }
+
     /** [card] is null while the proposal is loading. */
     data class ProposalCard(val id: String, val proposalId: String, val card: ProposalCardUi?) : ChatItem {
         override val key get() = id
@@ -76,6 +94,7 @@ fun buildChatItems(
     proposals: Map<String, Proposal>,
     events: Map<String, GroupEvent>,
     today: LocalDate = DateTimes.today(),
+    now: Instant = Instant.now(),
 ): List<ChatItem> {
     val items = mutableListOf<ChatItem>()
     // Deleted messages get no receipt (they can't be opened for info).
@@ -92,6 +111,10 @@ fun buildChatItems(
         val receipt = if (m.id == latestOwn?.id) receiptFor(m, directory) else null
         val authorName = directory.displayName(m.authorId, youSuffix = false)
         when {
+            // A confirmation; until its event loads (or if it was deleted) it stays a plain line.
+            m.kind == MessageKind.System && m.eventId != null && events[m.eventId] != null ->
+                items += confirmedItem(m, events.getValue(m.eventId), now)
+
             m.kind == MessageKind.System || m.authorId == null && m.kind == MessageKind.Text ->
                 items += ChatItem.System(m.id, m.body.orEmpty())
 
@@ -168,6 +191,25 @@ fun buildChatItems(
     }
     return items
 }
+
+private fun confirmedItem(m: Message, e: GroupEvent, now: Instant): ChatItem.Confirmed {
+    val sent = DateTimes.parseInstant(m.createdAt)
+    val detail = listOfNotNull(
+        DateTimes.rangeLabel(e.start, e.end, e.allDay).takeIf { it.isNotEmpty() },
+        e.location?.takeIf { it.isNotBlank() },
+    ).joinToString(" · ")
+    return ChatItem.Confirmed(
+        id = m.id,
+        eventId = e.id,
+        proposalId = e.proposalId,
+        title = e.title,
+        detail = detail,
+        recent = sent != null && !sent.isBefore(now.minus(BURST_WINDOW)) && !sent.isAfter(now.plus(BURST_WINDOW)),
+    )
+}
+
+/** How recent a confirmation must be to burst. */
+private val BURST_WINDOW: Duration = Duration.ofHours(24)
 
 private fun receiptFor(m: Message, directory: MemberDirectory): ChatItem.Receipt? {
     val prefix = if (m.isEdited) "Edited · " else ""
