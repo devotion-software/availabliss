@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { Repeat } from '#lib/types';
-import { expandBlock, toManualBlock } from './blocks';
+import { expandBlock, occurrenceDates, toManualBlock } from './blocks';
 
 const block = (start: string, end: string, repeat: Repeat = 'none', until: string | null = null) => ({
 	start: new Date(start),
@@ -126,5 +126,57 @@ test('toManualBlock serialises dates', () => {
 		repeat: 'weekly',
 		until: '2026-12-31',
 		note: 'Gym'
+	});
+});
+
+describe('occurrenceDates', () => {
+	const take = (first: string, repeat: Repeat, from = first, until: string | null = null, n = 6) => {
+		const out: string[] = [];
+		for (const d of occurrenceDates(first, repeat, from, until)) {
+			if (d >= from) out.push(d);
+			if (out.length === n) break;
+		}
+		return out;
+	};
+
+	test('daily', () => {
+		expect(take('2026-11-16', 'daily', '2026-11-16', null, 3)).toEqual(['2026-11-16', '2026-11-17', '2026-11-18']);
+	});
+	test('weekdays skip the weekend', () => {
+		expect(take('2026-11-19', 'weekdays')).toEqual(['2026-11-19', '2026-11-20', '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26']);
+	});
+	test('monthly keeps the date, skipping months without it', () => {
+		expect(take('2026-10-31', 'monthly', '2026-10-31', null, 4)).toEqual(['2026-10-31', '2026-12-31', '2027-01-31', '2027-03-31']);
+	});
+	test('monthly on a weekday: the 2nd Tuesday', () => {
+		expect(take('2026-11-10', 'monthlyWeekday', '2026-11-10', null, 3)).toEqual(['2026-11-10', '2026-12-08', '2027-01-12']);
+	});
+	test('monthly on a weekday: the last Friday when it started in the last week', () => {
+		expect(take('2026-11-27', 'monthlyWeekday', '2026-11-27', null, 3)).toEqual(['2026-11-27', '2026-12-25', '2027-01-29']);
+	});
+	test('yearly, and 29 February only in leap years', () => {
+		expect(take('2026-11-16', 'yearly', '2026-11-16', null, 2)).toEqual(['2026-11-16', '2027-11-16']);
+		expect(take('2028-02-29', 'yearly', '2028-02-29', null, 2)).toEqual(['2028-02-29', '2032-02-29']);
+	});
+	test('stops at until', () => {
+		expect(take('2026-11-16', 'daily', '2026-11-16', '2026-11-18')).toEqual(['2026-11-16', '2026-11-17', '2026-11-18']);
+	});
+	test('jumps to the range rather than walking from the start', () => {
+		expect(take('2020-01-15', 'monthly', '2026-11-01', null, 2)).toEqual(['2026-11-15', '2026-12-15']);
+		expect(take('2020-01-06', 'weekdays', '2026-11-21', null, 2)).toEqual(['2026-11-23', '2026-11-24']);
+	});
+});
+
+describe('expandBlock (new repeats)', () => {
+	test('monthly on a weekday keeps its local time across DST', () => {
+		// 2nd Sunday of March 2026 at 09:00 London (GMT), then April (BST): still 09:00 local.
+		const b = block('2026-03-08T09:00:00Z', '2026-03-08T10:00:00Z', 'monthlyWeekday');
+		expect(isoSpans(expandBlock(b, at('2026-04-01T00:00:00Z'), at('2026-05-01T00:00:00Z'), TZ))).toEqual([
+			['2026-04-12T08:00:00.000Z', '2026-04-12T09:00:00.000Z']
+		]);
+	});
+	test('weekdays within a week', () => {
+		const b = block('2026-11-16T09:00:00Z', '2026-11-16T17:30:00Z', 'weekdays');
+		expect(expandBlock(b, at('2026-11-21T00:00:00Z'), at('2026-11-24T00:00:00Z'), TZ)).toHaveLength(1);
 	});
 });

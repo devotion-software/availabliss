@@ -18,7 +18,12 @@ export type TileColor = (typeof TILE_COLORS)[number];
 export const CALENDAR_PROVIDERS = ['google', 'microsoft', 'caldav', 'device'] as const;
 export type CalendarProvider = (typeof CALENDAR_PROVIDERS)[number];
 
-export const REPEATS = ['none', 'weekly', 'fortnightly'] as const;
+/**
+ * How a block repeats. `monthly` is the same date each month (skipped in months without it);
+ * `monthlyWeekday` the same weekday of the month (e.g. the 2nd Tuesday, or the last one if it
+ * started in a month's last seven days); `yearly` the same date each year.
+ */
+export const REPEATS = ['none', 'daily', 'weekdays', 'weekly', 'fortnightly', 'monthly', 'monthlyWeekday', 'yearly'] as const;
 export type Repeat = (typeof REPEATS)[number];
 
 export const RESPONSE_KINDS = ['pending', 'accepted', 'declined'] as const;

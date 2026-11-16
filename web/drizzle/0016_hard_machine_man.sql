@@ -1,0 +1,1 @@
+ALTER TABLE `manual_blocks` MODIFY COLUMN `repeat` enum('none','daily','weekdays','weekly','fortnightly','monthly','monthlyWeekday','yearly') NOT NULL DEFAULT 'none';

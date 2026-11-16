@@ -1,11 +1,11 @@
-/** Manual busy blocks ("My time"), including weekly / fortnightly repeats. */
+/** Manual busy blocks ("My time"), including daily, weekly, monthly and yearly repeats. */
 import { and, desc, eq } from 'drizzle-orm';
 import type { ManualBlock, Repeat } from '#lib/types';
 import { db } from './db';
 import { manualBlocks } from './db/schema';
 import { badRequest, notFound } from './http';
 import { newId } from './ids';
-import { addDays, DAY, dateOf, daysBetween, wallClock, zonedInstant } from './availability/time';
+import { addDays, DAY, dateOf, daysBetween, wallClock, weekdayOf, zonedInstant } from './availability/time';
 import type { Span } from './availability/intervals';
 
 type BlockRow = typeof manualBlocks.$inferSelect;
@@ -20,7 +20,77 @@ export const toManualBlock = (row: BlockRow): ManualBlock => ({
 	note: row.note
 });
 
-const STEP_DAYS: Record<Exclude<Repeat, 'none'>, number> = { weekly: 7, fortnightly: 14 };
+/** Repeats that step a fixed number of days. */
+const STEP_DAYS: Partial<Record<Repeat, number>> = { daily: 1, weekly: 7, fortnightly: 14 };
+
+const ymd = (date: string) => date.split('-').map(Number) as [number, number, number];
+const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+const iso = (y: number, m: number, d: number) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+/** Month `m` (1–12) of year `y`, `n` months on. */
+function addMonths(y: number, m: number, n: number): [number, number] {
+	const index = y * 12 + (m - 1) + n;
+	return [Math.floor(index / 12), (index % 12) + 1];
+}
+
+/**
+ * The local dates a repeat falls on, in order, starting from its first date, from the first
+ * one on or after `fromDate` (roughly: it may start a little before). Stops at `until`.
+ */
+export function* occurrenceDates(first: string, repeat: Repeat, fromDate: string, until: string | null): Generator<string> {
+	const done = (date: string) => until !== null && date > until;
+	if (repeat === 'none') {
+		if (!done(first)) yield first;
+		return;
+	}
+	const step = STEP_DAYS[repeat];
+	if (step) {
+		const k = Math.max(0, Math.floor(daysBetween(first, fromDate) / step) - 1);
+		for (let date = addDays(first, k * step); !done(date); date = addDays(date, step)) yield date;
+		return;
+	}
+	if (repeat === 'weekdays') {
+		const k = Math.max(0, daysBetween(first, fromDate) - 7);
+		for (let date = addDays(first, k); !done(date); date = addDays(date, 1)) {
+			if (weekdayOf(date) < 5) yield date; // Mon–Fri (0 = Monday)
+		}
+		return;
+	}
+	const [fy, fm, fd] = ymd(first);
+	const [ty, tm] = ymd(fromDate);
+	if (repeat === 'yearly') {
+		for (let y = Math.max(fy, ty - 1); ; y++) {
+			if (fd > daysInMonth(y, fm)) continue; // 29 Feb: leap years only
+			const date = iso(y, fm, fd);
+			if (done(date)) return;
+			yield date;
+		}
+	}
+	// Monthly: walk month by month from just before the range.
+	const skip = Math.max(0, (ty - fy) * 12 + (tm - fm) - 1);
+	const nth = Math.ceil(fd / 7);
+	const last = fd + 7 > daysInMonth(fy, fm);
+	const weekday = new Date(Date.UTC(fy, fm - 1, fd)).getUTCDay();
+	for (let n = skip; ; n++) {
+		const [y, m] = addMonths(fy, fm, n);
+		let day: number | null;
+		if (repeat === 'monthly') {
+			day = fd <= daysInMonth(y, m) ? fd : null; // the 31st: months that have one
+		} else {
+			const firstWeekday = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+			const firstMatch = 1 + ((weekday - firstWeekday + 7) % 7);
+			if (last) {
+				day = firstMatch + 7 * Math.floor((daysInMonth(y, m) - firstMatch) / 7);
+			} else {
+				const d = firstMatch + 7 * (nth - 1);
+				day = d <= daysInMonth(y, m) ? d : null;
+			}
+		}
+		if (day === null) continue;
+		const date = iso(y, m, day);
+		if (done(date)) return;
+		yield date;
+	}
+}
 
 /**
  * Occurrences of a block overlapping `[from, to)`. Repeats keep the same local
@@ -36,7 +106,6 @@ export function expandBlock(
 	const duration = block.end.getTime() - start;
 	if (block.repeat === 'none') return start < to && start + duration > from ? [{ start, end: start + duration }] : [];
 
-	const step = STEP_DAYS[block.repeat];
 	const firstDate = dateOf(start, timeZone);
 	const w = wallClock(start, timeZone);
 	const minutes = w.hour * 60 + w.minute;
@@ -45,14 +114,13 @@ export function expandBlock(
 	const endDays = daysBetween(firstDate, dateOf(block.end.getTime(), timeZone));
 	const we = wallClock(block.end.getTime(), timeZone);
 	const endMinutes = we.hour * 60 + we.minute;
+	// Start looking a little before the range so an occurrence running into it is caught.
+	const fromDate = dateOf(Math.max(start, from - duration - DAY), timeZone);
 	const out: Span[] = [];
-	// Jump close to the range instead of walking every occurrence since the first.
-	let k = Math.max(0, Math.floor((from - duration - start) / (step * DAY)) - 1);
-	for (;; k++) {
-		const date = addDays(firstDate, k * step);
-		if (block.until && date > block.until) break;
+	for (const date of occurrenceDates(firstDate, block.repeat, fromDate < firstDate ? firstDate : fromDate, block.until)) {
 		const s = zonedInstant(date, minutes, timeZone);
 		if (s >= to) break;
+		if (s < start) continue;
 		const local = zonedInstant(addDays(date, endDays), endMinutes, timeZone);
 		const e = local > s ? local : s + duration;
 		if (e > from) out.push({ start: s, end: e });

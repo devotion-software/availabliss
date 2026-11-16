@@ -389,7 +389,10 @@ interface ManualBlock {
   id: string;
   start: string; end: string;   // first occurrence
   allDay: boolean;
-  repeat: 'none' | 'weekly' | 'fortnightly';
+  repeat: 'none' | 'daily' | 'weekdays' | 'weekly' | 'fortnightly'
+        | 'monthly'          // same date each month (skipped in months without it)
+        | 'monthlyWeekday'   // same weekday of the month, e.g. the 2nd Tuesday (the last one if it starts in a month's last 7 days)
+        | 'yearly';          // same date each year (29 Feb: leap years only)
   until: string | null;         // YYYY-MM-DD, last date a repeat can occur
   note: string | null;          // private to the owner
 }
