@@ -1,116 +1,72 @@
 import SwiftUI
 
-/// "Block a time": date, all day / exact times / several whole days, repeat, private note.
+/// "Block a time": when (a date with its time underneath, to another, or all day), repeat, private note.
 struct BlockTimeSheet: View {
+    /// How a preset opens the sheet: exact times, one whole day, or several whole days.
     enum When: Hashable { case times, allDay, days }
-    /// Which date's calendar is open.
-    private enum Picking: Hashable { case date, lastDate }
 
     let editing: ManualBlock?
     let save: (NewManualBlock) async -> Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
-    @State private var date: Date
-    /// The last day, for several whole days.
-    @State private var lastDate: Date
-    @State private var when: When
     @State private var start: Date
+    /// All day: the last day.
     @State private var end: Date
+    @State private var allDay: Bool
     @State private var repeatMode: ManualBlock.Repeat
+    @State private var until: Date?
     @State private var note: String
-    @State private var picking: Picking?
     @State private var isSaving = false
+    private let opensOnDate: Bool
 
     /// - Parameters:
     ///   - range: Exact times to prefill, in minutes since midnight on `initialDay` (e.g. from a tap
     ///     on the week grid). 1440 means midnight at the end of the day. Defaults to 09:00–10:00.
     ///   - when: Start on exact times, all day, or several days (from `initialDay` to `lastDay`).
-    ///   - pickDate: Open with the date's calendar showing (for presets that still need a day).
-    ///   - editing: Edit this block instead of creating one; its day, times, repeat and note win.
+    ///   - pickDate: Open with the start date's calendar showing (for presets that still need a day).
+    ///   - editing: Edit this block instead of creating one; its times, repeat and note win.
     init(
         initialDay: CalendarDay, range: (from: Int, to: Int)? = nil, when: When = .times, lastDay: CalendarDay? = nil,
         pickDate: Bool = false, editing: ManualBlock? = nil, save: @escaping (NewManualBlock) async -> Bool
     ) {
         self.editing = editing
         self.save = save
-        let wall = { (minutes: Int) in WallTime(hour: (minutes / 60) % 24, minute: minutes % 60).date() }
+        opensOnDate = pickDate
         if let block = editing {
-            let first = CalendarDay(block.start), last = CalendarDay(block.end.addingTimeInterval(-1))
-            _date = State(initialValue: first.startDate())
-            _lastDate = State(initialValue: max(first, last).startDate())
-            _when = State(initialValue: block.allDay ? (last > first ? .days : .allDay) : .times)
-            _start = State(initialValue: block.allDay ? wall(9 * 60) : WallTime(block.start).date())
-            _end = State(initialValue: block.allDay ? wall(10 * 60) : WallTime(block.end).date())
-            _repeatMode = State(initialValue: block.repeat)
+            _start = State(initialValue: block.start)
+            _end = State(initialValue: block.allDay ? block.end.addingTimeInterval(-1) : block.end)
+            _allDay = State(initialValue: block.allDay)
+            _repeatMode = State(initialValue: block.repeat == .unknown ? .none : block.repeat)
+            _until = State(initialValue: block.until?.startDate())
             _note = State(initialValue: block.note ?? "")
         } else {
-            _date = State(initialValue: initialDay.startDate())
-            _lastDate = State(initialValue: max(initialDay, lastDay ?? initialDay.adding(days: when == .days ? 2 : 0)).startDate())
-            _when = State(initialValue: when)
-            // 24:00 becomes 00:00, which reads as "runs to midnight".
-            _start = State(initialValue: wall(range?.from ?? 9 * 60))
-            _end = State(initialValue: wall(range?.to ?? 10 * 60))
+            let from = range?.from ?? 9 * 60, to = range?.to ?? 10 * 60
+            let at = { (minutes: Int) in initialDay.startDate().addingTimeInterval(TimeInterval(minutes * 60)) }
+            switch when {
+            case .times:
+                _start = State(initialValue: at(from))
+                // An end at or before the start runs past midnight.
+                _end = State(initialValue: to > from ? at(to) : at(to + 24 * 60))
+            case .allDay, .days:
+                _start = State(initialValue: initialDay.startDate())
+                let last = when == .days ? max(initialDay.adding(days: 2), lastDay ?? initialDay) : initialDay
+                _end = State(initialValue: last.startDate())
+            }
+            _allDay = State(initialValue: when != .times)
             _repeatMode = State(initialValue: .none)
+            _until = State(initialValue: nil)
             _note = State(initialValue: "")
         }
-        _picking = State(initialValue: pickDate ? .date : nil)
     }
 
     var body: some View {
         BottomSheet(title: editing == nil ? "Block a time" : "Edit block") {
-            HStack(spacing: 8) {
-                if when == .days {
-                    FieldTile(label: "From", value: Formatting.shortDay(date), isActive: picking == .date) { toggle(.date) }
-                    FieldTile(label: "To", value: Formatting.shortDay(lastDate), isActive: picking == .lastDate) { toggle(.lastDate) }
-                } else {
-                    FieldTile(label: "Date", value: Formatting.shortDay(date), isActive: picking == .date) { toggle(.date) }
-                    FieldTile(label: "Time", value: timeLabel, isActive: false) {
-                        picking = nil
-                        when = .times
-                    }
-                }
-            }
-            if picking == .date {
-                DatePicker(when == .days ? "From" : "Date", selection: $date, in: earliestDate..., displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .tint(theme.accent)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            } else if picking == .lastDate {
-                DatePicker("To", selection: $lastDate, in: date..., displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .tint(theme.accent)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-            SegmentedControl(
-                selection: $when,
-                options: [
-                    SegmentOption(value: .times, label: "Set times"),
-                    SegmentOption(value: .allDay, label: "All day"),
-                    SegmentOption(value: .days, label: "Several days"),
-                ],
-                accessibilityLabel: "Set times, all day or several days"
+            DateRangeInput(
+                start: $start, end: $end, allDay: $allDay,
+                earliest: min(Calendar.current.startOfDay(for: .now), Calendar.current.startOfDay(for: start)),
+                initiallyOpen: opensOnDate ? .startDate : nil
             )
-            if when == .times {
-                HStack(spacing: 8) {
-                    timePicker("From", selection: $start)
-                    timePicker("To", selection: $end)
-                }
-                .transition(.opacity)
-            }
-            if when != .days {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Repeat").sectionLabelStyle()
-                    SegmentedControl(
-                        selection: $repeatMode,
-                        options: [
-                            SegmentOption(value: .none, label: "Once"),
-                            SegmentOption(value: .weekly, label: "Weekly"),
-                            SegmentOption(value: .fortnightly, label: "Fortnightly"),
-                        ],
-                        accessibilityLabel: "Repeat"
-                    )
-                }
-            }
+            repeatRows
             VStack(alignment: .leading, spacing: 6) {
                 Text("Note (only you see this)").sectionLabelStyle()
                 InputField(placeholder: "e.g. Wedding", text: $note, height: 48, cornerRadius: 14)
@@ -123,62 +79,80 @@ struct BlockTimeSheet: View {
             .buttonStyle(.filled(.accent, height: 52))
             .disabled(isSaving)
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: picking)
-        .onChange(of: date) { _, newDate in
-            if lastDate < newDate { lastDate = newDate }
-            // Several days: once the first day is picked, go straight on to the last.
-            if when == .days, picking == .date { picking = .lastDate }
-        }
-        .onChange(of: when) { _, newWhen in
-            if newWhen == .days, lastDate <= date { lastDate = CalendarDay(date).adding(days: 1).startDate() }
-            if newWhen != .days, picking == .lastDate { picking = nil }
-        }
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: when)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: repeatMode)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: until)
     }
 
-    private func toggle(_ which: Picking) {
-        picking = picking == which ? nil : which
-    }
-
-    private func timePicker(_ label: String, selection: Binding<Date>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label).sectionLabelStyle()
-            DatePicker(label, selection: selection, displayedComponents: .hourAndMinute)
-                .labelsHidden()
-                .bodyFont(14, .semibold)
+    /// Repeat (a menu of choices worded from the start date), then when it ends.
+    private var repeatRows: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Repeat").bodyFont(15, .semibold)
+                Spacer(minLength: 8)
+                Menu {
+                    Picker("Repeat", selection: $repeatMode) {
+                        ForEach(ManualBlock.Repeat.allCases, id: \.self) { option in
+                            Text(option.choice(from: start)).tag(option)
+                        }
+                    }
+                } label: {
+                    menuLabel(repeatMode.choice(from: start))
+                }
+                .accessibilityLabel("Repeat, \(repeatMode.choice(from: start))")
+            }
+            .frame(minHeight: 50)
+            if repeatMode != .none {
+                theme.line.frame(height: 1)
+                HStack {
+                    Text("Ends").bodyFont(15, .semibold)
+                    Spacer(minLength: 8)
+                    if let until {
+                        DatePicker(
+                            "Ends on",
+                            selection: Binding(get: { until }, set: { self.until = $0 }),
+                            in: Calendar.current.startOfDay(for: start)...,
+                            displayedComponents: .date
+                        )
+                        .labelsHidden()
+                        .tint(theme.accent)
+                    }
+                    Menu {
+                        Button("Never") { until = nil }
+                        Button("On a date") { until = until ?? Calendar.current.date(byAdding: .month, value: 3, to: start) }
+                    } label: {
+                        menuLabel(until == nil ? "Never" : "On")
+                    }
+                    .accessibilityLabel(until == nil ? "Ends, never" : "Ends on a date")
+                }
+                .frame(minHeight: 50)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .glass(cornerRadius: 22)
     }
 
-    /// Today, or the prefilled day if that's earlier (a tap on a past day this week).
-    private var earliestDate: Date { min(Calendar.current.startOfDay(for: Date()), Calendar.current.startOfDay(for: date)) }
-
-    private var timeLabel: String {
-        switch when {
-        case .times: "\(Formatting.time(start)) – \(Formatting.time(end))"
-        case .allDay, .days: "All day"
+    private func menuLabel(_ text: String) -> some View {
+        HStack(spacing: 4) {
+            Text(text).bodyFont(14, .semibold).lineLimit(1)
+            Image(systemName: "chevron.up.chevron.down").font(.system(size: 11, weight: .bold))
         }
+        .foregroundStyle(theme.accentInk)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 
-    /// Builds the block's start/end on the chosen day. An end at or before the start runs past midnight.
+    /// The block to save. All day runs from the first day's midnight to the midnight after the last.
     private var block: NewManualBlock {
-        let day = CalendarDay(date)
-        let range: (Date, Date)
-        switch when {
-        case .allDay:
-            range = (day.startDate(), day.adding(days: 1).startDate())
-        case .days:
-            range = (day.startDate(), max(day, CalendarDay(lastDate)).adding(days: 1).startDate())
-        case .times:
-            let from = WallTime(start), to = WallTime(end)
-            range = (from.date(on: day), to.date(on: to <= from ? day.adding(days: 1) : day))
-        }
-        // A span of days happens once.
-        let repeats = when == .days ? .none : repeatMode
+        let calendar = Calendar.current
+        let range: (Date, Date) = allDay
+            ? (calendar.startOfDay(for: start), CalendarDay(max(end, start)).adding(days: 1).startDate())
+            : (start, end)
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         return NewManualBlock(
-            start: range.0, end: range.1, allDay: when != .times, repeat: repeats,
-            until: repeats == .none ? nil : editing?.until, note: trimmed.isEmpty ? nil : trimmed
+            start: range.0, end: range.1, allDay: allDay, repeat: repeatMode,
+            until: repeatMode == .none ? nil : until.map { CalendarDay($0) },
+            note: trimmed.isEmpty ? nil : trimmed
         )
     }
 

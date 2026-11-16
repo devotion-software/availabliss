@@ -168,7 +168,7 @@ struct MyTimeView: View {
     private var everyWeek: some View {
         if !model.recurringBlocks.isEmpty {
         VStack(alignment: .leading, spacing: 6) {
-            SectionHeading(title: "Every week")
+            SectionHeading(title: "Repeating")
             VStack(spacing: 0) {
                 ForEach(Array(model.recurringBlocks.enumerated()), id: \.element.id) { index, block in
                     if index > 0 { theme.line.frame(height: 1) }

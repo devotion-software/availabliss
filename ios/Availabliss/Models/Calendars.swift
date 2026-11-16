@@ -76,7 +76,15 @@ struct DeviceSync: Encodable, Sendable {
 
 struct ManualBlock: Codable, Sendable, Identifiable, Equatable {
     enum Repeat: String, Codable, Sendable, CaseIterable {
-        case none, weekly, fortnightly
+        case none, daily, weekdays, weekly, fortnightly, monthly, monthlyWeekday, yearly
+        /// A value from a newer server.
+        case unknown
+
+        static var allCases: [Repeat] { [.none, .daily, .weekdays, .weekly, .fortnightly, .monthly, .monthlyWeekday, .yearly] }
+
+        init(from decoder: Decoder) throws {
+            self = Repeat(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .unknown
+        }
     }
 
     let id: String

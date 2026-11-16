@@ -98,11 +98,7 @@ private struct AgendaDay: View {
     /// Where a busy item came from: "Weekly", "Every other week", "Your block" or "Calendar".
     private func tag(_ interval: BusyInterval) -> String {
         guard interval.source == .manual else { return "Calendar" }
-        switch model.block(for: interval)?.repeat {
-        case .weekly: return "Weekly"
-        case .fortnightly: return "Every other week"
-        default: return "Your block"
-        }
+        return model.block(for: interval)?.repeat.tag ?? "Your block"
     }
 }
 

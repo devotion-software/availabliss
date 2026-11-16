@@ -55,6 +55,8 @@ struct NewProposalSheet: View {
     @State private var isSaving = false
     @State private var error: String?
     @State private var busyIds: [String] = []
+    /// The end as the input shows it: all day, the last day rather than the midnight after it.
+    @State private var inputEnd: Date
 
     private var groupId: String { group.id }
     private var clash: String? { Clash.text(busyIds, group: group, me: me) }
@@ -70,6 +72,7 @@ struct NewProposalSheet: View {
         self.api = api
         self.onCreated = onCreated
         _draft = State(initialValue: draft)
+        _inputEnd = State(initialValue: draft.allDay ? draft.end.addingTimeInterval(-1) : draft.end)
         // Prefilled with the group's name, which is what the event is called anyway if left blank.
         _title = State(initialValue: draft.title.isEmpty ? group.name : draft.title)
         _note = State(initialValue: draft.note)
@@ -77,24 +80,9 @@ struct NewProposalSheet: View {
 
     var body: some View {
         BottomSheet(title: "Propose a time") {
-            Text(Formatting.span(start: draft.start, end: draft.end, allDay: draft.allDay))
+            Text(Formatting.span(start: span.start, end: span.end, allDay: draft.allDay))
                 .displayFont(24, .bold)
-            VStack(spacing: 0) {
-                DatePicker("Starts", selection: $draft.start, in: draft.bounds ?? Date.distantPast...Date.distantFuture,
-                           displayedComponents: draft.allDay ? .date : [.date, .hourAndMinute])
-                    .frame(minHeight: 58)
-                Divider().overlay(theme.line)
-                DatePicker("Ends", selection: $draft.end, in: draft.start...(draft.bounds?.upperBound ?? Date.distantFuture),
-                           displayedComponents: draft.allDay ? .date : [.date, .hourAndMinute])
-                    .frame(minHeight: 58)
-                Divider().overlay(theme.line)
-                Toggle("All day", isOn: $draft.allDay).toggleStyle(.glassSwitch).frame(minHeight: 58)
-            }
-            .bodyFont(15, .medium)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 4)
-            .surfaceBackground(cornerRadius: 18)
-            .padding(.vertical, 6)
+            DateRangeInput(start: $draft.start, end: $inputEnd, allDay: $draft.allDay, bounds: draft.bounds)
             InputField(placeholder: "Title", text: $title)
             InputField(placeholder: "Where? (optional)", text: $location)
             InputField(placeholder: "Note (optional)", text: $note)
@@ -111,22 +99,30 @@ struct NewProposalSheet: View {
                 LoadingLabel(title: clash == nil ? "Send proposal" : "Propose anyway", isLoading: isSaving)
             }
             .buttonStyle(.accent)
-            .disabled(isSaving || draft.end <= draft.start)
+            .disabled(isSaving || span.end <= span.start)
         }
         .animation(.easeInOut(duration: 0.2), value: clash)
-        .task(id: TimesKey(start: draft.start, end: draft.end, allDay: draft.allDay)) { await checkConflicts() }
+        .task(id: TimesKey(start: span.start, end: span.end, allDay: draft.allDay)) { await checkConflicts() }
         .errorAlert($error)
+    }
+
+    /// What's proposed. All day runs from the first day's midnight to the midnight after the last.
+    private var span: (start: Date, end: Date) {
+        guard draft.allDay else { return (draft.start, inputEnd) }
+        let calendar = Calendar.current
+        return (calendar.startOfDay(for: draft.start), CalendarDay(max(inputEnd, draft.start)).adding(days: 1).startDate())
     }
 
     /// Debounced: a newer change cancels this task before the request goes out.
     private func checkConflicts() async {
-        guard draft.end > draft.start else {
+        let span = span
+        guard span.end > span.start else {
             busyIds = []
             return
         }
         do {
             try await Task.sleep(for: .milliseconds(250))
-            busyIds = try await api.send(API.Groups.conflicts(groupId: groupId, start: draft.start, end: draft.end)).busyMemberIds
+            busyIds = try await api.send(API.Groups.conflicts(groupId: groupId, start: span.start, end: span.end)).busyMemberIds
         } catch where error.isCancellation {
             // Superseded by a newer time.
         } catch {
@@ -143,7 +139,7 @@ struct NewProposalSheet: View {
         }
         do {
             let proposal = try await api.send(API.Proposals.create(groupId: groupId, CreateProposalBody(
-                start: draft.start, end: draft.end, allDay: draft.allDay,
+                start: span.start, end: span.end, allDay: draft.allDay,
                 title: clean(title), location: clean(location), note: clean(note)
             )))
             dismiss()

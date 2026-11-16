@@ -200,14 +200,74 @@ final class MyTimeViewModel {
 }
 
 extension ManualBlock {
-    /// "Every Tuesday · 19:00 – 21:30"
+    /// "Every Tuesday · 19:00 – 21:30", "Monthly on the 3rd Monday · All day · until 20 Dec"
     var scheduleDescription: String {
-        let weekday = start.formatted(.dateTime.weekday(.wide))
         let times = allDay ? "All day" : "\(Formatting.time(start)) – \(Formatting.time(end))"
-        switch self.repeat {
-        case .none: return "\(Formatting.shortDay(start)) · \(times)"
-        case .weekly: return "Every \(weekday) · \(times)"
-        case .fortnightly: return "Every other \(weekday) · \(times)"
+        let ends = until.map { " \u{00B7} until \(Formatting.shortDay($0.startDate()))" } ?? ""
+        guard self.repeat != .none else { return "\(Formatting.shortDay(start)) \u{00B7} \(times)" }
+        return "\(self.repeat.summary(from: start)) \u{00B7} \(times)\(ends)"
+    }
+}
+
+extension ManualBlock.Repeat {
+    /// The repeat in a schedule line: "Every Tuesday", "Weekdays", "Monthly on the 16th".
+    func summary(from start: Date) -> String {
+        let weekday = start.formatted(.dateTime.weekday(.wide))
+        switch self {
+        case .none: return "Once"
+        case .daily: return "Every day"
+        case .weekdays: return "Weekdays"
+        case .weekly: return "Every \(weekday)"
+        case .fortnightly: return "Every other \(weekday)"
+        case .monthly: return "Monthly on the \(Self.ordinal(Calendar.current.component(.day, from: start)))"
+        case .monthlyWeekday: return "Monthly on the \(Self.weekOfMonth(start)) \(weekday)"
+        case .yearly: return "Yearly on \(start.formatted(.dateTime.day().month(.abbreviated)))"
+        case .unknown: return "Repeats"
         }
+    }
+
+    /// The choice in the block sheet's Repeat menu, from the block's start date.
+    func choice(from start: Date) -> String {
+        let weekday = start.formatted(.dateTime.weekday(.wide))
+        switch self {
+        case .none: return "Never"
+        case .daily: return "Every day"
+        case .weekdays: return "Every weekday (Mon\u{2013}Fri)"
+        case .weekly: return "Every week on \(weekday)"
+        case .fortnightly: return "Every 2 weeks on \(weekday)"
+        case .monthly: return "Every month on the \(Self.ordinal(Calendar.current.component(.day, from: start)))"
+        case .monthlyWeekday: return "Every month on the \(Self.weekOfMonth(start)) \(weekday)"
+        case .yearly: return "Every year on \(start.formatted(.dateTime.day().month(.wide)))"
+        case .unknown: return "Repeats"
+        }
+    }
+
+    /// The agenda's source tag.
+    var tag: String {
+        switch self {
+        case .none: "Your block"
+        case .daily: "Daily"
+        case .weekdays: "Weekdays"
+        case .weekly: "Weekly"
+        case .fortnightly: "Every other week"
+        case .monthly, .monthlyWeekday: "Monthly"
+        case .yearly: "Yearly"
+        case .unknown: "Repeats"
+        }
+    }
+
+    /// "1st", "2nd", "23rd".
+    static func ordinal(_ n: Int) -> String {
+        let suffix = (11...13).contains(n % 100) ? "th" : [1: "st", 2: "nd", 3: "rd"][n % 10] ?? "th"
+        return "\(n)\(suffix)"
+    }
+
+    /// "3rd" for the third Monday, or "last" when the date is in its month's last seven days
+    /// (matching the server's monthlyWeekday rule).
+    static func weekOfMonth(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let day = calendar.component(.day, from: date)
+        let days = calendar.range(of: .day, in: .month, for: date)?.count ?? 31
+        return day + 7 > days ? "last" : ordinal((day + 6) / 7)
     }
 }

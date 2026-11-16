@@ -58,7 +58,8 @@ struct EventEditorSheet: View {
         case .edit(let event):
             _title = State(initialValue: event.title)
             _start = State(initialValue: event.start)
-            _end = State(initialValue: event.end)
+            // All day ends at the midnight after the last day; the input shows the last day.
+            _end = State(initialValue: event.allDay ? event.end.addingTimeInterval(-1) : event.end)
             _allDay = State(initialValue: event.allDay)
             _location = State(initialValue: event.location ?? "")
             _note = State(initialValue: event.note ?? "")
@@ -72,16 +73,7 @@ struct EventEditorSheet: View {
         BottomSheet(title: isNew ? "Add event" : "Edit event") {
             cover
             InputField(placeholder: "What's happening?", text: $title)
-            VStack(spacing: 0) {
-                Toggle("All day", isOn: $allDay).toggleStyle(.glassSwitch).frame(minHeight: 50)
-                Divider().overlay(theme.line)
-                DatePicker("Starts", selection: $start, displayedComponents: allDay ? .date : [.date, .hourAndMinute]).frame(minHeight: 50)
-                Divider().overlay(theme.line)
-                DatePicker("Ends", selection: $end, in: start..., displayedComponents: allDay ? .date : [.date, .hourAndMinute]).frame(minHeight: 50)
-            }
-            .bodyFont(15, .medium)
-            .padding(.horizontal, 14)
-            .surfaceBackground(cornerRadius: 18)
+            DateRangeInput(start: $start, end: $end, allDay: $allDay)
             InputField(placeholder: "Where? (optional)", text: $location)
             InputField(placeholder: "Note (optional)", text: $note)
             Button {
