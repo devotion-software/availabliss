@@ -55,6 +55,8 @@ struct WeekDayView: View {
     var body: some View {
         let summary = model.summary(for: day)
         let allDay = model.layout.allDay[day] ?? []
+        // Busy all day: no hours to show, just what makes it so.
+        let busyAllDay = allDay.contains { !$0.isIgnored }
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 topBar
@@ -63,7 +65,7 @@ struct WeekDayView: View {
                     .transition(slide)
                     .modifier(SwipeToStep(onDrag: { lastSwipeAt = .now }) { delta in move(byDays: 7 * delta) })
                 summaryLine(summary)
-                if !allDay.isEmpty {
+                if !allDay.isEmpty && !busyAllDay {
                     VStack(spacing: 6) {
                         ForEach(Array(allDay.enumerated()), id: \.offset) { _, interval in
                             AllDayChip(interval: interval) { open(interval) }
@@ -75,26 +77,40 @@ struct WeekDayView: View {
             .padding(.top, 12)
             .padding(.bottom, 10)
             theme.line.frame(height: 1)
-            ScrollViewReader { proxy in
-                ScrollView(.vertical) {
-                    MyDayTimeline(day: day, pieces: model.layout.timed[day] ?? []) { from, to in
-                        if !justSwiped { draft = BlockDraft(day: day, range: (from, to)) }
-                    } onOpen: { interval in
-                        if !justSwiped { open(interval) }
+            SwiftUI.Group {
+                if busyAllDay {
+                    ScrollView(.vertical) {
+                        BusyAllDayCard(day: day, items: allDay) { interval in
+                            if !justSwiped { open(interval) }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 20)
                     }
-                    .padding(.leading, 8)
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 24)
-                }
-                .scrollIndicators(.hidden)
-                // A new page per day, sliding in from the side it's coming from.
-                .id(day)
-                .transition(slide)
-                .task(id: day) {
-                    proxy.scrollTo(Self.startHour, anchor: .top)
-                    await model.ensureLoaded(through: weekStart.adding(days: 6))
+                    .scrollIndicators(.hidden)
+                    .id(day)
+                    .transition(slide)
+                } else {
+                    ScrollViewReader { proxy in
+                        ScrollView(.vertical) {
+                            MyDayTimeline(day: day, pieces: model.layout.timed[day] ?? []) { from, to in
+                                if !justSwiped { draft = BlockDraft(day: day, range: (from, to)) }
+                            } onOpen: { interval in
+                                if !justSwiped { open(interval) }
+                            }
+                            .padding(.leading, 8)
+                            .padding(.trailing, 20)
+                            .padding(.bottom, 24)
+                        }
+                        .scrollIndicators(.hidden)
+                        .task(id: day) { proxy.scrollTo(Self.startHour, anchor: .top) }
+                    }
+                    // A new page per day, sliding in from the side it's coming from.
+                    .id(day)
+                    .transition(slide)
                 }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
+            .task(id: day) { await model.ensureLoaded(through: weekStart.adding(days: 6)) }
             .modifier(SwipeToStep(onDrag: { lastSwipeAt = .now }) { delta in move(byDays: delta) })
             .clipped()
         }
@@ -203,6 +219,43 @@ struct WeekDayView: View {
                 toast = "That block was just removed."
             }
         }
+    }
+}
+
+/// In place of the timeline on a day something blocks entirely: "Busy all day" and what it is,
+/// each tappable (to edit your block, or to mark a calendar event not busy).
+private struct BusyAllDayCard: View {
+    let day: CalendarDay
+    let items: [BusyInterval]
+    let onOpen: (BusyInterval) -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "calendar")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(theme.accentInk)
+                .frame(width: 48, height: 48)
+                .background(Circle().fill(theme.accentSoft))
+                .accessibilityHidden(true)
+            VStack(spacing: 4) {
+                Text("Busy all day")
+                    .displayFont(19, .semibold, relativeTo: .headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Groups see you as busy for the whole day.")
+                    .bodyFont(14, relativeTo: .subheadline)
+                    .foregroundStyle(theme.muted)
+                    .multilineTextAlignment(.center)
+            }
+            VStack(spacing: 6) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, interval in
+                    AllDayChip(interval: interval) { onOpen(interval) }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(18)
+        .glass(cornerRadius: 24)
     }
 }
 

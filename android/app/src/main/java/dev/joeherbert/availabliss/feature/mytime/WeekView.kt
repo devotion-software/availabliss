@@ -7,6 +7,10 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import dev.joeherbert.availabliss.core.network.model.BusyInterval
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -68,6 +72,8 @@ internal fun WeekView(state: MyTimeUiState, day: LocalDate, actions: MyTimeActio
     val row = state.rows[day]
     val allDay = state.layout.allDay[day].orEmpty()
     val placed = state.layout.timed[day].orEmpty()
+    // Busy all day: no hours to show, just what makes it so.
+    val busyAllDay = allDay.any { !it.isIgnored }
     val bottom = tabBarClearance()
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -117,7 +123,7 @@ internal fun WeekView(state: MyTimeUiState, day: LocalDate, actions: MyTimeActio
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
-            if (allDay.isNotEmpty()) {
+            if (allDay.isNotEmpty() && !busyAllDay) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     allDay.forEach { AllDayChip(it, day, onClick = actions.onIntervalClick) }
                 }
@@ -141,6 +147,11 @@ internal fun WeekView(state: MyTimeUiState, day: LocalDate, actions: MyTimeActio
                     .glass(Shapes.panel, shadow = false)
                     .swipeToStep(onPrevious = { actions.onStepDay(-1) }, onNext = { actions.onStepDay(1) }),
             ) { (pageDay, pagePlaced) ->
+                val pageAllDay = state.layout.allDay[pageDay].orEmpty()
+                if (pageAllDay.any { !it.isIgnored }) {
+                    BusyAllDay(pageAllDay, pageDay, onClick = actions.onIntervalClick, modifier = Modifier.height(height))
+                    return@AnimatedContent
+                }
                 DayTimeline(
                     day = pageDay,
                     placed = pagePlaced,
@@ -151,6 +162,40 @@ internal fun WeekView(state: MyTimeUiState, day: LocalDate, actions: MyTimeActio
                     modifier = Modifier.padding(end = Spacing.s),
                 )
             }
+        }
+    }
+}
+
+/**
+ * In place of the timeline on a day something blocks entirely: "Busy all day" and what it is,
+ * each tappable (to edit your block, or to mark a calendar event not busy).
+ */
+@Composable
+private fun BusyAllDay(items: List<BusyInterval>, day: LocalDate, onClick: (BusyInterval) -> Unit, modifier: Modifier = Modifier) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    Column(
+        modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(Spacing.l),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.m),
+    ) {
+        Box(
+            Modifier.padding(top = Spacing.l).size(48.dp).clip(CircleShape).background(colors.accentSoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(AvIcons.Calendar, contentDescription = null, tint = colors.accentInk, modifier = Modifier.size(22.dp))
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Busy all day", style = type.titleSmall, color = colors.ink, modifier = Modifier.semantics { heading() })
+            Text(
+                "Groups see you as busy for the whole day.",
+                style = type.body,
+                color = colors.muted,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items.forEach { AllDayChip(it, day, modifier = Modifier.fillMaxWidth(), onClick = onClick) }
         }
     }
 }

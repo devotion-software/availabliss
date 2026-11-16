@@ -36,6 +36,8 @@
 	const weekStart = $derived(startOfWeek(day));
 	const week = $derived(Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)));
 	const shown = $derived(get(day) ?? { timed: [], allDay: [] });
+	// Busy all day: no hours to show, just what makes it so.
+	const busyAllDay = $derived(shown.allDay.some((i) => !i.ignoreId));
 	const line = $derived(dayLine(day, today, busyRanges(shown.timed, shown.allDay), dayNames(shown.timed, shown.allDay)));
 
 	const canWeek = (by: 1 | -1) => (by < 0 ? weekStart > today : addDays(weekStart, 7) <= last);
@@ -104,7 +106,7 @@
 
 	<p class="line" aria-live="polite">{line}</p>
 
-	{#if shown.allDay.length}
+	{#snippet chips()}
 		<div class="chips" aria-label="All day">
 			{#each shown.allDay as interval, i (i)}
 				<button
@@ -120,7 +122,9 @@
 				</button>
 			{/each}
 		</div>
-	{/if}
+	{/snippet}
+
+	{#if shown.allDay.length && !busyAllDay}{@render chips()}{/if}
 
 	<div
 		class="grid"
@@ -135,11 +139,20 @@
 	>
 		{#key day}
 			<div class="page" in:slide={dayDir.current}>
-				<DayTimeGrid {day} timed={shown.timed} {today} {timeZone} {onselect} {onopen} />
+				{#if busyAllDay}
+					<div class="all-day-card">
+						<span class="badge" aria-hidden="true"><Icon name="calendar" size={22} /></span>
+						<h3>Busy all day</h3>
+						<p>Groups see you as busy for the whole day.</p>
+						{@render chips()}
+					</div>
+				{:else}
+					<DayTimeGrid {day} timed={shown.timed} {today} {timeZone} {onselect} {onopen} />
+				{/if}
 			</div>
 		{/key}
 	</div>
-	<p class="hint"><span class="touch">Tap a time to block it</span><span class="mouse">Click a time to block it, or drag to choose a range</span></p>
+	<p class="hint" class:gone={busyAllDay}><span class="touch">Tap a time to block it</span><span class="mouse">Click a time to block it, or drag to choose a range</span></p>
 </section>
 
 <style>
@@ -321,6 +334,43 @@
 	}
 	.page {
 		height: 100%;
+	}
+	.all-day-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+		padding: 22px 18px 18px;
+		border-radius: 24px;
+		background: var(--glass);
+		border: 1px solid var(--glass-border);
+		text-align: center;
+	}
+	.all-day-card .chips {
+		align-self: stretch;
+		margin-top: 10px;
+	}
+	.badge {
+		display: grid;
+		place-items: center;
+		width: 48px;
+		height: 48px;
+		border-radius: 50%;
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		margin-bottom: 6px;
+	}
+	.all-day-card h3 {
+		font-family: var(--font-display);
+		font-size: 19px;
+		font-weight: 650;
+	}
+	.all-day-card p {
+		font-size: 14px;
+		color: var(--muted);
+	}
+	.hint.gone {
+		visibility: hidden;
 	}
 	.hint {
 		font-size: 12px;
