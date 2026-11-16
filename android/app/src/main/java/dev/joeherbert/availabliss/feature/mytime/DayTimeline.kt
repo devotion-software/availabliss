@@ -75,7 +75,7 @@ private val ContainScroll = object : NestedScrollConnection {
     override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity = available.copy(x = 0f)
 }
 
-private val HourHeight = 52.dp
+private val HourHeight = 40.dp
 private val GutterWidth = 44.dp
 private val DayHeight = HourHeight * 24
 
@@ -285,7 +285,7 @@ private fun IntervalBox(p: PlacedInterval, compact: Boolean, showText: Boolean, 
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (p.minutes >= 45) {
+        if (p.minutes >= 60) {
             Text(
                 // Too narrow for "19:00 – 21:30" on one line: stack the start and end instead.
                 if (compact) "${clock(p.from)}\n${clock(p.to)}" else "${clock(p.from)} – ${clock(p.to)}",
@@ -293,7 +293,7 @@ private fun IntervalBox(p: PlacedInterval, compact: Boolean, showText: Boolean, 
                 lineHeight = 14.sp,
                 style = Tabular,
                 color = ink.copy(alpha = ink.alpha * 0.8f),
-                maxLines = if (compact && p.minutes >= 60) 2 else 1,
+                maxLines = if (compact && p.minutes >= 90) 2 else 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }

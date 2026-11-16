@@ -141,7 +141,7 @@
 						class:ignored={!!p.interval.ignoreId}
 						class:cont-before={p.continuesBefore}
 						class:cont-after={p.continuesAfter}
-						class:short={minutes < 45}
+						class:short={minutes < 60}
 						style={boxStyle(p)}
 						title={describe(p)}
 						aria-label="{p.interval.source === 'manual' ? 'Edit: ' : ''}{describe(p)}"
@@ -170,7 +170,7 @@
 	.dtg {
 		--gutter-w: 48px;
 		/* At least 48px an hour so every slot is an easy target. */
-		--hour: 52px;
+		--hour: 40px;
 		display: flex;
 		flex-direction: column;
 		min-width: 0;

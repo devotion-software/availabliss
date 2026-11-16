@@ -10,7 +10,7 @@ struct MyDayTimeline: View {
     /// A tap on busy time: your own block, or an interval from a calendar.
     let onOpen: (BusyInterval) -> Void
 
-    static let hourHeight: CGFloat = 56
+    static let hourHeight: CGFloat = 40
     static let gutterWidth: CGFloat = 48
     /// Space above 00:00 and below 24:00 so their labels aren't cut off.
     static let verticalPadding: CGFloat = 10
@@ -158,11 +158,11 @@ private struct BusyBox: View {
             Text(piece.interval.label ?? "Busy")
                 .bodyFont(13, .semibold, relativeTo: .footnote)
                 .fixedSize()
-            if piece.minutes >= 45 {
+            if piece.minutes >= 60 {
                 let from = DayLayout.clock(piece.from), to = DayLayout.clock(piece.to)
                 ViewThatFits(in: .horizontal) {
                     Text("\(from) – \(to)").fixedSize()
-                    if piece.minutes >= 75 {
+                    if piece.minutes >= 90 {
                         Text("\(from) –\n\(to)").fixedSize()
                     }
                     Text(from).fixedSize()
