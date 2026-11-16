@@ -45,8 +45,15 @@ final class AppModel {
     // MARK: Lifecycle
 
     func launch() async {
-        await session.restore()
-        if session.isSignedIn { await didSignIn() }
+        // A returning user opens straight from the cached account; it's refreshed alongside.
+        let fromCache = await session.restore()
+        guard session.isSignedIn else { return }
+        if fromCache {
+            Task {
+                if await session.revalidate(), let user = session.user { appearance.adopt(user) }
+            }
+        }
+        await didSignIn()
     }
 
     func signIn(token: String) async throws {
