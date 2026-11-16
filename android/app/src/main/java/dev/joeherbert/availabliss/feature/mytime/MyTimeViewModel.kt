@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.common.TimeRangeDraft
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.AppPreferences
 import dev.joeherbert.availabliss.core.data.BlocksRepository
@@ -29,7 +30,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
-import java.time.LocalTime
 import java.time.YearMonth
 import javax.inject.Inject
 
@@ -327,10 +327,10 @@ class MyTimeViewModel @Inject constructor(
 
     // region "Block a time" sheet
     /** "Something else…": the sheet as it comes, on today. */
-    fun openBlockSheet() = openDraft(BlockDraft(date = DateTimes.today()))
+    fun openBlockSheet() = openDraft(BlockDraft.on(DateTimes.today()))
 
     /** The week view's "+ Block": the sheet on the selected day. */
-    fun openBlockSheetOn(date: LocalDate) = openDraft(BlockDraft(date = date))
+    fun openBlockSheetOn(date: LocalDate) = openDraft(BlockDraft.on(date))
 
     /** The agenda's free row: the sheet prefilled with the day's longest free stretch. */
     fun blockFree(date: LocalDate, summary: DaySummary) {
@@ -352,21 +352,10 @@ class MyTimeViewModel @Inject constructor(
 
     fun updateDraft(transform: (BlockDraft) -> BlockDraft) = _state.update { s -> s.copy(draft = s.draft?.let(transform)) }
 
-    fun onDraftDate(date: LocalDate) = updateDraft { it.copy(date = date, lastDay = null, until = it.until?.takeIf { u -> !u.isBefore(date) }) }
+    /** The date range input changed (start, end or all day). */
+    fun onDraftRange(range: TimeRangeDraft) = updateDraft { it.withRange(range) }
 
-    /** All day over several days: new first and last days. */
-    fun onDraftDates(from: LocalDate, to: LocalDate) = updateDraft { d ->
-        val away = BlockDraft.away(from, to)
-        d.copy(date = away.date, lastDay = away.lastDay, until = d.until?.takeIf { u -> !u.isBefore(away.date) })
-    }
-
-    fun onDraftWhen(option: BlockWhen) = updateDraft { it.copy(whenOption = option) }
-
-    fun onDraftStart(time: LocalTime) = updateDraft { it.withStart(time) }
-
-    fun onDraftEnd(time: LocalTime) = updateDraft { it.copy(whenOption = BlockWhen.Times, end = time) }
-
-    fun onDraftRepeat(repeat: Repeat) = updateDraft { it.copy(repeat = repeat, until = if (repeat == Repeat.None) null else it.until) }
+    fun onDraftRepeat(repeat: Repeat) = updateDraft { it.withRepeat(repeat) }
 
     fun onDraftUntil(until: LocalDate?) = updateDraft { it.copy(until = until) }
 
@@ -383,7 +372,8 @@ class MyTimeViewModel @Inject constructor(
                     set("start", request.start)
                     set("end", request.end)
                     set("allDay", request.allDay)
-                    set("repeat", request.repeat.wireName)
+                    // A repeat this version doesn't know is left as it is.
+                    if (request.repeat != Repeat.Unknown) set("repeat", request.repeat.wireName)
                     set("until", request.until)
                     set("note", request.note)
                 }
@@ -393,7 +383,7 @@ class MyTimeViewModel @Inject constructor(
                     blocks = blocks.filterNot { it.id == result.value.id } + result.value
                     _state.update { it.copy(draft = null, savingDraft = false) }
                     val verb = if (draft.isEditing) "Updated" else "Blocked"
-                    showMessage("$verb ${draft.dateLabel} · ${draft.timeLabel}")
+                    showMessage("$verb ${draft.label}")
                     load(silent = true)
                 }
                 is ApiResult.Failure -> {

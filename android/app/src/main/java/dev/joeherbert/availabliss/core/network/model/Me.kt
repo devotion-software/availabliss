@@ -36,15 +36,37 @@ data class BusyIgnoreResponse(val id: String)
 @Serializable
 data class BusyResponse(val intervals: List<BusyInterval>)
 
-@Serializable
-enum class Repeat {
-    @SerialName("none") None,
-    @SerialName("weekly") Weekly,
-    @SerialName("fortnightly") Fortnightly,
+/**
+ * How a manual block repeats. Decoding never fails: a value this app doesn't know yet (from a
+ * newer server) becomes [Unknown], which is never sent back.
+ */
+@Serializable(with = RepeatSerializer::class)
+enum class Repeat(override val wire: String) : WireEnum {
+    None("none"),
+    Daily("daily"),
+    Weekdays("weekdays"),
+    Weekly("weekly"),
+    Fortnightly("fortnightly"),
+    /** Same date each month (skipped in months without it). */
+    Monthly("monthly"),
+    /** Same weekday of the month, e.g. the 2nd Tuesday (the last one if it starts in a month's last 7 days). */
+    MonthlyWeekday("monthlyWeekday"),
+    /** Same date each year (29 Feb: leap years only). */
+    Yearly("yearly"),
+    /** A repeat this version doesn't know. */
+    Unknown("unknown"),
+    ;
+
+    companion object {
+        /** The repeats that can be picked, in menu order. */
+        val choices: List<Repeat> = entries - Unknown
+    }
 }
 
-/** The API's name for this value (its @SerialName), for JSON patches. */
-val Repeat.wireName: String get() = Repeat.serializer().descriptor.getElementName(ordinal)
+/** The API's name for this value, for JSON patches. */
+val Repeat.wireName: String get() = wire
+
+object RepeatSerializer : LenientEnumSerializer<Repeat>("Repeat", Repeat.entries.toTypedArray(), Repeat.Unknown)
 
 @Serializable
 data class ManualBlock(

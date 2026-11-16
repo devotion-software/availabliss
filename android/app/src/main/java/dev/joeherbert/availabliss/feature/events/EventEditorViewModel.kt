@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
+import dev.joeherbert.availabliss.core.common.TimeRangeDraft
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.EventsRepository
 import dev.joeherbert.availabliss.core.data.GroupsRepository

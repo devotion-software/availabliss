@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.common.TimeRangeDraft
+import dev.joeherbert.availabliss.designsystem.component.DateRangeInput
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
@@ -158,7 +160,7 @@ private fun EditableFields(state: EventEditorUiState, actions: EventEditorAction
     }
     GlassPanel(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionLabel("When")
-        TimeRangeFields(state.range, actions.onRangeChange)
+        DateRangeInput(state.range, actions.onRangeChange)
     }
     GlassPanel(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AvTextField(state.location, actions.onLocationChange, label = "Where (optional)", placeholder = "e.g. Keswick", imeAction = ImeAction.Next)

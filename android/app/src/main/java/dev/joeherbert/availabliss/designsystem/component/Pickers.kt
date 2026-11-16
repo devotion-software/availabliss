@@ -23,11 +23,11 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
 
-private fun LocalDate.utcMillis() = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-private fun Long.utcDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
+internal fun LocalDate.utcMillis() = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+internal fun Long.utcDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
 
 @Composable
-private fun pickerColors() = AvailablissTheme.colors.let { c ->
+internal fun pickerColors() = AvailablissTheme.colors.let { c ->
     DatePickerDefaults.colors(
         containerColor = c.bg,
         titleContentColor = c.muted,
@@ -45,6 +45,21 @@ private fun pickerColors() = AvailablissTheme.colors.let { c ->
         selectedYearContainerColor = c.accent,
         selectedYearContentColor = c.onAccent,
         dividerColor = c.line,
+    )
+}
+
+@Composable
+internal fun timePickerColors() = AvailablissTheme.colors.let { c ->
+    TimePickerDefaults.colors(
+        clockDialColor = c.surface,
+        selectorColor = c.accent,
+        containerColor = c.bg,
+        clockDialSelectedContentColor = c.onAccent,
+        clockDialUnselectedContentColor = c.ink,
+        timeSelectorSelectedContainerColor = c.accentSoft,
+        timeSelectorUnselectedContainerColor = c.surface,
+        timeSelectorSelectedContentColor = c.accentInk,
+        timeSelectorUnselectedContentColor = c.ink,
     )
 }
 
@@ -126,17 +141,7 @@ fun AvTimePickerDialog(
         text = {
             TimePicker(
                 state = state,
-                colors = TimePickerDefaults.colors(
-                    clockDialColor = c.surface,
-                    selectorColor = c.accent,
-                    containerColor = c.bg,
-                    clockDialSelectedContentColor = c.onAccent,
-                    clockDialUnselectedContentColor = c.ink,
-                    timeSelectorSelectedContainerColor = c.accentSoft,
-                    timeSelectorUnselectedContainerColor = c.surface,
-                    timeSelectorSelectedContentColor = c.accentInk,
-                    timeSelectorUnselectedContentColor = c.ink,
-                ),
+                colors = timePickerColors(),
             )
         },
         confirmButton = { TextAction("Done", { onPick(LocalTime.of(state.hour, state.minute)); onDismiss() }) },

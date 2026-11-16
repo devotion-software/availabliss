@@ -137,16 +137,12 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
             draft = draft,
             saving = state.savingDraft,
             onDismiss = viewModel::closeBlockSheet,
-            onDate = viewModel::onDraftDate,
-            onWhen = viewModel::onDraftWhen,
-            onStart = viewModel::onDraftStart,
-            onEnd = viewModel::onDraftEnd,
+            onRange = viewModel::onDraftRange,
             onRepeat = viewModel::onDraftRepeat,
             onUntil = viewModel::onDraftUntil,
             onNote = viewModel::onDraftNote,
             onSave = viewModel::saveDraft,
             onDelete = viewModel::deleteEditingBlock,
-            onDates = viewModel::onDraftDates,
         )
     }
 }

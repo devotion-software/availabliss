@@ -40,8 +40,8 @@ import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostSta
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
-import dev.joeherbert.availabliss.feature.events.TimeRangeDraft
-import dev.joeherbert.availabliss.feature.events.TimeRangeFields
+import dev.joeherbert.availabliss.core.common.TimeRangeDraft
+import dev.joeherbert.availabliss.designsystem.component.DateRangeInput
 
 @Composable
 fun CreateProposalScreen(
@@ -108,7 +108,7 @@ private fun CreateProposalContent(
                 }
                 GlassPanel(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionLabel("When")
-                    TimeRangeFields(state.range, onRangeChange)
+                    DateRangeInput(state.range, onRangeChange)
                 }
                 state.clash?.let { ClashPanel(it, "You can still propose it; everyone will see the clash before they reply.") }
                 GlassPanel(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -78,10 +78,28 @@ fun monthRange(today: LocalDate): ClosedRange<YearMonth> = YearMonth.from(today)
 // region Agenda
 /** Where a busy item comes from, as the agenda's small tag says. */
 enum class AgendaTag(val label: String) {
+    Daily("Daily"),
+    Weekdays("Weekdays"),
     Weekly("Weekly"),
     Fortnightly("Every other week"),
+    Monthly("Monthly"),
+    Yearly("Yearly"),
+    /** A repeat this version doesn't know. */
+    Repeats("Repeats"),
     Block("Your block"),
     Calendar("Calendar"),
+}
+
+/** The agenda tag for one of your blocks that repeats as [repeat]. */
+fun agendaTag(repeat: Repeat?): AgendaTag = when (repeat) {
+    Repeat.Daily -> AgendaTag.Daily
+    Repeat.Weekdays -> AgendaTag.Weekdays
+    Repeat.Weekly -> AgendaTag.Weekly
+    Repeat.Fortnightly -> AgendaTag.Fortnightly
+    Repeat.Monthly, Repeat.MonthlyWeekday -> AgendaTag.Monthly
+    Repeat.Yearly -> AgendaTag.Yearly
+    Repeat.Unknown -> AgendaTag.Repeats
+    Repeat.None, null -> AgendaTag.Block
 }
 
 /** One busy item under a day in the agenda. [from] / [to] are minutes on the day (to may be 1440). */
@@ -103,9 +121,7 @@ data class AgendaItem(
 fun agendaItems(allDay: List<BusyInterval>, timed: List<PlacedInterval>, repeats: Map<String, Repeat>): List<AgendaItem> {
     fun tag(i: BusyInterval) = when {
         i.source == BusySource.Calendar -> AgendaTag.Calendar
-        repeats[i.blockId] == Repeat.Weekly -> AgendaTag.Weekly
-        repeats[i.blockId] == Repeat.Fortnightly -> AgendaTag.Fortnightly
-        else -> AgendaTag.Block
+        else -> agendaTag(repeats[i.blockId])
     }
     fun title(i: BusyInterval) = if (i.source == BusySource.Manual) i.label?.trim()?.takeIf { it.isNotEmpty() } ?: "Busy" else "Busy"
     val whole = allDay.filterNot { it.isIgnored }.map { AgendaItem(it, true, 0, DAY_MINUTES, title(it), tag(it)) }

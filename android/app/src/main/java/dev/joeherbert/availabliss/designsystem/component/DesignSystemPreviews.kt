@@ -132,6 +132,32 @@ private fun FieldsPreview() = PreviewCanvas(dark = false) {
     }
 }
 
+@Composable
+private fun DateRangeSample(allDay: Boolean) {
+    val day = java.time.LocalDate.of(2026, 11, 16)
+    var range by remember {
+        mutableStateOf(
+            if (allDay) dev.joeherbert.availabliss.core.common.TimeRangeDraft.allDay(day, day.plusDays(2))
+            else dev.joeherbert.availabliss.core.common.TimeRangeDraft.timed(day.atTime(18, 0), day.atTime(21, 0)),
+        )
+    }
+    GlassPanel(Modifier.fillMaxWidth()) {
+        SectionLabel("When")
+        DateRangeInput(range, { range = it })
+    }
+}
+
+@Preview(name = "Date range input", widthDp = 390)
+@Composable
+private fun DateRangePreview() = PreviewCanvas(dark = false) {
+    DateRangeSample(allDay = false)
+    DateRangeSample(allDay = true)
+}
+
+@Preview(name = "Date range input (dark)", widthDp = 390)
+@Composable
+private fun DateRangePreviewDark() = PreviewCanvas(dark = true, theme = ColorTheme.Lagoon) { DateRangeSample(allDay = false) }
+
 @Preview(name = "Tab bar", widthDp = 390, heightDp = 140)
 @Composable
 private fun TabBarPreview() = AvailablissPreviewTheme {

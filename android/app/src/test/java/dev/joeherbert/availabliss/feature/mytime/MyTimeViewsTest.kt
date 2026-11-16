@@ -164,18 +164,18 @@ class MyTimeViewsTest {
     @Test
     fun blockDraftForFree_prefillsTheLongestStretch() {
         assertNull(blockDraftForFree(today, DaySummary.BusyAllDay))
-        assertEquals(BlockWhen.AllDay, blockDraftForFree(today, DaySummary.FreeAllDay)?.whenOption)
+        assertEquals(true, blockDraftForFree(today, DaySummary.FreeAllDay)?.range?.allDay)
 
         val evening = requireNotNull(blockDraftForFree(today, DaySummary.FreeFrom(h(17, 30))))
-        assertEquals(LocalTime.of(17, 30), evening.start)
-        assertEquals(LocalTime.MIDNIGHT, evening.end)
+        assertEquals(today.atTime(17, 30), evening.range.start)
+        assertEquals(today.plusDays(1).atStartOfDay(), evening.range.end)
         assertEquals(today, evening.date)
 
         val morning = requireNotNull(blockDraftForFree(today, DaySummary.FreeUntil(h(9))))
-        assertEquals(LocalTime.of(6, 0) to LocalTime.of(9, 0), morning.start to morning.end)
+        assertEquals(LocalTime.of(6, 0) to LocalTime.of(9, 0), morning.range.startTime to morning.range.endTime)
 
         val lunch = requireNotNull(blockDraftForFree(today, DaySummary.FreeBetween(h(12), h(14))))
-        assertEquals(LocalTime.of(12, 0) to LocalTime.of(14, 0), lunch.start to lunch.end)
+        assertEquals(LocalTime.of(12, 0) to LocalTime.of(14, 0), lunch.range.startTime to lunch.range.endTime)
     }
     // endregion
 

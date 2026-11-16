@@ -91,6 +91,9 @@ object DateTimes {
     /** "13 Nov" */
     fun dayMonth(date: LocalDate): String = pattern("d MMM").format(date)
 
+    /** "13 November" */
+    fun dayMonthLong(date: LocalDate): String = pattern("d MMMM").format(date)
+
     /** "1 Nov 2026" */
     fun dayMonthYear(date: LocalDate): String = pattern("d MMM yyyy").format(date)
 

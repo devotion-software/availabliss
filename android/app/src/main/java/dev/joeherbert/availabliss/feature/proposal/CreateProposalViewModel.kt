@@ -11,7 +11,7 @@ import dev.joeherbert.availabliss.core.data.ProposalsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.CreateProposalRequest
-import dev.joeherbert.availabliss.feature.events.TimeRangeDraft
+import dev.joeherbert.availabliss.core.common.TimeRangeDraft
 import dev.joeherbert.availabliss.navigation.CreateProposalRoute
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow

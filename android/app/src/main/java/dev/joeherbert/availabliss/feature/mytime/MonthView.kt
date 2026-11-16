@@ -61,7 +61,7 @@ import java.time.YearMonth
 private val CellHeight = 46.dp
 private val CellShape = RoundedCornerShape(12.dp)
 
-/** The month heat map: how free each day is, a tap opening the week view; "Every week" below. */
+/** The month heat map: how free each day is, a tap opening the week view; "Repeating" below. */
 @Composable
 internal fun MonthView(state: MyTimeUiState, scroll: ScrollState, actions: MyTimeActions, top: @Composable () -> Unit) {
     Column(
@@ -106,7 +106,7 @@ internal fun MonthView(state: MyTimeUiState, scroll: ScrollState, actions: MyTim
         }
         if (state.recurring.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                SectionHeading("Every week")
+                SectionHeading("Repeating")
                 state.recurring.forEach { block ->
                     RecurringBlockRow(block, onClick = { actions.onOpenRecurring(block.id) }, onDelete = { actions.onDeleteRecurring(block.id) })
                 }

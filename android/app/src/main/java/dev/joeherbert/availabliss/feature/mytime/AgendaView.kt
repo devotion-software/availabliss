@@ -77,7 +77,7 @@ private sealed interface Entry {
     }
 }
 
-/** Week sections of days, with "Every week" after the first one. */
+/** Week sections of days, with "Repeating" after the first one. */
 private fun entries(state: MyTimeUiState): List<Entry> = buildList {
     add(Entry.Top)
     if (state.loading && state.days.isEmpty()) {
@@ -89,7 +89,7 @@ private fun entries(state: MyTimeUiState): List<Entry> = buildList {
         add(Entry.Heading(weekHeading(weekStart, state.today), "w$weekStart"))
         days.forEach { add(Entry.Day(it)) }
         if (i == 0 && state.recurring.isNotEmpty()) {
-            add(Entry.Heading("Every week", "every-week"))
+            add(Entry.Heading("Repeating", "repeating"))
             state.recurring.forEach { add(Entry.Recurring(it)) }
         }
     }
