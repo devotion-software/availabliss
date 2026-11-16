@@ -43,8 +43,9 @@ struct DaySummary: Equatable, Sendable {
         self.busy = busy
 
         var names: [String] = []
-        let manual = allDay.filter { $0.source == .manual }.map(\.label)
-            + timed.sorted { $0.from < $1.from }.filter { $0.interval.source == .manual }.map(\.interval.label)
+        // Your blocks' notes and your events' names (never "Busy").
+        let manual = allDay.filter { !$0.isIgnored }.map { $0.name == "Busy" ? nil : $0.name }
+            + timed.sorted { $0.from < $1.from }.filter { !$0.interval.isIgnored }.map { $0.interval.name == "Busy" ? nil : $0.interval.name }
         for case let name? in manual where !name.isEmpty && !names.contains(name) { names.append(name) }
         self.names = names
 

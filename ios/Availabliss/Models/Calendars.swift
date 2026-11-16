@@ -61,6 +61,8 @@ struct DeviceSync: Encodable, Sendable {
         let end: Date
         /// Hash of the event's series id (shared by every occurrence), so a series can be marked not busy.
         var eventKey: String?
+        /// The event's name: stored encrypted and only ever shown to you.
+        var title: String?
     }
 
     let deviceId: String

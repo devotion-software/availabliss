@@ -155,7 +155,7 @@ private struct BusyBox: View {
         )
         VStack(alignment: .leading, spacing: 1) {
             // Narrow lanes clip the label rather than collapsing it to "…".
-            Text(piece.interval.label ?? "Busy")
+            Text(piece.interval.name)
                 .bodyFont(13, .semibold, relativeTo: .footnote)
                 .fixedSize()
             if piece.minutes >= 60 {
@@ -191,8 +191,9 @@ private struct BusyBox: View {
 
     private var accessibilityText: String {
         let label = piece.interval.label
+        let event = piece.interval.title.map { "\($0), " } ?? ""
         let what = isManual ? "Blocked by you\(label.map { ": \($0)" } ?? "")"
-            : piece.interval.isIgnored ? "Marked not busy, from \(label ?? "a calendar")" : "Busy from \(label ?? "a calendar")"
+            : piece.interval.isIgnored ? "Marked not busy, \(event)from \(label ?? "a calendar")" : "\(event)busy from \(label ?? "a calendar")"
         let edit = isManual ? "Edit: " : ""
         return "\(edit)\(what), \(Formatting.longDay(piece.day.startDate())) \(DayLayout.clock(piece.from)) to \(DayLayout.clock(piece.to))"
     }
@@ -208,7 +209,7 @@ struct AllDayChip: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        Text(interval.label ?? "Busy")
+        Text(interval.name)
             .bodyFont(14, .semibold, relativeTo: .subheadline)
             .lineLimit(1)
             .foregroundStyle(isManual ? theme.accentInk : theme.ink)
@@ -221,7 +222,7 @@ struct AllDayChip: View {
             .opacity(interval.isIgnored ? 0.55 : 1)
             .contentShape(shape)
             .onTapGesture(perform: onTap)
-            .accessibilityLabel(isManual ? "Edit: blocked by you all day, \(interval.label ?? "Busy")" : "Busy all day from \(interval.label ?? "a calendar")")
+            .accessibilityLabel(isManual ? "Edit: blocked by you all day, \(interval.label ?? "Busy")" : "\(interval.title.map { "\($0), " } ?? "")busy all day from \(interval.label ?? "a calendar")")
             .accessibilityAddTraits(.isButton)
     }
 }

@@ -24,7 +24,7 @@ struct DayLayout: Sendable {
         let continuesBefore: Bool
         let continuesAfter: Bool
 
-        var id: String { "\(day)-\(interval.start.timeIntervalSince1970)-\(interval.end.timeIntervalSince1970)-\(interval.blockId ?? interval.calendarId ?? "")-\(interval.label ?? "")" }
+        var id: String { "\(day)-\(interval.start.timeIntervalSince1970)-\(interval.end.timeIntervalSince1970)-\(interval.blockId ?? interval.calendarId ?? "")-\(interval.label ?? "")-\(interval.title ?? "")" }
         var minutes: Double { to - from }
     }
 

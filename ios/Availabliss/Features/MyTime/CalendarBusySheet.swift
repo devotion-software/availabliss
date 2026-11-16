@@ -30,8 +30,9 @@ struct CalendarBusySheet: View {
                     }
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(interval.label ?? "A connected calendar").bodyFont(15, .semibold)
-                    Text(when).bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
+                    Text(interval.title ?? interval.label ?? "A connected calendar").bodyFont(15, .semibold)
+                    Text(interval.title != nil ? [interval.label, when].compactMap { $0 }.joined(separator: " \u{00B7} ") : when)
+                        .bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
                 }
                 Spacer(minLength: 0)
             }

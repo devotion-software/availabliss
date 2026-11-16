@@ -147,8 +147,16 @@ struct BusyInterval: Codable, Sendable, Hashable {
     var recurring: Bool?
     /// Set when you've marked this event not busy (it doesn't count): the id to undo it with.
     var ignoreId: String?
+    /// Calendar busy: the event's name (`label` is the calendar's). Only ever sent to you.
+    var title: String?
 
     var isIgnored: Bool { ignoreId != nil }
+
+    /// What to call it: the event's name, or your block's note, else "Busy".
+    var name: String {
+        let text = source == .manual ? label : title
+        return text?.isEmpty == false ? text! : "Busy"
+    }
 
     func overlaps(_ start: Date, _ end: Date) -> Bool {
         self.start < end && self.end > start

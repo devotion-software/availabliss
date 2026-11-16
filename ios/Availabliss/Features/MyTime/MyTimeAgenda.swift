@@ -111,7 +111,7 @@ private struct BusyRow: View {
     @Environment(\.theme) private var theme
 
     private var isManual: Bool { interval.source == .manual }
-    private var title: String { isManual ? (interval.label ?? "Busy") : "Busy" }
+    private var title: String { interval.name }
 
     var body: some View {
         Button(action: action) {

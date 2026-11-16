@@ -272,7 +272,10 @@ final class DeviceCalendarService {
             .events(matching: store.predicateForEvents(withStart: start, end: end, calendars: selected))
             .filter { $0.availability != .free && $0.status != .canceled && !Self.isDeclined($0) }
             .map {
-                DeviceSync.BusyRange(calendarExternalId: $0.calendar.calendarIdentifier, start: $0.startDate, end: $0.endDate, eventKey: Self.eventKey($0))
+                DeviceSync.BusyRange(
+                    calendarExternalId: $0.calendar.calendarIdentifier, start: $0.startDate, end: $0.endDate,
+                    eventKey: Self.eventKey($0), title: $0.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
             }
             .sorted { ($0.start, $0.end, $0.calendarExternalId) < ($1.start, $1.end, $1.calendarExternalId) }
     }
