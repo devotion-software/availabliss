@@ -146,8 +146,8 @@ fun dayRow(date: LocalDate, allDay: List<BusyInterval>, timed: List<PlacedInterv
     val busy = mergeSpans(counted.map { it.copy(manual = false) })
     val summary = summarise(busy)
     val names = (
-        allDay.filter { it.source == BusySource.Manual }.map { it.label } +
-            timed.filter { it.interval.source == BusySource.Manual }.sortedBy { it.from }.map { it.interval.label }
+        allDay.filterNot { it.isIgnored }.map { it.name } +
+            timed.filterNot { it.interval.isIgnored }.sortedBy { it.from }.map { it.interval.name }
         )
         .mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }
         .distinct()

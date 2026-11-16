@@ -46,7 +46,7 @@ fun resolveIntervalTap(interval: BusyInterval, blocks: List<ManualBlock>, zone: 
     when (interval.source) {
         BusySource.Calendar -> IntervalTap.CalendarBusy(
             CalendarBusyUi(
-                calendarName = interval.label?.takeIf { it.isNotBlank() } ?: "A connected calendar",
+                calendarName = interval.title ?: interval.label?.takeIf { it.isNotBlank() } ?: "A connected calendar",
                 timeLabel = calendarTimeLabel(interval, zone),
                 interval = interval,
             ),

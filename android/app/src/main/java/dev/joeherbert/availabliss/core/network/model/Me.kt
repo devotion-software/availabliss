@@ -23,8 +23,13 @@ data class BusyInterval(
     val recurring: Boolean = false,
     /** Set when you've marked this event not busy (it doesn't count): the id to undo it with. */
     val ignoreId: String? = null,
+    /** Calendar busy: the event's name (`label` is the calendar's). Only ever sent to you. */
+    val title: String? = null,
 ) {
     val isIgnored: Boolean get() = ignoreId != null
+
+    /** What to call it: your block's note or your calendar event's name, or null. */
+    val name: String? get() = (if (source == BusySource.Manual) label else title)?.trim()?.takeIf { it.isNotEmpty() }
 }
 
 @Serializable

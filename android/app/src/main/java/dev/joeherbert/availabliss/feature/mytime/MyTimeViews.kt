@@ -123,7 +123,7 @@ fun agendaItems(allDay: List<BusyInterval>, timed: List<PlacedInterval>, repeats
         i.source == BusySource.Calendar -> AgendaTag.Calendar
         else -> agendaTag(repeats[i.blockId])
     }
-    fun title(i: BusyInterval) = if (i.source == BusySource.Manual) i.label?.trim()?.takeIf { it.isNotEmpty() } ?: "Busy" else "Busy"
+    fun title(i: BusyInterval) = i.name ?: "Busy"
     val whole = allDay.filterNot { it.isIgnored }.map { AgendaItem(it, true, 0, DAY_MINUTES, title(it), tag(it)) }
     val parts = timed.filterNot { it.interval.isIgnored }
         .sortedWith(compareBy<PlacedInterval> { it.from }.thenBy { it.to })

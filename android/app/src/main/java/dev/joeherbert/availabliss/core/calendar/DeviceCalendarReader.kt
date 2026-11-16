@@ -37,13 +37,14 @@ data class DeviceCalendarInfo(
         }
 }
 
-/** A busy time range from a device calendar. Titles are never read. */
+/** A busy time range from a device calendar, with the event's name (only ever shown to you). */
 data class DeviceBusyRange(
     val calendarId: Long,
     val start: Instant,
     val end: Instant,
     /** Hash of the event id, shared by every occurrence of a recurring event, so a series can be marked not busy. */
     val eventKey: String? = null,
+    val title: String? = null,
 )
 
 /** 22 base64url chars of SHA-256, as the server makes event keys, so the raw id is never sent. */
@@ -118,6 +119,7 @@ class DeviceCalendarReader @Inject constructor(
                 CalendarContract.Instances.STATUS,
                 CalendarContract.Instances.SELF_ATTENDEE_STATUS,
                 CalendarContract.Instances.EVENT_ID,
+                CalendarContract.Instances.TITLE,
             )
             val placeholders = calendarIds.joinToString(",") { "?" }
             val selection = "${CalendarContract.Instances.CALENDAR_ID} IN ($placeholders)"
@@ -142,7 +144,8 @@ class DeviceCalendarReader @Inject constructor(
                     }
                     if (!end.isAfter(start)) continue
                     val eventKey = if (c.isNull(7)) null else eventKeyOf("${c.getLong(0)}:${c.getLong(7)}")
-                    ranges += DeviceBusyRange(c.getLong(0), start, end, eventKey)
+                    val title = if (c.isNull(8)) null else c.getString(8)?.trim()?.takeIf { it.isNotEmpty() }
+                    ranges += DeviceBusyRange(c.getLong(0), start, end, eventKey, title)
                 }
             }
             ranges

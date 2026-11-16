@@ -92,4 +92,11 @@ data class DeviceCalendar(
 )
 
 @Serializable
-data class DeviceBusy(val calendarExternalId: String, val start: String, val end: String, val eventKey: String? = null)
+data class DeviceBusy(
+    val calendarExternalId: String,
+    val start: String,
+    val end: String,
+    val eventKey: String? = null,
+    /** The event's name: stored encrypted and only ever shown to you. */
+    val title: String? = null,
+)

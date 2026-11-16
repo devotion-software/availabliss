@@ -164,7 +164,7 @@ class DeviceCalendarSync @Inject constructor(
                 rangeEnd = DateTimes.toIso(to),
                 calendars = deviceCalendars,
                 busy = reader.busyRanges(busyCalendarIds, from, to).take(MAX_RANGES).map {
-                    DeviceBusy(calendarExternalId = it.calendarId.toString(), start = DateTimes.toIso(it.start), end = DateTimes.toIso(it.end), eventKey = it.eventKey)
+                    DeviceBusy(calendarExternalId = it.calendarId.toString(), start = DateTimes.toIso(it.start), end = DateTimes.toIso(it.end), eventKey = it.eventKey, title = it.title)
                 },
             )
             val key = from.epochSecond.toString()

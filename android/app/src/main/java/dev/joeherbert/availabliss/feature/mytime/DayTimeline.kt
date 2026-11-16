@@ -334,9 +334,9 @@ private fun Modifier.tapOnly(onClick: (() -> Unit)?): Modifier {
 private val BusyInterval.clickLabel: String
     get() = if (source == BusySource.Calendar) "Details" else "Edit $displayLabel"
 
-private val BusyInterval.displayLabel: String get() = label?.takeIf { it.isNotBlank() } ?: "Busy"
+private val BusyInterval.displayLabel: String get() = name ?: "Busy"
 
 private fun BusyInterval.describe(): String = when (source) {
-    BusySource.Calendar -> "${if (isIgnored) "Marked not busy, from" else "Busy from"} ${label?.takeIf { it.isNotBlank() } ?: "a calendar"}"
+    BusySource.Calendar -> "${title?.let { "$it, " } ?: ""}${if (isIgnored) "marked not busy, from" else "busy from"} ${label?.takeIf { it.isNotBlank() } ?: "a calendar"}"
     else -> "Blocked by you" + (label?.takeIf { it.isNotBlank() }?.let { ": $it" } ?: "")
 }
