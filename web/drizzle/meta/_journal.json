@@ -120,6 +120,13 @@
       "when": 1794856713896,
       "tag": "0016_hard_machine_man",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1794857807290,
+      "tag": "0017_strange_doctor_spectrum",
+      "breakpoints": true
     }
   ]
 }

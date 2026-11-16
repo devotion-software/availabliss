@@ -63,10 +63,10 @@ function parseDuration(value: string): number {
 }
 
 /** Busy spans from the VEVENTs in an iCalendar document. */
-export function parseBusyEvents(ics: string, timeZone: string): { start: number; end: number; uid?: string }[] {
+export function parseBusyEvents(ics: string, timeZone: string): { start: number; end: number; uid?: string; title?: string }[] {
 	const unfolded = ics.replace(/\r?\n[ \t]/g, '');
 	const events = unfolded.split(/BEGIN:VEVENT/).slice(1).map((chunk) => chunk.split(/END:VEVENT/)[0]);
-	const out: { start: number; end: number; uid?: string }[] = [];
+	const out: { start: number; end: number; uid?: string; title?: string }[] = [];
 
 	for (const body of events) {
 		const props = new Map<string, { params: string; value: string }>();
@@ -88,7 +88,9 @@ export function parseBusyEvents(ics: string, timeZone: string): { start: number;
 				: start.at + (start.date ? 24 * 60 * 60 * 1000 : 0);
 		// Expanded recurrences share their series' UID.
 		const uid = props.get('UID')?.value;
-		if (end && end > start.at) out.push({ start: start.at, end, ...(uid && { uid }) });
+		// SUMMARY text escapes \\, \; \, and \n (RFC 5545).
+		const title = props.get('SUMMARY')?.value.replace(/\\([\\;,])/g, '$1').replace(/\\[nN]/g, ' ').trim();
+		if (end && end > start.at) out.push({ start: start.at, end, ...(uid && { uid }), ...(title && { title }) });
 	}
 	return out;
 }
@@ -188,7 +190,8 @@ export const caldav: CalendarAdapter<CaldavCredentials> = {
 						calendarExternalId: cal.externalId,
 						...(span.uid && { eventKey: eventKey(span.uid) }),
 						start: new Date(span.start),
-						end: new Date(span.end)
+						end: new Date(span.end),
+						...(span.title && { title: span.title })
 					});
 				}
 			}

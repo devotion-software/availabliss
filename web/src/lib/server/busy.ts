@@ -1,7 +1,7 @@
 /**
  * Loads busy time for users: calendar intervals (from calendars marked busy)
- * merged with manual blocks. Calendar event titles are never stored, so the only
- * label available is the calendar's name, and that is only shown to its owner.
+ * merged with manual blocks. Calendar event titles are stored encrypted and only
+ * decrypted for their owner (`myBusy`); everyone else only ever gets times.
  */
 import { and, count, eq, gt, inArray, isNotNull, lt, min, ne, or } from 'drizzle-orm';
 import type { BusyInterval } from '#lib/types';
@@ -11,6 +11,7 @@ import { expandBlock } from './blocks';
 import type { Span } from './availability/intervals';
 import { badRequest, notFound } from './http';
 import { newId } from './ids';
+import { openTitle } from './calendars';
 
 export interface LabelledBusy extends Span {
 	manual: boolean;
@@ -20,6 +21,8 @@ export interface LabelledBusy extends Span {
 	eventKey: string;
 	/** Marked "not busy" by its owner: only kept when asked for (`includeIgnored`). */
 	ignoreId: string | null;
+	/** The calendar event's name: only loaded for its owner (`withTitles`). */
+	title?: string | null;
 }
 
 type Ignore = typeof busyIgnores.$inferSelect;
@@ -66,7 +69,13 @@ export async function calendarCoverage(userIds: string[]): Promise<Map<string, n
  * Everyone's busy time in [from, to): calendar intervals (minus events they've marked not busy)
  * and manual blocks. `includeIgnored` keeps the not-busy events too, flagged with `ignoreId`.
  */
-export async function loadBusy(userIds: string[], from: number, to: number, includeIgnored = false): Promise<Map<string, LabelledBusy[]>> {
+export async function loadBusy(
+	userIds: string[],
+	from: number,
+	to: number,
+	includeIgnored = false,
+	withTitles = false
+): Promise<Map<string, LabelledBusy[]>> {
 	const result = new Map<string, LabelledBusy[]>(userIds.map((id) => [id, []]));
 	if (!userIds.length) return result;
 	const range = { from: new Date(from), to: new Date(to) };
@@ -79,7 +88,8 @@ export async function loadBusy(userIds: string[], from: number, to: number, incl
 				end: busyIntervals.end,
 				eventKey: busyIntervals.eventKey,
 				calendarId: calendars.id,
-				calendarName: calendars.name
+				calendarName: calendars.name,
+				...(withTitles && { title: busyIntervals.title })
 			})
 			.from(busyIntervals)
 			.innerJoin(calendars, eq(calendars.id, busyIntervals.calendarId))
@@ -117,7 +127,8 @@ export async function loadBusy(userIds: string[], from: number, to: number, incl
 			calendarId: r.calendarId,
 			blockId: null,
 			eventKey: r.eventKey,
-			ignoreId: ignore?.id ?? null
+			ignoreId: ignore?.id ?? null,
+			...(withTitles && { title: openTitle(r.userId, (r as { title?: string | null }).title ?? null) })
 		});
 	}
 
@@ -137,7 +148,7 @@ export async function loadBusy(userIds: string[], from: number, to: number, incl
  * (with `ignoreId`) so they can be shown faded and marked busy again.
  */
 export async function myBusy(userId: string, from: number, to: number): Promise<BusyInterval[]> {
-	const list = (await loadBusy([userId], from, to, true)).get(userId) ?? [];
+	const list = (await loadBusy([userId], from, to, true, true)).get(userId) ?? [];
 	// Which events repeat: more than one stored occurrence of the same key in that calendar.
 	const keys = [...new Set(list.filter((b) => b.calendarId && b.eventKey).map((b) => b.eventKey))];
 	const repeats = keys.length
@@ -156,6 +167,7 @@ export async function myBusy(userId: string, from: number, to: number): Promise<
 		calendarId: b.calendarId,
 		blockId: b.blockId,
 		...(!b.manual && {
+			title: b.title ?? null,
 			eventKey: b.eventKey,
 			recurring: recurring.has(`${b.calendarId}|${b.eventKey}`),
 			ignoreId: b.ignoreId

@@ -6,7 +6,8 @@ import { db, isDuplicateKey } from '#lib/server/db';
 import { calendarConnections } from '#lib/server/db/schema';
 import { newId } from '#lib/server/ids';
 import { syncConnection, syncDevice, syncStaleConnections, type DeviceSyncInput } from '#lib/server/calendars';
-import { loadBusy } from '#lib/server/busy';
+import { loadBusy, myBusy } from '#lib/server/busy';
+import { busyIntervals } from '#lib/server/db/schema';
 import { subscribe } from '#lib/server/realtime';
 import type { LiveEvent } from '#lib/types';
 import { everyDay, fixture } from './fixtures';
@@ -15,6 +16,35 @@ const fx = fixture('device-sync');
 afterAll(() => fx.cleanup());
 
 const settle = () => new Promise((r) => setTimeout(r, 50));
+
+describe('event titles', () => {
+	test('stored encrypted, shown only to their owner, and updated when renamed', async () => {
+		const me = await fx.user();
+		const input: DeviceSyncInput = {
+			deviceId: 'phone-titles',
+			deviceName: 'Phone',
+			rangeStart: '2031-07-01T00:00:00.000Z',
+			rangeEnd: '2031-08-01T00:00:00.000Z',
+			calendars: [{ externalId: 'home', name: 'Home', color: null, busy: true }],
+			busy: [{ calendarExternalId: 'home', start: '2031-07-10T09:00:00.000Z', end: '2031-07-10T10:00:00.000Z', title: 'Dentist' }]
+		};
+		await syncDevice(me, input);
+		const from = Date.parse('2031-07-01T00:00:00Z'), to = Date.parse('2031-08-01T00:00:00Z');
+
+		// Not readable in the database.
+		const [row] = await db.select({ title: busyIntervals.title }).from(busyIntervals).where(eq(busyIntervals.userId, me));
+		expect(row.title).not.toBeNull();
+		expect(row.title).not.toContain('Dentist');
+
+		// The owner sees it; what groups are built from never carries it.
+		expect((await myBusy(me, new Date(from).getTime(), to))[0]).toMatchObject({ title: 'Dentist', label: 'Home' });
+		expect((await loadBusy([me], from, to)).get(me)![0].title).toBeUndefined();
+
+		input.busy[0].title = 'Dentist (moved)';
+		await syncDevice(me, input);
+		expect((await myBusy(me, from, to))[0].title).toBe('Dentist (moved)');
+	});
+});
 
 describe('syncDevice', () => {
 	test('only tells the group when busy time or calendars changed', async () => {

@@ -235,3 +235,10 @@ describe('caldav adapter (stubbed fetch)', () => {
 		expect(calls.map((c) => c.url)).toEqual(['https://dav.example.com/']);
 	});
 });
+
+describe('parseBusyEvents titles', () => {
+	test('reads SUMMARY, unescaping commas, semicolons and newlines', () => {
+		const ics = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:a', 'DTSTART:20261113T180000Z', 'DTEND:20261113T190000Z', 'SUMMARY:Tea\\, cake\; chat\\nlater', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+		expect(parseBusyEvents(ics, 'UTC')[0].title).toBe('Tea, cake; chat later');
+	});
+});

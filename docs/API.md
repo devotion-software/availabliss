@@ -231,6 +231,7 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 interface BusyInterval {
   start: string; end: string; source: 'calendar' | 'manual'; label: string | null; calendarId: string | null; blockId: string | null;
   // Calendar busy only:
+  title?: string | null;    // the event's name (label is the calendar's name). Stored encrypted; only ever sent to its owner
   eventKey?: string;        // opaque key of the event / its series ('' if the calendar gives no ids)
   recurring?: boolean;      // the event repeats, so "not busy" can cover every occurrence
   ignoreId?: string | null; // set when you've marked it not busy (it doesn't count as busy for anyone)
@@ -378,7 +379,7 @@ interface DeviceSync {
   coveredUntil?: string;        // a sync sent as several ranges: the end of the whole sync (defaults to rangeEnd)
   more?: boolean;               // more ranges of this sync follow: groups are refreshed once, after the last
   calendars: { externalId: string; name: string; color: string | null; busy?: boolean }[];
-  busy: { calendarExternalId: string; start: string; end: string }[];
+  busy: { calendarExternalId: string; start: string; end: string; eventKey?: string; title?: string | null }[]; // title: the event's name (stored encrypted, only shown to you)
 }
 ```
 

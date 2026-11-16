@@ -123,7 +123,9 @@ export const busyIntervals = mysqlTable(
 		// event's rows can be replaced on their own. Empty when the source has no ids.
 		eventKey: varchar('event_key', { length: 32 }).default('').notNull(),
 		start: farInstant('start').notNull(),
-		end: farInstant('end').notNull()
+		end: farInstant('end').notNull(),
+		// The event's name, encrypted (AES-GCM, see crypto.ts). Only ever shown to its owner.
+		title: text('title')
 	},
 	(t) => [
 		index('busy_intervals_user_range_idx').on(t.userId, t.start, t.end),

@@ -21,6 +21,8 @@ export interface RemoteBusy {
 	eventKey?: string;
 	start: Date;
 	end: Date;
+	/** The event's name, when the source gives one. Stored encrypted; only its owner sees it. */
+	title?: string | null;
 }
 
 /** Events changed since a cursor: each key's busy time in the range, replacing what was stored (empty = gone). */

@@ -15,7 +15,7 @@ const API = 'https://www.googleapis.com/calendar/v3';
 /** freeBusy accepts at most 50 calendars and a bounded window per call. */
 const MAX_CALENDARS = 50;
 const FREEBUSY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
-const EVENT_FIELDS = 'id,status,transparency,start,end,recurringEventId,recurrence,attendees(self,responseStatus)';
+const EVENT_FIELDS = 'id,status,transparency,summary,start,end,recurringEventId,recurrence,attendees(self,responseStatus)';
 const PAGE_FIELDS = `nextPageToken,timeZone,items(${EVENT_FIELDS})`;
 /** Channels are asked to last this long (Google may grant less). */
 const CHANNEL_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -37,6 +37,7 @@ export interface GoogleEvent {
 	id: string;
 	status?: string;
 	transparency?: string;
+	summary?: string;
 	start?: EventTime;
 	end?: EventTime;
 	recurringEventId?: string;
@@ -94,7 +95,7 @@ const eventsUrl = (calendarId: string, params: Record<string, string>) =>
 function toBusy(calendarExternalId: string, events: GoogleEvent[], timeZone: string): RemoteBusy[] {
 	return events.flatMap((e) => {
 		const span = eventSpan(e, timeZone);
-		return span ? [{ calendarExternalId, eventKey: eventKey(seriesOf(e)), start: new Date(span.start), end: new Date(span.end) }] : [];
+		return span ? [{ calendarExternalId, eventKey: eventKey(seriesOf(e)), start: new Date(span.start), end: new Date(span.end), ...(e.summary?.trim() && { title: e.summary.trim() }) }] : [];
 	});
 }
 

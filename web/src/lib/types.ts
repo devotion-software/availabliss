@@ -141,6 +141,8 @@ export interface BusyInterval {
 	label: string | null;
 	calendarId: string | null;
 	blockId: string | null;
+	/** Calendar busy: the event's name, when the calendar gives one. Only ever sent to its owner. */
+	title?: string | null;
 	/** Calendar busy: the event's opaque key ('' when the calendar gives no ids). */
 	eventKey?: string;
 	/** Calendar busy: the event repeats (so "not busy" can cover every occurrence). */

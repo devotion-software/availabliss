@@ -1,0 +1,1 @@
+ALTER TABLE `busy_intervals` ADD `title` text;

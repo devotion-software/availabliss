@@ -102,6 +102,7 @@ describe('loadBusy', () => {
 			label: 'Work',
 			calendarId: work,
 			blockId: null,
+			title: null,
 			eventKey: '',
 			recurring: false,
 			ignoreId: null

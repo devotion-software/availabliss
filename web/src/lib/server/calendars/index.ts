@@ -263,9 +263,26 @@ interface BusyRow {
 	eventKey: string;
 	start: Date;
 	end: Date;
+	/** Plain text here; encrypted when written. */
+	title: string | null;
 }
 
-const rowKey = (r: BusyRow) => `${r.calendarId}|${r.eventKey}|${r.start.getTime()}|${r.end.getTime()}`;
+const rowKey = (r: BusyRow) => `${r.calendarId}|${r.eventKey}|${r.start.getTime()}|${r.end.getTime()}|${r.title ?? ''}`;
+
+/** Event titles are encrypted per user, so a row copied to someone else can't be read. */
+export const titleContext = (userId: string) => `busy-title:${userId}`;
+const MAX_TITLE = 200;
+function sealTitle(userId: string, title: string | null): string | null {
+	return title ? encryptJson(title.slice(0, MAX_TITLE), titleContext(userId)) : null;
+}
+export function openTitle(userId: string, stored: string | null): string | null {
+	if (!stored) return null;
+	try {
+		return decryptJson<string>(stored, titleContext(userId));
+	} catch {
+		return null;
+	}
+}
 const overlapping = (from: Date, to: Date) => and(lt(busyIntervals.start, to), gt(busyIntervals.end, from));
 const inCalendars = (ids: string[]) => inArray(busyIntervals.calendarId, ids);
 
@@ -274,7 +291,7 @@ function toRows(calendarIds: Map<string, string>, busy: RemoteBusy[], from: Date
 	return busy.flatMap((b) => {
 		const calendarId = calendarIds.get(b.calendarExternalId);
 		return calendarId && b.end > b.start && b.start < to && b.end > from
-			? [{ calendarId, eventKey: b.eventKey ?? '', start: b.start, end: b.end }]
+			? [{ calendarId, eventKey: b.eventKey ?? '', start: b.start, end: b.end, title: b.title?.trim() || null }]
 			: [];
 	});
 }
@@ -289,15 +306,15 @@ async function writeBusy(userId: string, scope: SQL | undefined, rows: BusyRow[]
 	const wanted = new Map(rows.map((r) => [rowKey(r), r]));
 	return db.transaction(async (tx) => {
 		const stored = await tx
-			.select({ id: busyIntervals.id, calendarId: busyIntervals.calendarId, eventKey: busyIntervals.eventKey, start: busyIntervals.start, end: busyIntervals.end })
+			.select({ id: busyIntervals.id, calendarId: busyIntervals.calendarId, eventKey: busyIntervals.eventKey, start: busyIntervals.start, end: busyIntervals.end, title: busyIntervals.title })
 			.from(busyIntervals)
 			.where(scope);
-		// Whatever is stored and still wanted stays; the rest of `stored` goes.
-		const stale = stored.filter((r) => !wanted.delete(rowKey(r))).map((r) => r.id);
+		// Whatever is stored and still wanted (renames included) stays; the rest of `stored` goes.
+		const stale = stored.filter((r) => !wanted.delete(rowKey({ ...r, title: openTitle(userId, r.title) }))).map((r) => r.id);
 		if (!stale.length && !wanted.size) return false;
 
 		for (let i = 0; i < stale.length; i += CHUNK) await tx.delete(busyIntervals).where(inArray(busyIntervals.id, stale.slice(i, i + CHUNK)));
-		const fresh = [...wanted.values()].map((r) => ({ id: newId(), userId, ...r }));
+		const fresh = [...wanted.values()].map((r) => ({ id: newId(), userId, ...r, title: sealTitle(userId, r.title) }));
 		for (let i = 0; i < fresh.length; i += CHUNK) await tx.insert(busyIntervals).values(fresh.slice(i, i + CHUNK));
 		return true;
 	});
@@ -619,7 +636,7 @@ export interface DeviceSyncInput {
 	/** More ranges of this sync follow: hold the group refresh until the last one. */
 	more?: boolean;
 	calendars: { externalId: string; name: string; color: string | null; busy?: boolean }[];
-	busy: { calendarExternalId: string; start: string; end: string; eventKey?: string }[];
+	busy: { calendarExternalId: string; start: string; end: string; eventKey?: string; title?: string | null }[];
 }
 
 const deviceRefreshKey = (userId: string, deviceId: string) => `device-sync-changed:${userId}:${deviceId}`;
@@ -649,7 +666,7 @@ export async function syncDevice(userId: string, input: DeviceSyncInput): Promis
 	const saved = await saveCalendars(id, input.calendars);
 	// The app sends everything in its range each time; only the difference is written.
 	const ids = [...saved.ids.values()];
-	const busy = input.busy.map((b) => ({ calendarExternalId: b.calendarExternalId, eventKey: b.eventKey, start: new Date(b.start), end: new Date(b.end) }));
+	const busy = input.busy.map((b) => ({ calendarExternalId: b.calendarExternalId, eventKey: b.eventKey, start: new Date(b.start), end: new Date(b.end), title: b.title ?? null }));
 	const busyChanged = ids.length > 0 && (await writeBusy(userId, and(inCalendars(ids), overlapping(from, to)), toRows(saved.ids, busy, from, to)));
 	// The apps upload on every foreground: only make every group refresh when something
 	// changed, and once per multi-range sync rather than once per range.

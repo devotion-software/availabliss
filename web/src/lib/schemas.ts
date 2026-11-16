@@ -156,7 +156,16 @@ export const deviceSyncSchema = z.object({
 		.max(200),
 	busy: z
 		// eventKey: the app's hash of the event's series id, so a series can be marked not busy.
-		.array(z.object({ calendarExternalId: trimmed(255), start: isoDateTime, end: isoDateTime, eventKey: z.string().max(64).optional() }))
+		// title: the event's name (optional; stored encrypted, only ever shown to the owner).
+		.array(
+			z.object({
+				calendarExternalId: trimmed(255),
+				start: isoDateTime,
+				end: isoDateTime,
+				eventKey: z.string().max(64).optional(),
+				title: z.string().max(500).nullable().optional()
+			})
+		)
 		.max(20000)
 });
 
