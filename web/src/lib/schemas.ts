@@ -213,6 +213,8 @@ export const createMessageSchema = z.union([
 	})
 ]);
 
+export const editMessageSchema = z.object({ body: trimmed(4000) });
+
 export const receiptsSchema = z.object({ upTo: z.string().min(1), state: z.enum(['delivered', 'seen']) });
 export const voteSchema = z.object({ optionIds: z.array(z.string().min(1)).max(10) });
 export const readNotificationsSchema = z.object({ ids: z.array(z.string()).max(500).optional() });

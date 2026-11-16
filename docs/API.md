@@ -546,6 +546,8 @@ interface Message {
   proposalId: string | null;
   eventId: string | null;
   createdAt: string;
+  editedAt: string | null;              // when the author last edited it
+  deleted: boolean;                     // deleted by its author: show "This message was deleted" (body is null)
   receipt: { delivered: number; seen: number; recipients: number; seenBy: string[] } | null; // only on your own messages; seenBy in the order they read it
 }
 interface Poll {
@@ -565,6 +567,8 @@ interface MessageInfo {
 | GET 🔒 | `/groups/:id/messages?before=<messageId>&limit=50` | | `{ messages: Message[]; hasMore: boolean }` (newest last) |
 | POST 🔒 | `/groups/:id/messages` | `{ body }` or `{ poll: { question, options: string[], multi? } }` | `Message` |
 | POST 🔒 | `/groups/:id/messages/receipts` | `{ upTo: messageId, state: 'delivered' \| 'seen' }` | `204` |
+| PATCH 🔒 | `/messages/:id` | `{ body }` | `Message` (the sender's own text messages only) |
+| DELETE 🔒 | `/messages/:id` | | `204` (the sender's own text messages only; it stays in the chat as deleted) |
 | GET 🔒 | `/messages/:id/info` | | `MessageInfo` (any member of the group) |
 | POST 🔒 | `/polls/:id/vote` | `{ optionIds: string[] }` (empty = remove vote) | `Poll` |
 | POST 🔒 | `/polls/:id/close` | | `Poll` (only the poll's author) |
@@ -577,7 +581,7 @@ belongs to. Each event is `data: <json>\n\n` with:
 ```ts
 interface LiveEvent {
   type:
-    | 'message.created' | 'message.receipts' | 'poll.updated'
+    | 'message.created' | 'message.updated' | 'message.receipts' | 'poll.updated'
     | 'proposal.created' | 'proposal.updated' | 'proposal.confirmed'
     | 'event.changed' | 'group.updated' | 'member.changed' | 'availability.changed'
     | 'notification.created';
@@ -586,7 +590,8 @@ interface LiveEvent {
 }
 ```
 
-Payloads by type: `message.created` → `Message`; `poll.updated` → `Poll`;
+Payloads by type: `message.created` → `Message`; `message.updated` → `Message`
+(edited or deleted; `receipt` is null, so keep your own); `poll.updated` → `Poll`;
 `proposal.created` / `proposal.updated` → `Proposal`; `proposal.confirmed` →
 `{ proposal: Proposal, event: GroupEvent }`; `event.changed` → `GroupEvent` (or
 `{ id, deleted: true }`); `group.updated` → `Group`; `member.changed` → `Member`

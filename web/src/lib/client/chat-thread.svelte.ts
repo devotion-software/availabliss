@@ -87,6 +87,8 @@ export class ChatThread {
 			proposalId: null,
 			eventId: null,
 			createdAt: new Date().toISOString(),
+			editedAt: null,
+			deleted: false,
 			receipt: { delivered: 0, seen: 0, recipients: this.#recipients, seenBy: [] }
 		};
 		this.messages = [...this.messages, temp];

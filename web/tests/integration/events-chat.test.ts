@@ -5,7 +5,7 @@ import { db } from '#lib/server/db';
 import { devices } from '#lib/server/db/schema';
 import { createGroup } from '#lib/server/groups';
 import { createEvent, deleteEvent, getEvent, listEvents, updateEvent, upcomingFor } from '#lib/server/events';
-import { closePoll, listMessages, markReceipts, messageInfo, sendPoll, sendText, vote } from '#lib/server/chat';
+import { closePoll, deleteMessage, editMessage, listMessages, markReceipts, messageInfo, sendPoll, sendText, vote } from '#lib/server/chat';
 import { groupSummaries } from '#lib/server/group-summaries';
 import { newId } from '#lib/server/ids';
 import { messageReceipts, messages } from '#lib/server/db/schema';
@@ -98,6 +98,25 @@ describe('chat', () => {
 		// The author's own view carries receipt counts.
 		const own = (await listMessages(groupId, owner, null, 50)).messages.find((m) => m.id === first.id)!;
 		expect(own.receipt).toMatchObject({ delivered: 2, seen: 1, recipients: 2, seenBy: [admin] });
+	});
+
+	test('only the sender can edit or delete a text message', async () => {
+		const sent = await sendText(groupId, member, 'See you at 7');
+		expect((await apiError(editMessage(sent.id, owner, 'Hijacked'))).code).toBe('forbidden');
+		expect((await apiError(deleteMessage(sent.id, owner))).code).toBe('forbidden');
+
+		const edited = await editMessage(sent.id, member, 'See you at 8');
+		expect(edited.body).toBe('See you at 8');
+		expect(edited.editedAt).not.toBeNull();
+		expect(edited.deleted).toBe(false);
+
+		await deleteMessage(sent.id, member);
+		const seen = (await listMessages(groupId, owner, null, 50)).messages.find((m) => m.id === sent.id)!;
+		expect(seen).toMatchObject({ deleted: true, body: null });
+		expect((await apiError(editMessage(sent.id, member, 'Back again'))).code).toBe('conflict');
+
+		const poll = await sendPoll(groupId, member, { question: 'Pizza?', options: ['Yes', 'No'], multi: false });
+		expect((await apiError(deleteMessage(poll.id, member))).code).toBe('validation_error');
 	});
 
 	test('unread counts skip history from before joining', async () => {

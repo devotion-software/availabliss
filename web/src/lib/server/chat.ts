@@ -203,11 +203,13 @@ async function toMessages(rows: MessageRow[], viewerId: string, groupSize: numbe
 			groupId: r.groupId,
 			authorId: r.authorId,
 			kind: r.kind,
-			body: r.body,
+			body: r.deletedAt ? null : r.body,
 			poll: r.pollId ? (pollMap.get(r.pollId) ?? null) : null,
 			proposalId: r.proposalId,
 			eventId: r.eventId,
 			createdAt: r.createdAt.toISOString(),
+			editedAt: r.editedAt?.toISOString() ?? null,
+			deleted: r.deletedAt !== null,
 			receipt: receipt ? { delivered: receipt.delivered, seen: receipt.seen, recipients: receipt.recipients, seenBy: receipt.seenBy } : null
 		};
 	});
@@ -279,6 +281,38 @@ export async function postMessage(groupId: string, authorId: string | null, inpu
 export async function sendText(groupId: string, userId: string, body: string): Promise<Message> {
 	await requireMember(groupId, userId);
 	return postMessage(groupId, userId, { kind: 'text', body });
+}
+
+/** The author's own text message, for editing or deleting. */
+async function ownText(messageId: string, userId: string) {
+	const row = await db.query.messages.findFirst({ where: eq(messages.id, messageId) });
+	if (!row) throw notFound('Message not found');
+	await requireMember(row.groupId, userId);
+	if (row.authorId !== userId) throw forbidden('Only the person who sent a message can change it');
+	if (row.kind !== 'text') throw badRequest('Only text messages can be edited or deleted');
+	if (row.deletedAt) throw conflict('That message was deleted');
+	return row;
+}
+
+/** Republishes a changed message to the group (`message.updated`), as the author sees it. */
+async function publishUpdated(messageId: string, userId: string): Promise<Message> {
+	const row = (await db.query.messages.findFirst({ where: eq(messages.id, messageId) }))!;
+	const [message] = await toMessages([row], userId, (await memberIds(row.groupId)).length);
+	// Receipts are per viewer: everyone keeps their own.
+	await publishToGroup(row.groupId, 'message.updated', { ...message, receipt: null });
+	return message;
+}
+
+export async function editMessage(messageId: string, userId: string, body: string): Promise<Message> {
+	const row = await ownText(messageId, userId);
+	if (row.body !== body) await db.update(messages).set({ body, editedAt: new Date() }).where(eq(messages.id, messageId));
+	return publishUpdated(messageId, userId);
+}
+
+export async function deleteMessage(messageId: string, userId: string): Promise<void> {
+	await ownText(messageId, userId);
+	await db.update(messages).set({ body: null, deletedAt: new Date() }).where(eq(messages.id, messageId));
+	await publishUpdated(messageId, userId);
 }
 
 export async function sendPoll(

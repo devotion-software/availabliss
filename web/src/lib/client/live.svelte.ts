@@ -25,6 +25,7 @@ export interface ReceiptsPayload {
 
 export interface LivePayloads {
 	'message.created': Message;
+	'message.updated': Message;
 	'message.receipts': ReceiptsPayload;
 	'poll.updated': Poll;
 	'proposal.created': Proposal;

@@ -286,6 +286,10 @@ export interface Message {
 	proposalId: string | null;
 	eventId: string | null;
 	createdAt: string;
+	/** When the author last edited the text, or null. */
+	editedAt: string | null;
+	/** Deleted by its author: shown as "This message was deleted" (body is null). */
+	deleted: boolean;
 	receipt: { delivered: number; seen: number; recipients: number; seenBy: string[] } | null;
 }
 
@@ -321,6 +325,7 @@ export interface AppNotification {
 
 export type LiveEventType =
 	| 'message.created'
+	| 'message.updated'
 	| 'message.receipts'
 	| 'poll.updated'
 	| 'proposal.created'

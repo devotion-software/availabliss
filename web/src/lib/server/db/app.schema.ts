@@ -360,7 +360,11 @@ export const messages = mysqlTable(
 		eventId: varchar('event_id', { length: 36 }),
 		// Monotonic per insert so pagination and "read up to" never tie.
 		seq: int('seq').autoincrement().notNull().unique(),
-		createdAt: createdAt()
+		createdAt: createdAt(),
+		// Set when the author edits the text.
+		editedAt: instant('edited_at'),
+		// Set when the author deletes it: the row stays (as "This message was deleted") with its body cleared.
+		deletedAt: instant('deleted_at')
 	},
 	(t) => [index('messages_group_seq_idx').on(t.groupId, t.seq)]
 );
