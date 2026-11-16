@@ -93,7 +93,7 @@ describe('block schemas', () => {
 	});
 
 	test('rejects bad repeats, timestamps, ordering and long notes', () => {
-		expect(ok(createBlockSchema, { ...block, repeat: 'daily' })).toBe(false);
+		expect(ok(createBlockSchema, { ...block, repeat: 'hourly' })).toBe(false);
 		expect(ok(createBlockSchema, { ...block, start: '2026-11-13 18:00' })).toBe(false);
 		expect(ok(createBlockSchema, { ...block, end: block.start })).toBe(false);
 		expect(ok(createBlockSchema, { start: block.end, end: block.start })).toBe(false);
