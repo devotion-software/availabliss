@@ -34,6 +34,13 @@ class ChatRepository @Inject constructor(
     suspend fun markReceipts(groupId: String, upTo: String, state: ReceiptState): ApiResult<Unit> =
         call { api.sendReceipts(groupId, ReceiptsRequest(upTo, state)) }
 
+    /** Edits your own text message. */
+    suspend fun edit(messageId: String, body: String): ApiResult<Message> =
+        call { api.editMessage(messageId, SendTextRequest(body.trim())) }
+
+    /** Deletes your own text message (it stays in the chat, shown as deleted). */
+    suspend fun delete(messageId: String): ApiResult<Unit> = call { api.deleteMessage(messageId) }
+
     suspend fun info(messageId: String): ApiResult<MessageInfo> = call { api.getMessageInfo(messageId) }
 
     /** Empty [optionIds] removes the vote. */

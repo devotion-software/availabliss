@@ -47,6 +47,7 @@ import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
+import dev.joeherbert.availabliss.designsystem.component.chat.BubbleAction
 import dev.joeherbert.availabliss.designsystem.component.chat.ChatComposer
 import dev.joeherbert.availabliss.designsystem.component.chat.ChatMeta
 import dev.joeherbert.availabliss.designsystem.component.chat.MessageBubble
@@ -80,6 +81,9 @@ data class ChatActions(
     val onVote: (messageId: String, optionId: String) -> Unit = { _, _ -> },
     val onClosePoll: (messageId: String) -> Unit = {},
     val onOpenInfo: (messageId: String) -> Unit = {},
+    val onEditMessage: (messageId: String) -> Unit = {},
+    val onDeleteMessage: (messageId: String) -> Unit = {},
+    val onCancelEdit: () -> Unit = {},
     /** Set when the chat wasn't opened over its group's calendar: the header's group name opens it. */
     val onOpenGroup: (() -> Unit)? = null,
 )
@@ -104,6 +108,7 @@ fun GroupChatTab(
         onPauseOrDispose { viewModel.onVisibilityChanged(false) }
     }
     BackHandler(enabled = state.menuOpen) { viewModel.closeMenu() }
+    BackHandler(enabled = state.editing && !state.menuOpen) { viewModel.cancelEdit() }
 
     val currentOnBack by rememberUpdatedState(onBack)
     val currentOnOpenProposal by rememberUpdatedState(onOpenProposal)
@@ -133,6 +138,9 @@ fun GroupChatTab(
             onVote = viewModel::onVote,
             onClosePoll = viewModel::onClosePoll,
             onOpenInfo = viewModel::openInfo,
+            onEditMessage = viewModel::startEdit,
+            onDeleteMessage = viewModel::requestDelete,
+            onCancelEdit = viewModel::cancelEdit,
             onOpenGroup = onOpenGroup,
         )
     }
@@ -143,6 +151,9 @@ fun GroupChatTab(
     }
 
     state.info?.let { MessageInfoSheet(it, onDismiss = viewModel::closeInfo) }
+    if (state.confirmDeleteId != null) {
+        DeleteMessageDialog(onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
+    }
     state.pollDraft?.let { draft ->
         PollComposerSheet(
             draft = draft,
@@ -189,6 +200,8 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
                 onProposeTime = actions.onProposeTime,
                 onAddEvent = actions.onAddEvent,
                 sending = state.sending,
+                editing = state.editing,
+                onCancelEdit = actions.onCancelEdit,
             )
         }
     }
@@ -274,8 +287,20 @@ private fun ChatRow(item: ChatItem, actions: ChatActions) {
             author = item.author,
             showAvatar = item.showAvatar,
             authorName = item.authorName,
-            onClick = { actions.onOpenInfo(item.id) },
+            onClick = if (item.deleted) null else ({ actions.onOpenInfo(item.id) }),
             accessibilityLabel = item.accessibilityLabel,
+            edited = item.edited,
+            deleted = item.deleted,
+            menuActions = if (item.canEdit) {
+                remember(item.id, actions) {
+                    listOf(
+                        BubbleAction("Edit") { actions.onEditMessage(item.id) },
+                        BubbleAction("Delete", destructive = true) { actions.onDeleteMessage(item.id) },
+                    )
+                }
+            } else {
+                emptyList()
+            },
         )
         is ChatItem.ProposalCard -> ProposalCard(
             ui = item.card ?: ProposalCardUi("", "", "Proposed a time", "Loading…", ""),
@@ -321,7 +346,8 @@ private fun GroupChatPreview() {
                 loading = false,
                 items = listOf(
                     ChatItem.Receipt("m3", "Seen by 3 of 5", true, listOf(AvatarPerson("a", "Ana"), priya)),
-                    ChatItem.Text("m3", "I'll book somewhere to stay. Vote below", own = true, author = null, showAvatar = false, accessibilityLabel = ""),
+                    ChatItem.Text("m3", "I'll book somewhere to stay. Vote below", own = true, author = null, showAvatar = false, accessibilityLabel = "", canEdit = true),
+                    ChatItem.Text("m4", "You deleted this message", own = true, author = null, showAvatar = false, accessibilityLabel = "Message deleted", deleted = true),
                     ChatItem.ProposalCard("m2", "p1", ProposalCardUi("NOV", "13", "Ana proposed a time", "Fri 13 – Sun 15 Nov", "4 of 6 accepted")),
                     ChatItem.Text("m1", "Has everyone put their calendar in yet? Leo, Jade…", own = false, author = priya, showAvatar = true, accessibilityLabel = ""),
                     ChatItem.Day("Today", "2026-11-01"),

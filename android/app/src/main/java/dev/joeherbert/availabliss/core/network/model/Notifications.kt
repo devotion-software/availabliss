@@ -58,6 +58,7 @@ data class LiveEvent(
 ) {
     companion object Types {
         const val MESSAGE_CREATED = "message.created"
+        const val MESSAGE_UPDATED = "message.updated"
         const val MESSAGE_RECEIPTS = "message.receipts"
         const val POLL_UPDATED = "poll.updated"
         const val PROPOSAL_CREATED = "proposal.created"

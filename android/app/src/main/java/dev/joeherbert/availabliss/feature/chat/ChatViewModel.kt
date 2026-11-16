@@ -27,6 +27,7 @@ import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
+import dev.joeherbert.availabliss.core.network.model.MessageKind
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ReceiptState
@@ -93,8 +94,15 @@ data class ChatUiState(
     val pollDraft: PollDraft? = null,
     /** Non-null while the Message info sheet is open. */
     val info: MessageInfoUi? = null,
+    /** The composer is editing one of your messages (the draft holds its text). */
+    val editing: Boolean = false,
+    /** Non-null while "Delete this message?" is showing. */
+    val confirmDeleteId: String? = null,
     val message: UserMessage? = null,
 )
+
+/** Editing [messageId]; [original] is its text, [stashedDraft] the composer draft to restore afterwards. */
+private data class EditSession(val messageId: String, val original: String, val stashedDraft: String)
 
 private data class InfoSheet(val messageId: String, val info: MessageInfo? = null, val error: String? = null)
 
@@ -111,6 +119,8 @@ private data class ChatData(
     val sending: Boolean = false,
     val pollDraft: PollDraft? = null,
     val infoSheet: InfoSheet? = null,
+    val editing: EditSession? = null,
+    val confirmDeleteId: String? = null,
     val message: UserMessage? = null,
 )
 
@@ -273,6 +283,12 @@ class ChatViewModel @Inject constructor(
                 if (visible) scheduleReceipts()
                 else if (payload.message.authorId != meId) chat.markReceipts(groupId, payload.message.id, ReceiptState.Delivered)
             }
+            is LivePayload.MessageUpdated -> {
+                val m = payload.message
+                data.update { it.copy(messages = it.messages.withUpdated(m)) }
+                // Deleted elsewhere (e.g. on another device) while you were editing it.
+                if (m.deleted && data.value.editing?.messageId == m.id) cancelEdit()
+            }
             is LivePayload.MessageReceipts -> {
                 val updates = payload.payload.receipts.associateBy { it.messageId }
                 data.update { d ->
@@ -344,6 +360,7 @@ class ChatViewModel @Inject constructor(
     fun closeMenu() = data.update { it.copy(menuOpen = false) }
 
     fun send() {
+        if (data.value.editing != null) return saveEdit()
         val text = draft.trim()
         if (text.isEmpty() || data.value.sending) return
         draft = ""
@@ -358,6 +375,67 @@ class ChatViewModel @Inject constructor(
                     if (draft.isEmpty()) draft = text
                     data.update { it.copy(sending = false, message = UserMessage(result.error.message)) }
                 }
+            }
+        }
+    }
+    // endregion
+
+    // region Edit & delete
+    /** Your own, non-deleted text message, or null. */
+    private fun editable(messageId: String): Message? = data.value.messages.firstOrNull {
+        it.id == messageId && it.kind == MessageKind.Text && !it.deleted && it.authorId != null && it.authorId == meId
+    }
+
+    /** Puts the composer into edit mode with the message's text; the current draft comes back afterwards. */
+    fun startEdit(messageId: String) {
+        val m = editable(messageId) ?: return
+        val stash = data.value.editing?.stashedDraft ?: draft
+        data.update { it.copy(editing = EditSession(m.id, m.body.orEmpty(), stash), menuOpen = false) }
+        draft = m.body.orEmpty()
+    }
+
+    /** Leaves edit mode, restoring whatever draft was there before. */
+    fun cancelEdit() {
+        val session = data.value.editing ?: return
+        draft = session.stashedDraft
+        data.update { it.copy(editing = null) }
+    }
+
+    private fun saveEdit() {
+        val session = data.value.editing ?: return
+        val text = draft.trim()
+        if (text.isEmpty() || data.value.sending) return
+        if (text == session.original.trim()) return cancelEdit()
+        data.update { it.copy(sending = true) }
+        viewModelScope.launch {
+            val result = chat.edit(session.messageId, text)
+            when (result) {
+                is ApiResult.Success -> {
+                    data.update { it.copy(messages = it.messages.withUpdated(result.value), sending = false) }
+                    if (data.value.editing?.messageId == session.messageId) cancelEdit()
+                }
+                is ApiResult.Failure -> data.update { it.copy(sending = false, message = UserMessage(result.error.message)) }
+            }
+        }
+    }
+
+    fun requestDelete(messageId: String) {
+        if (editable(messageId) == null) return
+        data.update { it.copy(confirmDeleteId = messageId, menuOpen = false) }
+    }
+
+    fun dismissDelete() = data.update { it.copy(confirmDeleteId = null) }
+
+    fun confirmDelete() {
+        val id = data.value.confirmDeleteId ?: return
+        data.update { it.copy(confirmDeleteId = null) }
+        viewModelScope.launch {
+            when (val result = chat.delete(id)) {
+                is ApiResult.Success -> {
+                    data.update { it.copy(messages = it.messages.withDeleted(id)) }
+                    if (data.value.editing?.messageId == id) cancelEdit()
+                }
+                is ApiResult.Failure -> data.update { it.copy(message = UserMessage(result.error.message)) }
             }
         }
     }
@@ -481,6 +559,8 @@ class ChatViewModel @Inject constructor(
             menuOpen = menuOpen,
             sending = sending,
             pollDraft = pollDraft,
+            editing = editing != null,
+            confirmDeleteId = confirmDeleteId,
             info = infoSheet?.let { sheet ->
                 sheet.toUi(messages.firstOrNull { it.id == sheet.messageId }, MemberDirectory(g?.members.orEmpty(), me))
             },

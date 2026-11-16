@@ -370,6 +370,14 @@ interface AvailablissApi {
     @POST("api/v1/groups/{id}/messages/receipts")
     suspend fun sendReceipts(@Path("id") groupId: String, @Body body: ReceiptsRequest)
 
+    /** Your own text messages only. */
+    @PATCH("api/v1/messages/{id}")
+    suspend fun editMessage(@Path("id") messageId: String, @Body body: SendTextRequest): Message
+
+    /** Your own text messages only; it stays in the chat as deleted. */
+    @DELETE("api/v1/messages/{id}")
+    suspend fun deleteMessage(@Path("id") messageId: String)
+
     @GET("api/v1/messages/{id}/info")
     suspend fun getMessageInfo(@Path("id") messageId: String): MessageInfo
 

@@ -24,6 +24,10 @@ data class Message(
     val proposalId: String? = null,
     val eventId: String? = null,
     val createdAt: String,
+    /** When the author last edited it. */
+    val editedAt: String? = null,
+    /** Deleted by its author: shown as "This message was deleted" ([body] is null). */
+    val deleted: Boolean = false,
     /** Only on your own messages. */
     val receipt: Receipt? = null,
 )

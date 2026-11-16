@@ -40,6 +40,8 @@ data class MessageReceipt(
  */
 sealed interface LivePayload {
     data class MessageCreated(val message: Message) : LivePayload
+    /** Edited or deleted; its `receipt` is null, so keep the one you have. */
+    data class MessageUpdated(val message: Message) : LivePayload
     data class MessageReceipts(val payload: ReceiptsPayload) : LivePayload
     data class PollUpdated(val poll: Poll) : LivePayload
     data class ProposalChanged(val proposal: Proposal, val created: Boolean) : LivePayload
@@ -60,6 +62,7 @@ fun LiveEvent.decode(json: Json): LivePayload = runCatching {
     fun str(key: String) = obj?.get(key)?.jsonPrimitive?.content
     when (type) {
         LiveEvent.MESSAGE_CREATED -> LivePayload.MessageCreated(json.decodeFromJsonElement(Message.serializer(), payload))
+        LiveEvent.MESSAGE_UPDATED -> LivePayload.MessageUpdated(json.decodeFromJsonElement(Message.serializer(), payload))
         LiveEvent.MESSAGE_RECEIPTS -> LivePayload.MessageReceipts(json.decodeFromJsonElement(ReceiptsPayload.serializer(), payload))
         LiveEvent.POLL_UPDATED -> LivePayload.PollUpdated(json.decodeFromJsonElement(Poll.serializer(), payload))
         LiveEvent.PROPOSAL_CREATED, LiveEvent.PROPOSAL_UPDATED -> LivePayload.ProposalChanged(

@@ -24,7 +24,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -40,6 +49,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
 import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
@@ -50,6 +60,10 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
  * Glass composer: + menu toggle (rotates 45° and turns solid when open), message
  * field and accent send button. The action menu (Poll / Propose a time / Add event)
  * slides in above it.
+ *
+ * [editing]: editing one of your messages. An "Editing message" strip with a cancel
+ * button sits above the field, the + toggle is hidden, the field is focused, and the
+ * send button becomes a check ("Save").
  */
 @Composable
 fun ChatComposer(
@@ -63,10 +77,39 @@ fun ChatComposer(
     onAddEvent: () -> Unit,
     modifier: Modifier = Modifier,
     sending: Boolean = false,
+    editing: Boolean = false,
+    onCancelEdit: () -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
     val canSend = text.isNotBlank() && !sending
+    // Local selection, so text set from outside (an edit's prefill, a restored draft)
+    // puts the caret at the end while typing keeps it where it is.
+    var field by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
+    if (field.text != text) field = TextFieldValue(text, TextRange(text.length))
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(editing) {
+        if (editing) {
+            runCatching { focus.requestFocus() }
+            keyboard?.show()
+        }
+    }
     Column(modifier.fillMaxWidth()) {
+        AnimatedVisibility(visible = editing, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            Row(
+                Modifier
+                    .padding(start = 12.dp, end = 12.dp, top = 10.dp)
+                    .fillMaxWidth()
+                    .glass(RoundedCornerShape(22.dp))
+                    .padding(start = 14.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(AvIcons.Pencil, null, tint = colors.accentInk, modifier = Modifier.size(16.dp))
+                Text("Editing message", style = AvailablissTheme.type.captionStrong, color = colors.ink, modifier = Modifier.weight(1f))
+                PlainIconButton(AvIcons.Close, "Cancel editing", onCancelEdit, size = 40.dp, iconSize = 16.dp, tint = colors.muted)
+            }
+        }
         AnimatedVisibility(visible = menuOpen, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             Row(
                 Modifier
@@ -91,7 +134,7 @@ fun ChatComposer(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             val rotation by animateFloatAsState(if (menuOpen) 45f else 0f, label = "plus-rotation")
-            Box(
+            if (!editing) Box(
                 Modifier
                     .size(44.dp)
                     .clip(CircleShape)
@@ -106,15 +149,20 @@ fun ChatComposer(
                 Icon(AvIcons.Plus, null, tint = if (menuOpen) colors.onSolid else colors.ink, modifier = Modifier.size(20.dp).rotate(rotation))
             }
             BasicTextField(
-                value = text,
-                onValueChange = onTextChange,
+                value = field,
+                onValueChange = {
+                    field = it
+                    if (it.text != text) onTextChange(it.text)
+                },
                 textStyle = AvailablissTheme.type.bodyMediumRegular.copy(color = colors.ink),
                 cursorBrush = SolidColor(colors.accent),
                 maxLines = 5,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
                 modifier = Modifier
                     .weight(1f)
+                    .padding(start = if (editing) 10.dp else 0.dp)
                     .heightIn(min = 44.dp)
+                    .focusRequester(focus)
                     .semantics { contentDescription = "Message" },
                 decorationBox = { inner ->
                     Box(Modifier.defaultMinSize(minHeight = 44.dp).padding(vertical = 11.dp), contentAlignment = Alignment.CenterStart) {
@@ -130,10 +178,10 @@ fun ChatComposer(
                     .background(colors.accent)
                     .alpha(if (canSend) 1f else 0.45f)
                     .clickable(enabled = canSend, role = Role.Button, onClick = onSend)
-                    .semantics { contentDescription = "Send" },
+                    .semantics { contentDescription = if (editing) "Save" else "Send" },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(AvIcons.ArrowRight, null, tint = colors.onAccent, modifier = Modifier.size(18.dp))
+                Icon(if (editing) AvIcons.Check else AvIcons.ArrowRight, null, tint = colors.onAccent, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -163,6 +211,16 @@ private fun ChatComposerPreview() {
     AvailablissPreviewTheme {
         Box(Modifier.background(AvailablissTheme.colors.bg)) {
             ChatComposer("", {}, {}, menuOpen = true, onToggleMenu = {}, onPoll = {}, onProposeTime = {}, onAddEvent = {})
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun ChatComposerEditingPreview() {
+    AvailablissPreviewTheme {
+        Box(Modifier.background(AvailablissTheme.colors.bg)) {
+            ChatComposer("I'll book somewhere to stay", {}, {}, menuOpen = false, onToggleMenu = {}, onPoll = {}, onProposeTime = {}, onAddEvent = {}, editing = true)
         }
     }
 }

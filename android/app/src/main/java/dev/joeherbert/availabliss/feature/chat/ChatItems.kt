@@ -32,6 +32,12 @@ sealed interface ChatItem {
         val accessibilityLabel: String,
         /** Shown above the first incoming message in a run from the same person. */
         val authorName: String? = null,
+        /** Shows "Edited" under the bubble (unless the receipt line below already says so). */
+        val edited: Boolean = false,
+        /** Deleted by its author: a dashed "This message was deleted" bubble, not tappable. */
+        val deleted: Boolean = false,
+        /** Your own, non-deleted text message: long-press offers Edit and Delete. */
+        val canEdit: Boolean = false,
     ) : ChatItem {
         override val key get() = id
     }
@@ -53,6 +59,7 @@ sealed interface ChatItem {
         override val key get() = id
     }
 
+    /** [label] starts with "Edited · " when the message above it was edited. */
     data class Receipt(val messageId: String, val label: String, val seen: Boolean, val seenBy: List<AvatarPerson>) : ChatItem {
         override val key get() = "receipt-$messageId"
     }
@@ -71,7 +78,8 @@ fun buildChatItems(
     today: LocalDate = DateTimes.today(),
 ): List<ChatItem> {
     val items = mutableListOf<ChatItem>()
-    val latestOwn = messages.lastOrNull { directory.isMe(it.authorId) && it.kind != MessageKind.System }
+    // Deleted messages get no receipt (they can't be opened for info).
+    val latestOwn = messages.lastOrNull { directory.isMe(it.authorId) && it.kind != MessageKind.System && !it.deleted }
     var lastDate: LocalDate? = null
 
     messages.forEachIndexed { index, m ->
@@ -81,6 +89,7 @@ fun buildChatItems(
             lastDate = date
         }
         val own = directory.isMe(m.authorId)
+        val receipt = if (m.id == latestOwn?.id) receiptFor(m, directory) else null
         val authorName = directory.displayName(m.authorId, youSuffix = false)
         when {
             m.kind == MessageKind.System || m.authorId == null && m.kind == MessageKind.Text ->
@@ -122,7 +131,11 @@ fun buildChatItems(
             }
 
             else -> {
-                val text = m.body.orEmpty()
+                val text = when {
+                    !m.deleted -> m.body.orEmpty()
+                    own -> "You deleted this message"
+                    else -> "This message was deleted"
+                }
                 if (text.isNotBlank()) {
                     val next = messages.getOrNull(index + 1)
                     val continues = next != null && next.authorId == m.authorId && next.kind == MessageKind.Text &&
@@ -136,29 +149,52 @@ fun buildChatItems(
                         own = own,
                         author = m.authorId?.let(directory::avatar),
                         showAvatar = !continues,
-                        accessibilityLabel = if (own) "Your message: $text. Tap for message info" else "$authorName: $text",
+                        accessibilityLabel = when {
+                            m.deleted -> "Message deleted"
+                            own -> "Your message: $text${if (m.isEdited) ", edited" else ""}. Tap for message info"
+                            else -> "$authorName: $text${if (m.isEdited) ", edited" else ""}"
+                        },
                         authorName = if (!own && startsRun) m.authorId?.let { directory.avatar(it).name } else null,
+                        // Your latest message says "Edited" on its receipt line instead.
+                        edited = m.isEdited && receipt == null,
+                        deleted = m.deleted,
+                        canEdit = own && m.kind == MessageKind.Text && !m.deleted,
                     )
                 }
             }
         }
 
-        if (m.id == latestOwn?.id) {
-            receiptFor(m, directory)?.let { items += it }
-        }
+        receipt?.let { items += it }
     }
     return items
 }
 
 private fun receiptFor(m: Message, directory: MemberDirectory): ChatItem.Receipt? {
-    val r = m.receipt ?: return ChatItem.Receipt(m.id, "Sent", seen = false, seenBy = emptyList())
+    val prefix = if (m.isEdited) "Edited · " else ""
+    val r = m.receipt ?: return ChatItem.Receipt(m.id, "${prefix}Sent", seen = false, seenBy = emptyList())
     val seenBy = r.seenBy.map(directory::avatar)
     return when {
         r.recipients == 0 -> null
-        r.seen > 0 -> ChatItem.Receipt(m.id, "Seen by ${r.seen} of ${r.recipients}", seen = true, seenBy = seenBy)
-        r.delivered > 0 -> ChatItem.Receipt(m.id, "Delivered to ${r.delivered} of ${r.recipients}", seen = false, seenBy = emptyList())
-        else -> ChatItem.Receipt(m.id, "Sent", seen = false, seenBy = emptyList())
+        r.seen > 0 -> ChatItem.Receipt(m.id, "${prefix}Seen by ${r.seen} of ${r.recipients}", seen = true, seenBy = seenBy)
+        r.delivered > 0 -> ChatItem.Receipt(m.id, "${prefix}Delivered to ${r.delivered} of ${r.recipients}", seen = false, seenBy = emptyList())
+        else -> ChatItem.Receipt(m.id, "${prefix}Sent", seen = false, seenBy = emptyList())
     }
+}
+
+private val Message.isEdited: Boolean get() = editedAt != null && !deleted
+
+/**
+ * Applies an edited or deleted message (from `message.updated` or your own PATCH) to
+ * the loaded list, by id. The update's `receipt` is null on live events, so the
+ * receipt already held is kept. Unknown ids are ignored.
+ */
+fun List<Message>.withUpdated(updated: Message): List<Message> = map { m ->
+    if (m.id == updated.id) updated.copy(receipt = updated.receipt ?: m.receipt) else m
+}
+
+/** Marks a message deleted locally after your own DELETE succeeds. */
+fun List<Message>.withDeleted(messageId: String): List<Message> = map { m ->
+    if (m.id == messageId) m.copy(body = null, deleted = true) else m
 }
 
 private fun Poll.toUi(directory: MemberDirectory, canClose: Boolean, title: String): PollUi {

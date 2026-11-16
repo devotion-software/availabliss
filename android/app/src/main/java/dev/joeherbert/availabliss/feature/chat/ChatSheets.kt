@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,12 +33,14 @@ import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.RowDivider
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
 import dev.joeherbert.availabliss.designsystem.component.SurfacePanel
+import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.ToggleRow
 import dev.joeherbert.availabliss.designsystem.component.chat.IncomingBubbleShape
 import dev.joeherbert.availabliss.designsystem.component.chat.OwnBubbleShape
 import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
+import dev.joeherbert.availabliss.designsystem.theme.Shapes
 
 /** "Message info": who has seen, received, or not yet received your message. */
 @Composable
@@ -160,4 +163,20 @@ fun PollComposerSheet(draft: PollDraft, actions: PollSheetActions) {
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+/** "Delete this message?" before deleting one of your own messages. */
+@Composable
+fun DeleteMessageDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = colors.bg,
+        shape = Shapes.cardLarge,
+        tonalElevation = 0.dp,
+        title = { Text("Delete this message?", style = AvailablissTheme.type.headlineSmall, color = colors.ink) },
+        text = { Text("It'll show as deleted for everyone.", style = AvailablissTheme.type.body, color = colors.muted) },
+        confirmButton = { TextAction("Delete", onConfirm, color = colors.warnInk) },
+        dismissButton = { TextAction("Cancel", onDismiss, color = colors.muted) },
+    )
 }
