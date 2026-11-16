@@ -212,6 +212,10 @@ enum API {
             .init(.post, "/groups/\(groupId.pathEncoded)/messages/receipts", body: ReceiptBody(upTo: upTo, state: state))
         }
         static func info(messageId: String) -> Endpoint<MessageInfo> { .init(.get, "/messages/\(messageId.pathEncoded)/info") }
+        static func edit(messageId: String, body: String) -> Endpoint<Message> {
+            .init(.patch, "/messages/\(messageId.pathEncoded)", body: EditMessageBody(body: body))
+        }
+        static func delete(messageId: String) -> Endpoint<EmptyResponse> { .init(.delete, "/messages/\(messageId.pathEncoded)") }
         static func vote(pollId: String, optionIds: [String]) -> Endpoint<Poll> {
             .init(.post, "/polls/\(pollId.pathEncoded)/vote", body: VoteBody(optionIds: optionIds))
         }

@@ -13,6 +13,10 @@ final class ChatViewModel {
     private(set) var events: [String: GroupEvent] = [:]
     var draft = ""
     var error: String?
+    /// Your message being edited in the composer, if any.
+    private(set) var editing: Message?
+    /// The composer's draft from before editing started, put back when it ends.
+    private var draftBeforeEdit = ""
 
     let groupId: String
     private let api: APIClient
@@ -76,6 +80,7 @@ final class ChatViewModel {
     // MARK: Sending
 
     func send() async {
+        if editing != nil { return await saveEdit() }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSending else { return }
         isSending = true
@@ -129,6 +134,58 @@ final class ChatViewModel {
         do { update(poll: try await api.send(API.Chat.closePoll(pollId: poll.id))) } catch { self.error = error.userMessage }
     }
 
+    // MARK: Editing and deleting
+
+    func startEditing(_ message: Message) {
+        guard message.kind == .text, !message.isDeleted, message.authorId == me else { return }
+        if editing == nil { draftBeforeEdit = draft }
+        editing = message
+        draft = message.body ?? ""
+    }
+
+    func cancelEditing() {
+        guard editing != nil else { return }
+        editing = nil
+        draft = draftBeforeEdit
+        draftBeforeEdit = ""
+    }
+
+    private func saveEdit() async {
+        guard let message = editing, !isSending else { return }
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        guard text != message.body else { return cancelEditing() }
+        isSending = true
+        defer { isSending = false }
+        do {
+            replaceKeepingReceipt(try await api.send(API.Chat.edit(messageId: message.id, body: text)))
+            cancelEditing()
+        } catch {
+            self.error = error.userMessage
+        }
+    }
+
+    func delete(_ message: Message) async {
+        do {
+            _ = try await api.send(API.Chat.delete(messageId: message.id))
+            if let index = messages.firstIndex(where: { $0.id == message.id }) {
+                messages[index].deleted = true
+                messages[index].body = nil
+            }
+            if editing?.id == message.id { cancelEditing() }
+        } catch {
+            self.error = error.userMessage
+        }
+    }
+
+    /// An edited or deleted message: everything but the receipt, which is per viewer.
+    private func replaceKeepingReceipt(_ message: Message) {
+        guard let index = messages.firstIndex(where: { $0.id == message.id }) else { return }
+        var updated = message
+        updated.receipt = messages[index].receipt
+        messages[index] = updated
+    }
+
     func info(for messageId: String) async -> MessageInfo? {
         do { return try await api.send(API.Chat.info(messageId: messageId)) } catch {
             self.error = error.userMessage
@@ -145,6 +202,10 @@ final class ChatViewModel {
             insert(message)
             await hydrate([message])
             if message.authorId != me { await markSeen() }
+        case .messageUpdated:
+            guard let message = event.payload(as: Message.self), message.groupId == groupId else { return }
+            replaceKeepingReceipt(message)
+            if message.isDeleted, editing?.id == message.id { cancelEditing() }
         case .pollUpdated:
             if let poll = event.payload(as: Poll.self) { update(poll: poll) }
         case .messageReceipts:

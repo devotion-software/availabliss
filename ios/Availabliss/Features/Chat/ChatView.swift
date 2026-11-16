@@ -9,6 +9,8 @@ struct ChatView: View {
     @State private var model: ChatViewModel
     @State private var showsMenu = false
     @State private var sheet: ChatSheet?
+    /// Your message waiting for "Delete this message?".
+    @State private var pendingDelete: Message?
 
     enum ChatSheet: Identifiable {
         case poll, propose, event, info(Message)
@@ -40,9 +42,24 @@ struct ChatView: View {
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            Composer(text: $model.draft, isMenuOpen: $showsMenu, isSending: model.isSending) {
+            if model.editing != nil {
+                EditingStrip { model.cancelEditing() }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            Composer(text: $model.draft, isMenuOpen: $showsMenu, isSending: model.isSending, editingId: model.editing?.id) {
                 Task { await model.send() }
             }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.editing?.id)
+        .confirmationDialog(
+            "Delete this message?",
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { message in
+            Button("Delete", role: .destructive) { Task { await model.delete(message) } }
+        } message: { _ in
+            Text("It'll show as deleted for everyone.")
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showsMenu)
         .screenBackground(OrbLayout.chat)
@@ -82,7 +99,12 @@ struct ChatView: View {
                         isLatestOwn: message.id == model.latestOwnMessageId,
                         startsRun: startsRun(at: index),
                         openInfo: { sheet = .info(message) },
-                        openProposal: { id in app.router.push(.proposal(id: id)) }
+                        openProposal: { id in app.router.push(.proposal(id: id)) },
+                        onEdit: {
+                            showsMenu = false
+                            model.startEditing(message)
+                        },
+                        onDelete: { pendingDelete = message }
                     )
                     .id(message.id)
                 }
@@ -116,6 +138,39 @@ struct ChatView: View {
         case .info(let message):
             MessageInfoSheet(message: message, group: group, me: app.session.user?.id, model: model)
         }
+    }
+}
+
+/// Above the composer while you edit a message: "Editing message" and ✕ to stop.
+private struct EditingStrip: View {
+    let cancel: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "pencil")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(theme.accentInk)
+                .accessibilityHidden(true)
+            Text("Editing message")
+                .bodyFont(13, .semibold, relativeTo: .footnote)
+                .foregroundStyle(theme.ink)
+            Spacer(minLength: 0)
+            Button(action: cancel) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(theme.muted)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Stop editing")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 4)
+        .glass(cornerRadius: 18)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
     }
 }
 
@@ -154,8 +209,11 @@ private struct Composer: View {
     @Binding var text: String
     @Binding var isMenuOpen: Bool
     let isSending: Bool
+    /// The message being edited: Send becomes Save, and the field takes focus.
+    let editingId: String?
     let send: () -> Void
     @Environment(\.theme) private var theme
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
@@ -178,12 +236,14 @@ private struct Composer: View {
                 .bodyFont(15)
                 .foregroundStyle(theme.ink)
                 .frame(minHeight: 44)
-                .submitLabel(.send)
+                .submitLabel(editingId == nil ? .send : .done)
                 .onSubmit(send)
-                .accessibilityLabel("Message")
+                .focused($isFocused)
+                .onChange(of: editingId) { _, id in if id != nil { isFocused = true } }
+                .accessibilityLabel(editingId == nil ? "Message" : "Edit message")
 
             Button(action: send) {
-                Image(systemName: "arrow.right")
+                Image(systemName: editingId == nil ? "arrow.right" : "checkmark")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(theme.onAccent)
                     .frame(width: 44, height: 44)
@@ -191,7 +251,7 @@ private struct Composer: View {
             }
             .buttonStyle(.pressable)
             .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
-            .accessibilityLabel("Send")
+            .accessibilityLabel(editingId == nil ? "Send" : "Save")
         }
         .padding(6)
         .glass(cornerRadius: 24)

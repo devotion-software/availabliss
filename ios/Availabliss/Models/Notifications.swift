@@ -46,6 +46,7 @@ struct RegisterDeviceBody: Encodable, Sendable {
 struct LiveEvent: Sendable {
     enum Kind: String, Decodable, Sendable {
         case messageCreated = "message.created"
+        case messageUpdated = "message.updated"
         case messageReceipts = "message.receipts"
         case pollUpdated = "poll.updated"
         case proposalCreated = "proposal.created"

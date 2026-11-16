@@ -20,7 +20,18 @@ struct Message: Codable, Sendable, Identifiable, Equatable {
     var proposalId: String?
     var eventId: String?
     let createdAt: Date
+    /// When the author last edited the text.
+    var editedAt: Date?
+    /// Deleted by its author: shown as deleted, with no body.
+    var deleted: Bool?
     var receipt: Receipt?
+
+    var isDeleted: Bool { deleted == true }
+    var isEdited: Bool { editedAt != nil && !isDeleted }
+}
+
+struct EditMessageBody: Encodable, Sendable {
+    let body: String
 }
 
 struct Poll: Codable, Sendable, Identifiable, Equatable {

@@ -11,6 +11,9 @@ struct MessageRow: View {
     var startsRun = true
     let openInfo: () -> Void
     let openProposal: (String) -> Void
+    /// Your own text messages: edit it in the composer / ask to delete it.
+    var onEdit: () -> Void = {}
+    var onDelete: () -> Void = {}
     @Environment(\.theme) private var theme
 
     private var isMine: Bool { message.authorId != nil && message.authorId == me }
@@ -25,12 +28,26 @@ struct MessageRow: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
         case .text:
-            if isMine {
+            if message.isDeleted {
+                if isMine {
+                    DeletedBubble(isMine: true).frame(maxWidth: .infinity, alignment: .trailing)
+                } else {
+                    IncomingRow(author: author, showsName: startsRun) { DeletedBubble(isMine: false) }
+                }
+            } else if isMine {
                 VStack(alignment: .trailing, spacing: 4) {
                     MessageBubble(text: message.body ?? "", isMine: true)
                         .onTapGesture(perform: openInfo)
+                        .contextMenu {
+                            Button(action: openInfo) { Label("Info", systemImage: "info.circle") }
+                            Button(action: onEdit) { Label("Edit", systemImage: "pencil") }
+                            Button(role: .destructive, action: onDelete) { Label("Delete", systemImage: "trash") }
+                        }
                         .accessibilityAddTraits(.isButton)
                         .accessibilityHint("Shows message info")
+                        .accessibilityAction(named: "Edit", onEdit)
+                        .accessibilityAction(named: "Delete", onDelete)
+                    if message.isEdited { EditedLabel() }
                     if isLatestOwn, let receipt = message.receipt {
                         ReadReceipt(receipt: receipt, group: group, action: openInfo)
                     }
@@ -38,8 +55,11 @@ struct MessageRow: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
                 IncomingRow(author: author, showsName: startsRun) {
-                    MessageBubble(text: message.body ?? "", isMine: false)
-                        .onTapGesture(perform: openInfo)
+                    VStack(alignment: .leading, spacing: 4) {
+                        MessageBubble(text: message.body ?? "", isMine: false)
+                            .onTapGesture(perform: openInfo)
+                        if message.isEdited { EditedLabel() }
+                    }
                 }
                 .accessibilityAddTraits(.isButton)
                 .accessibilityHint("Shows message info")
@@ -98,6 +118,41 @@ private struct IncomingRow<Content: View>: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(author?.firstName ?? "Someone") said")
+    }
+}
+
+/// Under an edited message.
+private struct EditedLabel: View {
+    @Environment(\.theme) private var theme
+    var body: some View {
+        Text("Edited")
+            .bodyFont(11, relativeTo: .caption2)
+            .foregroundStyle(theme.muted)
+            .padding(.horizontal, 4)
+    }
+}
+
+/// A message its author deleted: a dashed outline in the bubble's place.
+private struct DeletedBubble: View {
+    let isMine: Bool
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let shape = UnevenRoundedRectangle(
+            topLeadingRadius: 18,
+            bottomLeadingRadius: isMine ? 18 : 6,
+            bottomTrailingRadius: isMine ? 6 : 18,
+            topTrailingRadius: 18,
+            style: .continuous
+        )
+        Text(isMine ? "You deleted this message" : "This message was deleted")
+            .bodyFont(14)
+            .italic()
+            .foregroundStyle(theme.muted)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(shape.strokeBorder(theme.line3, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+            .accessibilityLabel("Message deleted")
     }
 }
 
