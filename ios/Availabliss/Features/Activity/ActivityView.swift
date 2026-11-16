@@ -94,7 +94,7 @@ struct ActivityView: View {
                 ForEach(model.notifications) { notification in
                     Button {
                         if let link = DeepLink(data: notification.data.merging(["kind": notification.kind.rawValue, "groupId": notification.groupId ?? ""]) { current, _ in current }) {
-                            app.open(link)
+                            app.openFromActivity(link)
                         }
                     } label: {
                         NotificationRow(notification: notification)

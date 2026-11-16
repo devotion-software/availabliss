@@ -70,6 +70,25 @@ final class Router {
         }
     }
 
+    /// Opens a link from the Activity tab: a chat or proposal stacks on Activity, so back returns there.
+    func openFromActivity(_ link: DeepLink) {
+        switch link {
+        case .groupChat(let id):
+            tab = .activity
+            activityPath.append(.groupSection(id: id, section: .chat))
+        case .proposal(let id):
+            tab = .activity
+            activityPath.append(.proposal(id: id))
+        default:
+            open(link)
+        }
+    }
+
+    /// Whether the screen on top of the current tab sits over its group's calendar.
+    func isOverGroup(_ id: String) -> Bool {
+        currentPath.dropLast().last == .group(id: id)
+    }
+
     func open(_ link: DeepLink) {
         switch link {
         case .invite(let token):

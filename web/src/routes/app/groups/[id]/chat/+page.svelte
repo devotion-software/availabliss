@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { ChatThread } from '#lib/client/chat-thread.svelte';
 	import { firstName, listNames } from '#lib/client/format';
 	import GroupTile from '#lib/components/ui/GroupTile.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
 	import MessageList from '#lib/components/chat/MessageList.svelte';
 	import Composer from '#lib/components/chat/Composer.svelte';
 	import PollComposerSheet from '#lib/components/chat/PollComposerSheet.svelte';
@@ -28,6 +30,8 @@
 			.sort((a, b) => a.localeCompare(b))
 	);
 	const calendarHref = $derived(`/app/groups/${group.id}`);
+	// Opened from Activity: back returns there, and the group's name opens its calendar.
+	const fromActivity = $derived(page.url.searchParams.get('from') === 'activity');
 
 	$effect(() => {
 		const t = thread;
@@ -40,12 +44,30 @@
 
 <div class="chat">
 	<header class="head glass">
-		<span class="back"><IconButton href={calendarHref} icon="chevron-left" label="Back to calendar" variant="plain" /></span>
-		<GroupTile monogram={group.monogram} color={group.color} image={group.image} size={40} />
-		<div class="titles">
-			<h1>{group.name}</h1>
-			<span>{others.length ? listNames(others) : 'Just you so far'}</span>
-		</div>
+		<span class="back" class:keep={fromActivity}>
+			<IconButton
+				href={fromActivity ? '/app/activity' : calendarHref}
+				icon="chevron-left"
+				label={fromActivity ? 'Back to activity' : 'Back to calendar'}
+				variant="plain"
+			/>
+		</span>
+		{#if fromActivity}
+			<a class="group-link" href={calendarHref} aria-label="{group.name}, open the group">
+				<GroupTile monogram={group.monogram} color={group.color} image={group.image} size={40} />
+				<div class="titles">
+					<h1>{group.name}</h1>
+					<span>{others.length ? listNames(others) : 'Just you so far'}</span>
+				</div>
+				<Icon name="chevron-right" size={16} />
+			</a>
+		{:else}
+			<GroupTile monogram={group.monogram} color={group.color} image={group.image} size={40} />
+			<div class="titles">
+				<h1>{group.name}</h1>
+				<span>{others.length ? listNames(others) : 'Just you so far'}</span>
+			</div>
+		{/if}
 		<span class="cal-link"><IconButton href={calendarHref} icon="calendar" label="Group calendar" variant="plain" /></span>
 	</header>
 
@@ -83,6 +105,23 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
+	}
+	.group-link {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		color: inherit;
+		text-decoration: none;
+		border-radius: 14px;
+	}
+	.group-link :global(svg) {
+		color: var(--muted);
+		flex: none;
+	}
+	.group-link:hover h1 {
+		text-decoration: underline;
 	}
 	.titles {
 		flex: 1;
@@ -139,6 +178,10 @@
 		}
 		.back {
 			display: none;
+		}
+		/* From Activity, back still leads there. */
+		.back.keep {
+			display: block;
 		}
 		h1 {
 			font-family: var(--font-display);

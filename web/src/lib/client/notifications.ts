@@ -10,7 +10,7 @@ export const markNotificationsRead = (ids?: string[]) => api.post('/notification
 export function notificationHref(n: AppNotification): string {
 	if (n.kind === 'invite.received' && n.data.token) return `/invite/${n.data.token}`;
 	if (n.data.proposalId) return `/app/proposals/${n.data.proposalId}`;
-	if (n.groupId && (n.kind === 'message' || n.data.messageId)) return `/app/groups/${n.groupId}/chat`;
+	if (n.groupId && (n.kind === 'message' || n.data.messageId)) return `/app/groups/${n.groupId}/chat?from=activity`;
 	if (n.groupId) return `/app/groups/${n.groupId}`;
 	return '/app';
 }

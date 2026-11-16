@@ -7,7 +7,10 @@ struct ScreenHeader<Trailing: View>: View {
     var titleSize: CGFloat = 24
     var backLabel = "Back"
     var onBack: (() -> Void)?
+    /// Makes the title a link (shown with a chevron after it).
+    var onTitle: (() -> Void)?
     @ViewBuilder var trailing: Trailing
+    @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 10) {
@@ -15,10 +18,25 @@ struct ScreenHeader<Trailing: View>: View {
                 IconButton(systemImage: "chevron.left", label: backLabel, action: onBack)
             }
             VStack(alignment: .leading, spacing: 0) {
-                Text(title)
-                    .displayFont(titleSize, .bold)
-                    .lineLimit(2)
+                if let onTitle {
+                    Button(action: onTitle) {
+                        HStack(spacing: 4) {
+                            Text(title).displayFont(titleSize, .bold).lineLimit(2).multilineTextAlignment(.leading)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: titleSize * 0.55, weight: .bold))
+                                .foregroundStyle(theme.muted)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                     .accessibilityAddTraits(.isHeader)
+                    .accessibilityHint("Opens the group")
+                } else {
+                    Text(title)
+                        .displayFont(titleSize, .bold)
+                        .lineLimit(2)
+                        .accessibilityAddTraits(.isHeader)
+                }
                 if let subtitle {
                     SubtitleText(subtitle)
                 }
@@ -30,8 +48,8 @@ struct ScreenHeader<Trailing: View>: View {
 }
 
 extension ScreenHeader where Trailing == EmptyView {
-    init(title: String, subtitle: String? = nil, titleSize: CGFloat = 24, backLabel: String = "Back", onBack: (() -> Void)? = nil) {
-        self.init(title: title, subtitle: subtitle, titleSize: titleSize, backLabel: backLabel, onBack: onBack) { EmptyView() }
+    init(title: String, subtitle: String? = nil, titleSize: CGFloat = 24, backLabel: String = "Back", onBack: (() -> Void)? = nil, onTitle: (() -> Void)? = nil) {
+        self.init(title: title, subtitle: subtitle, titleSize: titleSize, backLabel: backLabel, onBack: onBack, onTitle: onTitle) { EmptyView() }
     }
 }
 

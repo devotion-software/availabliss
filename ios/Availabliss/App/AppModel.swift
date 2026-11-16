@@ -109,6 +109,10 @@ final class AppModel {
         router.open(link)
     }
 
+    func openFromActivity(_ link: DeepLink) {
+        router.openFromActivity(link)
+    }
+
     func templatesChanged() { templatesVersion += 1 }
 
     /// Another account was merged into this one: reload the user and everything that depends on it.

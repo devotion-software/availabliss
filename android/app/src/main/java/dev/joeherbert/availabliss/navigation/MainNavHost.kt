@@ -116,7 +116,14 @@ fun MainNavHost(root: RootViewModel) {
                 )
             }
             composable<MyTimeRoute> { MyTimeScreen(onOpenCalendars = { nav.navigate(CalendarsRoute) }) }
-            composable<ActivityRoute> { ActivityScreen(onOpenLink = { nav.open(it) }) }
+            composable<ActivityRoute> {
+                ActivityScreen(
+                    onOpenLink = { link ->
+                        // A chat opens straight over Activity, so back returns here.
+                        if (link is DeepLink.GroupChat) nav.navigateSingleTop(GroupChatRoute(link.groupId)) else nav.open(link)
+                    },
+                )
+            }
             composable<YouRoute> {
                 YouScreen(
                     onOpenAppearance = { nav.navigate(AppearanceRoute) },
@@ -150,13 +157,23 @@ fun MainNavHost(root: RootViewModel) {
                         onDispose { shell.onChatVisible(false) }
                     }
                 }
+                // Opened from Activity rather than over the calendar: back returns there, and the
+                // group's name (or proposing a time) opens the calendar in its place.
+                val overGroup = remember(backStackEntry) {
+                    nav.previousBackStackEntry?.let { it.destination.hasRoute<GroupRoute>() && it.toRoute<GroupRoute>().groupId == groupId } == true
+                }
+                val openGroup = {
+                    nav.popBackStack()
+                    nav.open(DeepLink.GroupCalendar(groupId))
+                }
                 GroupChatTab(
                     onBack = { nav.popBackStack() },
                     onOpenProposal = { nav.navigate(ProposalRoute(it)) },
                     onOpenEvent = { nav.navigate(EventEditorRoute(groupId, eventId = it)) },
                     // Proposing starts from the calendar.
-                    onProposeTime = { nav.popBackStack() },
+                    onProposeTime = { if (overGroup) nav.popBackStack() else openGroup() },
                     onAddEvent = { nav.navigate(EventEditorRoute(groupId)) },
+                    onOpenGroup = if (overGroup) null else openGroup,
                 )
             }
             composable<GroupPlansRoute> { backStackEntry ->

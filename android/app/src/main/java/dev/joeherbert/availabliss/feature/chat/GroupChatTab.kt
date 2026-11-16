@@ -20,6 +20,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -86,6 +90,8 @@ fun GroupChatTab(
     onOpenEvent: (String) -> Unit,
     onProposeTime: () -> Unit,
     onAddEvent: () -> Unit,
+    /** Set when the chat wasn't opened over its group's calendar (e.g. from Activity): the group's name opens it. */
+    onOpenGroup: (() -> Unit)? = null,
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -155,7 +161,7 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
     val listState = rememberLazyListState()
     AvailablissBackground(OrbLayout.Chat) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-            ChatHeader(state, actions.onBack)
+            ChatHeader(state, actions.onBack, onOpenGroup)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     state.loading && state.items.isEmpty() -> LoadingIndicator(Modifier.align(Alignment.Center))
@@ -186,7 +192,7 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
 }
 
 @Composable
-private fun ChatHeader(state: ChatUiState, onBack: () -> Unit) {
+private fun ChatHeader(state: ChatUiState, onBack: () -> Unit, onOpenGroup: (() -> Unit)? = null) {
     val colors = AvailablissTheme.colors
     Row(
         Modifier
@@ -197,12 +203,24 @@ private fun ChatHeader(state: ChatUiState, onBack: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        PlainIconButton(AvIcons.Back, "Back to calendar", onBack)
-        GroupTile(state.monogram, colors.tile(state.tileColor), image = state.groupImage, size = 40.dp, radius = 14.dp)
-        Column(Modifier.weight(1f)) {
-            Text(state.groupName, style = AvailablissTheme.type.bodyStrong.copy(fontWeight = AvWeights.Display650), color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (state.membersSummary.isNotEmpty()) {
-                Text(state.membersSummary, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        PlainIconButton(AvIcons.Back, if (onOpenGroup == null) "Back to calendar" else "Back", onBack)
+        Row(
+            Modifier
+                .weight(1f)
+                .clip(Shapes.inner)
+                .then(if (onOpenGroup != null) Modifier.clickable(onClickLabel = "Open the group", onClick = onOpenGroup) else Modifier),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            GroupTile(state.monogram, colors.tile(state.tileColor), image = state.groupImage, size = 40.dp, radius = 14.dp)
+            Column(Modifier.weight(1f)) {
+                Text(state.groupName, style = AvailablissTheme.type.bodyStrong.copy(fontWeight = AvWeights.Display650), color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (state.membersSummary.isNotEmpty()) {
+                    Text(state.membersSummary, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (onOpenGroup != null) {
+                Icon(AvIcons.Forward, contentDescription = null, tint = colors.muted, modifier = Modifier.size(18.dp))
             }
         }
     }

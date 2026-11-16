@@ -74,8 +74,11 @@ private struct GroupTopBar: View {
 
     var body: some View {
         SwiftUI.Group {
-            if let section {
+            if let section, app.router.isOverGroup(group.id) {
                 ScreenHeader(title: group.name, titleSize: 22, backLabel: "Back to calendar", onBack: { app.router.pop() })
+            } else if section != nil {
+                // Opened from elsewhere (Activity): back returns there; the name opens the group.
+                ScreenHeader(title: group.name, titleSize: 22, onBack: { app.router.pop() }, onTitle: { app.router.pop(); app.open(.group(id: group.id)) })
             } else {
                 GroupHeader(group: group, unreadCount: unreadCount)
             }
