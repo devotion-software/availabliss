@@ -4,6 +4,7 @@
 	import { minutesIntoDay } from '#lib/client/dates';
 	import { weekdayName } from '#lib/client/format';
 	import { clock, DAY_MINUTES, selectionRange, tapRange, type PlacedInterval } from './parts';
+	import { busyName } from './days';
 
 	/**
 	 * One day of your busy time, hours down the side, every interval at its exact
@@ -105,12 +106,12 @@
 		return `top:${top(p.from)};height:${((p.to - p.from) / DAY_MINUTES) * 100}%;left:calc(${p.lane * width}% + 4px);width:calc(${width}% - 8px)`;
 	}
 
-	const labelOf = (i: BusyInterval) => i.label ?? 'Busy';
+	const labelOf = (i: BusyInterval) => busyName(i) ?? 'Busy';
 
 	function describe(p: PlacedInterval): string {
 		const what =
 			p.interval.source === 'calendar'
-				? `${p.interval.ignoreId ? 'Marked not busy, from' : 'Busy from'} ${p.interval.label ?? 'a calendar'}`
+				? `${p.interval.title ? `${p.interval.title}, ` : ''}${p.interval.ignoreId ? 'marked not busy, from' : 'busy from'} ${p.interval.label ?? 'a calendar'}`
 				: `Blocked by you${p.interval.label ? `: ${p.interval.label}` : ''}`;
 		return `${what}, ${weekdayName(p.day, 'long')} ${clock(p.from)} to ${clock(p.to)}`;
 	}

@@ -64,8 +64,8 @@
 			<div class="card">
 				<span class="icon"><Icon name="calendar-sync" size={20} /></span>
 				<span class="text">
-					<strong>{interval.label ?? 'A connected calendar'}</strong>
-					<span>{fmt.current.when(interval.start, interval.end, allDay)}</span>
+					<strong>{interval.title ?? interval.label ?? 'A connected calendar'}</strong>
+					<span>{[interval.title ? interval.label : null, fmt.current.when(interval.start, interval.end, allDay)].filter(Boolean).join(' · ')}</span>
 				</span>
 			</div>
 			{#if interval.ignoreId}

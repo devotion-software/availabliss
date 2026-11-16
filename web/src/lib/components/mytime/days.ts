@@ -103,11 +103,16 @@ export function freeLevel(busy: readonly Range[]): FreeLevel {
 	return 0;
 }
 
-/** Your own block notes that day ("Choir"), once each, in time order. Calendar labels are calendar names, not events, so they're left out. */
+/** What a busy item is called: your block's note or your calendar event's name (calendar `label` is the calendar's name), else null. */
+export function busyName(i: BusyInterval): string | null {
+	return ((i.source === 'manual' ? i.label : i.title) ?? '').trim() || null;
+}
+
+/** The names of what's on that day ("Choir", "Lunch with Mum"), once each, in time order. */
 export function dayNames(timed: readonly DayPiece[], allDay: readonly BusyInterval[]): string[] {
 	const items = [...allDay, ...[...timed].sort((a, b) => a.from - b.from).map((p) => p.interval)];
-	const names = items.filter((i) => counts(i) && i.source === 'manual' && i.label).map((i) => i.label!.trim());
-	return [...new Set(names.filter(Boolean))];
+	const names = items.filter(counts).map(busyName);
+	return [...new Set(names.filter((n): n is string => !!n))];
 }
 
 const joinAnd = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
@@ -176,7 +181,7 @@ export function agendaItems(timed: readonly DayPiece[], allDay: readonly BusyInt
 	const item = (interval: BusyInterval, range: Range | null): AgendaItem => ({
 		interval,
 		range,
-		title: (interval.source === 'manual' && interval.label?.trim()) || 'Busy',
+		title: busyName(interval) ?? 'Busy',
 		tag: sourceTag(interval, blocks)
 	});
 	return [

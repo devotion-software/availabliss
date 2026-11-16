@@ -7,7 +7,7 @@
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import DayTimeGrid from './DayTimeGrid.svelte';
 	import type { PlacedInterval } from './parts';
-	import { busyRanges, clampDay, dayLine, dayMarks, dayNames } from './days';
+	import { busyName, busyRanges, clampDay, dayLine, dayMarks, dayNames } from './days';
 	import { pageDirection, swipe } from './swipe.svelte';
 
 	/**
@@ -52,7 +52,7 @@
 	const stripSwipe = swipe({ step: stepWeek, can: canWeek });
 	const daySwipe = swipe({ step: stepDay, can: canDay });
 
-	const labelOf = (i: BusyInterval) => i.label ?? (i.source === 'manual' ? 'Blocked' : 'Busy');
+	const labelOf = (i: BusyInterval) => busyName(i) ?? (i.source === 'manual' ? 'Blocked' : 'Busy');
 </script>
 
 <section class="week-view" aria-labelledby="week-title">
