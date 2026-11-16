@@ -220,8 +220,3 @@ export function groupWeeks(days: readonly string[], today: string): { start: str
 	}
 	return out;
 }
-
-/** "This evening": 18:00 – 23:59 today, or tomorrow once it's past 18:00. */
-export function eveningPreset(today: string, nowMinutes: number): { day: string; range: Range } {
-	return { day: nowMinutes >= 18 * 60 ? addDays(today, 1) : today, range: { from: 18 * 60, to: 23 * 60 + 59 } };
-}

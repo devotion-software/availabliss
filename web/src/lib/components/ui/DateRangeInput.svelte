@@ -149,11 +149,8 @@
 	.side {
 		display: flex;
 		flex-direction: column;
-		align-items: flex-start;
+		align-items: center;
 		min-width: 0;
-	}
-	.side.end {
-		align-items: flex-end;
 	}
 	.arrow {
 		color: var(--muted);
@@ -204,12 +201,7 @@
 		.row {
 			grid-template-columns: minmax(0, 1fr);
 		}
-		.side.end {
-			align-items: flex-start;
-		}
 		.arrow {
-			justify-self: start;
-			padding-left: 14px;
 			transform: rotate(90deg);
 		}
 	}

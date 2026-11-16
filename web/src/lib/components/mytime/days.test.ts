@@ -10,7 +10,6 @@ import {
 	dayMarks,
 	dayNames,
 	describeDay,
-	eveningPreset,
 	freeGaps,
 	freeLevel,
 	freeMinutes,
@@ -108,11 +107,6 @@ describe('weeks', () => {
 			['Next week', 1]
 		]);
 	});
-});
-
-test('eveningPreset moves to tomorrow after 18:00', () => {
-	expect(eveningPreset('2026-11-16', h(17, 59))).toEqual({ day: '2026-11-16', range: { from: h(18), to: h(23, 59) } });
-	expect(eveningPreset('2026-11-16', h(18))).toEqual({ day: '2026-11-17', range: { from: h(18), to: h(23, 59) } });
 });
 
 describe('how free a day is', () => {

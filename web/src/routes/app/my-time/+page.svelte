@@ -6,15 +6,14 @@
 	import type { BusyInterval, ManualBlock } from '#lib/types';
 	import { createBlock, deleteBlock } from '#lib/client/blocks';
 	import { getMyBusy } from '#lib/client/me';
-	import { addDays, addMonths, eachDay, endOfMonth, minutesIntoDay, startOfMonth, startOfWeek, zonedToIso } from '#lib/client/dates';
+	import { addDays, addMonths, eachDay, endOfMonth, startOfMonth, startOfWeek, zonedToIso } from '#lib/client/dates';
 	import { weekdayName } from '#lib/client/format';
 	import { live } from '#lib/client/live.svelte';
 	import { toasts } from '#lib/client/toast.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
-	import Icon, { type IconName } from '#lib/components/ui/Icon.svelte';
-	import Sheet from '#lib/components/ui/Sheet.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
 	import Spinner from '#lib/components/ui/Spinner.svelte';
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import BlockRow from '#lib/components/mytime/BlockRow.svelte';
@@ -32,7 +31,6 @@
 		dayMarks,
 		describeDay,
 		dayNames,
-		eveningPreset,
 		freeLevel,
 		freeSummary,
 		groupWeeks,
@@ -267,30 +265,6 @@
 		sheetOpen = true;
 	}
 
-	// "Block time": quick choices, each opening the block sheet ready to go.
-	let choicesOpen = $state(false);
-	const choices = $derived.by(() => {
-		void choicesOpen; // Recomputed on each open, so "This evening" follows the clock.
-		const now = minutesIntoDay(new Date().toISOString(), today, tz);
-		const evening = eveningPreset(today, now);
-		const list: { label: string; sub: string; icon: IconName; go: () => void }[] = [
-			{
-				label: evening.day === today ? 'This evening' : 'Tomorrow evening',
-				sub: `${weekdayName(evening.day)} from 18:00`,
-				icon: 'moon',
-				go: () => openNew(evening.day, { range: evening.range })
-			},
-			{ label: 'All day…', sub: 'Pick a day', icon: 'sun', go: () => openNew(today, { allDay: true }) },
-			{ label: 'Away for a few days…', sub: 'Pick the first and last day', icon: 'map-pin', go: () => openNew(today, { allDay: true, lastDay: addDays(today, 2) }) },
-			{ label: 'Something else…', sub: 'Choose the times, or make it repeat', icon: 'clock', go: () => openNew(weekDay || today) }
-		];
-		return list;
-	});
-	function choose(go: () => void) {
-		choicesOpen = false;
-		go();
-	}
-
 	/** The agenda's free row: block that stretch (or the whole day). */
 	const blockFree = (day: string, range: Range | null) => (range ? openNew(day, { range }) : openNew(day, { allDay: true }));
 
@@ -352,7 +326,7 @@
 
 		<div class="layout">
 			<div class="top">
-				<Button size="lg" variant="accent" icon="plus" block onclick={() => (choicesOpen = true)}>Block time</Button>
+				<Button size="lg" variant="accent" icon="plus" block onclick={() => openNew(weekDay || today)}>Block time</Button>
 
 				{#if showCalendarHint}
 					<a class="glass hint" href="/app/calendars">
@@ -412,21 +386,6 @@
 		</div>
 	</div>
 {/if}
-
-<Sheet bind:open={choicesOpen} title="Block time" width={420}>
-	<div class="choices">
-		{#each choices as c (c.label)}
-			<button type="button" class="choice" onclick={() => choose(c.go)}>
-				<span class="choice-icon"><Icon name={c.icon} size={19} /></span>
-				<span class="choice-text">
-					<strong>{c.label}</strong>
-					<span>{c.sub}</span>
-				</span>
-				<Icon name="chevron-right" size={16} />
-			</button>
-		{/each}
-	</div>
-</Sheet>
 
 <BlockTimeSheet
 	bind:open={sheetOpen}
@@ -546,51 +505,6 @@
 		margin: 0 auto;
 	}
 
-	.choices {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-	.choice {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		min-height: 60px;
-		padding: 8px 12px;
-		border-radius: 18px;
-		background: var(--surface);
-		border: 1px solid var(--glass-border);
-		text-align: left;
-		color: var(--ink);
-	}
-	.choice:hover {
-		border-color: var(--accent);
-	}
-	.choice-icon {
-		flex: none;
-		width: 38px;
-		height: 38px;
-		border-radius: 12px;
-		display: grid;
-		place-items: center;
-		background: var(--accent-soft);
-		color: var(--accent-ink);
-	}
-	.choice-text {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-	}
-	.choice-text strong {
-		font-size: 15px;
-		font-weight: 650;
-	}
-	.choice-text span {
-		font-size: 13px;
-		color: var(--muted);
-	}
 
 	/* Wide screens: the month or agenda in the main column, blocking and repeats beside it. */
 	@media (min-width: 900px) {
