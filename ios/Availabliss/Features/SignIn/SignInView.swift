@@ -152,9 +152,11 @@ private struct SignInForm: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Check your inbox").bodyFont(15, .semibold)
-                Text("Enter the 6-digit code we just sent to \(model.email).")
+                // Wrap a long address rather than truncating it (fixedSize: the card is height-limited).
+                Text("Enter the 6-digit code we just sent to \(Text(model.email.trimmingCharacters(in: .whitespaces)).foregroundStyle(theme.ink).fontWeight(.semibold)).")
                     .bodyFont(13, relativeTo: .subheadline)
                     .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             OneTimeCodeField(code: $model.code, length: SignInViewModel.codeLength, isBusy: model.busyMethod == .email)
                 .onChange(of: model.code) { _, _ in Task { await model.codeChanged() } }
