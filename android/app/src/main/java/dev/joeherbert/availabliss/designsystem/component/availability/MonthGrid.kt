@@ -22,6 +22,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -59,7 +60,19 @@ data class MonthCellUi(
     /** How many members' preferred times this day fits (shown as a heart on days that work). */
     val preferredCount: Int = 0,
     val accessibilityLabel: String = "",
+    /** Today: its number sits on an accent pill. */
+    val today: Boolean = false,
 )
+
+/**
+ * Picks out today's date with a pill behind it in [pill]. Drawn outside the layout, so cells keep
+ * their size.
+ */
+fun Modifier.todayPill(today: Boolean, pill: Color): Modifier = if (!today) this else drawBehind {
+    val h = 6.dp.toPx()
+    val v = 3.dp.toPx()
+    drawRoundRect(pill, topLeft = Offset(-h, -v), size = Size(size.width + 2 * h, size.height + 2 * v), cornerRadius = CornerRadius(size.height))
+}
 
 /** Shape of a cell: 16dp corners, 5dp on the inner edges of a joined band. */
 fun bandShape(band: BandPosition?, outer: Dp = 16.dp, inner: Dp = 5.dp): Shape = when (band) {
@@ -147,7 +160,13 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
             .padding(horizontal = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
-        Text(cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp, color = fg)
+        // Today's pill is inverted on a cell already filled with the accent.
+        val onAccent = cell.state == CellState.Match
+        Text(
+            cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp,
+            color = if (!cell.today) fg else if (onAccent) colors.accent else colors.onAccent,
+            modifier = Modifier.todayPill(cell.today, if (onAccent) colors.onAccent else colors.accent),
+        )
         Text(cell.note, style = AvailablissTheme.type.micro, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
     if (cell.state == CellState.Match && cell.preferredCount > 0) {
@@ -175,7 +194,11 @@ private fun HiddenCell(cell: MonthCellUi, modifier: Modifier = Modifier) {
             .padding(horizontal = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
-        Text(cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp, color = colors.ink)
+        Text(
+            cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp,
+            color = if (cell.today) colors.onAccent else colors.ink,
+            modifier = Modifier.todayPill(cell.today, colors.accent),
+        )
         Text(cell.note, style = AvailablissTheme.type.micro, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

@@ -20,6 +20,7 @@
 	let { dates, days, members, onselect, selected, cards = false }: Props = $props();
 
 	const fmt = useFormat();
+	const today = $derived(fmt.current.today());
 	const tz = $derived(fmt.current.timeZone);
 
 	const axis: Axis = $derived(
@@ -85,7 +86,7 @@
 			{@const busy = parts.filter((b) => !b.free)}
 			<li>
 				<button type="button" class="card glass" class:on={d === selected} aria-pressed={d === selected} onclick={() => onselect?.(d)}>
-					<span class="date">{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span>
+					<span class="date"><span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span></span>
 					<span class="info">
 						<span class="what" class:free={free.length > 0}>
 							{#if day === undefined}Loading…{:else if day === null}Outside the timing{:else}{free[0]?.label ?? "No time when everyone's free"}{/if}
@@ -112,9 +113,10 @@
 				class:on={d === selected}
 				aria-pressed={d === selected}
 				onclick={() => onselect?.(d)}
-				aria-label="See who's free on {formatDayKey(d)}"
+				aria-label="See who's free on {d === today ? 'today, ' : ''}{formatDayKey(d)}"
+				aria-current={d === today ? 'date' : undefined}
 			>
-				{formatDayKey(d).split(' ').slice(0, 2).join(' ')}
+				<span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span>
 			</button>
 		{/each}
 	</div>
@@ -317,5 +319,12 @@
 		.head {
 			font-size: 12px;
 		}
+	}
+	/* Today: its date on an accent pill. */
+	.today {
+		padding: 1px 7px;
+		border-radius: 999px;
+		background: var(--accent);
+		color: var(--on-accent);
 	}
 </style>

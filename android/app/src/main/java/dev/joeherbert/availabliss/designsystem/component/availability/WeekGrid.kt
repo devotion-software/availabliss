@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.clickable
@@ -44,7 +45,14 @@ data class WeekBlockUi(
     val free: Boolean,
 )
 
-data class WeekColumnUi(val label: String, val blocks: List<WeekBlockUi>, val accessibilityLabel: String = label, val selected: Boolean = false)
+data class WeekColumnUi(
+    val label: String,
+    val blocks: List<WeekBlockUi>,
+    val accessibilityLabel: String = label,
+    val selected: Boolean = false,
+    /** Today: its label sits on an accent pill. */
+    val today: Boolean = false,
+)
 
 /** Hour labels on the shared 08–24 axis. */
 val TimelineHours = listOf(8, 12, 16, 20, 24)
@@ -64,7 +72,12 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Spacer(Modifier.width(34.dp))
             columns.forEach {
-                Text(it.label, style = type.micro, color = colors.muted, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Text(
+                        it.label, style = type.micro, color = if (it.today) colors.onAccent else colors.muted, textAlign = TextAlign.Center,
+                        modifier = Modifier.todayPill(it.today, colors.accent),
+                    )
+                }
             }
         }
         Row(Modifier.fillMaxWidth().height(320.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -150,7 +163,12 @@ fun WeekCards(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSele
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
-                Text(column.label, style = type.bodySmallStrong, color = colors.ink, modifier = Modifier.width(56.dp))
+                Box(Modifier.width(56.dp)) {
+                    Text(
+                        column.label, style = type.bodySmallStrong, color = if (column.today) colors.onAccent else colors.ink,
+                        modifier = Modifier.padding(start = if (column.today) 6.dp else 0.dp).todayPill(column.today, colors.accent),
+                    )
+                }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         free.firstOrNull()?.label ?: "No time when everyone's free",

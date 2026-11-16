@@ -166,6 +166,7 @@ object AvailabilityUiMapper {
             selected = date == selected,
             preferredCount = if (state == CellState.Match) day?.preferredBy.orEmpty().size else 0,
             accessibilityLabel = listOfNotNull(dateLabel, stateLabel, day?.holiday, if (date == today) "today" else null).joinToString(", "),
+            today = date == today,
         )
     }
 
@@ -314,7 +315,8 @@ object AvailabilityUiMapper {
             label = DateTimes.weekdayAndDay(date),
             blocks = blocks,
             selected = date == selected,
-            accessibilityLabel = DateTimes.shortDay(date) + ": " + (freeBlocks.joinToString { it.label }.ifEmpty { "no time when everyone's free" }),
+            today = date == DateTimes.today(),
+            accessibilityLabel = (if (date == DateTimes.today()) "Today, " else "") + DateTimes.shortDay(date) + ": " + (freeBlocks.joinToString { it.label }.ifEmpty { "no time when everyone's free" }),
         )
     }
 

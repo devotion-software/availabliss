@@ -205,6 +205,34 @@ struct GroupAvailabilityView: View {
     }
 }
 
+extension View {
+    /// Today's date, picked out with a pill behind it in the accent colour (inverted on a cell
+    /// that's already filled with it). Drawn outside the layout, so cells keep their size.
+    func todayMark(_ date: CalendarDay, onAccent: Bool = false) -> some View {
+        modifier(TodayMark(isToday: date == .today(), onAccent: onAccent))
+    }
+}
+
+private struct TodayMark: ViewModifier {
+    let isToday: Bool
+    let onAccent: Bool
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        if isToday {
+            content
+                .foregroundStyle(onAccent ? theme.accent : theme.onAccent)
+                .background {
+                    Capsule().fill(onAccent ? theme.onAccent : theme.accent)
+                        .padding(.horizontal, -6)
+                        .padding(.vertical, -2)
+                }
+        } else {
+            content
+        }
+    }
+}
+
 /// Swipe sideways for the previous / next month or week: the page follows your finger, then slides
 /// on (or springs back). The drag lives here so following the finger redraws only this, not the
 /// whole screen.
@@ -448,6 +476,7 @@ private struct DayCell: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(date.day)").font(AppFont.body(compact ? 15 : 17, .semibold, relativeTo: .body))
+                    .todayMark(date, onAccent: status == .match)
                 if !compact || status == .match || isPast {
                     Text(note).bodyFont(compact ? 9 : 11, .semibold, relativeTo: .caption2).lineLimit(1)
                 }
@@ -504,7 +533,7 @@ private struct DayCell: View {
     }
 
     private func accessibilityText(_ status: AvailabilityDay.Status) -> String {
-        let base = Formatting.longDay(date.startDate())
+        let base = (date == .today() ? "Today, " : "") + Formatting.longDay(date.startDate())
         switch status {
         case .match:
             let prefers = (info?.preferredBy?.count ?? 0) > 0 ? ", \(Formatting.plural(info?.preferredBy?.count ?? 0, "person", "people")) prefer it" : ""

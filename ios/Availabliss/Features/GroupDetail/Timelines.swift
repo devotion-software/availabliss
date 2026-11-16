@@ -29,6 +29,7 @@ struct WeekGrid: View {
                 Color.clear.frame(width: 28, height: 1)
                 ForEach(model.weekDays, id: \.self) { day in
                     Text(model.weekDays.count > 4 ? "\(Weekday.short(day.weekday()).prefix(1)) \(day.day)" : "\(Weekday.short(day.weekday())) \(day.day)")
+                        .todayMark(day)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -172,6 +173,8 @@ private struct WeekDayCard: View {
             VStack(spacing: 0) {
                 Text(Weekday.short(day.weekday())).bodyFont(11, .semibold, relativeTo: .caption2).foregroundStyle(theme.muted)
                 Text("\(day.day)").displayFont(20, .bold).monospacedDigit()
+                    .todayMark(day)
+                    .padding(.top, day == .today() ? 3 : 0)
             }
             .frame(width: 40)
             VStack(alignment: .leading, spacing: 6) {

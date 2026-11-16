@@ -244,8 +244,19 @@
 	.compact .match.end {
 		border-radius: 5px 16px 16px 5px;
 	}
-	.today:not(.match) .num {
-		color: var(--accent-ink);
+	/* Today: the number on an accent pill (inverted on a cell already filled with the accent). */
+	.today .num {
+		align-self: flex-start;
+		margin-left: -6px;
+		padding: 2px 6px;
+		border-radius: 999px;
+		background: var(--accent);
+		color: var(--on-accent);
+		opacity: 1;
+	}
+	.today.match .num {
+		background: var(--on-accent);
+		color: var(--accent);
 	}
 	.cell {
 		position: relative;
