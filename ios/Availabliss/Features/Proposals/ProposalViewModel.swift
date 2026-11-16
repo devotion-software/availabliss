@@ -8,6 +8,8 @@ final class ProposalViewModel {
     private(set) var group: Group?
     private(set) var event: GroupEvent?
     private(set) var isResponding = false
+    /// The reply being sent, so only its button shows a spinner.
+    private(set) var sending: ResponseKind?
     private(set) var loadError: String?
     var error: String?
 
@@ -102,6 +104,8 @@ final class ProposalViewModel {
     // MARK: Actions
 
     func respond(_ response: ResponseKind) async {
+        sending = response
+        defer { sending = nil }
         await run { try await self.api.send(API.Proposals.respond(id: self.proposalId, response)) }
     }
 

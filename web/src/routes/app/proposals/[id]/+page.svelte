@@ -22,8 +22,11 @@
 	let { data } = $props();
 
 	const fmt = useFormat();
-	// Seeded from the load, then replaced by responses and live events.
-	let proposal = $derived(data.proposal);
+	// Seeded from the load, then replaced by responses and live events. The newer copy is kept
+	// against the load it came after: other invalidations (e.g. app:groups after replying) hand
+	// back a new `data` with the same, older proposal, which mustn't undo the reply.
+	let newer = $state.raw<{ base: Proposal; value: Proposal } | null>(null);
+	const proposal = $derived(newer && newer.base === data.proposal ? newer.value : data.proposal);
 	const group = $derived(data.group);
 	const me = $derived(data.user.id);
 	const members = $derived(memberMap(group));
@@ -65,7 +68,7 @@
 	async function apply(request: () => Promise<Proposal>): Promise<Proposal> {
 		const ticket = ++latest;
 		const next = await request();
-		if (ticket === latest) proposal = next;
+		if (ticket === latest) newer = { base: data.proposal, value: next };
 		return next;
 	}
 

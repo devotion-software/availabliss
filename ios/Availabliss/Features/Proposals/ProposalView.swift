@@ -161,13 +161,15 @@ private struct PendingProposalView: View {
                 .bodyFont(13, .semibold, relativeTo: .subheadline)
                 .padding(.leading, 4)
             HStack(spacing: 8) {
-                Button("Can't make it") { Task { await model.respond(.declined) } }
+                Button { Task { await model.respond(.declined) } } label: {
+                    LoadingLabel(title: "Can't make it", isLoading: model.sending == .declined)
+                }
                     .buttonStyle(.secondary)
                     .disabled(mine == .declined || model.isResponding)
                 Button {
                     Task { await model.respond(.accepted) }
                 } label: {
-                    LoadingLabel(title: mine == .accepted ? "Accepted" : "Accept", systemImage: mine == .accepted ? "checkmark" : nil, isLoading: model.isResponding)
+                    LoadingLabel(title: mine == .accepted ? "Accepted" : "Accept", systemImage: mine == .accepted ? "checkmark" : nil, isLoading: model.sending == .accepted)
                 }
                 .buttonStyle(.primary)
                 .disabled(mine == .accepted || model.isResponding)
