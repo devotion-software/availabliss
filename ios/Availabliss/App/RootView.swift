@@ -60,7 +60,7 @@ struct SplashView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            VennLogo(size: 72)
+            VennLogo(size: 72, animated: error == nil)
             if let error, let retry {
                 StatusView(kind: .error(error, retry: retry))
             }

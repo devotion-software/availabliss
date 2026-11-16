@@ -1,5 +1,11 @@
 package dev.joeherbert.availabliss.designsystem.component
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import android.os.Build
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -112,10 +118,23 @@ fun AvailablissBackground(
     }
 }
 
-/** The three-circle Availabliss mark. */
+/**
+ * The three-circle Availabliss mark. [animated] (loading): the circles drift apart and back
+ * together into their overlap, over and over.
+ */
 @Composable
-fun VennLogo(size: Dp, modifier: Modifier = Modifier, contentDescription: String? = "Availabliss logo") {
+fun VennLogo(size: Dp, modifier: Modifier = Modifier, contentDescription: String? = "Availabliss logo", animated: Boolean = false) {
     val dark = AvailablissTheme.colors.isDark
+    val spread = if (animated) {
+        rememberInfiniteTransition(label = "venn").animateFloat(
+            initialValue = 1.5f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(1100, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "venn-spread",
+        ).value
+    } else {
+        1f
+    }
     Canvas(
         modifier
             .size(size)
@@ -123,10 +142,14 @@ fun VennLogo(size: Dp, modifier: Modifier = Modifier, contentDescription: String
     ) {
         val u = this.size.width / 40f
         val r = 10f * u
+        // The circles' shared centre, so they spread out evenly.
+        val cx = 20f
+        val cy = 55f / 3f
+        fun at(x: Float, y: Float) = Offset((cx + (x - cx) * spread) * u, (cy + (y - cy) * spread) * u)
         // In dark mode the concept blends the circles with `screen`; approximate with slight transparency.
         val a = if (dark) 0.9f else 1f
-        drawCircle(BrandColors.VennPeach, r, Offset(14f * u, 15f * u), alpha = a)
-        drawCircle(BrandColors.VennPeriwinkle, r, Offset(26f * u, 15f * u), alpha = if (dark) 0.85f else 0.95f)
-        drawCircle(BrandColors.VennMint, r, Offset(20f * u, 25f * u), alpha = if (dark) 0.85f else 0.95f)
+        drawCircle(BrandColors.VennPeach, r, at(14f, 15f), alpha = a)
+        drawCircle(BrandColors.VennPeriwinkle, r, at(26f, 15f), alpha = if (dark) 0.85f else 0.95f)
+        drawCircle(BrandColors.VennMint, r, at(20f, 25f), alpha = if (dark) 0.85f else 0.95f)
     }
 }

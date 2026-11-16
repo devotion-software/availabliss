@@ -47,7 +47,7 @@ private fun SplashScreen(failed: Boolean, onRetry: () -> Unit, onSignOut: () -> 
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         ) {
-            VennLogo(72.dp)
+            VennLogo(72.dp, contentDescription = if (failed) "Availabliss logo" else "Loading", animated = !failed)
             if (failed) {
                 Text("We couldn't reach Availabliss.", style = AvailablissTheme.type.cardTitle, color = AvailablissTheme.colors.ink)
                 PrimaryButton("Try again", onRetry, height = 50.dp)

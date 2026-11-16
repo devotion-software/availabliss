@@ -25,7 +25,13 @@ struct Stripes: View {
 /// The Availabliss logo: three overlapping circles.
 struct VennLogo: View {
     var size: CGFloat = 40
+    /// Loading: the circles drift apart and back together into their overlap, over and over
+    /// (still with Reduce Motion).
+    var animated = false
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 1 = the logo as drawn; more pushes the circles apart from their shared centre.
+    @State private var spread: CGFloat = 1
 
     var body: some View {
         let scale = size / 40
@@ -37,13 +43,20 @@ struct VennLogo: View {
         .frame(width: size, height: size, alignment: .topLeading)
         .compositingGroup()
         .accessibilityHidden(true)
+        .onAppear {
+            guard animated, !reduceMotion else { return }
+            spread = 1.5
+            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { spread = 1 }
+        }
     }
 
     private func circle(_ hex: UInt32, x: CGFloat, y: CGFloat, scale: CGFloat) -> some View {
-        Circle()
+        // The centre of the three circles, so they spread out evenly.
+        let cx: CGFloat = 20, cy: CGFloat = 55.0 / 3
+        return Circle()
             .fill(Color(hex: hex))
             .frame(width: 20 * scale, height: 20 * scale)
-            .offset(x: (x - 10) * scale, y: (y - 10) * scale)
+            .offset(x: (cx + (x - cx) * spread - 10) * scale, y: (cy + (y - cy) * spread - 10) * scale)
             .blendMode(theme.isDark ? .screen : .multiply)
     }
 }
