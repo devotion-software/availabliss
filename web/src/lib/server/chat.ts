@@ -172,15 +172,15 @@ export async function markReceipts(groupId: string, userId: string, upTo: string
 export async function messageInfo(messageId: string, userId: string): Promise<MessageInfo> {
 	const message = await db.query.messages.findFirst({ where: eq(messages.id, messageId) });
 	if (!message) throw notFound('Message not found');
+	// Any member can see who has read a message, not only its sender.
 	await requireMember(message.groupId, userId);
-	if (message.authorId !== userId) throw forbidden('Only the sender can see message info');
 
 	const [receipts, members] = await Promise.all([
 		db.select().from(messageReceipts).where(eq(messageReceipts.messageId, messageId)),
 		memberIds(message.groupId)
 	]);
 	const byUser = new Map(receipts.map((r) => [r.userId, r]));
-	const others = members.filter((id) => id !== userId);
+	const others = members.filter((id) => id !== message.authorId);
 	return {
 		messageId,
 		sentAt: message.createdAt.toISOString(),

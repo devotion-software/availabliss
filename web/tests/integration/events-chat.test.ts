@@ -89,7 +89,11 @@ describe('chat', () => {
 		expect(info.seen.map((s) => s.userId)).toEqual([admin]);
 		expect(info.delivered.map((s) => s.userId)).toEqual([member]);
 		expect(info.pending).toEqual([]);
-		expect((await apiError(messageInfo(first.id, member))).code).toBe('forbidden');
+		// Other members can see it too, with the same receipts.
+		const theirs = await messageInfo(first.id, member);
+		expect(theirs.seen.map((s) => s.userId)).toEqual([admin]);
+		expect(theirs.delivered.map((s) => s.userId)).toEqual([member]);
+		expect(theirs.pending).toEqual([]);
 
 		// The author's own view carries receipt counts.
 		const own = (await listMessages(groupId, owner, null, 50)).messages.find((m) => m.id === first.id)!;

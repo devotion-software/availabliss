@@ -161,7 +161,7 @@
 	</div>
 </div>
 
-<MessageInfoSheet bind:open={infoOpen} message={infoMessage} {members} />
+<MessageInfoSheet bind:open={infoOpen} message={infoMessage} {members} {meId} />
 
 <style>
 	.scroller {

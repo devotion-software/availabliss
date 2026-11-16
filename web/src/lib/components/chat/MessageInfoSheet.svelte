@@ -8,13 +8,15 @@
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import Spinner from '#lib/components/ui/Spinner.svelte';
 
-	/** Who has seen / received one of your messages. */
+	/** Who has seen / received a message (yours or someone else's). */
 	interface Props {
 		open: boolean;
 		message: Message | null;
 		members: Map<string, Member>;
+		meId: string;
 	}
-	let { open = $bindable(), message, members }: Props = $props();
+	let { open = $bindable(), message, members, meId }: Props = $props();
+	const mine = $derived(!!message && message.authorId === meId);
 
 	const fmt = useFormat();
 	let info = $state<MessageInfo | null>(null);
@@ -34,7 +36,10 @@
 	const sentLabel = $derived.by(() => {
 		if (!message) return '';
 		const day = fmt.current.dayDivider(message.createdAt);
-		return `Sent ${day === 'Today' || day === 'Yesterday' ? day.toLowerCase() : day} at ${fmt.current.time(message.createdAt)}`;
+		const when = `${day === 'Today' || day === 'Yesterday' ? day.toLowerCase() : day} at ${fmt.current.time(message.createdAt)}`;
+		// "Sent today at 18:20", or "Ana sent this today at 18:20".
+		if (message.authorId === meId) return `Sent ${when}`;
+		return `${(message.authorId ? name(message.authorId) : 'Someone').split(' ')[0]} sent this ${when}`;
 	});
 	const groups = $derived(
 		info
@@ -53,8 +58,8 @@
 
 <Sheet bind:open title="Message info">
 	{#if message}
-		<div class="bubble">{message.body ?? message.poll?.question ?? ''}</div>
-		<span class="sent">{sentLabel}</span>
+		<div class="bubble" class:theirs={!mine}>{message.body ?? message.poll?.question ?? ''}</div>
+		<span class="sent" class:theirs={!mine}>{sentLabel}</span>
 	{/if}
 	{#if error}
 		<p class="error" role="alert">{error}</p>
@@ -96,6 +101,16 @@
 		color: var(--on-solid);
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
+	}
+	.bubble.theirs {
+		align-self: flex-start;
+		border-radius: 18px 18px 18px 6px;
+		background: var(--surface);
+		color: var(--ink);
+		border: 1px solid var(--glass-border);
+	}
+	.sent.theirs {
+		align-self: flex-start;
 	}
 	.sent {
 		align-self: flex-end;

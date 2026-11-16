@@ -4,19 +4,29 @@ import SwiftUI
 struct MessageInfoSheet: View {
     let message: Message
     let group: Group
+    let me: String?
     let model: ChatViewModel
     @Environment(\.theme) private var theme
     @State private var info: MessageInfo?
 
+    private var isMine: Bool { message.authorId != nil && message.authorId == me }
+    /// "Sent today at 18:20", or "Ana sent this today at 18:20" for someone else's message.
+    private var sentLine: String {
+        let when = "\(Formatting.chatDay(message.createdAt).lowercased()) at \(Formatting.time(message.createdAt))"
+        if isMine { return "Sent \(when)" }
+        let name = message.authorId.flatMap(group.member)?.firstName ?? "Someone"
+        return "\(name) sent this \(when)"
+    }
+
     var body: some View {
         BottomSheet(title: "Message info") {
-            VStack(alignment: .trailing, spacing: 4) {
-                MessageBubble(text: message.body ?? message.poll?.question ?? "", isMine: true)
-                Text("Sent \(Formatting.chatDay(message.createdAt).lowercased()) at \(Formatting.time(message.createdAt))")
+            VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
+                MessageBubble(text: message.body ?? message.poll?.question ?? "", isMine: isMine)
+                Text(sentLine)
                     .bodyFont(11, relativeTo: .caption2)
                     .foregroundStyle(theme.muted)
             }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
             if let info {
                 if !info.seen.isEmpty {
                     ReceiptSection(title: "Seen by", seen: true, rows: info.seen.map { ($0.userId, Formatting.time($0.at)) }, group: group)

@@ -2,7 +2,7 @@
 	import type { Member, Message } from '#lib/types';
 	import Avatar from '#lib/components/ui/Avatar.svelte';
 
-	/** A text message. Others' are glass with an avatar; yours are solid and open message info. */
+	/** A text message. Others' are glass with an avatar; yours are solid. Either opens message info. */
 	interface Props {
 		message: Message;
 		mine: boolean;
@@ -37,7 +37,12 @@
 		</span>
 		<div class="col">
 			{#if first}<span class="name">{name.split(' ')[0]}</span>{/if}
-			<div class="bubble glass">{message.body}</div>
+			<button
+				type="button"
+				class="bubble glass theirs"
+				aria-label="{name}: {message.body}. Show message info"
+				onclick={() => oninfo?.(message)}>{message.body}</button
+			>
 		</div>
 	</div>
 {/if}
@@ -83,6 +88,13 @@
 		-webkit-backdrop-filter: none;
 		box-shadow: none;
 		border-color: transparent;
+	}
+	.theirs {
+		text-align: left;
+		color: inherit;
+		font: inherit;
+		font-size: 14px;
+		cursor: pointer;
 	}
 	.mine {
 		align-self: flex-end;

@@ -50,6 +50,8 @@ data class InfoPerson(val person: AvatarPerson, val name: String, val time: Stri
 data class MessageInfoUi(
     val text: String,
     val sentLabel: String,
+    /** Your own message (bubble on the right) or someone else's (on the left). */
+    val own: Boolean = true,
     val loading: Boolean,
     val seen: List<InfoPerson> = emptyList(),
     val delivered: List<InfoPerson> = emptyList(),
@@ -490,9 +492,13 @@ class ChatViewModel @Inject constructor(
         fun person(userId: String, time: String) = InfoPerson(directory.avatar(userId), directory.displayName(userId), time)
         fun clock(iso: String) = DateTimes.localDateTime(iso)?.let(DateTimes::time).orEmpty()
         val text = message?.body ?: message?.poll?.question.orEmpty()
+        val own = message == null || directory.isMe(message.authorId)
+        val sent = sentAtLabel(info?.sentAt ?: message?.createdAt.orEmpty())
         return MessageInfoUi(
             text = text,
-            sentLabel = "Sent " + sentAtLabel(info?.sentAt ?: message?.createdAt.orEmpty()),
+            // "Sent today at 18:20", or "Ana sent this today at 18:20".
+            sentLabel = if (own) "Sent $sent" else "${directory[message?.authorId.orEmpty()]?.name?.substringBefore(' ') ?: "Someone"} sent this $sent",
+            own = own,
             loading = info == null && error == null,
             seen = info?.seen.orEmpty().map { person(it.userId, clock(it.at)) },
             delivered = info?.delivered.orEmpty().map { person(it.userId, "Delivered ${clock(it.at)}") },

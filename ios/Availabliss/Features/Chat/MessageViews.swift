@@ -37,7 +37,12 @@ struct MessageRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
-                IncomingRow(author: author, showsName: startsRun) { MessageBubble(text: message.body ?? "", isMine: false) }
+                IncomingRow(author: author, showsName: startsRun) {
+                    MessageBubble(text: message.body ?? "", isMine: false)
+                        .onTapGesture(perform: openInfo)
+                }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Shows message info")
             }
         case .poll:
             if let poll = message.poll {

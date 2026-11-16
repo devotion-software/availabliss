@@ -33,7 +33,9 @@ import dev.joeherbert.availabliss.designsystem.component.RowDivider
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
 import dev.joeherbert.availabliss.designsystem.component.SurfacePanel
 import dev.joeherbert.availabliss.designsystem.component.ToggleRow
+import dev.joeherbert.availabliss.designsystem.component.chat.IncomingBubbleShape
 import dev.joeherbert.availabliss.designsystem.component.chat.OwnBubbleShape
+import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 
@@ -43,15 +45,17 @@ fun MessageInfoSheet(info: MessageInfoUi, onDismiss: () -> Unit) {
     val colors = AvailablissTheme.colors
     AvBottomSheet(title = "Message info", onDismissRequest = onDismiss) {
         if (info.text.isNotBlank()) {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = if (info.own) Alignment.CenterEnd else Alignment.CenterStart) {
                 Text(
                     info.text,
                     style = AvailablissTheme.type.body,
-                    color = colors.onSolid,
+                    color = if (info.own) colors.onSolid else colors.ink,
                     modifier = Modifier
                         .widthIn(max = 270.dp)
-                        .clip(OwnBubbleShape)
-                        .background(colors.solid)
+                        .then(
+                            if (info.own) Modifier.clip(OwnBubbleShape).background(colors.solid)
+                            else Modifier.glass(IncomingBubbleShape, shadow = false),
+                        )
                         .padding(horizontal = 12.dp, vertical = 9.dp),
                 )
             }
@@ -60,7 +64,7 @@ fun MessageInfoSheet(info: MessageInfoUi, onDismiss: () -> Unit) {
             info.sentLabel,
             style = AvailablissTheme.type.micro.copy(fontWeight = FontWeight.Normal),
             color = colors.muted,
-            modifier = Modifier.align(Alignment.End).offset(y = (-8).dp),
+            modifier = Modifier.align(if (info.own) Alignment.End else Alignment.Start).offset(y = (-8).dp),
         )
         when {
             info.loading -> LoadingIndicator()

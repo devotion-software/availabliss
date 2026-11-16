@@ -114,7 +114,7 @@ struct ChatView: View {
         case .event:
             EventEditorSheet(groupId: group.id, target: .new, api: detail.api) { _ in }
         case .info(let message):
-            MessageInfoSheet(message: message, group: group, model: model)
+            MessageInfoSheet(message: message, group: group, me: app.session.user?.id, model: model)
         }
     }
 }

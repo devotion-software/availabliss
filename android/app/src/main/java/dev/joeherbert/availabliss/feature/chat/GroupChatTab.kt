@@ -80,6 +80,8 @@ data class ChatActions(
     val onVote: (messageId: String, optionId: String) -> Unit = { _, _ -> },
     val onClosePoll: (messageId: String) -> Unit = {},
     val onOpenInfo: (messageId: String) -> Unit = {},
+    /** Set when the chat wasn't opened over its group's calendar: the header's group name opens it. */
+    val onOpenGroup: (() -> Unit)? = null,
 )
 
 /** The group's chat (full screen; back returns to the calendar tab). */
@@ -131,6 +133,7 @@ fun GroupChatTab(
             onVote = viewModel::onVote,
             onClosePoll = viewModel::onClosePoll,
             onOpenInfo = viewModel::openInfo,
+            onOpenGroup = onOpenGroup,
         )
     }
 
@@ -161,7 +164,7 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
     val listState = rememberLazyListState()
     AvailablissBackground(OrbLayout.Chat) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-            ChatHeader(state, actions.onBack, onOpenGroup)
+            ChatHeader(state, actions.onBack, actions.onOpenGroup)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     state.loading && state.items.isEmpty() -> LoadingIndicator(Modifier.align(Alignment.Center))
@@ -271,7 +274,7 @@ private fun ChatRow(item: ChatItem, actions: ChatActions) {
             author = item.author,
             showAvatar = item.showAvatar,
             authorName = item.authorName,
-            onClick = if (item.own) ({ actions.onOpenInfo(item.id) }) else null,
+            onClick = { actions.onOpenInfo(item.id) },
             accessibilityLabel = item.accessibilityLabel,
         )
         is ChatItem.ProposalCard -> ProposalCard(

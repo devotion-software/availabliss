@@ -565,7 +565,7 @@ interface MessageInfo {
 | GET 🔒 | `/groups/:id/messages?before=<messageId>&limit=50` | | `{ messages: Message[]; hasMore: boolean }` (newest last) |
 | POST 🔒 | `/groups/:id/messages` | `{ body }` or `{ poll: { question, options: string[], multi? } }` | `Message` |
 | POST 🔒 | `/groups/:id/messages/receipts` | `{ upTo: messageId, state: 'delivered' \| 'seen' }` | `204` |
-| GET 🔒 | `/messages/:id/info` | | `MessageInfo` (author only) |
+| GET 🔒 | `/messages/:id/info` | | `MessageInfo` (any member of the group) |
 | POST 🔒 | `/polls/:id/vote` | `{ optionIds: string[] }` (empty = remove vote) | `Poll` |
 | POST 🔒 | `/polls/:id/close` | | `Poll` (only the poll's author) |
 
