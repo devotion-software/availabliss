@@ -173,13 +173,31 @@ test('monthCells starts on Monday', () => {
 
 describe('agenda', () => {
 	const block = (id: string, repeat: ManualBlock['repeat']): ManualBlock => ({ id, start: '', end: '', allDay: false, repeat, until: null, note: null });
-	const blocks = [block('w', 'weekly'), block('f', 'fortnightly'), block('o', 'none')];
+	const blocks = [
+		block('w', 'weekly'),
+		block('f', 'fortnightly'),
+		block('o', 'none'),
+		block('d', 'daily'),
+		block('wd', 'weekdays'),
+		block('m', 'monthly'),
+		block('mw', 'monthlyWeekday'),
+		block('y', 'yearly'),
+		block('u', 'hourly' as ManualBlock['repeat'])
+	];
 
 	test('sourceTag', () => {
 		expect(sourceTag(interval({ blockId: 'w' }), blocks)).toBe('Weekly');
 		expect(sourceTag(interval({ blockId: 'f' }), blocks)).toBe('Every other week');
 		expect(sourceTag(interval({ blockId: 'o' }), blocks)).toBe('Your block');
 		expect(sourceTag(interval({ source: 'calendar', blockId: null }), blocks)).toBe('Calendar');
+		expect(sourceTag(interval({ blockId: 'd' }), blocks)).toBe('Daily');
+		expect(sourceTag(interval({ blockId: 'wd' }), blocks)).toBe('Weekdays');
+		expect(sourceTag(interval({ blockId: 'm' }), blocks)).toBe('Monthly');
+		expect(sourceTag(interval({ blockId: 'mw' }), blocks)).toBe('Monthly');
+		expect(sourceTag(interval({ blockId: 'y' }), blocks)).toBe('Yearly');
+		// A repeat from a newer server doesn't crash.
+		expect(sourceTag(interval({ blockId: 'u' }), blocks)).toBe('Repeats');
+		expect(sourceTag(interval({ blockId: 'gone' }), blocks)).toBe('Your block');
 	});
 
 	test('agendaItems: all day first, then by time, not-busy events left out', () => {

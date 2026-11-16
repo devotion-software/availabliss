@@ -2,15 +2,19 @@
 	import type { ManualBlock, Repeat } from '#lib/types';
 	import { createBlockSchema } from '#lib/schemas';
 	import { createBlock, updateBlock } from '#lib/client/blocks';
-	import { addDays, dayKeyIn, daysBetween, timeIn, zonedToIso } from '#lib/client/dates';
+	import { addDays, dayKeyIn, timeIn, todayIn, zonedToIso } from '#lib/client/dates';
+	import { formatDayKey } from '#lib/client/format';
 	import { toasts } from '#lib/client/toast.svelte';
 	import Sheet from '#lib/components/ui/Sheet.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';
-	import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
-	import { clock } from './parts';
+	import DateRangeInput from '#lib/components/ui/DateRangeInput.svelte';
+	import MonthCalendar from '#lib/components/ui/MonthCalendar.svelte';
+	import { clock, DAY_MINUTES } from './parts';
+	import { repeatChoices, repeatLabel } from './repeat';
 
-	/** "Block a time" (BlockTime.dc.html): a date (or a few days), all day or exact times, repeat, and a private note. */
+	/** "Block a time": the date range (all day or times, over one or several days), repeat, ends, and a private note. */
 	interface Props {
 		open: boolean;
 		timeZone: string;
@@ -27,79 +31,91 @@
 	}
 	let { open = $bindable(), timeZone, block = null, defaultDay, defaultRange = null, defaultAllDay = false, defaultLastDay = null, onsaved }: Props = $props();
 
-	type When = 'day' | 'times';
-	const WHENS: { value: When; label: string }[] = [
-		{ value: 'times', label: 'Set times' },
-		{ value: 'day', label: 'All day' }
-	];
-	const REPEATS: { value: Repeat; label: string }[] = [
-		{ value: 'none', label: 'Once' },
-		{ value: 'weekly', label: 'Weekly' },
-		{ value: 'fortnightly', label: 'Fortnightly' }
-	];
+	const uid = $props.id();
 
-	let date = $state('');
-	/** Last day of an all-day block (inclusive). */
-	let lastDay = $state('');
-	let when = $state<When>('day');
-	let from = $state('14:00');
-	let to = $state('18:00');
+	let startDate = $state('');
+	let startTime = $state('09:00');
+	/** All day: the last day (inclusive). Timed: the day the block ends. */
+	let endDate = $state('');
+	let endTime = $state('10:00');
+	let allDay = $state(false);
 	let repeat = $state<Repeat>('none');
-	let until = $state('');
+	let until = $state<string | null>(null);
 	let note = $state('');
 	let error = $state<string | null>(null);
 	let busy = $state(false);
+	let panel = $state<'repeat' | 'ends' | null>(null);
 
 	// Seed the form whenever the sheet opens.
 	$effect.pre(() => {
 		if (!open) return;
 		error = null;
+		panel = null;
 		if (!block) {
-			date = defaultDay;
-			lastDay = defaultLastDay ?? defaultDay;
-			when = defaultAllDay ? 'day' : 'times';
-			from = defaultRange ? clock(defaultRange.from) : '09:00';
-			// 24:00 is entered as 00:00, which the form reads as "runs to midnight".
-			to = defaultRange ? clock(defaultRange.to % (24 * 60)) : '10:00';
+			startDate = defaultDay;
+			allDay = defaultAllDay;
+			startTime = defaultRange ? clock(defaultRange.from) : '09:00';
+			if (allDay) {
+				endDate = defaultLastDay && defaultLastDay > defaultDay ? defaultLastDay : defaultDay;
+				endTime = '10:00';
+			} else {
+				// A range to 24:00 ends at midnight the next day.
+				const to = defaultRange?.to ?? 10 * 60;
+				endDate = to >= DAY_MINUTES ? addDays(defaultDay, 1) : defaultDay;
+				endTime = clock(to % DAY_MINUTES);
+			}
 			repeat = 'none';
-			until = '';
+			until = null;
 			note = '';
 			return;
 		}
-		date = dayKeyIn(block.start, timeZone);
+		startDate = dayKeyIn(block.start, timeZone);
+		allDay = block.allDay;
 		repeat = block.repeat;
-		until = block.until ?? '';
+		until = block.until;
 		note = block.note ?? '';
 		if (block.allDay) {
-			when = 'day';
 			const last = addDays(dayKeyIn(block.end, timeZone), -1);
-			lastDay = last > date ? last : date;
+			endDate = last > startDate ? last : startDate;
+			startTime = '09:00';
+			endTime = '10:00';
 			return;
 		}
-		when = 'times';
-		from = timeIn(block.start, timeZone);
-		to = timeIn(block.end, timeZone);
+		startTime = timeIn(block.start, timeZone);
+		endDate = dayKeyIn(block.end, timeZone);
+		endTime = timeIn(block.end, timeZone);
 	});
 
-	// Moving the first day past the last one moves the last one with it.
-	$effect.pre(() => {
-		if (date && lastDay && lastDay < date) lastDay = date;
+	const today = $derived(todayIn(timeZone));
+	// A repeat this app doesn't know yet (from a newer server) still shows, as "Repeats".
+	const choices = $derived.by(() => {
+		const list = repeatChoices(startDate || today);
+		return list.some((c) => c.value === repeat) ? list : [...list, { value: repeat, label: 'Repeats' }];
 	});
+	const repeatText = $derived(repeatLabel(repeat, startDate || today));
+	const endsText = $derived(until ? `On ${formatDayKey(until)}` : 'Never');
 
-	const days = $derived(when === 'day' && lastDay > date ? daysBetween(date, lastDay) + 1 : 1);
-	const timeLabel = $derived(when === 'times' ? `${from} – ${to}` : days > 1 ? `All day · ${days} days` : 'All day');
+	const togglePanel = (p: 'repeat' | 'ends') => (panel = panel === p ? null : p);
+	function chooseRepeat(value: Repeat) {
+		repeat = value;
+		panel = null;
+	}
+	function chooseUntil(value: string | null) {
+		until = value;
+		panel = null;
+	}
 
 	function range(): { start: string; end: string; allDay: boolean } | string {
-		if (!date) return 'Choose a date';
-		if (when === 'day') {
-			if (lastDay && lastDay < date) return 'The last day is before the first';
-			const last = lastDay || date;
-			return { start: zonedToIso(date, '00:00', timeZone), end: zonedToIso(addDays(last, 1), '00:00', timeZone), allDay: true };
+		if (!startDate || !endDate) return 'Choose a date';
+		if (allDay) {
+			if (endDate < startDate) return 'The last day is before the first';
+			return { start: zonedToIso(startDate, '00:00', timeZone), end: zonedToIso(addDays(endDate, 1), '00:00', timeZone), allDay: true };
 		}
-		if (!from || !to) return 'Choose a start and end time';
-		// An end at or before the start runs past midnight.
-		const endDay = to <= from ? addDays(date, 1) : date;
-		return { start: zonedToIso(date, from, timeZone), end: zonedToIso(endDay, to, timeZone), allDay: false };
+		if (!startTime || !endTime) return 'Choose a start and end time';
+		const start = zonedToIso(startDate, startTime, timeZone);
+		const end = zonedToIso(endDate, endTime, timeZone);
+		if (end <= start) return 'It ends before it starts';
+		return { start, end, allDay: false };
 	}
 
 	async function submit(e: SubmitEvent) {
@@ -109,7 +125,12 @@
 			error = r;
 			return;
 		}
-		const parsed = createBlockSchema.safeParse({ ...r, repeat, until: repeat === 'none' ? null : until || null, note });
+		const repeatUntil = repeat === 'none' ? null : until;
+		if (repeatUntil && repeatUntil < startDate) {
+			error = 'The repeat ends before the first date';
+			return;
+		}
+		const parsed = createBlockSchema.safeParse({ ...r, repeat, until: repeatUntil, note });
 		if (!parsed.success) {
 			error = parsed.error.issues[0]?.message ?? 'Check the details';
 			return;
@@ -131,32 +152,42 @@
 
 <Sheet bind:open title={block ? 'Edit block' : 'Block a time'}>
 	<form class="form" onsubmit={submit} novalidate>
-		<div class="pair">
-			<TextField label="Date" type="date" bind:value={date} required />
-			<div class="time-card" aria-live="polite">
-				<span class="k">Time</span>
-				<span class="v">{timeLabel}</span>
-			</div>
+		<DateRangeInput bind:startDate bind:startTime bind:endDate bind:endTime bind:allDay {today} />
+
+		<div class="glass options">
+			<button type="button" class="row" aria-expanded={panel === 'repeat'} aria-controls="repeat-{uid}" onclick={() => togglePanel('repeat')}>
+				<span class="k"><Icon name="repeat" size={18} />Repeat</span>
+				<span class="v">{repeatText}</span>
+				<Icon name="chevron-down" size={16} class={panel === 'repeat' ? 'flip' : ''} />
+			</button>
+			{#if panel === 'repeat'}
+				<div class="list" id="repeat-{uid}" role="radiogroup" aria-label="Repeat">
+					{#each choices as choice (choice.value)}
+						<button type="button" role="radio" aria-checked={repeat === choice.value} class:sel={repeat === choice.value} onclick={() => chooseRepeat(choice.value)}>
+							<span>{choice.label}</span>
+							{#if repeat === choice.value}<Icon name="check" size={18} />{/if}
+						</button>
+					{/each}
+				</div>
+			{/if}
+
+			{#if repeat !== 'none'}
+				<button type="button" class="row" aria-expanded={panel === 'ends'} aria-controls="ends-{uid}" onclick={() => togglePanel('ends')}>
+					<span class="k"><Icon name="calendar" size={18} />Ends</span>
+					<span class="v">{endsText}</span>
+					<Icon name="chevron-down" size={16} class={panel === 'ends' ? 'flip' : ''} />
+				</button>
+				{#if panel === 'ends'}
+					<div class="ends" id="ends-{uid}">
+						<button type="button" class="never" class:sel={!until} aria-pressed={!until} onclick={() => chooseUntil(null)}>
+							<span>Never</span>
+							{#if !until}<Icon name="check" size={18} />{/if}
+						</button>
+						<MonthCalendar value={until ?? ''} min={startDate} {today} label="Last date it repeats" onpick={(d) => chooseUntil(d)} />
+					</div>
+				{/if}
+			{/if}
 		</div>
-
-		<SegmentedControl options={WHENS} bind:value={when} label="All day or set times" variant="soft" size="sm" block />
-
-		{#if when === 'times'}
-			<div class="pair">
-				<TextField label="From" type="time" bind:value={from} />
-				<TextField label="To" type="time" bind:value={to} />
-			</div>
-		{:else}
-			<TextField label="Last day" type="date" bind:value={lastDay} min={date} hint="Away for a few days? Pick the last one." />
-		{/if}
-
-		<div class="repeat">
-			<span class="eyebrow" id="repeat-label">Repeat</span>
-			<SegmentedControl options={REPEATS} bind:value={repeat} label="Repeat" variant="soft" size="sm" block />
-		</div>
-		{#if repeat !== 'none'}
-			<TextField label="Until (optional)" type="date" bind:value={until} min={date} hint="Leave empty to keep repeating" />
-		{/if}
 
 		<TextField label="Note (only you see this)" bind:value={note} placeholder="e.g. Wedding" maxlength={120} />
 
@@ -171,35 +202,85 @@
 		flex-direction: column;
 		gap: 14px;
 	}
-	.pair {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 8px;
-		align-items: end;
-	}
-	.time-card {
-		min-height: 48px;
-		border-radius: 14px;
-		border: 1px solid var(--glass-border);
-		background: var(--surface);
-		padding: 6px 12px;
+	.options {
+		border-radius: 22px;
+		padding: 4px 10px;
 		display: flex;
 		flex-direction: column;
-		justify-content: center;
+	}
+	.row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-height: 52px;
+		padding: 0 6px;
+		text-align: left;
+		color: var(--ink);
+	}
+	.row + .row,
+	.list + .row {
+		border-top: 1px solid var(--line);
 	}
 	.k {
-		font-size: 11px;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 15px;
 		font-weight: 600;
+		flex: none;
+	}
+	.k :global(svg) {
 		color: var(--muted);
 	}
 	.v {
-		font-size: 15px;
+		flex: 1;
+		min-width: 0;
+		text-align: right;
+		font-size: 14px;
 		font-weight: 600;
+		line-height: 1.3;
+		color: var(--accent-ink);
+		padding: 6px 0;
+		text-wrap: balance;
 	}
-	.repeat {
+	.row > :global(svg:last-child) {
+		flex: none;
+		color: var(--muted);
+		transition: transform 0.2s ease;
+	}
+	.row > :global(svg.flip) {
+		transform: rotate(180deg);
+	}
+	.list,
+	.ends {
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
+		gap: 2px;
+		padding: 2px 0 8px;
+	}
+	.list button,
+	.never {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		min-height: 44px;
+		padding: 0 12px;
+		border-radius: 12px;
+		text-align: left;
+		font-size: 15px;
+		font-weight: 500;
+		color: var(--ink);
+	}
+	.list button:hover:not(.sel),
+	.never:hover:not(.sel) {
+		background: var(--line);
+	}
+	.list button.sel,
+	.never.sel {
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		font-weight: 600;
 	}
 	.error {
 		font-size: 13px;

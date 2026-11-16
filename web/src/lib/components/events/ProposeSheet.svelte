@@ -36,13 +36,15 @@
 	$effect.pre(() => {
 		if (!open) return;
 		const tz = fmt.current.timeZone;
-		draft = !initial
+		const next = !initial
 			? blankDraft(fmt.current.today())
 			: 'day' in initial
 				? blankDraft(initial.day)
 				: { ...draftFromRange(initial.start, initial.end, !!initial.allDay, tz, initial.title ?? ''), note: initial.note ?? '' };
 		// Prefill the title with the group's name, which is what the event is called anyway if left blank.
-		if (!draft.title) draft.title = group.name;
+		if (!next.title) next.title = group.name;
+		// Only write the draft (never read it here), so this doesn't re-run itself.
+		draft = next;
 		error = null;
 	});
 

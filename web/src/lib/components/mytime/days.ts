@@ -7,6 +7,7 @@ import type { BusyInterval, ManualBlock } from '#lib/types';
 import { addDays, endOfMonth, startOfWeek, weekdayOf } from '#lib/client/dates';
 import { dayNumber, formatDayRange, weekdayName } from '#lib/client/format';
 import { clock, DAY_MINUTES } from './parts';
+import { repeatTag } from './repeat';
 
 /** The row's strip and summary cover the waking day, 06:00 – 24:00. */
 export const STRIP_FROM = 6 * 60;
@@ -164,11 +165,10 @@ export interface AgendaItem {
 	tag: string;
 }
 
-/** "Weekly", "Every other week", "Your block" or "Calendar". */
+/** "Daily", "Weekly", "Every other week", "Monthly", …, "Your block" or "Calendar". */
 export function sourceTag(interval: BusyInterval, blocks: readonly ManualBlock[]): string {
 	if (interval.source === 'calendar') return 'Calendar';
-	const repeat = blocks.find((b) => b.id === interval.blockId)?.repeat;
-	return repeat === 'weekly' ? 'Weekly' : repeat === 'fortnightly' ? 'Every other week' : 'Your block';
+	return repeatTag(blocks.find((b) => b.id === interval.blockId)?.repeat);
 }
 
 /** A day's busy items for the agenda: all day first, then by start; events marked not busy left out. */

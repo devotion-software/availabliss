@@ -313,11 +313,11 @@
 
 {#snippet everyWeek()}
 	<section class="every-week" aria-labelledby="every-week">
-		<h2 class="eyebrow" id="every-week">Every week</h2>
+		<h2 class="eyebrow" id="every-week">Repeating</h2>
 		{#each repeating as block (block.id)}
 			<BlockRow {block} timeZone={tz} onedit={() => openEdit(block)} ondelete={() => askDelete(block)} />
 		{:else}
-			<p class="none">Nothing repeats yet. Block time and choose Weekly for things like a class or practice.</p>
+			<p class="none">Nothing repeats yet. Block time and choose a repeat for things like a class or practice.</p>
 		{/each}
 	</section>
 {/snippet}

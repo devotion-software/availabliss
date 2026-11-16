@@ -4,8 +4,8 @@
  * intervals covering whole days sit in the all-day row.
  */
 import type { BusyInterval, ManualBlock } from '#lib/types';
-import { addDays, dayKeyIn, minutesIntoDay, timeIn, weekdayOf, zonedToIso } from '#lib/client/dates';
-import { WEEKDAY_NAMES } from '#lib/client/requirements';
+import { addDays, dayKeyIn, minutesIntoDay, timeIn, zonedToIso } from '#lib/client/dates';
+import { scheduleLead } from './repeat';
 import { formatDayKey } from '#lib/client/format';
 
 export const DAY_MINUTES = 24 * 60;
@@ -137,13 +137,14 @@ export function rangeToIso(day: string, from: number, to: number, timeZone: stri
 	return { start: at(from), end: at(to) };
 }
 
-/** "Every Tuesday · 19:00 – 21:30", "Every other Sat · All day", "Sat 21 Nov · 09:00 – 12:00". */
+/**
+ * "Every Tuesday · 19:00 – 21:30", "Monthly on the 3rd Monday · All day · until Sun 20 Dec",
+ * "Sat 21 Nov · 09:00 – 12:00" (one-offs).
+ */
 export function blockSummary(block: ManualBlock, timeZone: string): string {
 	const day = dayKeyIn(block.start, timeZone);
 	const when = block.allDay ? 'All day' : `${timeIn(block.start, timeZone)} – ${timeIn(block.end, timeZone)}`;
-	const weekday = WEEKDAY_NAMES[weekdayOf(day)];
-	const until = block.until ? ` until ${formatDayKey(block.until)}` : '';
-	if (block.repeat === 'weekly') return `Every ${weekday} · ${when}${until}`;
-	if (block.repeat === 'fortnightly') return `Every other ${weekday} · ${when}${until}`;
-	return `${formatDayKey(day)} · ${when}`;
+	const lead = scheduleLead(block.repeat, day);
+	if (!lead) return `${formatDayKey(day)} · ${when}`;
+	return `${lead} · ${when}${block.until ? ` · until ${formatDayKey(block.until)}` : ''}`;
 }
