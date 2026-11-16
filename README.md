@@ -35,6 +35,7 @@ Run `make help` for every task. The useful ones:
 | `make test-integration` | Service tests against the dev database (`DATABASE_URL`); they create and delete their own users and groups |
 | `make smoke` | End-to-end API test against the running dev server |
 | `make seed-demo` / `make clean-demo` | Create / delete demo users, groups, busy time and chat to explore the apps |
+| `make apple-secret KEY=AuthKey_….p8 CLIENT_ID=<Services ID>` | Make `APPLE_CLIENT_SECRET` for Sign in with Apple (expires after 6 months; `TEAM_ID` defaults to `APPLE_TEAM_ID`) |
 | `make check` | Type-check |
 | `make db-generate` / `make db-migrate` | Create / apply a migration after schema changes |
 | `make school-holidays FILE=…csv` | Import school holiday dates per local authority |
