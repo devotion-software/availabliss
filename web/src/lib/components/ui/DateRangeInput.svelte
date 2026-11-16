@@ -166,7 +166,7 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		transition: background-color 0.15s ease;
+		transition: color 0.15s ease;
 	}
 	.chip.date {
 		font-size: 15px;
@@ -180,11 +180,7 @@
 		letter-spacing: -0.01em;
 		font-variant-numeric: tabular-nums;
 	}
-	.chip:hover:not(.open) {
-		background: var(--line);
-	}
 	.chip.open {
-		background: var(--accent-soft);
 		color: var(--accent-ink);
 	}
 	.chip:focus-visible {

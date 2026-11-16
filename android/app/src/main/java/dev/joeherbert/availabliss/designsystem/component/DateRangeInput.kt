@@ -1,7 +1,6 @@
 package dev.joeherbert.availabliss.designsystem.component
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -167,7 +166,7 @@ private fun RangeSide(
     }
 }
 
-/** A tappable date or time: accent-soft pill while its picker is open. Min 44dp tall. */
+/** A tappable date or time: accent text while its picker is open. Min 44dp tall. */
 @Composable
 private fun RangeChip(text: String, style: TextStyle, open: Boolean, description: String, onClick: () -> Unit) {
     val colors = AvailablissTheme.colors
@@ -175,7 +174,6 @@ private fun RangeChip(text: String, style: TextStyle, open: Boolean, description
         Modifier
             .defaultMinSize(minHeight = 44.dp, minWidth = 44.dp)
             .clip(Shapes.pill)
-            .background(if (open) colors.accentSoft else Color.Transparent)
             .clickable(role = Role.Button, onClickLabel = if (open) "Close picker" else "Change", onClick = onClick)
             .semantics {
                 contentDescription = description

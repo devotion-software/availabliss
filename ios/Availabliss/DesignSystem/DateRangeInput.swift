@@ -85,7 +85,6 @@ struct DateRangeInput: View {
             .foregroundStyle(isOpen ? theme.accentInk : theme.ink)
             .padding(.horizontal, 10)
             .frame(minHeight: 44)
-            .background(Capsule().fill(isOpen ? theme.accentSoft : theme.surface))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
