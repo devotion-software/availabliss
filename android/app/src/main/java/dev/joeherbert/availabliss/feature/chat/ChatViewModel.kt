@@ -76,6 +76,8 @@ data class ChatUiState(
     val groupName: String = "",
     val monogram: String = "",
     val tileColor: TileColor = TileColor.T1,
+    /** The group's photo, instead of the monogram. */
+    val groupImage: String? = null,
     val membersSummary: String = "",
     /** Newest first (the list is reverse-laid-out). */
     val items: List<ChatItem> = emptyList(),
@@ -468,6 +470,7 @@ class ChatViewModel @Inject constructor(
             groupName = g?.name.orEmpty(),
             monogram = g?.monogram.orEmpty(),
             tileColor = g?.color ?: TileColor.T1,
+            groupImage = g?.image,
             membersSummary = others.joinNamesSummary(),
             items = items,
             loading = loading,

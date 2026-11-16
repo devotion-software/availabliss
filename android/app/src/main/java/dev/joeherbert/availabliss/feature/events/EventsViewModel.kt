@@ -38,6 +38,8 @@ data class EventRowUi(
     val day: String,
     val canDelete: Boolean,
     val added: Boolean,
+    /** Cover photo. */
+    val image: String? = null,
 )
 
 data class EventsUiState(
@@ -149,6 +151,7 @@ class EventsViewModel @Inject constructor(
                     day = date?.dayOfMonth?.toString().orEmpty(),
                     canDelete = e.createdBy == meId || role?.isAdmin == true,
                     added = e.id in cal.added,
+                    image = e.image,
                 )
             }
         return EventsUiState(

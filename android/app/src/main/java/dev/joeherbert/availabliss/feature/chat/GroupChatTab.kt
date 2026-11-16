@@ -198,7 +198,7 @@ private fun ChatHeader(state: ChatUiState, onBack: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         PlainIconButton(AvIcons.Back, "Back to calendar", onBack)
-        GroupTile(state.monogram, colors.tile(state.tileColor), size = 40.dp, radius = 14.dp)
+        GroupTile(state.monogram, colors.tile(state.tileColor), image = state.groupImage, size = 40.dp, radius = 14.dp)
         Column(Modifier.weight(1f)) {
             Text(state.groupName, style = AvailablissTheme.type.bodyStrong.copy(fontWeight = AvWeights.Display650), color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (state.membersSummary.isNotEmpty()) {

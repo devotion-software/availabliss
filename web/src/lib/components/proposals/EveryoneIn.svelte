@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Group, Proposal } from '#lib/types';
 	import { useFormat } from '#lib/client/format';
+	import { getEventCached } from '#lib/client/events';
 	import Logo from '#lib/components/ui/Logo.svelte';
 	import AddToCalendar from '#lib/components/events/AddToCalendar.svelte';
 
@@ -14,6 +15,21 @@
 	const fmt = useFormat();
 	const range = $derived(fmt.current.when(proposal.start, proposal.end, proposal.allDay));
 	const count = $derived(proposal.responses.length || group.members.length);
+
+	// The confirmed event's cover photo, if someone has added one.
+	let cover = $state<string | null>(null);
+	$effect(() => {
+		const id = proposal.eventId;
+		cover = null;
+		if (!id) return;
+		let alive = true;
+		getEventCached(id)
+			.then((e) => alive && (cover = e.image))
+			.catch(() => {});
+		return () => {
+			alive = false;
+		};
+	});
 </script>
 
 <div class="confirmed">
@@ -35,6 +51,7 @@
 	</div>
 
 	<div class="card glass">
+		{#if cover}<img class="cover" src={cover} alt="" onerror={() => (cover = null)} />{/if}
 		{#if proposal.eventId}
 			<AddToCalendar
 				eventId={proposal.eventId}
@@ -118,6 +135,14 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
+	}
+	.cover {
+		display: block;
+		width: 100%;
+		aspect-ratio: 2 / 1;
+		object-fit: cover;
+		border-radius: 18px;
+		margin-bottom: 8px;
 	}
 	.back {
 		align-self: center;

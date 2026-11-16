@@ -13,6 +13,8 @@ import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ProposalStatus
 import dev.joeherbert.availabliss.core.network.model.RespondRequest
 import dev.joeherbert.availabliss.core.network.model.ResponseKind
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -64,4 +66,10 @@ class EventsRepository @Inject constructor(
         call { api.updateEvent(id, jsonPatch(block)) }
 
     suspend fun delete(id: String): ApiResult<Unit> = call { api.deleteEvent(id) }
+
+    /** Uploads the event's cover photo (JPEG, creator or admin), or removes it with null. */
+    suspend fun setImage(id: String, jpeg: ByteArray?): ApiResult<GroupEvent> = call {
+        if (jpeg == null) api.removeEventImage(id)
+        else api.setEventImage(id, jpeg.toRequestBody("image/jpeg".toMediaType()))
+    }
 }

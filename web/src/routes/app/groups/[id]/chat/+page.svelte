@@ -41,7 +41,7 @@
 <div class="chat">
 	<header class="head glass">
 		<span class="back"><IconButton href={calendarHref} icon="chevron-left" label="Back to calendar" variant="plain" /></span>
-		<GroupTile monogram={group.monogram} color={group.color} size={40} />
+		<GroupTile monogram={group.monogram} color={group.color} image={group.image} size={40} />
 		<div class="titles">
 			<h1>{group.name}</h1>
 			<span>{others.length ? listNames(others) : 'Just you so far'}</span>

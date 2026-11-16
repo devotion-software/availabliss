@@ -1,6 +1,13 @@
 package dev.joeherbert.availabliss.feature.events
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +37,7 @@ import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
+import dev.joeherbert.availabliss.designsystem.component.CoverPhoto
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
@@ -42,8 +50,10 @@ import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostSta
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
+import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.feature.common.AddToCalendarButton
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
+import dev.joeherbert.availabliss.feature.common.rememberPhotoPicker
 
 /** Adds a group event, or views / edits / deletes an existing one. */
 @Composable
@@ -53,6 +63,8 @@ fun EventEditorScreen(onBack: () -> Unit, onSaved: () -> Unit, viewModel: EventE
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
     AddToCalendarEffect(state.calendar, viewModel::onCalendarIntentHandled)
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onSaved() }
+    // Covers are shown wide, so keep more pixels than an avatar (the server fits them to 1600 px).
+    val pickCover = rememberPhotoPicker(maxSide = 1600, onUnreadable = viewModel::coverUnreadable, onPicked = viewModel::setCover)
     EventEditorContent(
         state = state,
         actions = EventEditorActions(
@@ -64,6 +76,8 @@ fun EventEditorScreen(onBack: () -> Unit, onSaved: () -> Unit, viewModel: EventE
             onSave = viewModel::save,
             onDelete = viewModel::delete,
             onAddToCalendar = viewModel::onAddToCalendar,
+            onPickCover = pickCover,
+            onRemoveCover = { viewModel.setCover(null) },
         ),
     )
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) { AvSnackbarHost(snackbar, Modifier.navigationBarsPadding()) }
@@ -78,6 +92,8 @@ data class EventEditorActions(
     val onSave: () -> Unit = {},
     val onDelete: () -> Unit = {},
     val onAddToCalendar: () -> Unit = {},
+    val onPickCover: () -> Unit = {},
+    val onRemoveCover: () -> Unit = {},
 )
 
 @Composable
@@ -136,6 +152,7 @@ private fun EventEditorContent(state: EventEditorUiState, actions: EventEditorAc
 
 @Composable
 private fun EditableFields(state: EventEditorUiState, actions: EventEditorActions) {
+    CoverField(state, actions)
     GlassPanel(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AvTextField(state.title, actions.onTitleChange, label = "What's happening?", placeholder = "e.g. Dinner at Hana's", error = state.titleError, imeAction = ImeAction.Next)
     }
@@ -149,12 +166,55 @@ private fun EditableFields(state: EventEditorUiState, actions: EventEditorAction
     }
 }
 
+/** The cover photo with Change / Remove, or a row to add one. */
+@Composable
+private fun CoverField(state: EventEditorUiState, actions: EventEditorActions) {
+    val colors = AvailablissTheme.colors
+    val cover = state.cover
+    if (cover == null) {
+        GlassPanel(
+            Modifier.fillMaxWidth(),
+            shape = Shapes.row,
+            contentPadding = PaddingValues(14.dp),
+            onClick = if (state.uploadingImage) null else actions.onPickCover,
+            onClickLabel = "Add a cover photo",
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(40.dp).clip(Shapes.inner).background(colors.accentSoft), contentAlignment = Alignment.Center) {
+                    if (state.uploadingImage) CircularProgressIndicator(Modifier.size(18.dp), color = colors.accentInk, strokeWidth = 2.dp)
+                    else Icon(AvIcons.Photo, null, tint = colors.accentInk, modifier = Modifier.size(20.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Add a cover photo", style = AvailablissTheme.type.bodySmallStrong, color = colors.ink)
+                    Text("Optional · shown on the event's cards", style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                }
+            }
+        }
+    } else {
+        GlassPanel(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Box {
+                CoverPhoto(cover, contentDescription = "Cover photo")
+                if (state.uploadingImage) {
+                    Box(Modifier.matchParentSize().clip(Shapes.inner).background(colors.bg.copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(24.dp), color = colors.accent, strokeWidth = 3.dp)
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                TextAction("Change photo", actions.onPickCover, enabled = !state.uploadingImage)
+                TextAction("Remove", actions.onRemoveCover, color = colors.warnInk, enabled = !state.uploadingImage)
+            }
+        }
+    }
+}
+
 /** For members who didn't create the event: the details, without editing controls. */
 @Composable
 private fun ReadOnlyDetails(state: EventEditorUiState) {
     val colors = AvailablissTheme.colors
     val muted = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal)
     GlassPanel(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        state.image?.let { CoverPhoto(it, Modifier.padding(bottom = 6.dp), contentDescription = "Cover photo") }
         Text(state.title, style = AvailablissTheme.type.headlineSmall, color = colors.ink)
         Text(
             DateTimes.rangeLabel(state.range.startIso(), state.range.endIso(), state.range.allDay),

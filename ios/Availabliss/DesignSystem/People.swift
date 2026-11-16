@@ -76,22 +76,61 @@ struct AvatarStack: View {
     }
 }
 
-/// Group monogram on a `t1`–`t5` tile.
+/// Group monogram on a `t1`–`t5` tile, or the group's photo when it has one
+/// (the monogram shows while it loads, or if it fails).
 struct GroupTile: View {
     let monogram: String
     let colorToken: String
+    var imageURL: String?
     var size: CGFloat = 48
     var cornerRadius: CGFloat = 16
     @Environment(\.theme) private var theme
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         Text(monogram)
             .displayFont(size * 0.35, .bold, relativeTo: .headline)
             .foregroundStyle(theme.ink)
             .lineLimit(1)
             .minimumScaleFactor(0.6)
             .frame(width: size, height: size)
-            .background(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).fill(theme.tile(colorToken)))
+            .background(shape.fill(theme.tile(colorToken)))
+            .overlay {
+                if let imageURL, let url = URL(string: imageURL) {
+                    AsyncImage(url: url) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Color.clear
+                    }
+                    .frame(width: size, height: size)
+                    .clipShape(shape)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+/// An event's cover photo, cropped to fill a wide strip (a plain strip while it loads, or if it fails).
+struct EventCover: View {
+    let imageURL: String
+    var height: CGFloat = 140
+    var cornerRadius: CGFloat = 14
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        theme.line
+            .frame(height: height)
+            .frame(maxWidth: .infinity)
+            .overlay {
+                AsyncImage(url: URL(string: imageURL)) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFill()
+                    } else if case .empty = phase {
+                        ProgressView().tint(theme.muted)
+                    }
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .accessibilityHidden(true)
     }
 }

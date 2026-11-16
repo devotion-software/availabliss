@@ -75,6 +75,7 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import dev.joeherbert.availabliss.feature.calendars.IconTile
+import dev.joeherbert.availabliss.feature.common.rememberPhotoPicker
 import dev.joeherbert.availabliss.feature.plan.UpgradeSheet
 import dev.joeherbert.availabliss.feature.common.UsernameField
 
@@ -100,16 +101,7 @@ fun YouScreen(
         viewModel.refreshAccounts()
     }
     var upgrading by rememberSaveable { mutableStateOf(false) }
-    // Android's photo picker: no storage permission needed.
-    val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val jpeg = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { photoAsJpeg(context, uri) }
-            if (jpeg == null) viewModel.photoUnreadable() else viewModel.setPhoto(jpeg)
-        }
-    }
+    val pickPhoto = rememberPhotoPicker(onUnreadable = viewModel::photoUnreadable, onPicked = viewModel::setPhoto)
     if (upgrading) UpgradeSheet(onDismiss = { upgrading = false }, onUpgraded = viewModel::upgraded)
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
 
@@ -117,9 +109,7 @@ fun YouScreen(
         YouContent(
             state = state,
             onEditName = viewModel::startEditingName,
-            onPickPhoto = {
-                pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
-            },
+            onPickPhoto = pickPhoto,
             onRemovePhoto = { viewModel.setPhoto(null) },
             onOpenCalendars = onOpenCalendars,
             onOpenAppearance = onOpenAppearance,
@@ -414,34 +404,3 @@ private fun YouPreview() {
         }
     }
 }
-
-/** A picked photo as a JPEG at most 1024 px on its longest side (the server shrinks it further). */
-private fun photoAsJpeg(context: android.content.Context, uri: android.net.Uri): ByteArray? = runCatching {
-    val bitmap = if (android.os.Build.VERSION.SDK_INT >= 28) {
-        val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
-        android.graphics.ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-            val longest = maxOf(info.size.width, info.size.height)
-            if (longest > 1024) {
-                val scale = 1024f / longest
-                decoder.setTargetSize((info.size.width * scale).toInt(), (info.size.height * scale).toInt())
-            }
-            decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
-        }
-    } else {
-        // Android 8: decode at a power-of-two sample size, then scale down.
-        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1024) sample *= 2
-        val decoded = context.contentResolver.openInputStream(uri)?.use {
-            android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
-        } ?: return@runCatching null
-        val longest = maxOf(decoded.width, decoded.height)
-        if (longest <= 1024) decoded
-        else android.graphics.Bitmap.createScaledBitmap(decoded, decoded.width * 1024 / longest, decoded.height * 1024 / longest, true)
-    }
-    java.io.ByteArrayOutputStream().use { out ->
-        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
-        out.toByteArray()
-    }
-}.getOrNull()

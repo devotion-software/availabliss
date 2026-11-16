@@ -2,13 +2,14 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createEventSchema } from '#lib/schemas';
-	import { createEvent } from '#lib/client/events';
+	import { createEvent, setEventImage } from '#lib/client/events';
 	import { blankDraft, draftTimes, optional, type EventDraft } from '#lib/client/event-form';
 	import { useFormat } from '#lib/client/format';
 	import { toasts } from '#lib/client/toast.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import EventFields from '#lib/components/events/EventFields.svelte';
+	import CoverField from '#lib/components/events/CoverField.svelte';
 
 	let { data } = $props();
 
@@ -19,6 +20,7 @@
 	let draft = $state<EventDraft>(blankDraft(queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate) ? queryDate : fmt.current.today()));
 	let error = $state<string | null>(null);
 	let busy = $state(false);
+	let cover = $state<File | null>(null);
 
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
@@ -36,7 +38,15 @@
 		error = null;
 		busy = true;
 		try {
-			await createEvent(data.group.id, { ...body, title: draft.title.trim() });
+			const event = await createEvent(data.group.id, { ...body, title: draft.title.trim() });
+			// The event stands without its cover, so a failed upload doesn't undo it.
+			if (cover) {
+				try {
+					await setEventImage(event.id, cover);
+				} catch (err) {
+					toasts.error(err);
+				}
+			}
 			toasts.success('Event added for everyone');
 			await goto(back);
 		} catch (err) {
@@ -59,6 +69,7 @@
 />
 	<form class="glass panel" onsubmit={submit} novalidate>
 		<p class="lead">Already decided? Add it straight to the group calendar. No vote needed.</p>
+		<CoverField bind:file={cover} disabled={busy} />
 		<EventFields bind:draft titleRequired titlePlaceholder="e.g. Book club at Hana's" {error} />
 		<div class="actions">
 			<Button href={back} variant="secondary">Cancel</Button>

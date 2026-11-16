@@ -43,6 +43,8 @@ object AvIcons {
     val Link = line("Link", "M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1", "M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1")
     val Repeat = line("Repeat", "M17 2l4 4-4 4", "M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4", "M21 13v2a3 3 0 0 1-3 3H3", stroke = 2.2f)
     val Shield = line("Shield", "M12 3l8 3v6c0 4.5-3.3 8.3-8 9-4.7-.7-8-4.5-8-9V6l8-3z")
+    /** A photo: a frame with a sun and hills (group photos, event covers). */
+    val Photo = line("Photo", rect(3f, 4f, 18f, 16f, 3f), circle(8.5f, 9.5f, 1.5f), "M21 16l-5-5-9 9")
     val Location = line("Location", "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z", circle(12f, 9.5f, 2.5f))
     val Poll = line("Poll", "M5 20V10M12 20V4M19 20v-7", stroke = 2.2f)
     val ArrowRight = line("ArrowRight", "M5 12h14M13 6l6 6-6 6", stroke = 2.2f)

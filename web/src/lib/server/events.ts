@@ -10,6 +10,7 @@ import { publishToGroup } from './realtime';
 import { notify } from './notifications';
 import { postMessage } from './chat';
 import { dayLabel } from './availability/labels';
+import { deleteStored, IMAGE_SIZES, processImage, putImage } from './media';
 
 type EventRow = typeof events.$inferSelect;
 
@@ -23,6 +24,7 @@ export const toGroupEvent = (row: EventRow): GroupEvent => ({
 	start: row.start.toISOString(),
 	end: row.end.toISOString(),
 	allDay: row.allDay,
+	image: row.image ?? null,
 	createdBy: row.createdBy,
 	createdAt: row.createdAt.toISOString()
 });
@@ -121,7 +123,19 @@ export async function updateEvent(eventId: string, userId: string, patch: Partia
 export async function deleteEvent(eventId: string, userId: string): Promise<void> {
 	const row = await requireEditable(eventId, userId);
 	await db.delete(events).where(eq(events.id, eventId));
+	await deleteStored(row.image);
 	await publishToGroup(row.groupId, 'event.changed', { id: eventId, deleted: true });
+}
+
+/** Sets (or with null, removes) the event's cover photo: the creator or an admin, like other edits. */
+export async function setEventImage(eventId: string, userId: string, image: ArrayBuffer | null): Promise<GroupEvent> {
+	const row = await requireEditable(eventId, userId);
+	const url = image ? await putImage('cover', row.groupId, await processImage(image, IMAGE_SIZES.cover)) : null;
+	await db.update(events).set({ image: url }).where(eq(events.id, eventId));
+	await deleteStored(row.image);
+	const event = toGroupEvent({ ...row, image: url });
+	await publishToGroup(row.groupId, 'event.changed', event);
+	return event;
 }
 
 /** Upcoming events across every group the user belongs to (next 60 days). */

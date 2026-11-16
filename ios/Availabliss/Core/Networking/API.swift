@@ -96,6 +96,13 @@ enum API {
         static func get(id: String) -> Endpoint<Group> { .init(.get, "/groups/\(id.pathEncoded)") }
         static func update(id: String, _ body: UpdateGroupBody) -> Endpoint<Group> { .init(.patch, "/groups/\(id.pathEncoded)", body: body) }
         static func delete(id: String) -> Endpoint<EmptyResponse> { .init(.delete, "/groups/\(id.pathEncoded)") }
+        /// Sets the group's photo (admins; JPEG bytes, shrunk to fit 512 px).
+        static func setImage(id: String, jpeg: Data) -> Endpoint<Group> {
+            var endpoint = Endpoint<Group>(.put, "/groups/\(id.pathEncoded)/image", timeout: 60)
+            endpoint.rawBody = (jpeg, "image/jpeg")
+            return endpoint
+        }
+        static func removeImage(id: String) -> Endpoint<Group> { .init(.delete, "/groups/\(id.pathEncoded)/image") }
         static func setRole(groupId: String, userId: String, role: Role) -> Endpoint<Member> {
             .init(.patch, "/groups/\(groupId.pathEncoded)/members/\(userId.pathEncoded)", body: RoleBody(role: role))
         }
@@ -184,6 +191,13 @@ enum API {
         static func get(id: String) -> Endpoint<GroupEvent> { .init(.get, "/events/\(id.pathEncoded)") }
         static func update(id: String, _ body: EventBody) -> Endpoint<GroupEvent> { .init(.patch, "/events/\(id.pathEncoded)", body: body) }
         static func delete(id: String) -> Endpoint<EmptyResponse> { .init(.delete, "/events/\(id.pathEncoded)") }
+        /// Sets the cover photo (creator or admin; JPEG bytes, shrunk to fit 1600 px).
+        static func setImage(id: String, jpeg: Data) -> Endpoint<GroupEvent> {
+            var endpoint = Endpoint<GroupEvent>(.put, "/events/\(id.pathEncoded)/image", timeout: 60)
+            endpoint.rawBody = (jpeg, "image/jpeg")
+            return endpoint
+        }
+        static func removeImage(id: String) -> Endpoint<GroupEvent> { .init(.delete, "/events/\(id.pathEncoded)/image") }
     }
 
     // MARK: Chat

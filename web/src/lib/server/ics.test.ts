@@ -12,6 +12,7 @@ const event = (over: Partial<GroupEvent> = {}): GroupEvent => ({
 	start: '2026-11-13T18:00:00.000Z',
 	end: '2026-11-13T21:30:00.000Z',
 	allDay: false,
+	image: null,
 	createdBy: 'u1',
 	createdAt: '2026-11-01T00:00:00.000Z',
 	...over

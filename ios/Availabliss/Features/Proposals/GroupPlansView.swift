@@ -250,6 +250,7 @@ struct EventRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let image = event.image { EventCover(imageURL: image) }
             HStack(spacing: 12) {
                 DateBlock(date: event.start)
                 VStack(alignment: .leading, spacing: 2) {

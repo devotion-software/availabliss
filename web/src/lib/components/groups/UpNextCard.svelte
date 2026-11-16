@@ -10,9 +10,13 @@
 	}
 	let { event }: Props = $props();
 	const fmt = useFormat();
+	// Remembers which URL failed, so a new cover gets a fresh try.
+	let failed = $state<string | null>(null);
+	const cover = $derived(event.image && event.image !== failed ? event.image : null);
 </script>
 
-<section class="next glass" aria-label="Up next">
+<section class="next glass" class:has-cover={cover} aria-label="Up next">
+	{#if cover}<img class="cover" src={cover} alt="" onerror={() => (failed = cover)} />{/if}
 	<div class="top">
 		<StatusPill tone="mint" icon="check" size="md">Everyone's in</StatusPill>
 		<a class="group" href="/app/groups/{event.groupId}">{event.groupName}</a>
@@ -31,6 +35,19 @@
 		display: flex;
 		flex-direction: column;
 		gap: 14px;
+	}
+	/* The cover sits 6px in from the card's edge, its corners following the card's. */
+	.has-cover {
+		padding-top: 6px;
+	}
+	.cover {
+		display: block;
+		width: calc(100% + 24px);
+		margin: 0 -12px;
+		aspect-ratio: 2 / 1;
+		max-height: 240px;
+		object-fit: cover;
+		border-radius: 22px;
 	}
 	.top {
 		display: flex;

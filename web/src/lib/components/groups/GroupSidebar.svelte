@@ -27,7 +27,7 @@
 	<span class="heading">Your groups</span>
 	{#each groups as g (g.id)}
 		<a href="/app/groups/{g.id}" class="group" class:open={g.id === currentId} aria-current={g.id === currentId && route === '/app/groups/[id]' ? 'page' : undefined}>
-			<GroupTile monogram={g.monogram} color={g.color} size={40} />
+			<GroupTile monogram={g.monogram} color={g.color} image={g.image} size={40} />
 			<span class="text">
 				<span class="name">{g.name}</span>
 				<span class="sub">{groupStatusText(g)}</span>

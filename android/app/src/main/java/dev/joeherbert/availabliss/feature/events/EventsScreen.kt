@@ -29,6 +29,7 @@ import androidx.compose.material3.AlertDialog
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
+import dev.joeherbert.availabliss.designsystem.component.CoverPhoto
 import dev.joeherbert.availabliss.designsystem.component.EmptyState
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
@@ -156,6 +157,7 @@ fun DeleteEventDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Uni
 private fun EventRow(row: EventRowUi, past: Boolean, onOpen: () -> Unit, onAddToCalendar: () -> Unit, onDelete: () -> Unit) {
     val colors = AvailablissTheme.colors
     GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.row, contentPadding = PaddingValues(12.dp), onClick = onOpen, onClickLabel = "Open ${row.title}") {
+        row.image?.let { CoverPhoto(it, aspectRatio = 2.4f) }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             DateTile(row.month, row.day, muted = past)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

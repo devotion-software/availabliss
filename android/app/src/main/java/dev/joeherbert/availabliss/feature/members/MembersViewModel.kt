@@ -12,6 +12,7 @@ import dev.joeherbert.availabliss.core.live.LivePayload
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.Role
+import dev.joeherbert.availabliss.core.network.model.TileColor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,6 +62,11 @@ data class InviteUi(
 
 data class MembersUiState(
     val groupName: String = "",
+    val monogram: String = "",
+    val tileColor: TileColor = TileColor.T1,
+    /** The group's photo, instead of the monogram. */
+    val groupImage: String? = null,
+    val uploadingPhoto: Boolean = false,
     val members: List<MemberUi> = emptyList(),
     val myRole: Role? = null,
     val loading: Boolean = true,
@@ -257,6 +263,29 @@ class MembersViewModel @Inject constructor(
     }
     // endregion
 
+    /** Uploads a picked group photo (already a JPEG), or removes it with null. Admins only. */
+    fun setPhoto(jpeg: ByteArray?) {
+        if (!_state.value.isAdmin || _state.value.uploadingPhoto) return
+        viewModelScope.launch {
+            _state.update { it.copy(uploadingPhoto = true) }
+            // Success caches the group in GroupsRepository, which flows back here through groups.group().
+            val result = groups.setImage(groupId, jpeg)
+            _state.update {
+                it.copy(
+                    uploadingPhoto = false,
+                    message = UserMessage(
+                        when (result) {
+                            is ApiResult.Success -> if (jpeg == null) "Group photo removed" else "Group photo updated"
+                            is ApiResult.Failure -> result.error.message
+                        },
+                    ),
+                )
+            }
+        }
+    }
+
+    fun photoUnreadable() = showMessage("Couldn't read that photo.")
+
     fun messageShown(message: UserMessage) = _state.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 
     private fun showMessage(text: String) = _state.update { it.copy(message = UserMessage(text)) }
@@ -280,6 +309,14 @@ class MembersViewModel @Inject constructor(
                     canRemove = manageable,
                 )
             }
-        return copy(groupName = group.name, members = members, myRole = myRole, loading = false)
+        return copy(
+            groupName = group.name,
+            monogram = group.monogram,
+            tileColor = group.color,
+            groupImage = group.image,
+            members = members,
+            myRole = myRole,
+            loading = false,
+        )
     }
 }

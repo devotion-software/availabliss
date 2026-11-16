@@ -149,6 +149,7 @@ interface GroupSummary {
   name: string;
   color: string;            // tile colour token: 't1' … 't5'
   monogram: string;         // 1–3 chars
+  image: string | null;     // the group's photo, shown instead of the monogram tile
   role: Role;
   memberCount: number;
   syncedCount: number;
@@ -409,6 +410,8 @@ interface ManualBlock {
 | POST 🔒 | `/groups` | `{ name, color?, requirement? }` | `Group` (creator is owner; `402 upgrade_required` past the free limit) |
 | GET 🔒 | `/groups/:id` | | `Group` |
 | PATCH 👑 | `/groups/:id` | `{ name?, color?, requirement? }` | `Group` |
+| PUT 👑 | `/groups/:id/image` | the image bytes (as `/me/avatar`) | `Group` (`image` shrunk to fit 512 px; publishes `group.updated`) |
+| DELETE 👑 | `/groups/:id/image` | | `Group` (no photo: the monogram tile) |
 | DELETE ⭐ | `/groups/:id` | | `204` |
 | PATCH 👑 | `/groups/:id/members/:userId` | `{ role: 'admin' \| 'member' }` | `Member` |
 | DELETE 👑/self | `/groups/:id/members/:userId` | | `204` (self = leave) |
@@ -514,6 +517,7 @@ interface GroupEvent {
   id: string; groupId: string; proposalId: string | null;
   title: string; location: string | null; note: string | null;
   start: string; end: string; allDay: boolean;   // all-day: end is the exclusive midnight after the last day
+  image: string | null;                          // cover photo
   createdBy: string; createdAt: string;
 }
 ```
@@ -525,6 +529,8 @@ interface GroupEvent {
 | POST 🔒 | `/groups/:id/events` | `{ title, start, end, allDay?, location?, note? }` | `GroupEvent` |
 | PATCH 🔒 | `/events/:id` | partial of the above | `GroupEvent` (creator or admin) |
 | DELETE 🔒 | `/events/:id` | | `204` (creator or admin) |
+| PUT 🔒 | `/events/:id/image` | the image bytes (as `/me/avatar`) | `GroupEvent` (`image` shrunk to fit 1600 px; creator or admin; publishes `event.changed`) |
+| DELETE 🔒 | `/events/:id/image` | | `GroupEvent` (no cover) |
 | GET 🔒 | `/events/:id/ics` | | `text/calendar` file (web "Add to calendar"; native uses EventKit / CalendarContract directly) |
 | GET 🔒 | `/me/upcoming` | | `{ events: (GroupEvent & { groupName: string })[] }` (next 60 days, all groups) |
 

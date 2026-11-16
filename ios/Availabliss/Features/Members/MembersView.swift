@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// Members & invites: share an invite link, manage roles, leave or delete the group.
+/// Members & invites: the group's photo (admins), share an invite link, manage roles, leave or delete the group.
 struct MembersView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var model: MembersViewModel
     @State private var confirmation: Confirmation?
+    @State private var showsPhotoPicker = false
 
     private enum Confirmation: Identifiable {
         case remove(Member), leave, delete
@@ -28,7 +29,10 @@ struct MembersView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 ScreenHeader(title: "Members", subtitle: model.group?.name, onBack: { app.router.pop() })
-                if model.isAdmin { inviteCard }
+                if model.isAdmin, let group = model.group {
+                    photoCard(group)
+                    inviteCard
+                }
                 if !model.sortedMembers.isEmpty {
                     GlassList(data: model.sortedMembers, id: \.userId, header: Formatting.plural(model.sortedMembers.count, "member"), rowMinHeight: 58) { member in
                         MemberRow(member: member, isMe: member.userId == me, canManage: canManage(member)) { action in
@@ -82,6 +86,60 @@ struct MembersView: View {
     private func canManage(_ member: Member) -> Bool {
         guard member.userId != me, member.role != .owner, let role = model.group?.role else { return false }
         return role == .owner || (role == .admin && member.role == .member)
+    }
+
+    /// The group's photo, shown instead of its monogram tile (admins only).
+    private func photoCard(_ group: Group) -> some View {
+        HStack(spacing: 14) {
+            Menu {
+                Button { showsPhotoPicker = true } label: {
+                    Label(group.image == nil ? "Add photo" : "Change photo", systemImage: "photo")
+                }
+                if group.image != nil {
+                    Button(role: .destructive) { setPhoto(nil) } label: { Label("Remove photo", systemImage: "trash") }
+                }
+            } label: {
+                GroupTile(monogram: group.monogram, colorToken: group.color, imageURL: group.image, size: 56, cornerRadius: 18)
+                    .overlay(alignment: .bottomTrailing) {
+                        ZStack {
+                            Circle().fill(theme.solid).frame(width: 22, height: 22)
+                            if model.isUploadingPhoto {
+                                ProgressView().controlSize(.mini).tint(theme.onSolid)
+                            } else {
+                                Image(systemName: "camera.fill").font(.system(size: 10, weight: .bold)).foregroundStyle(theme.onSolid)
+                            }
+                        }
+                        .overlay(Circle().stroke(theme.bg, lineWidth: 2))
+                        .offset(x: 4, y: 4)
+                    }
+            }
+            .disabled(model.isUploadingPhoto)
+            .accessibilityLabel("Group photo")
+            .jpegPhotoPicker(isPresented: $showsPhotoPicker) { jpeg in
+                guard let jpeg else {
+                    model.error = "Couldn\u{2019}t read that photo."
+                    return
+                }
+                setPhoto(jpeg)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Group photo").bodyFont(15, .semibold)
+                Text(group.image == nil ? "Shown instead of the \u{201C}\(group.monogram)\u{201D} tile." : "Everyone in the group sees it.")
+                    .bodyFont(13, relativeTo: .subheadline)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(16)
+        .glass(cornerRadius: 24)
+    }
+
+    private func setPhoto(_ jpeg: Data?) {
+        Task {
+            // Also update the calendar's copy underneath, so it doesn't wait for the live event.
+            if let updated = await model.setPhoto(jpeg) { app.groupDetails.existingModel(for: updated.id)?.update(updated) }
+        }
     }
 
     /// Two ways in: a link anyone can use, or invites for particular people (by email or username)

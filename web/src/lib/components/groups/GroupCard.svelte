@@ -21,7 +21,7 @@
 <div class="card glass">
 	<!-- The whole card opens the group (stretched link); the chat strip sits above it. -->
 	<a class="open" href="/app/groups/{group.id}" aria-label="Open {group.name}"></a>
-	<GroupTile monogram={group.monogram} color={group.color} size={48} />
+	<GroupTile monogram={group.monogram} color={group.color} image={group.image} size={48} />
 	<span class="body">
 		<span class="row">
 			<span class="name">{group.name}</span>

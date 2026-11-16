@@ -77,6 +77,8 @@ data class GroupEvent(
     val start: String,
     val end: String,
     val allDay: Boolean = false,
+    /** Cover photo. Absent on older servers. */
+    val image: String? = null,
     val createdBy: String,
     val createdAt: String,
     /** Only present on `GET /me/upcoming`. */

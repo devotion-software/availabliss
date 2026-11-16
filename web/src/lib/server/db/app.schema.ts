@@ -175,6 +175,8 @@ export const groups = mysqlTable('groups', {
 	id: id(),
 	name: varchar('name', { length: 80 }).notNull(),
 	color: varchar('color', { length: 8 }).default('t1').notNull(),
+	/** The group's photo (our storage URL); null shows the coloured monogram tile. */
+	image: varchar('image', { length: 512 }),
 	requirement: json('requirement').$type<Requirement>().notNull(),
 	createdBy: varchar('created_by', { length: 36 }).references(() => user.id, { onDelete: 'set null' }),
 	lastNudgedAt: instant('last_nudged_at'),
@@ -289,6 +291,8 @@ export const events = mysqlTable(
 		start: instant('start').notNull(),
 		end: instant('end').notNull(),
 		allDay: boolean('all_day').default(false).notNull(),
+		/** A cover photo (our storage URL). */
+		image: varchar('image', { length: 512 }),
 		createdAt: createdAt(),
 		updatedAt: updatedAt()
 	},

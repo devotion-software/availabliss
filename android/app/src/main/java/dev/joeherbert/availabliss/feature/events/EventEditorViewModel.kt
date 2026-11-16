@@ -35,6 +35,11 @@ data class EventEditorUiState(
     val location: String = "",
     val note: String = "",
     val range: TimeRangeDraft = TimeRangeDraft.default(),
+    /** The saved cover photo's URL. */
+    val image: String? = null,
+    /** A new event's picked cover (JPEG), uploaded once the event is created. */
+    val pendingImage: ByteArray? = null,
+    val uploadingImage: Boolean = false,
     val titleError: String? = null,
     val saving: Boolean = false,
     val saved: Boolean = false,
@@ -45,6 +50,8 @@ data class EventEditorUiState(
     val isExisting: Boolean get() = eventId != null
     val canSave: Boolean get() = canEdit && title.isNotBlank() && range.isValid && !saving
     val addedToCalendar: Boolean get() = eventId != null && eventId in calendar.added
+    /** What the cover shows: the picked bytes before they're uploaded, else the saved URL. */
+    val cover: Any? get() = pendingImage ?: image
 }
 
 @HiltViewModel
@@ -92,6 +99,7 @@ class EventEditorViewModel @Inject constructor(
                         location = e.location.orEmpty(),
                         note = e.note.orEmpty(),
                         range = TimeRangeDraft.fromIso(e.start, e.end, e.allDay) ?: it.range,
+                        image = e.image,
                     )
                 }
             }
@@ -141,7 +149,21 @@ class EventEditorViewModel @Inject constructor(
             when (result) {
                 is ApiResult.Success -> {
                     event = result.value
-                    _state.update { it.copy(saving = false, saved = true) }
+                    val pending = _state.value.pendingImage
+                    val cover = if (s.eventId == null && pending != null) events.setImage(result.value.id, pending) else null
+                    if (cover is ApiResult.Failure) {
+                        // The event exists now: stay on it as an existing event so the cover can be retried.
+                        _state.update {
+                            it.copy(
+                                eventId = result.value.id,
+                                saving = false,
+                                pendingImage = null,
+                                message = UserMessage("Event added, but the cover photo didn't upload: ${cover.error.message}"),
+                            )
+                        }
+                    } else {
+                        _state.update { it.copy(saving = false, saved = true) }
+                    }
                 }
                 is ApiResult.Failure -> _state.update {
                     it.copy(
@@ -153,6 +175,38 @@ class EventEditorViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Sets the cover from a picked photo (JPEG), or removes it with null. An existing event's
+     * cover uploads straight away; a new event's waits until [save] creates it.
+     */
+    fun setCover(jpeg: ByteArray?) {
+        val s = _state.value
+        if (!s.canEdit || s.uploadingImage) return
+        val id = s.eventId
+        if (id == null) {
+            _state.update { it.copy(pendingImage = jpeg) }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(uploadingImage = true) }
+            when (val result = events.setImage(id, jpeg)) {
+                is ApiResult.Success -> {
+                    event = result.value
+                    _state.update {
+                        it.copy(
+                            uploadingImage = false,
+                            image = result.value.image,
+                            message = UserMessage(if (jpeg == null) "Cover photo removed" else "Cover photo updated"),
+                        )
+                    }
+                }
+                is ApiResult.Failure -> _state.update { it.copy(uploadingImage = false, message = UserMessage(result.error.message)) }
+            }
+        }
+    }
+
+    fun coverUnreadable() = _state.update { it.copy(message = UserMessage("Couldn't read that photo.")) }
 
     fun delete() {
         val id = _state.value.eventId ?: return

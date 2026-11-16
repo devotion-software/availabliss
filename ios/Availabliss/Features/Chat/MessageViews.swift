@@ -255,6 +255,7 @@ private struct EventMessageCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if let image = event.image { EventCover(imageURL: image, height: 120, cornerRadius: 12) }
             HStack(spacing: 12) {
                 DateBlock(date: event.start)
                 VStack(alignment: .leading, spacing: 2) {

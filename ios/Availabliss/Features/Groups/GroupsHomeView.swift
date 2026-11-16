@@ -135,6 +135,7 @@ private struct UpNextCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if let image = event.image { EventCover(imageURL: image, height: 150, cornerRadius: 16) }
             HStack {
                 StatusPill(text: "Everyone's in", tone: .mint, systemImage: "checkmark", fontSize: 12)
                 Spacer()
@@ -172,7 +173,7 @@ struct GroupRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            GroupTile(monogram: group.monogram, colorToken: group.color)
+            GroupTile(monogram: group.monogram, colorToken: group.color, imageURL: group.image)
                 .overlay(alignment: .topTrailing) {
                     if group.unreadCount > 0 {
                         Circle().fill(theme.warn).frame(width: 10, height: 10)

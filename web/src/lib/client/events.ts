@@ -17,6 +17,10 @@ export const listEvents = (groupId: string, from: string, to: string, fetch?: Fe
 export const createEvent = (groupId: string, body: EventInput) => api.post<GroupEvent>(`/groups/${groupId}/events`, body);
 export const updateEvent = (id: string, patch: Partial<EventInput>) => api.patch<GroupEvent>(`/events/${id}`, patch);
 export const deleteEvent = (id: string) => api.del(`/events/${id}`);
+/** Sets the event's cover photo (creator or admin; the server shrinks it to fit 1600 px). */
+export const setEventImage = (id: string, file: Blob) => api.put<GroupEvent>(`/events/${id}/image`, file);
+/** Removes the event's cover photo. */
+export const removeEventImage = (id: string) => api.del<GroupEvent>(`/events/${id}/image`);
 export const listUpcoming = (fetch?: Fetch) =>
 	api.get<{ events: UpcomingEvent[] }>('/me/upcoming', { fetch }).then((r) => r.events);
 
@@ -37,4 +41,8 @@ export function getEventCached(id: string): Promise<GroupEvent> {
 		eventCache.set(id, p);
 	}
 	return p;
+}
+/** Keeps `getEventCached` current after a change (a new cover, a live `event.changed`). */
+export function cacheEvent(event: GroupEvent): void {
+	eventCache.set(event.id, Promise.resolve(event));
 }

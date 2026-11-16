@@ -111,6 +111,8 @@ export interface GroupSummary {
 	name: string;
 	color: TileColor;
 	monogram: string;
+	/** The group's photo, shown instead of the monogram tile; null for none. */
+	image: string | null;
 	role: Role;
 	memberCount: number;
 	syncedCount: number;
@@ -258,6 +260,8 @@ export interface GroupEvent {
 	start: string;
 	end: string;
 	allDay: boolean;
+	/** A cover photo; null for none. */
+	image: string | null;
 	createdBy: string;
 	createdAt: string;
 }

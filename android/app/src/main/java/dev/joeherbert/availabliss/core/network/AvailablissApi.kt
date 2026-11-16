@@ -202,6 +202,13 @@ interface AvailablissApi {
     @DELETE("api/v1/groups/{id}")
     suspend fun deleteGroup(@Path("id") id: String)
 
+    /** The group's photo (admins): the JPEG bytes as the body, as for [setAvatar]. */
+    @PUT("api/v1/groups/{id}/image")
+    suspend fun setGroupImage(@Path("id") id: String, @Body jpeg: okhttp3.RequestBody): Group
+
+    @DELETE("api/v1/groups/{id}/image")
+    suspend fun removeGroupImage(@Path("id") id: String): Group
+
     @PATCH("api/v1/groups/{id}/members/{userId}")
     suspend fun setMemberRole(
         @Path("id") groupId: String,
@@ -337,6 +344,13 @@ interface AvailablissApi {
 
     @DELETE("api/v1/events/{id}")
     suspend fun deleteEvent(@Path("id") id: String)
+
+    /** Cover photo (creator or admin): the JPEG bytes as the body, as for [setAvatar]. */
+    @PUT("api/v1/events/{id}/image")
+    suspend fun setEventImage(@Path("id") id: String, @Body jpeg: okhttp3.RequestBody): GroupEvent
+
+    @DELETE("api/v1/events/{id}/image")
+    suspend fun removeEventImage(@Path("id") id: String): GroupEvent
     // endregion
 
     // region Chat

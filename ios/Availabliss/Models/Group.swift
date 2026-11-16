@@ -80,6 +80,8 @@ struct GroupSummary: Codable, Sendable, Identifiable, Equatable {
     var name: String
     var color: String
     var monogram: String
+    /// The group's photo, drawn instead of the monogram tile; nil on older servers too.
+    var image: String?
     var role: Role
     var memberCount: Int
     var syncedCount: Int
@@ -94,6 +96,7 @@ struct Group: Codable, Sendable, Identifiable, Equatable {
     var name: String
     var color: String
     var monogram: String
+    var image: String?
     var role: Role
     var memberCount: Int
     var syncedCount: Int

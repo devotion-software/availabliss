@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.joeherbert.availabliss.designsystem.component.CoverPhoto
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
@@ -45,6 +46,8 @@ data class ProposalCardUi(
     val tone: ProposalCardTone = ProposalCardTone.Open,
     /** Appended to [status] in warn ink: "Priya busy then". */
     val clash: String? = null,
+    /** An event's cover photo, shown across the top of the card. */
+    val image: String? = null,
 )
 
 /** Accent date tile (46×50, radius 12): "NOV" over "13". */
@@ -81,7 +84,9 @@ fun ProposalCard(
         contentPadding = PaddingValues(12.dp),
         onClick = onClick,
         onClickLabel = actionLabel ?: "Open",
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        ui.image?.let { CoverPhoto(it, aspectRatio = 2.4f) }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             DateTile(ui.month, ui.day, muted = ui.tone == ProposalCardTone.Muted)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

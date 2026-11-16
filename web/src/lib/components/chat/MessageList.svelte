@@ -139,7 +139,7 @@
 				{:else if m.kind === 'proposal' && m.proposalId}
 					<ProposalCard proposalId={m.proposalId} {members} {meId} {compact} />
 				{:else if m.kind === 'event'}
-					<EventCard message={m} {compact} />
+					<EventCard message={m} {meId} {admin} {compact} />
 				{:else}
 					<MessageBubble
 						message={m}

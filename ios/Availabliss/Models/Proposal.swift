@@ -88,6 +88,8 @@ struct GroupEvent: Codable, Sendable, Identifiable, Equatable {
     var start: Date
     var end: Date
     var allDay: Bool
+    /// Cover photo; nil on older servers too.
+    var image: String?
     let createdBy: String
     let createdAt: Date
     /// Only present on `GET /me/upcoming`.

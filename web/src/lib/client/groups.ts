@@ -31,6 +31,10 @@ export const getGroup = (id: string, fetch?: Fetch) => api.get<Group>(`/groups/$
 export const createGroup = (body: GroupInput) => api.post<Group>('/groups', body);
 export const updateGroup = (id: string, patch: Partial<GroupInput>) => api.patch<Group>(`/groups/${id}`, patch);
 export const deleteGroup = (id: string) => api.del(`/groups/${id}`);
+/** Sets the group's photo (admins; the server shrinks it to fit 512 px). */
+export const setGroupImage = (id: string, file: Blob) => api.put<Group>(`/groups/${id}/image`, file);
+/** Removes the group's photo, back to the monogram tile. */
+export const removeGroupImage = (id: string) => api.del<Group>(`/groups/${id}/image`);
 
 export const setMemberRole = (groupId: string, userId: string, role: 'admin' | 'member') =>
 	api.patch<Member>(`/groups/${groupId}/members/${userId}`, { role });

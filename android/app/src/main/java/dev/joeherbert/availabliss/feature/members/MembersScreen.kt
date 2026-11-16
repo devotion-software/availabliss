@@ -2,7 +2,13 @@ package dev.joeherbert.availabliss.feature.members
 
 import androidx.compose.runtime.rememberUpdatedState
 import android.content.Intent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,6 +53,7 @@ import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
+import dev.joeherbert.availabliss.designsystem.component.GroupTile
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.PillTone
@@ -67,6 +74,7 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import dev.joeherbert.availabliss.feature.common.InviteRecipient
 import dev.joeherbert.availabliss.feature.common.InviteRecipientsField
+import dev.joeherbert.availabliss.feature.common.rememberPhotoPicker
 
 /** Members & invites for one group. */
 @Composable
@@ -89,6 +97,7 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
     LaunchedEffect(state.left) { if (state.left) onLeftGroup() }
 
     val currentOnBack by rememberUpdatedState(onBack)
+    val pickPhoto = rememberPhotoPicker(onUnreadable = viewModel::photoUnreadable, onPicked = viewModel::setPhoto)
     // One instance for the screen's lifetime so member rows skip recomposition.
     val actions = remember(viewModel) {
         MembersActions(
@@ -105,6 +114,8 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
             onLeave = viewModel::requestLeave,
             onDelete = viewModel::requestDelete,
             onRetry = viewModel::refresh,
+            onPickPhoto = pickPhoto,
+            onRemovePhoto = { viewModel.setPhoto(null) },
         )
     }
     MembersContent(state = state, snackbar = snackbar, actions = actions)
@@ -134,6 +145,8 @@ data class MembersActions(
     val onLeave: () -> Unit = {},
     val onDelete: () -> Unit = {},
     val onRetry: () -> Unit = {},
+    val onPickPhoto: () -> Unit = {},
+    val onRemovePhoto: () -> Unit = {},
 )
 
 @Composable
@@ -157,6 +170,8 @@ fun MembersContent(state: MembersUiState, snackbar: SnackbarHostState, actions: 
                 verticalArrangement = Arrangement.spacedBy(Spacing.l),
             ) {
                 state.error?.let { ErrorBanner(it, onRetry = actions.onRetry) }
+
+                if (state.groupName.isNotBlank()) GroupCard(state, actions)
 
                 // Only owners and admins can invite.
                 if (state.isAdmin) InviteCard(state, actions)
@@ -184,6 +199,66 @@ fun MembersContent(state: MembersUiState, snackbar: SnackbarHostState, actions: 
             }
         }
         AvSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+    }
+}
+
+/** The group's tile and name. Admins tap the tile to add, change or remove the group's photo. */
+@Composable
+private fun GroupCard(state: MembersUiState, actions: MembersActions) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    var menu by remember { mutableStateOf(false) }
+    GlassPanel(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box {
+                val tile = Modifier.clip(Shapes.controlLarge)
+                GroupTile(
+                    state.monogram,
+                    colors.tile(state.tileColor),
+                    image = state.groupImage,
+                    size = 56.dp,
+                    radius = 18.dp,
+                    modifier = if (state.isAdmin) {
+                        tile.clickable(enabled = !state.uploadingPhoto, onClickLabel = if (state.groupImage == null) "Add a group photo" else "Change the group photo") {
+                            if (state.groupImage == null) actions.onPickPhoto() else menu = true
+                        }
+                    } else {
+                        tile
+                    },
+                )
+                if (state.isAdmin) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(x = 4.dp, y = 4.dp)
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(colors.solid),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (state.uploadingPhoto) CircularProgressIndicator(Modifier.size(12.dp), color = colors.onSolid, strokeWidth = 2.dp)
+                        else Icon(if (state.groupImage == null) AvIcons.Photo else AvIcons.Pencil, null, tint = colors.onSolid, modifier = Modifier.size(11.dp))
+                    }
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = colors.bg) {
+                    DropdownMenuItem(text = { Text("Choose a new photo", style = type.bodySmallStrong) }, onClick = { menu = false; actions.onPickPhoto() })
+                    DropdownMenuItem(
+                        text = { Text("Remove photo", style = type.bodySmallStrong, color = colors.warnInk) },
+                        onClick = { menu = false; actions.onRemovePhoto() },
+                    )
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(state.groupName, style = type.cardTitle, color = colors.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (state.isAdmin) {
+                    Text(
+                        if (state.groupImage == null) "Tap the tile to add a group photo" else "Tap the photo to change it",
+                        style = type.caption.copy(fontWeight = FontWeight.Normal),
+                        color = colors.muted,
+                    )
+                }
+            }
+        }
     }
 }
 

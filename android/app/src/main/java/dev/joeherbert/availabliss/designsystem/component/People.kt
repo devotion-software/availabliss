@@ -78,20 +78,23 @@ fun AvatarStack(
     }
 }
 
-/** Group monogram tile on its `t1`–`t5` colour (48dp / radius 16 on lists). */
+/** Group tile: its photo if it has one, else the monogram on its `t1`–`t5` colour (48dp / radius 16 on lists). */
 @Composable
 fun GroupTile(
     monogram: String,
     color: Color,
     modifier: Modifier = Modifier,
+    image: String? = null,
     size: Dp = 48.dp,
     radius: Dp = 16.dp,
     fontSize: TextUnit = (size.value * 0.36f).sp,
 ) {
+    val shape = RoundedCornerShape(radius)
     Box(
-        modifier.size(size).clip(RoundedCornerShape(radius)).background(color).clearAndSetSemantics { },
+        modifier.size(size).clip(shape).background(color).clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
     ) {
+        // The monogram stays underneath, so it shows while the photo loads or if it fails.
         Text(
             monogram.take(3),
             fontFamily = DisplayFontFamily,
@@ -100,5 +103,13 @@ fun GroupTile(
             letterSpacing = (-0.025f * fontSize.value).sp,
             color = AvailablissTheme.colors.ink,
         )
+        if (!image.isNullOrBlank()) {
+            AsyncImage(
+                model = image,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(size).clip(shape),
+            )
+        }
     }
 }

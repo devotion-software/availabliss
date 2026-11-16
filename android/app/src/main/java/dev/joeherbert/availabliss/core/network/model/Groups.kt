@@ -14,6 +14,8 @@ data class GroupSummary(
     val name: String,
     val color: TileColor = TileColor.T1,
     val monogram: String,
+    /** The group's photo, shown instead of the monogram tile. Absent on older servers. */
+    val image: String? = null,
     val role: Role,
     val memberCount: Int,
     val syncedCount: Int,
@@ -63,6 +65,8 @@ data class Group(
     val name: String,
     val color: TileColor = TileColor.T1,
     val monogram: String,
+    /** The group's photo, shown instead of the monogram tile. */
+    val image: String? = null,
     val role: Role,
     val memberCount: Int,
     val syncedCount: Int,

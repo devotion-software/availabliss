@@ -99,6 +99,13 @@
       "when": 1794777644113,
       "tag": "0013_bumpy_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1794821275196,
+      "tag": "0014_left_jubilee",
+      "breakpoints": true
     }
   ]
 }

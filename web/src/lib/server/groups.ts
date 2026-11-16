@@ -5,7 +5,8 @@ import { TILE_COLORS } from '#lib/types';
 import { monogram } from '#lib/monogram';
 import { db } from './db';
 import { requireCanCreateGroup } from './billing';
-import { groupInvites, groupMembers, groups, user } from './db/schema';
+import { events, groupInvites, groupMembers, groups, user } from './db/schema';
+import { deleteStored, IMAGE_SIZES, processImage, putImage } from './media';
 import { ApiError, forbidden, notFound } from './http';
 import { newId, newToken } from './ids';
 import { requirementSummary } from './availability/labels';
@@ -88,6 +89,7 @@ export function groupBase(row: GroupRow, role: Role, members: Member[]) {
 		name: row.name,
 		color: (TILE_COLORS as readonly string[]).includes(row.color) ? (row.color as TileColor) : 't1',
 		monogram: monogram(row.name),
+		image: row.image ?? null,
 		role,
 		memberCount: members.length,
 		syncedCount: members.filter((m) => m.synced).length,
@@ -164,11 +166,24 @@ export async function updateGroup(
 	return getGroup(groupId, userId);
 }
 
+/** Sets (or with null, removes) the group's photo. Admins only, like the name and colour. */
+export async function setGroupImage(groupId: string, userId: string, image: ArrayBuffer | null): Promise<Group> {
+	await requireMember(groupId, userId, 'admin');
+	const before = await getGroupRow(groupId);
+	const url = image ? await putImage('group', groupId, await processImage(image, IMAGE_SIZES.group)) : null;
+	await db.update(groups).set({ image: url }).where(eq(groups.id, groupId));
+	await deleteStored(before.image);
+	return getGroup(groupId, userId);
+}
+
 /** Deletes the group. Returns who was in it, so they can be told. */
 export async function deleteGroup(groupId: string, userId: string): Promise<string[]> {
 	await requireMember(groupId, userId, 'owner');
 	const members = await memberIds(groupId);
+	const row = await getGroupRow(groupId);
+	const covers = await db.select({ image: events.image }).from(events).where(eq(events.groupId, groupId));
 	await db.delete(groups).where(eq(groups.id, groupId));
+	for (const url of [row.image, ...covers.map((c) => c.image)]) await deleteStored(url);
 	return members;
 }
 

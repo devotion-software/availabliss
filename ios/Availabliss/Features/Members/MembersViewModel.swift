@@ -9,6 +9,7 @@ final class MembersViewModel {
     private(set) var invites: [GroupInvite] = []
     private(set) var isCreatingInvite = false
     private(set) var isSendingInvites = false
+    private(set) var isUploadingPhoto = false
     var error: String?
     var toast: String?
     /// The emails and usernames about to be invited.
@@ -89,6 +90,21 @@ final class MembersViewModel {
             toast = invite.recipient.map { "Invite for \($0) revoked" } ?? "Link revoked: it no longer works"
         } catch {
             self.error = error.userMessage
+        }
+    }
+
+    /// Sets (or with nil, removes) the group's photo. Returns the updated group.
+    func setPhoto(_ jpeg: Data?) async -> Group? {
+        isUploadingPhoto = true
+        defer { isUploadingPhoto = false }
+        do {
+            let updated = try await api.send(jpeg.map { API.Groups.setImage(id: groupId, jpeg: $0) } ?? API.Groups.removeImage(id: groupId))
+            group = updated
+            toast = jpeg == nil ? "Photo removed" : "Photo updated"
+            return updated
+        } catch {
+            self.error = error.userMessage
+            return nil
         }
     }
 

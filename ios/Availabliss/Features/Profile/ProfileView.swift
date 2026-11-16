@@ -1,4 +1,3 @@
-import PhotosUI
 import SwiftUI
 
 /// "You": account, appearance, calendars, region, plan, passkeys, timing templates, sign out.
@@ -12,7 +11,6 @@ struct ProfileView: View {
     @State private var toast: String?
     @State private var editsName = false
     @State private var editsUsername = false
-    @State private var photoItem: PhotosPickerItem?
     @State private var showsPhotoPicker = false
     @State private var isUploadingPhoto = false
 
@@ -93,17 +91,12 @@ struct ProfileView: View {
             }
             .disabled(isUploadingPhoto)
             .accessibilityLabel("Profile photo")
-            .photosPicker(isPresented: $showsPhotoPicker, selection: $photoItem, matching: .images)
-            .onChange(of: photoItem) { _, item in
-                guard let item else { return }
-                photoItem = nil
-                Task {
-                    guard let data = try? await item.loadTransferable(type: Data.self), let jpeg = Self.jpeg(from: data) else {
-                        error = "Couldn\u{2019}t read that photo."
-                        return
-                    }
-                    await setPhoto(jpeg)
+            .jpegPhotoPicker(isPresented: $showsPhotoPicker) { jpeg in
+                guard let jpeg else {
+                    error = "Couldn\u{2019}t read that photo."
+                    return
                 }
+                Task { await setPhoto(jpeg) }
             }
             VStack(alignment: .leading, spacing: 2) {
                 if name.isEmpty {
@@ -137,20 +130,6 @@ struct ProfileView: View {
             toast = jpeg == nil ? "Photo removed" : "Photo updated"
         } catch {
             self.error = error.userMessage
-        }
-    }
-
-    /// Any photo (HEIC, PNG…) as a JPEG no bigger than 1024 px, so the upload stays small.
-    private static func jpeg(from data: Data) -> Data? {
-        guard let image = UIImage(data: data) else { return nil }
-        let longest = max(image.size.width, image.size.height)
-        guard longest > 1024 else { return image.jpegData(compressionQuality: 0.85) }
-        let scale = 1024 / longest
-        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        return UIGraphicsImageRenderer(size: size, format: format).jpegData(withCompressionQuality: 0.85) { _ in
-            image.draw(in: CGRect(origin: .zero, size: size))
         }
     }
 

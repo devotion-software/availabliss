@@ -114,6 +114,7 @@ fun buildChatItems(
                             title = e.title,
                             status = DateTimes.rangeLabel(e.start, e.end, e.allDay),
                             tone = ProposalCardTone.Confirmed,
+                            image = e.image,
                         ),
                     )
                 } else if (!m.body.isNullOrBlank()) {

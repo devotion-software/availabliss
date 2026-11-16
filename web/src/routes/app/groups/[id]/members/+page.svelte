@@ -12,6 +12,7 @@
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import InvitePanel from '#lib/components/members/InvitePanel.svelte';
 	import MemberActionsSheet from '#lib/components/members/MemberActionsSheet.svelte';
+	import GroupPhotoPanel from '#lib/components/groups/GroupPhotoPanel.svelte';
 
 	let { data } = $props();
 
@@ -124,6 +125,7 @@
 
 		<div class="side">
 			{#if admin}
+				<GroupPhotoPanel {group} />
 				<InvitePanel groupId={group.id} groupName={group.name} />
 			{:else}
 				<p class="glass hint">Ask an admin for an invite link to add people.</p>

@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -65,6 +67,12 @@ class GroupsRepository @Inject constructor(
     ): ApiResult<Group> = call { api.updateGroup(id, UpdateGroupRequest(name, color, requirement)) }.onSuccess(::cache)
 
     suspend fun delete(id: String): ApiResult<Unit> = call { api.deleteGroup(id) }.onSuccess { forget(id) }
+
+    /** Uploads the group's photo (JPEG, admins), or removes it with null. */
+    suspend fun setImage(id: String, jpeg: ByteArray?): ApiResult<Group> = call {
+        if (jpeg == null) api.removeGroupImage(id)
+        else api.setGroupImage(id, jpeg.toRequestBody("image/jpeg".toMediaType()))
+    }.onSuccess(::cache)
 
     suspend fun setRole(groupId: String, userId: String, role: Role): ApiResult<Member> =
         call { api.setMemberRole(groupId, userId, MemberRoleRequest(role)) }.onSuccess { member ->
@@ -141,6 +149,12 @@ class GroupsRepository @Inject constructor(
 
     private fun cache(group: Group) {
         details.update { it + (group.id to group) }
+        // Keep the groups list's tile in step (rename, colour, photo) without refetching it.
+        _groups.update { list ->
+            list?.map {
+                if (it.id == group.id) it.copy(name = group.name, color = group.color, monogram = group.monogram, image = group.image) else it
+            }
+        }
     }
 
     private fun forget(id: String) {

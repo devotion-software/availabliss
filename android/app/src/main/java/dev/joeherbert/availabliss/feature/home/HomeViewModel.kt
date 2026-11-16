@@ -47,6 +47,8 @@ data class GroupTileUi(
     val syncProgress: Float,
     val syncLabel: String,
     val unread: Int,
+    /** The group's photo, instead of the monogram. */
+    val image: String? = null,
 )
 
 /** The "Up next" card. */
@@ -57,6 +59,8 @@ data class UpNextUi(
     val whenLabel: String,
     val detail: String,
     val added: Boolean,
+    /** The event's cover photo. */
+    val image: String? = null,
 )
 
 data class HomeUiState(
@@ -167,6 +171,7 @@ class HomeViewModel @Inject constructor(
             whenLabel = DateTimes.dayAndTime(event.start, event.allDay),
             detail = listOfNotNull(event.location?.takeIf { it.isNotBlank() }?.let { "At $it" }, going).joinToString(" · "),
             added = added,
+            image = event.image,
         )
     }
 
@@ -190,6 +195,7 @@ class HomeViewModel @Inject constructor(
             syncProgress = if (g.memberCount == 0) 0f else g.syncedCount.toFloat() / g.memberCount,
             syncLabel = if (left == 0) "All synced" else "$left of ${g.memberCount} to sync",
             unread = g.unreadCount,
+            image = g.image,
         )
     }
 }

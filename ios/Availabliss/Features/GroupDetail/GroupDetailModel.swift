@@ -112,4 +112,7 @@ final class GroupDetailStore {
         entries[groupId] = Entry(model: model)
         return model
     }
+
+    /// The group's model if one of its screens is open (nil otherwise, rather than making one).
+    func existingModel(for groupId: String) -> GroupDetailModel? { entries[groupId]?.model }
 }

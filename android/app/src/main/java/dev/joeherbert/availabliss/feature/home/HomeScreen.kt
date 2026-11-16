@@ -43,6 +43,7 @@ import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.EmptyState
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassPillButton
+import dev.joeherbert.availabliss.designsystem.component.CoverPhoto
 import dev.joeherbert.availabliss.designsystem.component.GroupTile
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
@@ -169,6 +170,7 @@ private fun UpNextCard(upNext: UpNextUi, state: HomeUiState, onAddToCalendar: ()
         Modifier.fillMaxWidth().glass(Shapes.cardLarge).padding(18.dp).semantics(mergeDescendants = false) { contentDescription = "Up next" },
         verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
+        upNext.image?.let { CoverPhoto(it) }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             StatusPill(
                 "Everyone's in",
@@ -203,7 +205,7 @@ private fun GroupRow(tile: GroupTileUi, onClick: () -> Unit, onOpenChat: () -> U
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.l),
     ) {
-        GroupTile(tile.monogram, colors.tile(tile.color))
+        GroupTile(tile.monogram, colors.tile(tile.color), image = tile.image)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(tile.name, style = AvailablissTheme.type.bodyStrong, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
