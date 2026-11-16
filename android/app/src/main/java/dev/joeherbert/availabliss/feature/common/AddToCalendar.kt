@@ -158,12 +158,20 @@ fun CalendarPickerRow(state: AddToCalendarState, onSelect: (Long) -> Unit, modif
     }
 }
 
-/** The "Add to calendar" / "Added to your calendar" button. */
+/**
+ * The "Add to calendar" button, which says "Added to your calendar" just after you add it. An event
+ * already added before this screen opened isn't offered again: nothing shows.
+ */
 @Composable
 fun AddToCalendarButton(added: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, height: androidx.compose.ui.unit.Dp = 54.dp) {
+    var tapped by remember { mutableStateOf(false) }
+    if (added && !tapped) return
     PrimaryButton(
         text = if (added) "Added to your calendar" else "Add to calendar",
-        onClick = onClick,
+        onClick = {
+            tapped = true
+            onClick()
+        },
         icon = if (added) AvIcons.Check else AvIcons.CalendarAdd,
         style = if (added) ButtonStyle.Success else ButtonStyle.Solid,
         height = height,

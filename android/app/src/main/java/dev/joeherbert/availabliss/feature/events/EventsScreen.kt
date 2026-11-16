@@ -167,10 +167,15 @@ private fun EventRow(row: EventRowUi, past: Boolean, onOpen: () -> Unit, onAddTo
             }
             if (row.canDelete) PlainIconButton(AvIcons.Trash, "Delete ${row.title}", onDelete, size = 40.dp, iconSize = 18.dp, tint = colors.muted)
         }
-        if (!past) {
+        // Offered until it's added; "Added to your calendar" only just after you add it.
+        var tapped by remember(row.id) { mutableStateOf(false) }
+        if (!past && (!row.added || tapped)) {
             PrimaryButton(
                 text = if (row.added) "Added to your calendar" else "Add to calendar",
-                onClick = onAddToCalendar,
+                onClick = {
+                    tapped = true
+                    onAddToCalendar()
+                },
                 icon = if (row.added) AvIcons.Check else AvIcons.CalendarAdd,
                 style = if (row.added) ButtonStyle.Success else ButtonStyle.Solid,
                 height = 44.dp,
