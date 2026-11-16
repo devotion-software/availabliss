@@ -78,6 +78,13 @@ final class GroupAvailabilityViewModel {
     }
 
     func step(by delta: Int) async {
+        advance(by: delta)
+        await load()
+    }
+
+    /// Moves to the previous / next month or week without loading, so the change can be animated.
+    /// Follow with `load()`.
+    func advance(by delta: Int) {
         switch mode {
         case .month:
             month = month.addingMonths(delta)
@@ -86,8 +93,10 @@ final class GroupAvailabilityViewModel {
         case .week: selectedDay = selectedDay.adding(days: 7 * delta)
         }
         if mode != .month, selectedDay.firstOfMonth != month { month = selectedDay.firstOfMonth }
-        await load()
     }
+
+    /// What one page of the calendar shows: the month, or the week of the selected day.
+    var pageKey: CalendarDay { mode == .month ? month : selectedDay.startOfWeek() }
 
     /// A day tapped in the month or week grid: its detail shows underneath.
     func pick(_ date: CalendarDay) {

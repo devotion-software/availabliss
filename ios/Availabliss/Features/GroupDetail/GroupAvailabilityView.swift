@@ -10,6 +10,10 @@ struct GroupAvailabilityView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var model: GroupAvailabilityViewModel
     @State private var proposalDraft: ProposalDraft?
+    /// Which side the next calendar page slides in from (trailing = later).
+    @State private var pageEdge: Edge = .trailing
+    /// How far a sideways swipe has dragged the page.
+    @State private var dragX: CGFloat = 0
     /// The optional AI planner: offered only when the server has it set up; Pro to use.
     @State private var aiPlanner: Plan.AIPlanner?
     @State private var showsPlanner = false
@@ -121,16 +125,39 @@ struct GroupAvailabilityView: View {
         }
     }
 
+    private struct PageID: Hashable {
+        let mode: GroupAvailabilityViewModel.Mode
+        let key: CalendarDay
+    }
+
+    private var pageTransition: AnyTransition {
+        let out: Edge = pageEdge == .trailing ? .leading : .trailing
+        return .asymmetric(
+            insertion: .move(edge: pageEdge).combined(with: .opacity),
+            removal: .move(edge: out).combined(with: .opacity)
+        )
+    }
+
+    /// The previous / next month or week, sliding the grid across, then loading it.
+    private func page(by delta: Int) {
+        pageEdge = delta > 0 ? .trailing : .leading
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.9)) {
+            model.advance(by: delta)
+            dragX = 0
+        }
+        Task { await model.load() }
+    }
+
     private var headingRow: some View {
         HStack(spacing: 6) {
-            Button { Task { await model.step(by: -1) } } label: { chevron("chevron.left") }
+            Button { page(by: -1) } label: { chevron("chevron.left") }
                 .accessibilityLabel("Previous")
             Text(model.heading)
                 .displayFont(19, .semibold, relativeTo: .headline)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .accessibilityAddTraits(.isHeader)
-            Button { Task { await model.step(by: 1) } } label: { chevron("chevron.right") }
+            Button { page(by: 1) } label: { chevron("chevron.right") }
                 .accessibilityLabel("Next")
             Spacer(minLength: 4)
             SegmentedControl(
@@ -160,21 +187,36 @@ struct GroupAvailabilityView: View {
         if model.isLoading {
             StatusView(kind: .loading)
         } else {
-            SwiftUI.Group {
-                switch model.mode {
-                case .month: MonthGrid(model: model, group: group, me: app.session.user?.id)
-                // The time grid needs width: cards in portrait, the grid in landscape.
-                case .week:
-                    if verticalSizeClass == .compact { WeekGrid(model: model, group: group) } else { WeekCards(model: model, group: group) }
+            ZStack {
+                SwiftUI.Group {
+                    switch model.mode {
+                    case .month: MonthGrid(model: model, group: group, me: app.session.user?.id)
+                    // The time grid needs width: cards in portrait, the grid in landscape.
+                    case .week:
+                        if verticalSizeClass == .compact { WeekGrid(model: model, group: group) } else { WeekCards(model: model, group: group) }
+                    }
                 }
+                // A new page per month / week, sliding in from the side it's coming from.
+                .id(PageID(mode: model.mode, key: model.pageKey))
+                .transition(pageTransition)
             }
-            // Swipe sideways for the previous / next month or week.
+            .offset(x: dragX)
+            // Swipe sideways for the previous / next month or week; the page follows your finger.
             .simultaneousGesture(
-                DragGesture(minimumDistance: 30).onEnded { drag in
-                    let dx = drag.translation.width, dy = drag.translation.height
-                    guard abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
-                    Task { await model.step(by: dx < 0 ? 1 : -1) }
-                }
+                DragGesture(minimumDistance: 30)
+                    .onChanged { drag in
+                        let dx = drag.translation.width, dy = drag.translation.height
+                        guard abs(dx) > abs(dy) * 1.5 else { return }
+                        dragX = dx * 0.35
+                    }
+                    .onEnded { drag in
+                        let dx = drag.translation.width, dy = drag.translation.height
+                        if abs(dx) > 60, abs(dx) > abs(dy) * 1.5 {
+                            page(by: dx < 0 ? 1 : -1)
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { dragX = 0 }
+                        }
+                    }
             )
             DayDetailCard(model: model, group: group, me: app.session.user?.id) { draft in
                 proposalDraft = draft

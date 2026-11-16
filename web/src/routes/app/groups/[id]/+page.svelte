@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { fly } from 'svelte/transition';
+	import { prefersReducedMotion } from 'svelte/motion';
 	import type { DayAvailability, Slot } from '#lib/types';
 	import { getAvailability, getDayAvailability } from '#lib/client/availability';
 	import { addDays, addMonths, endOfMonth, startOfMonth } from '#lib/client/dates';
@@ -183,6 +185,41 @@
 		}
 	}
 
+	// One page per month / week: it slides in from the side it's coming from.
+	const pageKey = $derived(`${view}:${view === 'month' ? month : (week[0] ?? selected)}`);
+	let pageDir = $state<1 | -1>(1);
+	let lastPageKey = untrack(() => pageKey);
+	$effect.pre(() => {
+		const key = pageKey;
+		untrack(() => {
+			if (key.split(':')[0] === lastPageKey.split(':')[0] && key !== lastPageKey) pageDir = key > lastPageKey ? 1 : -1;
+			lastPageKey = key;
+		});
+	});
+	const pageIn = (node: Element) =>
+		fly(node, { x: prefersReducedMotion.current ? 0 : pageDir * 48, duration: prefersReducedMotion.current ? 0 : 220 });
+
+	// Swipe sideways on a touch screen for the previous / next month or week; the page follows the finger.
+	let touch: { x: number; y: number } | null = null;
+	let dragX = $state(0);
+	function touchStart(e: TouchEvent) {
+		touch = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+	}
+	function touchMove(e: TouchEvent) {
+		if (!touch) return;
+		const dx = e.touches[0].clientX - touch.x;
+		const dy = e.touches[0].clientY - touch.y;
+		dragX = Math.abs(dx) > Math.abs(dy) * 1.5 ? dx * 0.35 : 0;
+	}
+	function touchEnd(e: TouchEvent) {
+		if (!touch) return;
+		const dx = e.changedTouches[0].clientX - touch.x;
+		const dy = e.changedTouches[0].clientY - touch.y;
+		touch = null;
+		dragX = 0;
+		if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) step(dx < 0 ? 1 : -1);
+	}
+
 	let proposeOpen = $state(false);
 	let proposeInitial = $state<(Slot & { title?: string; note?: string; allDay?: boolean }) | { day: string } | null>(null);
 	function propose(slot: (Slot & { title?: string; note?: string; allDay?: boolean }) | { day: string } | null) {
@@ -276,7 +313,20 @@
 
 			<CoverageNote gaps={availability.checkedUntil ?? []} {members} meId={data.user.id} />
 
-			<div class="cal-body" class:boxed={view === 'week' && !(!desk && phoneWidth)}>
+			<div
+				class="cal-body"
+				role="group"
+				aria-label="Calendar"
+				class:boxed={view === 'week' && !(!desk && phoneWidth)}
+				class:dragging={dragX !== 0}
+				style:transform={dragX ? `translateX(${dragX}px)` : undefined}
+				ontouchstart={touchStart}
+				ontouchmove={touchMove}
+				ontouchend={touchEnd}
+				ontouchcancel={() => ((touch = null), (dragX = 0))}
+			>
+			{#key pageKey}
+			<div class="page" in:pageIn>
 			{#if view === 'month'}
 				{#if phone}
 					<span class="phone-only">
@@ -292,6 +342,8 @@
 				<!-- Phones get a card per day; the time grid needs a wider screen. -->
 				<WeekGrid dates={week} days={weekDays} {members} {selected} onselect={select} cards={!desk && phoneWidth} />
 			{/if}
+			</div>
+			{/key}
 			</div>
 		</section>
 
@@ -415,9 +467,19 @@
 		gap: 10px;
 	}
 	.cal-body {
+		transition: transform 0.25s ease;
+		touch-action: pan-y;
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
+	}
+	.page {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.cal-body.dragging {
+		transition: none;
 	}
 	.cal-body.boxed {
 		background: var(--glass);

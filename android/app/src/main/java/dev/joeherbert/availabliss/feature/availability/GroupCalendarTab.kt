@@ -1,6 +1,12 @@
 package dev.joeherbert.availabliss.feature.availability
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -181,23 +187,38 @@ fun GroupCalendarContent(
                 state.syncBanner?.let { SyncBanner(it, state.nudging, onNudge) }
                 if (state.requirementSummary.isNotBlank()) TimingChip(state.requirementSummary, state.isAdmin, onOpenTiming)
                 plans()
-                HeadingRow(state, onSelectView, onPrevious, onNext)
+                // Which way the next page slides in: forward (later) comes from the right.
+                var forward by remember { mutableStateOf(true) }
+                val previous = { forward = false; onPrevious() }
+                val next = { forward = true; onNext() }
+                HeadingRow(state, onSelectView, previous, next)
                 state.coverageNote?.let { CoverageNote(it) }
                 state.error?.let { ErrorBanner(it, onRetry = onRetry) }
                 AnimatedContent(
-                    targetState = state.view,
-                    label = "calendar-view",
+                    // The whole state, so the outgoing page keeps its own month / week while it slides out.
+                    targetState = state,
+                    contentKey = { it.view to it.heading },
+                    transitionSpec = {
+                        if (initialState.view != targetState.view) {
+                            fadeIn() togetherWith fadeOut()
+                        } else {
+                            val sign = if (forward) 1 else -1
+                            (slideInHorizontally { width -> sign * width / 3 } + fadeIn()) togetherWith
+                                (slideOutHorizontally { width -> -sign * width / 3 } + fadeOut())
+                        }
+                    },
+                    label = "calendar-page",
                     // Swipe sideways for the previous / next month or week.
-                    modifier = Modifier.swipeToStep(onPrevious = onPrevious, onNext = onNext),
-                ) { view ->
-                    when (view) {
-                        CalendarView.Month -> MonthSection(state, onSelectDate, onPlanWithAi)
-                        CalendarView.Week -> if (state.weekLoading && state.weekColumns.isEmpty()) LoadingIndicator()
+                    modifier = Modifier.swipeToStep(onPrevious = previous, onNext = next),
+                ) { page ->
+                    when (page.view) {
+                        CalendarView.Month -> MonthSection(page, onSelectDate, onPlanWithAi)
+                        CalendarView.Week -> if (page.weekLoading && page.weekColumns.isEmpty()) LoadingIndicator()
                         // The time grid needs width: cards in portrait, the grid in landscape.
                         else if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                            WeekGrid(state.weekColumns, onSelectColumn = { i -> state.weekDates.getOrNull(i)?.let(onSelectDate) })
+                            WeekGrid(page.weekColumns, onSelectColumn = { i -> page.weekDates.getOrNull(i)?.let(onSelectDate) })
                         } else {
-                            WeekCards(state.weekColumns, onSelectColumn = { i -> state.weekDates.getOrNull(i)?.let(onSelectDate) })
+                            WeekCards(page.weekColumns, onSelectColumn = { i -> page.weekDates.getOrNull(i)?.let(onSelectDate) })
                         }
                     }
                 }
