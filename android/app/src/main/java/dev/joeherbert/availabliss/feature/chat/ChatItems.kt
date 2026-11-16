@@ -88,7 +88,7 @@ fun buildChatItems(
                 items += ChatItem.System(m.id, m.body.orEmpty())
 
             m.kind == MessageKind.Poll && m.poll != null ->
-                items += ChatItem.PollItem(m.id, m.poll.toUi(directory, own || isAdmin), own, m.authorId?.let(directory::avatar))
+                items += ChatItem.PollItem(m.id, m.poll.toUi(directory, own || isAdmin, title = if (own) "Your poll" else "Poll by $authorName"), own, m.authorId?.let(directory::avatar))
 
             m.kind == MessageKind.Proposal && m.proposalId != null -> {
                 val p = proposals[m.proposalId]
@@ -162,7 +162,7 @@ private fun receiptFor(m: Message, directory: MemberDirectory): ChatItem.Receipt
     }
 }
 
-private fun Poll.toUi(directory: MemberDirectory, canClose: Boolean): PollUi {
+private fun Poll.toUi(directory: MemberDirectory, canClose: Boolean, title: String): PollUi {
     val counts = options.map { it.voterIds.size }
     val max = counts.maxOrNull() ?: 0
     val voters = options.flatMap { it.voterIds }
@@ -173,6 +173,7 @@ private fun Poll.toUi(directory: MemberDirectory, canClose: Boolean): PollUi {
         multi = multi,
         closed = closed,
         canClose = canClose,
+        title = title,
         options = options.map { o ->
             PollOptionUi(
                 id = o.id,

@@ -42,7 +42,7 @@ struct MessageRow: View {
         case .poll:
             if let poll = message.poll {
                 VStack(alignment: .trailing, spacing: 4) {
-                    PollCard(poll: poll, me: me, canClose: isMine || group.role.isAdmin, model: model)
+                    PollCard(poll: poll, me: me, title: isMine ? "Your poll" : "Poll by \(author?.firstName ?? "Someone")", canClose: isMine || group.role.isAdmin, model: model)
                     if isMine, isLatestOwn, let receipt = message.receipt {
                         ReadReceipt(receipt: receipt, group: group, action: openInfo)
                     }
@@ -164,6 +164,8 @@ struct ReadReceipt: View {
 struct PollCard: View {
     let poll: Poll
     let me: String?
+    /// Who asked: "Your poll" or "Poll by Ana".
+    let title: String
     let canClose: Bool
     let model: ChatViewModel
     @Environment(\.theme) private var theme
@@ -172,7 +174,7 @@ struct PollCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "chart.bar").font(.system(size: 14, weight: .semibold))
-                Text("Poll · \(Formatting.plural(poll.totalVotes, "vote"))\(poll.closed ? " · closed" : "")")
+                Text("\(title) · \(Formatting.plural(poll.totalVotes, "vote"))\(poll.closed ? " · closed" : "")")
                     .bodyFont(12, .semibold, relativeTo: .caption)
                 Spacer()
                 if canClose && !poll.closed {

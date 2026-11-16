@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Poll } from '#lib/types';
 	import Icon from '#lib/components/ui/Icon.svelte';
+	import { firstName } from '#lib/client/format';
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
 
 	/** A poll in the chat (Chat.dc.html): tap an option to vote, bars show the split. */
@@ -8,12 +9,14 @@
 		poll: Poll;
 		meId: string;
 		mine?: boolean;
+		/** Who asked, shown as "Poll by Ana" (yours: "Your poll"). */
+		authorName?: string;
 		canClose?: boolean;
 		compact?: boolean;
 		onvote: (optionIds: string[]) => void;
 		onclose?: () => void;
 	}
-	let { poll, meId, mine = false, canClose = false, compact = false, onvote, onclose }: Props = $props();
+	let { poll, meId, mine = false, authorName, canClose = false, compact = false, onvote, onclose }: Props = $props();
 
 	const counts = $derived(poll.options.map((o) => o.voterIds.length));
 	const total = $derived(counts.reduce((a, b) => a + b, 0));
@@ -31,7 +34,7 @@
 <section class="poll glass" class:mine class:compact aria-label="Poll: {poll.question}">
 	<div class="head">
 		<Icon name="poll" size={16} strokeWidth={2.2} />
-		<span>Poll · {total} vote{total === 1 ? '' : 's'}{poll.multi ? ' · pick any' : ''}</span>
+		<span>{mine ? 'Your poll' : `Poll by ${firstName(authorName ?? 'Someone')}`} · {total} vote{total === 1 ? '' : 's'}{poll.multi ? ' · pick any' : ''}</span>
 		{#if poll.closed}<StatusPill>Closed</StatusPill>{/if}
 	</div>
 	<h3>{poll.question}</h3>

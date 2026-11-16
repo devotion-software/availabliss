@@ -57,6 +57,8 @@ data class PollUi(
     val closed: Boolean,
     val options: List<PollOptionUi>,
     val canClose: Boolean = false,
+    /** Who asked: "Your poll" or "Poll by Ana". */
+    val title: String = "Poll",
 )
 
 /** Poll card with live result bars; tap an option to vote or unvote. */
@@ -79,7 +81,7 @@ fun PollCard(
             Icon(AvIcons.Poll, null, tint = colors.accentInk, modifier = Modifier.size(16.dp))
             val votes = if (poll.totalVotes == 1) "1 vote" else "${poll.totalVotes} votes"
             Text(
-                "Poll · $votes" + if (poll.closed) " · Closed" else if (poll.multi) " · Pick any" else "",
+                "${poll.title} · $votes" + if (poll.closed) " · Closed" else if (poll.multi) " · Pick any" else "",
                 style = AvailablissTheme.type.captionStrong,
                 color = colors.accentInk,
                 modifier = Modifier.weight(1f),
@@ -145,7 +147,7 @@ private fun PollCardPreview() {
         Box(Modifier.background(AvailablissTheme.colors.bg).padding(16.dp)) {
             PollCard(
                 PollUi(
-                    id = "p", question = "Where should we stay?", totalVotes = 5, multi = false, closed = false,
+                    id = "p", question = "Where should we stay?", totalVotes = 5, multi = false, closed = false, title = "Poll by Ana",
                     options = listOf(
                         PollOptionUi("a", "Keswick cottage", 3, mine = true, leading = true),
                         PollOptionUi("b", "Ambleside YHA", 1, mine = false, leading = false),
