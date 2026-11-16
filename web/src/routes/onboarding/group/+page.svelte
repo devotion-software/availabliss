@@ -74,13 +74,13 @@
 
 <div class="intro">
 	<h1>Start your first group</h1>
-	<p>Who are you trying to find a time with? You can change everything later.</p>
+	<p>Name the event you’re planning. You can change everything later.</p>
 </div>
 
 <form class="form" onsubmit={create} novalidate>
 	<div class="name-row">
 		<GroupTile monogram={monogram(name.trim() || '?')} {color} size={52} />
-		<TextField label="Group name" placeholder="e.g. Lake District crew" bind:value={name} maxlength={80} autofocus />
+		<TextField label="Group name" placeholder="e.g. Lake District weekend" bind:value={name} maxlength={80} autofocus />
 	</div>
 	<fieldset>
 		<legend class="eyebrow">What are you planning?</legend>

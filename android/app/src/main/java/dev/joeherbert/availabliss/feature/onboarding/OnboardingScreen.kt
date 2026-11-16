@@ -183,7 +183,7 @@ fun OnboardingScreen(
                     steps = state.steps,
                     onBack = viewModel::backToCalendars,
                     title = "Start your first group",
-                    subtitle = "Who are you trying to find a time with? You can change everything later.",
+                    subtitle = "Name the event you’re planning. You can change everything later.",
                     footer = {
                         PrimaryButton(
                             "Create group",
@@ -205,7 +205,7 @@ fun OnboardingScreen(
                         value = state.groupName,
                         onValueChange = viewModel::onGroupNameChange,
                         label = "Group name",
-                        placeholder = "e.g. Lake District crew",
+                        placeholder = "e.g. Lake District weekend",
                         capitalization = KeyboardCapitalization.Words,
                         modifier = Modifier.fillMaxWidth(),
                     )

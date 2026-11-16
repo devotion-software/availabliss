@@ -114,12 +114,12 @@ private struct FirstGroupStep: View {
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Start your first group").displayFont(30, .bold).accessibilityAddTraits(.isHeader)
-                    Text("Who are you trying to find a time with? You can change everything later.")
+                    Text("Name the event you’re planning. You can change everything later.")
                         .bodyFont(14).foregroundStyle(theme.muted)
                 }
                 HStack(spacing: 14) {
                     GroupTile(monogram: monogram, colorToken: color, size: 56, cornerRadius: 18)
-                    InputField(placeholder: "e.g. Lake District crew", text: $name)
+                    InputField(placeholder: "e.g. Lake District weekend", text: $name)
                         .textInputAutocapitalization(.words)
                         .submitLabel(.done)
                 }
