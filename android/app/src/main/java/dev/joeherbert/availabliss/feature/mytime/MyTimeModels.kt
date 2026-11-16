@@ -77,7 +77,16 @@ data class BlockDraft(
     val repeat: Repeat = Repeat.None,
     val until: LocalDate? = null,
     val note: String = "",
+    /** All day only: the last day of a block over several days (inclusive), or null for one day. */
+    val lastDay: LocalDate? = null,
 ) {
+    /** All day over more than one day. */
+    val isMultiDay: Boolean get() = whenOption == BlockWhen.AllDay && lastDay != null && lastDay.isAfter(date)
+
+    /** "Mon 17 Nov", or "17 – 21 Nov" for an all-day block over several days. */
+    val dateLabel: String
+        get() = if (isMultiDay) DateTimes.weekRange(date, lastDay!!) else DateTimes.shortDay(date)
+
     val timeLabel: String
         get() = when (whenOption) {
             BlockWhen.Times -> "${DateTimes.time(start)} – ${DateTimes.time(end)}"
@@ -87,11 +96,11 @@ data class BlockDraft(
     /** The set times run into the next day. */
     val endsNextDay: Boolean get() = whenOption == BlockWhen.Times && !end.isAfter(start)
 
-    val isValid: Boolean get() = until == null || !until.isBefore(date)
+    val isValid: Boolean get() = (until == null || !until.isBefore(date)) && (lastDay == null || !lastDay.isBefore(date))
 
-    /** Local start/end. All day = local midnight → next midnight; an end at or before the start is the next day. */
+    /** Local start/end. All day = local midnight → the midnight after the last day; an end at or before the start is the next day. */
     fun range(): Pair<LocalDateTime, LocalDateTime> = when (whenOption) {
-        BlockWhen.AllDay -> date.atStartOfDay() to date.plusDays(1).atStartOfDay()
+        BlockWhen.AllDay -> date.atStartOfDay() to (if (isMultiDay) lastDay!! else date).plusDays(1).atStartOfDay()
         BlockWhen.Times -> date.atTime(start) to (if (endsNextDay) date.plusDays(1) else date).atTime(end)
     }
 
@@ -124,6 +133,26 @@ data class BlockDraft(
             end = timeOf(range.to),
         )
 
+        /** "This evening": 18:00 to midnight today, or tomorrow once it's past 18:00. */
+        fun evening(now: LocalDateTime): BlockDraft {
+            val date = if (now.toLocalTime() >= EVENING) now.toLocalDate().plusDays(1) else now.toLocalDate()
+            return BlockDraft(date = date, whenOption = BlockWhen.Times, start = EVENING, end = LocalTime.MIDNIGHT)
+        }
+
+        /** "Tomorrow evening" once this evening has started (see [evening]). */
+        fun eveningLabel(now: LocalDateTime): String = if (now.toLocalTime() >= EVENING) "Tomorrow evening" else "This evening"
+
+        /** The whole of [date]. */
+        fun allDay(date: LocalDate): BlockDraft = BlockDraft(date = date, whenOption = BlockWhen.AllDay)
+
+        /** Every day [from]..[to] inclusive ("Away for a few days"). */
+        fun away(from: LocalDate, to: LocalDate): BlockDraft {
+            val (first, last) = if (to.isBefore(from)) to to from else from to to
+            return BlockDraft(date = first, whenOption = BlockWhen.AllDay, lastDay = last.takeIf { it.isAfter(first) })
+        }
+
+        private val EVENING = LocalTime.of(18, 0)
+
         private fun timeOf(minutes: Int): LocalTime = LocalTime.MIDNIGHT.plusMinutes(Math.floorMod(minutes, DAY_MINUTES).toLong())
 
         /** Prefills the sheet from an existing block so every part of it can be edited. */
@@ -139,7 +168,9 @@ data class BlockDraft(
             )
             // An all-day block keeps the default times in case it is switched to "Set times".
             return if (block.allDay) {
-                draft.copy(whenOption = BlockWhen.AllDay)
+                // Ends at the midnight after its last day.
+                val last = if (end.toLocalTime() == LocalTime.MIDNIGHT) end.toLocalDate().minusDays(1) else end.toLocalDate()
+                draft.copy(whenOption = BlockWhen.AllDay, lastDay = last.takeIf { it.isAfter(draft.date) })
             } else {
                 draft.copy(start = start.toLocalTime(), end = end.toLocalTime())
             }
@@ -148,20 +179,33 @@ data class BlockDraft(
 }
 
 data class MyTimeUiState(
-    val weekStart: LocalDate,
-    val weekLabel: String,
     val today: LocalDate = DateTimes.today(),
-    val layout: WeekLayout = WeekLayout.empty(weekStart),
+    /** Busy time laid out for every loaded day, from today. */
+    val layout: DaysLayout = DaysLayout.Empty,
+    /** One row per loaded day. */
+    val days: List<DayRowUi> = emptyList(),
     val recurring: List<RecurringBlockUi> = emptyList(),
-    val blockedCount: Int = 0,
+    /** The first load (nothing to show yet). */
     val loading: Boolean = true,
+    /** Loading further weeks at the bottom of the list. */
+    val loadingMore: Boolean = false,
+    /** Pull to refresh. */
+    val refreshing: Boolean = false,
     val error: String? = null,
+    /** No calendar is connected: show the "Connect a calendar" hint. */
+    val showCalendarHint: Boolean = false,
+    /** The day open in the day sheet. */
+    val openDay: LocalDate? = null,
+    /** "Jump to date": scroll the list to this day once it's loaded. */
+    val scrollTo: LocalDate? = null,
     val draft: BlockDraft? = null,
     /** Set while the "Busy from your calendar" sheet is open. */
     val calendarBusy: CalendarBusyUi? = null,
     val savingDraft: Boolean = false,
     val message: UserMessage? = null,
-)
+) {
+    val lastLoadedDay: LocalDate? get() = layout.days.lastOrNull()
+}
 
 /** "Every Tuesday · 19:00 – 21:30", "Every other Friday · All day", "Sat 21 Nov · All day". */
 internal fun ManualBlock.scheduleLabel(zone: ZoneId = DateTimes.zone): String {

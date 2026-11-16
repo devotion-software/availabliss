@@ -2,7 +2,7 @@
 	import type { ManualBlock, Repeat } from '#lib/types';
 	import { createBlockSchema } from '#lib/schemas';
 	import { createBlock, updateBlock } from '#lib/client/blocks';
-	import { addDays, dayKeyIn, timeIn, zonedToIso } from '#lib/client/dates';
+	import { addDays, dayKeyIn, daysBetween, timeIn, zonedToIso } from '#lib/client/dates';
 	import { toasts } from '#lib/client/toast.svelte';
 	import Sheet from '#lib/components/ui/Sheet.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
@@ -10,7 +10,7 @@
 	import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
 	import { clock } from './parts';
 
-	/** "Block a time" (BlockTime.dc.html): a date, all day or exact times, repeat, and a private note. */
+	/** "Block a time" (BlockTime.dc.html): a date (or a few days), all day or exact times, repeat, and a private note. */
 	interface Props {
 		open: boolean;
 		timeZone: string;
@@ -19,9 +19,13 @@
 		defaultDay: string;
 		/** Prefill exact times (minutes since midnight on `defaultDay`), e.g. from a tap on the week grid. */
 		defaultRange?: { from: number; to: number } | null;
+		/** Start on "All day", e.g. from the "All day…" and "Away for a few days…" choices. */
+		defaultAllDay?: boolean;
+		/** Prefill the last day of an all-day block that runs over several days. */
+		defaultLastDay?: string | null;
 		onsaved: (block: ManualBlock) => void;
 	}
-	let { open = $bindable(), timeZone, block = null, defaultDay, defaultRange = null, onsaved }: Props = $props();
+	let { open = $bindable(), timeZone, block = null, defaultDay, defaultRange = null, defaultAllDay = false, defaultLastDay = null, onsaved }: Props = $props();
 
 	type When = 'day' | 'times';
 	const WHENS: { value: When; label: string }[] = [
@@ -35,6 +39,8 @@
 	];
 
 	let date = $state('');
+	/** Last day of an all-day block (inclusive). */
+	let lastDay = $state('');
 	let when = $state<When>('day');
 	let from = $state('14:00');
 	let to = $state('18:00');
@@ -50,7 +56,8 @@
 		error = null;
 		if (!block) {
 			date = defaultDay;
-			when = 'times';
+			lastDay = defaultLastDay ?? defaultDay;
+			when = defaultAllDay ? 'day' : 'times';
 			from = defaultRange ? clock(defaultRange.from) : '09:00';
 			// 24:00 is entered as 00:00, which the form reads as "runs to midnight".
 			to = defaultRange ? clock(defaultRange.to % (24 * 60)) : '10:00';
@@ -65,6 +72,8 @@
 		note = block.note ?? '';
 		if (block.allDay) {
 			when = 'day';
+			const last = addDays(dayKeyIn(block.end, timeZone), -1);
+			lastDay = last > date ? last : date;
 			return;
 		}
 		when = 'times';
@@ -72,11 +81,21 @@
 		to = timeIn(block.end, timeZone);
 	});
 
-	const timeLabel = $derived(when === 'times' ? `${from} – ${to}` : 'All day');
+	// Moving the first day past the last one moves the last one with it.
+	$effect.pre(() => {
+		if (date && lastDay && lastDay < date) lastDay = date;
+	});
+
+	const days = $derived(when === 'day' && lastDay > date ? daysBetween(date, lastDay) + 1 : 1);
+	const timeLabel = $derived(when === 'times' ? `${from} – ${to}` : days > 1 ? `All day · ${days} days` : 'All day');
 
 	function range(): { start: string; end: string; allDay: boolean } | string {
 		if (!date) return 'Choose a date';
-		if (when === 'day') return { start: zonedToIso(date, '00:00', timeZone), end: zonedToIso(addDays(date, 1), '00:00', timeZone), allDay: true };
+		if (when === 'day') {
+			if (lastDay && lastDay < date) return 'The last day is before the first';
+			const last = lastDay || date;
+			return { start: zonedToIso(date, '00:00', timeZone), end: zonedToIso(addDays(last, 1), '00:00', timeZone), allDay: true };
+		}
 		if (!from || !to) return 'Choose a start and end time';
 		// An end at or before the start runs past midnight.
 		const endDay = to <= from ? addDays(date, 1) : date;
@@ -127,6 +146,8 @@
 				<TextField label="From" type="time" bind:value={from} />
 				<TextField label="To" type="time" bind:value={to} />
 			</div>
+		{:else}
+			<TextField label="Last day" type="date" bind:value={lastDay} min={date} hint="Away for a few days? Pick the last one." />
 		{/if}
 
 		<div class="repeat">

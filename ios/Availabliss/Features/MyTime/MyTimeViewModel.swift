@@ -4,120 +4,135 @@ import Observation
 @MainActor
 @Observable
 final class MyTimeViewModel {
-    enum Mode: Hashable { case week, month }
+    /// Days fetched per request as you scroll (the API allows up to 120 per call).
+    static let chunkDays = 28
+    static let maxRequestDays = 112
+    /// How far ahead the list goes.
+    static let maxDays = 366
 
-    var mode: Mode = .week
-    private(set) var weekStart: CalendarDay = CalendarDay.today().startOfWeek()
-    private(set) var monthStart: CalendarDay = CalendarDay.today().firstOfMonth
+    /// The list's days, from today.
+    private(set) var days: [CalendarDay] = []
     private(set) var intervals: [BusyInterval] = []
     private(set) var blocks: [ManualBlock] = []
-    private(set) var isLoading = false
-    /// The week the current `intervals` belong to (nil until the first load lands).
-    private(set) var loadedWeek: CalendarDay?
+    private(set) var layout = DayLayout(days: [], intervals: [])
+    private(set) var summaries: [CalendarDay: DaySummary] = [:]
+    /// False until the first busy time lands.
+    private(set) var hasLoaded = false
+    private(set) var isLoadingMore = false
+    /// Whether any calendar is connected (nil until known).
+    private(set) var hasCalendar: Bool?
     var error: String?
     /// A recurring / longer block the user tapped; confirm before deleting it entirely.
     var pendingRemoval: ManualBlock?
 
     private let api: APIClient
+    /// Bumped by every full reload, so a page fetched before it is dropped.
+    private var generation = 0
+    private var moreTask: Task<Void, Never>?
 
     init(api: APIClient) {
         self.api = api
     }
 
-    var title: String {
-        switch mode {
-        case .week: Formatting.dayRange(weekStart, weekStart.adding(days: 6))
-        case .month: Formatting.shortMonthYear(monthStart)
-        }
-    }
-
-    /// Whole weeks covering the month on screen (rows of seven days; days outside the month included).
-    var monthWeeks: [[CalendarDay]] {
-        var weeks: [[CalendarDay]] = []
-        var start = monthStart.startOfWeek()
-        let last = monthStart.lastOfMonth()
-        while start <= last {
-            weeks.append((0..<7).map { start.adding(days: $0) })
-            start = start.adding(days: 7)
-        }
-        return weeks
-    }
-
-    /// Busy intervals touching `day` (for the month view).
-    func intervals(on day: CalendarDay) -> [BusyInterval] {
-        let start = day.startDate(), end = day.adding(days: 1).startDate()
-        return intervals.filter { $0.overlaps(start, end) && !$0.isIgnored }
-    }
-
     var recurringBlocks: [ManualBlock] { blocks.filter { $0.repeat != .none } }
 
-    var layout: WeekLayout { WeekLayout(weekStart: weekStart, intervals: intervals) }
-
-    /// Distinct occurrences of your own blocks this week.
-    var blockedCount: Int {
-        Set(intervals.filter { $0.source == .manual }.map { "\($0.blockId ?? "")-\($0.start.timeIntervalSince1970)" }).count
+    /// The list's days in weeks (Monday to Sunday; the first starts today).
+    var weeks: [(start: CalendarDay, days: [CalendarDay])] {
+        var out: [(start: CalendarDay, days: [CalendarDay])] = []
+        for day in days {
+            let start = day.startOfWeek()
+            if out.last?.start == start { out[out.count - 1].days.append(day) } else { out.append((start, [day])) }
+        }
+        return out
     }
 
+    func summary(for day: CalendarDay) -> DaySummary {
+        summaries[day] ?? DaySummary(day: day, allDay: [], timed: [])
+    }
+
+    /// (Re)loads everything on the list so far (at least four weeks from today), and your blocks.
     func load() async {
-        isLoading = intervals.isEmpty
-        defer { isLoading = false }
-        let week = weekStart
-        let mode = self.mode
-        let month = monthStart
-        let from = mode == .week ? week.startDate() : month.startOfWeek().startDate()
-        let to = mode == .week ? week.adding(days: 7).startDate() : (monthWeeks.last?.last ?? month).adding(days: 1).startDate()
+        generation += 1
+        let generation = generation
+        let today = CalendarDay.today()
+        let count = max(Self.chunkDays, days.first == today ? days.count : 0)
         do {
-            async let busy = api.send(API.Me.busy(from: from, to: to))
             async let blockList = api.send(API.Blocks.list())
-            let loaded = try await busy.intervals
+            async let connections = try? api.send(API.Calendars.list())
+            var loaded: [BusyInterval] = []
+            var offset = 0
+            while offset < count {
+                let length = min(Self.maxRequestDays, count - offset)
+                loaded += try await fetch(from: today.adding(days: offset), days: length)
+                offset += length
+            }
             blocks = try await blockList.blocks
-            guard week == weekStart, mode == self.mode, month == monthStart else { return }
-            intervals = loaded
-            loadedWeek = week
+            if let connections = await connections { hasCalendar = !connections.connections.isEmpty }
+            guard generation == self.generation else { return }
+            days = (0..<count).map { today.adding(days: $0) }
+            setIntervals(loaded)
         } catch where !error.isCancellation {
             self.error = error.userMessage
-            // Show the (empty) grid rather than a loader that never ends.
-            if loadedWeek == nil { loadedWeek = week }
+            // Show free days rather than a loader that never ends.
+            if !hasLoaded {
+                days = (0..<count).map { today.adding(days: $0) }
+                setIntervals([])
+            }
         } catch {}
     }
 
-    func moveWeek(by weeks: Int) async {
-        weekStart = weekStart.adding(days: 7 * weeks)
-        intervals = []
-        await load()
+    /// The next four weeks, when the list scrolls to its end.
+    func loadMore() async {
+        if let moreTask { return await moreTask.value }
+        guard hasLoaded, let last = days.last, days.count < Self.maxDays else { return }
+        let task = Task {
+            isLoadingMore = true
+            defer { isLoadingMore = false; moreTask = nil }
+            let generation = generation
+            let from = last.adding(days: 1)
+            let count = min(Self.chunkDays, Self.maxDays - days.count)
+            do {
+                let loaded = try await fetch(from: from, days: count)
+                guard generation == self.generation, days.last == last else { return }
+                days += (0..<count).map { from.adding(days: $0) }
+                setIntervals(intervals + loaded)
+            } catch where !error.isCancellation {
+                self.error = error.userMessage
+            } catch {}
+        }
+        moreTask = task
+        await task.value
     }
 
-    /// Previous / next week or month, whichever is showing.
-    func move(by steps: Int) async {
-        switch mode {
-        case .week: await moveWeek(by: steps)
-        case .month:
-            monthStart = monthStart.addingMonths(steps)
-            intervals = []
-            await load()
+    /// Loads further weeks until `day` is on the list (or the list can't grow).
+    func ensureLoaded(through day: CalendarDay) async {
+        while let last = days.last, last < day {
+            let count = days.count
+            await loadMore()
+            if days.count == count { return }
         }
     }
 
-    func setMode(_ newMode: Mode) async {
-        guard newMode != mode else { return }
-        // Keep roughly the same place: the month of the week on screen, or the first week of the month.
-        if newMode == .month {
-            monthStart = weekStart.adding(days: 3).firstOfMonth
-        } else {
-            let today = CalendarDay.today()
-            weekStart = (today.firstOfMonth == monthStart ? today : monthStart).startOfWeek()
-        }
-        mode = newMode
-        intervals = []
-        await load()
+    private func fetch(from day: CalendarDay, days: Int) async throws -> [BusyInterval] {
+        try await api.send(API.Me.busy(from: day.startDate(), to: day.adding(days: days).startDate())).intervals
     }
 
-    /// A day tapped in the month: open its week.
-    func showWeek(of day: CalendarDay) async {
-        weekStart = day.startOfWeek()
-        mode = .week
-        intervals = []
-        await load()
+    /// Drops the repeats you get where neighbouring pages overlap (a block across the page boundary), then lays the days out.
+    private func setIntervals(_ list: [BusyInterval]) {
+        var seen = Set<BusyInterval>()
+        intervals = list.filter { seen.insert($0).inserted }
+        layout = DayLayout(days: days, intervals: intervals)
+        var summaries: [CalendarDay: DaySummary] = [:]
+        for day in days {
+            summaries[day] = DaySummary(day: day, allDay: layout.allDay[day] ?? [], timed: layout.timed[day] ?? [])
+        }
+        self.summaries = summaries
+        hasLoaded = true
+    }
+
+    /// Your own block behind a busy interval, if it still exists.
+    func block(for interval: BusyInterval) -> ManualBlock? {
+        blocks.first { $0.id == interval.blockId }
     }
 
     /// Marks a calendar event not busy: this occurrence, or (`series`) every occurrence.
@@ -152,7 +167,7 @@ final class MyTimeViewModel {
         do {
             try await api.send(API.Blocks.delete(id: block.id))
             blocks.removeAll { $0.id == block.id }
-            intervals.removeAll { $0.blockId == block.id }
+            setIntervals(intervals.filter { $0.blockId != block.id })
         } catch {
             self.error = error.userMessage
         }

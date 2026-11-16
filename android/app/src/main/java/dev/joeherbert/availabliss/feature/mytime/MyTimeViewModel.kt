@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.BlocksRepository
+import dev.joeherbert.availabliss.core.data.CalendarsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.live.LiveEvents
 import dev.joeherbert.availabliss.core.live.LivePayload
@@ -16,6 +17,8 @@ import dev.joeherbert.availabliss.core.network.model.Repeat
 import dev.joeherbert.availabliss.core.network.model.wireName
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,24 +26,38 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.time.LocalTime
 import javax.inject.Inject
+
+/** Weeks fetched per page as the day list scrolls (each request stays well under the 120-day limit). */
+private const val PAGE_DAYS = 28
+
+/** The busy endpoint takes at most 120 days per call. */
+private const val MAX_REQUEST_DAYS = 112
 
 @HiltViewModel
 class MyTimeViewModel @Inject constructor(
     private val blocksRepository: BlocksRepository,
     private val users: UserRepository,
+    private val calendars: CalendarsRepository,
     liveEvents: LiveEvents,
 ) : ViewModel() {
 
-    /** Raw data the grid is derived from. */
+    /** Raw data the list is derived from. */
     private var intervals: List<BusyInterval> = emptyList()
     private var blocks: List<ManualBlock> = emptyList()
 
-    private val _state = MutableStateFlow(initialState(DateTimes.startOfWeek(DateTimes.today())))
+    /** The list runs from [start] to [loadedThrough] (inclusive); [wantedThrough] is how far it should reach. */
+    private var start: LocalDate = DateTimes.today()
+    private var loadedThrough: LocalDate? = null
+    private var wantedThrough: LocalDate = endOfWeek(start).plusDays(PAGE_DAYS - 7L)
+
+    private val _state = MutableStateFlow(MyTimeUiState())
     val state: StateFlow<MyTimeUiState> = _state.asStateFlow()
 
     private var loadJob: Job? = null
+    private var moreJob: Job? = null
 
     init {
         load()
@@ -50,45 +67,130 @@ class MyTimeViewModel @Inject constructor(
             }
         }
         viewModelScope.launch { liveEvents.reconnected.collect { load(silent = true) } }
+        // "Connect a calendar" hint: only once we know for sure there are none.
+        viewModelScope.launch {
+            if (calendars.refresh() is ApiResult.Success) {
+                calendars.connections.collect { list -> _state.update { it.copy(showCalendarHint = list.isEmpty()) } }
+            }
+        }
     }
-
-    // region Week navigation
-    fun previousWeek() = showWeek(_state.value.weekStart.minusWeeks(1))
-
-    fun nextWeek() = showWeek(_state.value.weekStart.plusWeeks(1))
-
-    private fun showWeek(start: LocalDate) {
-        _state.update { initialState(start).copy(recurring = it.recurring) }
-        intervals = emptyList()
-        load()
-    }
-    // endregion
 
     fun refresh() = load(silent = true)
 
-    private fun load(silent: Boolean = false) {
+    /** Pull to refresh. */
+    fun pullRefresh() = load(silent = true, pulled = true)
+
+    /** Reloads every loaded day (from today, which may have moved on since). */
+    private fun load(silent: Boolean = false, pulled: Boolean = false) {
         loadJob?.cancel()
-        val weekStart = _state.value.weekStart
+        moreJob?.cancel()
+        val today = DateTimes.today()
+        if (today.isAfter(start)) start = today
+        val through = maxOf(loadedThrough ?: wantedThrough, start)
         loadJob = viewModelScope.launch {
             if (!silent) _state.update { it.copy(loading = true, error = null) }
-            val busyCall = async { blocksRepository.busy(weekStart, weekStart.plusDays(6)) }
+            if (pulled) _state.update { it.copy(refreshing = true) }
             val blocksCall = async { blocksRepository.blocks() }
-            val busy = busyCall.await()
+            val busy = fetch(start, through)
             val list = blocksCall.await()
             if (list is ApiResult.Success) blocks = list.value
             when (busy) {
                 is ApiResult.Success -> {
                     intervals = busy.value
-                    _state.update { it.copy(loading = false, error = null) }
+                    loadedThrough = through
+                    _state.update { it.copy(loading = false, refreshing = false, loadingMore = false, error = null) }
+                    publish()
+                    loadMore()
                 }
-                is ApiResult.Failure -> _state.update { it.copy(loading = false, error = busy.error.message) }
+                is ApiResult.Failure -> {
+                    _state.update { it.copy(loading = false, refreshing = false, loadingMore = false, error = busy.error.message) }
+                    publish()
+                }
             }
-            publish()
         }
     }
 
-    // region Grid taps
-    /** A tap on empty time opens the sheet on that day and range. */
+    /** Busy time for [from]..[to], in parallel requests under the endpoint's limit. */
+    private suspend fun fetch(from: LocalDate, to: LocalDate): ApiResult<List<BusyInterval>> = coroutineScope {
+        val results = dateChunks(from, to, MAX_REQUEST_DAYS)
+            .map { range -> async { blocksRepository.busy(range.start, range.endInclusive) } }
+            .awaitAll()
+        results.firstOrNull { it is ApiResult.Failure }
+            ?: ApiResult.Success(results.flatMap { (it as ApiResult.Success).value }.distinct())
+    }
+
+    // region Loading further days
+    /** The list has scrolled near its end: load the next few weeks. */
+    fun onNearEnd() {
+        val last = loadedThrough ?: return
+        if (moreJob?.isActive == true || loadJob?.isActive == true) return
+        wantedThrough = maxOf(wantedThrough, last.plusDays(PAGE_DAYS.toLong()))
+        loadMore()
+    }
+
+    /** Makes sure [date] (and the rest of its week) is loaded. */
+    private fun ensureLoaded(date: LocalDate) {
+        wantedThrough = maxOf(wantedThrough, endOfWeek(date))
+        if (loadJob?.isActive != true) loadMore()
+    }
+
+    /** Loads from just after [loadedThrough] up to [wantedThrough], a page at a time. */
+    private fun loadMore() {
+        if (moreJob?.isActive == true) return
+        val from = loadedThrough?.plusDays(1) ?: return
+        if (from.isAfter(wantedThrough)) return
+        moreJob = viewModelScope.launch {
+            _state.update { it.copy(loadingMore = true) }
+            var next = from
+            while (!next.isAfter(wantedThrough)) {
+                val to = minOf(maxOf(wantedThrough, next.plusDays(PAGE_DAYS - 1L)), next.plusDays(MAX_REQUEST_DAYS - 1L))
+                when (val busy = fetch(next, to)) {
+                    is ApiResult.Success -> {
+                        intervals = (intervals + busy.value).distinct()
+                        loadedThrough = to
+                        publish()
+                    }
+                    is ApiResult.Failure -> {
+                        // Scrolling to the end again retries.
+                        wantedThrough = loadedThrough ?: wantedThrough
+                        showMessage(busy.error.message)
+                        break
+                    }
+                }
+                next = to.plusDays(1)
+            }
+            _state.update { it.copy(loadingMore = false) }
+        }
+    }
+    // endregion
+
+    // region Jump to date and the day sheet
+    fun jumpTo(date: LocalDate) {
+        val target = maxOf(date, start)
+        _state.update { it.copy(scrollTo = target) }
+        ensureLoaded(target)
+    }
+
+    fun scrollHandled() = _state.update { it.copy(scrollTo = null) }
+
+    fun openDay(date: LocalDate) {
+        _state.update { it.copy(openDay = date) }
+        ensureLoaded(date)
+    }
+
+    fun closeDay() = _state.update { it.copy(openDay = null) }
+
+    /** The day sheet's previous / next arrows; never before today. */
+    fun stepDay(days: Long) {
+        val current = _state.value.openDay ?: return
+        val next = current.plusDays(days)
+        if (next.isBefore(start)) return
+        openDay(next)
+    }
+    // endregion
+
+    // region Taps
+    /** A tap on empty time in the day sheet opens the block sheet on that day and range. */
     fun onEmptyTapped(date: LocalDate, range: MinuteRange) {
         _state.update { it.copy(draft = BlockDraft.forRange(date, range), savingDraft = false) }
     }
@@ -188,18 +290,31 @@ class MyTimeViewModel @Inject constructor(
     // endregion
 
     // region "Block a time" sheet
-    fun openBlockSheet() {
-        val today = DateTimes.today()
-        val weekStart = _state.value.weekStart
-        val date = if (today in weekStart..weekStart.plusDays(6)) today else weekStart
-        _state.update { it.copy(draft = BlockDraft(date = date)) }
-    }
+    /** "Something else…": the sheet as it comes, on today. */
+    fun openBlockSheet() = openDraft(BlockDraft(date = DateTimes.today()))
+
+    /** "This evening" (or tomorrow evening once it's past 18:00). */
+    fun blockEvening() = openDraft(BlockDraft.evening(DateTimes.now().toLocalDateTime()))
+
+    /** "All day…" once the day is picked. */
+    fun blockAllDay(date: LocalDate) = openDraft(BlockDraft.allDay(date))
+
+    /** "Away for a few days…" once the dates are picked. */
+    fun blockAway(from: LocalDate, to: LocalDate) = openDraft(BlockDraft.away(from, to))
+
+    private fun openDraft(draft: BlockDraft) = _state.update { it.copy(draft = draft, savingDraft = false) }
 
     fun closeBlockSheet() = _state.update { it.copy(draft = null, savingDraft = false) }
 
     fun updateDraft(transform: (BlockDraft) -> BlockDraft) = _state.update { s -> s.copy(draft = s.draft?.let(transform)) }
 
-    fun onDraftDate(date: LocalDate) = updateDraft { it.copy(date = date, until = it.until?.takeIf { u -> !u.isBefore(date) }) }
+    fun onDraftDate(date: LocalDate) = updateDraft { it.copy(date = date, lastDay = null, until = it.until?.takeIf { u -> !u.isBefore(date) }) }
+
+    /** All day over several days: new first and last days. */
+    fun onDraftDates(from: LocalDate, to: LocalDate) = updateDraft { d ->
+        val away = BlockDraft.away(from, to)
+        d.copy(date = away.date, lastDay = away.lastDay, until = d.until?.takeIf { u -> !u.isBefore(away.date) })
+    }
 
     fun onDraftWhen(option: BlockWhen) = updateDraft { it.copy(whenOption = option) }
 
@@ -234,7 +349,7 @@ class MyTimeViewModel @Inject constructor(
                     blocks = blocks.filterNot { it.id == result.value.id } + result.value
                     _state.update { it.copy(draft = null, savingDraft = false) }
                     val verb = if (draft.isEditing) "Updated" else "Blocked"
-                    showMessage("$verb ${DateTimes.shortDay(draft.date)} · ${draft.timeLabel}")
+                    showMessage("$verb ${draft.dateLabel} · ${draft.timeLabel}")
                     load(silent = true)
                 }
                 is ApiResult.Failure -> {
@@ -252,11 +367,17 @@ class MyTimeViewModel @Inject constructor(
 
     /** Recomputes everything derived from the raw data. */
     private fun publish() {
+        val today = DateTimes.today()
+        val last = loadedThrough
+        val days = if (last == null || last.isBefore(start)) emptyList()
+        else (0..ChronoUnit.DAYS.between(start, last)).map(start::plusDays)
+        val layout = layoutDays(days, intervals)
+        val rows = days.map { day -> dayRow(day, layout.allDay[day].orEmpty(), layout.timed[day].orEmpty(), today) }
         _state.update { s ->
             s.copy(
-                today = DateTimes.today(),
-                layout = layoutWeek(s.weekStart, intervals),
-                blockedCount = blockedOccurrences(intervals),
+                today = today,
+                layout = layout,
+                days = rows,
                 recurring = blocks
                     .filter { it.repeat != Repeat.None }
                     .sortedBy { it.start }
@@ -264,9 +385,4 @@ class MyTimeViewModel @Inject constructor(
             )
         }
     }
-
-    private fun initialState(weekStart: LocalDate) = MyTimeUiState(
-        weekStart = weekStart,
-        weekLabel = DateTimes.weekRange(weekStart, weekStart.plusDays(6)),
-    )
 }

@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import type { BusyInterval } from '#lib/types';
-import { assignLanes, dayLength, initialScrollMinutes, layoutWeek, rangeToIso, selectionRange, tapRange } from './parts';
+import { addDays, eachDay } from '#lib/client/dates';
+import { assignLanes, dayLength, layoutDays, rangeToIso, selectionRange, tapRange } from './parts';
+
+const layoutWeek = (weekStart: string, intervals: BusyInterval[], tz: string) => layoutDays(eachDay(weekStart, addDays(weekStart, 6)), intervals, tz);
 
 const TZ = 'Europe/London';
 
@@ -8,7 +11,7 @@ function busy(start: string, end: string, source: BusyInterval['source'] = 'manu
 	return { start, end, source, label: null, calendarId: null, blockId: source === 'manual' ? 'b' : null };
 }
 
-describe('layoutWeek', () => {
+describe('layoutDays', () => {
 	// Monday 2 November 2026 (GMT, so UTC = London).
 	const week = '2026-11-02';
 
@@ -79,12 +82,5 @@ describe('ranges', () => {
 
 	test('rangeToIso maps 24:00 to the next midnight', () => {
 		expect(rangeToIso('2026-11-03', 18 * 60, 1440, TZ)).toEqual({ start: '2026-11-03T18:00:00.000Z', end: '2026-11-04T00:00:00.000Z' });
-	});
-
-	test('initialScrollMinutes starts an hour before the earliest item, no later than 06:00', () => {
-		const empty = layoutWeek('2026-11-02', [], TZ);
-		expect(initialScrollMinutes(empty)).toBe(6 * 60);
-		const early = layoutWeek('2026-11-02', [busy('2026-11-04T05:30:00Z', '2026-11-04T06:00:00Z')], TZ);
-		expect(initialScrollMinutes(early)).toBe(4 * 60);
 	});
 });

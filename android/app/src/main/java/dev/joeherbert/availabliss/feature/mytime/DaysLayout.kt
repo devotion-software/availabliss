@@ -2,7 +2,6 @@ package dev.joeherbert.availabliss.feature.mytime
 
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.BusyInterval
-import dev.joeherbert.availabliss.core.network.model.BusySource
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -10,10 +9,10 @@ import java.util.Locale
 import kotlin.math.floor
 
 /*
- * "My time" week view model: days across the top, hours down the side, and
- * every busy interval placed at its exact start and end. Overlapping intervals
- * share the column side by side; intervals covering whole days sit in the
- * all-day row. Pure, so it is unit-testable (mirrors web `mytime/parts.ts`).
+ * "My time" layout: every busy interval placed at its exact start and end on
+ * each day's 24-hour axis. Overlapping intervals share the day side by side;
+ * intervals covering whole days are kept apart as all-day items. Pure, so it is
+ * unit-testable (mirrors web `mytime/parts.ts`).
  */
 
 const val DAY_MINUTES = 24 * 60
@@ -38,7 +37,7 @@ data class PlacedInterval(
     val minutes: Float get() = to - from
 }
 
-data class WeekLayout(
+data class DaysLayout(
     val days: List<LocalDate>,
     /** Intervals that cover whole days, per day. */
     val allDay: Map<LocalDate, List<BusyInterval>>,
@@ -48,10 +47,7 @@ data class WeekLayout(
     val hasAllDay: Boolean get() = allDay.values.any { it.isNotEmpty() }
 
     companion object {
-        fun empty(weekStart: LocalDate): WeekLayout {
-            val days = weekDays(weekStart)
-            return WeekLayout(days, days.associateWith { emptyList() }, days.associateWith { emptyList() })
-        }
+        val Empty = DaysLayout(emptyList(), emptyMap(), emptyMap())
     }
 }
 
@@ -60,8 +56,6 @@ data class MinuteRange(val from: Int, val to: Int)
 
 /** An item with its side-by-side lane among overlapping items. */
 data class Laned<T>(val item: T, val lane: Int, val lanes: Int)
-
-private fun weekDays(weekStart: LocalDate): List<LocalDate> = (0L until 7L).map(weekStart::plusDays)
 
 /** Minutes from local midnight starting [day] to [instant]; negative before the day. */
 internal fun minutesIntoDay(instant: Instant, day: LocalDate, zone: ZoneId): Float =
@@ -111,9 +105,8 @@ private data class Piece(
     val continuesAfter: Boolean,
 )
 
-/** Lays out [intervals] over the 7 days from [weekStart] in [zone]. Unparseable intervals are skipped. */
-fun layoutWeek(weekStart: LocalDate, intervals: List<BusyInterval>, zone: ZoneId = DateTimes.zone): WeekLayout {
-    val days = weekDays(weekStart)
+/** Lays out [intervals] over [days] in [zone]. Unparseable intervals are skipped. */
+fun layoutDays(days: List<LocalDate>, intervals: List<BusyInterval>, zone: ZoneId = DateTimes.zone): DaysLayout {
     val parsed = intervals.mapNotNull { interval ->
         val start = DateTimes.parseInstant(interval.start) ?: return@mapNotNull null
         val end = DateTimes.parseInstant(interval.end) ?: return@mapNotNull null
@@ -146,14 +139,7 @@ fun layoutWeek(weekStart: LocalDate, intervals: List<BusyInterval>, zone: ZoneId
             PlacedInterval(p.interval, day, p.from, p.to, lane, lanes, p.continuesBefore, p.continuesAfter)
         }
     }
-    return WeekLayout(days, allDay, timed)
-}
-
-/** Where to scroll to first: an hour before the earliest timed interval, but no later than 06:00. */
-fun initialScrollMinutes(layout: WeekLayout): Int {
-    var earliest = 7f * 60
-    layout.timed.values.forEach { list -> list.forEach { earliest = minOf(earliest, it.from) } }
-    return maxOf(0, floor(earliest / 60).toInt() * 60 - 60)
+    return DaysLayout(days, allDay, timed)
 }
 
 /** The range a tap on an empty slot suggests: the hour it falls in. */
@@ -167,10 +153,3 @@ fun clock(minutes: Float): String {
     val m = Math.round(minutes)
     return String.format(Locale.ROOT, "%02d:%02d", m / 60, m % 60)
 }
-
-/** Manual blocks distinct by occurrence (a block id + start), as in "N blocked this week". */
-fun blockedOccurrences(intervals: List<BusyInterval>): Int =
-    intervals.filter { it.source == BusySource.Manual }
-        .map { it.blockId to it.start }
-        .distinct()
-        .size

@@ -15,13 +15,15 @@
 		/** `auto`: bottom sheet on phones, centred modal on wider screens. `center`: always a centred modal. */
 		placement?: 'auto' | 'center';
 		width?: number;
+		/** Take the full height available (a large detent), e.g. for a day's timeline. */
+		tall?: boolean;
 		onclose?: () => void;
 		children: Snippet;
 		footer?: Snippet;
 		/** Shown between the title and the description, e.g. a step indicator. */
 		lead?: Snippet;
 	}
-	let { open = $bindable(), title, description, placement = 'auto', width = 480, onclose, children, footer, lead }: Props = $props();
+	let { open = $bindable(), title, description, placement = 'auto', width = 480, tall = false, onclose, children, footer, lead }: Props = $props();
 
 	const uid = $props.id();
 	const phone = new MediaQuery('(max-width: 639px)');
@@ -61,6 +63,7 @@
 		<button class="scrim" tabindex="-1" aria-label="Close" onclick={close}></button>
 		<div
 			class="panel glass"
+			class:tall
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="sheet-title-{uid}"
@@ -125,6 +128,16 @@
 		max-width: none;
 		max-height: calc(100dvh - 16px);
 		padding-bottom: max(18px, env(safe-area-inset-bottom));
+	}
+	.panel.tall {
+		height: calc(100dvh - 48px);
+	}
+	.sheet .panel.tall {
+		height: calc(100dvh - 16px - env(safe-area-inset-top));
+	}
+	.panel.tall .body {
+		flex: 1;
+		min-height: 0;
 	}
 	.panel:focus {
 		outline: none;

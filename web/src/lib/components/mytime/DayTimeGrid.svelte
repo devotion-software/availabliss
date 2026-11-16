@@ -2,27 +2,30 @@
 	import { onMount } from 'svelte';
 	import type { BusyInterval } from '#lib/types';
 	import { minutesIntoDay } from '#lib/client/dates';
-	import { dayNumber, weekdayName } from '#lib/client/format';
-	import { clock, DAY_MINUTES, initialScrollMinutes, selectionRange, tapRange, type PlacedInterval, type WeekLayout } from './parts';
+	import { weekdayName } from '#lib/client/format';
+	import { clock, DAY_MINUTES, selectionRange, tapRange, type PlacedInterval } from './parts';
 
 	/**
-	 * Week view of your busy time: days across the top, hours down the side,
-	 * every interval at its exact times. Tap an empty slot (or drag with a mouse)
-	 * to block that time; tap busy time to edit or inspect it.
+	 * One day of your busy time, hours down the side, every interval at its exact
+	 * times. Tap empty time (or drag with a mouse) to block it; tap busy time to
+	 * edit or inspect it.
 	 */
 	interface Props {
-		layout: WeekLayout;
+		day: string;
+		/** Timed intervals on `day`, with lanes. */
+		timed: PlacedInterval[];
 		today: string;
 		timeZone: string;
+		/** Minutes to scroll to whenever the day changes. */
+		scrollTo?: number;
 		/** A tap (an hour) or a drag (exact range) on empty time. */
 		onselect: (day: string, from: number, to: number, dragged: boolean) => void;
 		/** A tap on busy time: your own block, or an interval from a calendar. */
 		onopen: (interval: BusyInterval) => void;
 	}
-	let { layout, today, timeZone, onselect, onopen }: Props = $props();
+	let { day, timed, today, timeZone, scrollTo = 8 * 60, onselect, onopen }: Props = $props();
 
 	const HOURS = Array.from({ length: 24 }, (_, h) => h);
-	const hasAllDay = $derived([...layout.allDay.values()].some((list) => list.length > 0));
 
 	let scroller = $state<HTMLDivElement>();
 	let now = $state(Date.now());
@@ -32,17 +35,25 @@
 		return () => clearInterval(timer);
 	});
 
-	// Open on the working day (or the earliest busy time) whenever the week changes.
+	// Open on the morning whenever the day changes.
 	let scrolledFor = '';
 	$effect(() => {
-		const week = layout.days[0];
-		if (!scroller || scrolledFor === week) return;
-		scrolledFor = week;
-		const hourPx = scroller.scrollHeight / 24;
-		scroller.scrollTop = (initialScrollMinutes(layout) / 60) * hourPx;
+		const el = scroller;
+		if (!el || scrolledFor === day) return;
+		const target = day;
+		// In a sheet the grid can mount before it's laid out: wait for a height to scroll by.
+		let frame = 0;
+		let tries = 0;
+		const apply = () => {
+			if (el.scrollHeight <= el.clientHeight && tries++ < 60) return void (frame = requestAnimationFrame(apply));
+			scrolledFor = target;
+			el.scrollTop = (scrollTo / 60) * (el.scrollHeight / 24);
+		};
+		apply();
+		return () => cancelAnimationFrame(frame);
 	});
 
-	const nowMinutes = $derived(layout.days.includes(today) ? minutesIntoDay(new Date(now).toISOString(), today, timeZone) : null);
+	const nowMinutes = $derived(day === today ? minutesIntoDay(new Date(now).toISOString(), today, timeZone) : null);
 
 	// ── Selecting empty time ────────────────────────────────────────────────
 	let drag = $state<{ day: string; anchor: number; current: number; pointerId: number; moved: boolean } | null>(null);
@@ -91,7 +102,7 @@
 
 	function boxStyle(p: PlacedInterval): string {
 		const width = 100 / p.lanes;
-		return `top:${top(p.from)};height:${((p.to - p.from) / DAY_MINUTES) * 100}%;left:calc(${p.lane * width}% + 2px);width:calc(${width}% - 4px)`;
+		return `top:${top(p.from)};height:${((p.to - p.from) / DAY_MINUTES) * 100}%;left:calc(${p.lane * width}% + 4px);width:calc(${width}% - 8px)`;
 	}
 
 	const labelOf = (i: BusyInterval) => i.label ?? 'Busy';
@@ -105,37 +116,7 @@
 	}
 </script>
 
-<div class="wtg" style="--cols: {layout.days.length}">
-	<div class="row head" aria-hidden="true">
-		<span class="gutter"></span>
-		{#each layout.days as day (day)}
-			<span class="dayhead" class:today={day === today}>
-				<span class="dname">{weekdayName(day)}</span>
-				<span class="dnum">{dayNumber(day)}</span>
-			</span>
-		{/each}
-	</div>
-
-	{#if hasAllDay}
-		<div class="row allday">
-			<span class="gutter label">All day</span>
-			{#each layout.days as day (day)}
-				<div class="allday-cell">
-					{#each layout.allDay.get(day) ?? [] as interval, i (i)}
-						<button
-							type="button"
-							class="chip {interval.source}"
-							class:ignored={!!interval.ignoreId}
-							title={labelOf(interval)}
-							aria-label="{interval.source === 'manual' ? 'Edit' : 'About'} {labelOf(interval)}, all day {weekdayName(day, 'long')}"
-							onclick={() => onopen(interval)}>{labelOf(interval)}</button
-						>
-					{/each}
-				</div>
-			{/each}
-		</div>
-	{/if}
-
+<div class="dtg">
 	<div class="scroller" bind:this={scroller}>
 		<div class="body">
 			<div class="gutter hours" aria-hidden="true">
@@ -143,128 +124,62 @@
 					{#if h > 0}<span class="hour" style="top: {top(h * 60)}">{String(h).padStart(2, '0')}:00</span>{/if}
 				{/each}
 			</div>
-			{#each layout.days as day (day)}
-				<div
-					class="column"
-					class:today={day === today}
-					role="group"
-					aria-label="{weekdayName(day, 'long')} {dayNumber(day)}"
-					onpointerdown={(e) => down(e, day)}
-					onpointermove={move}
-					onpointerup={up}
-					onpointercancel={cancel}
-				>
-					{#each layout.timed.get(day) ?? [] as p, i (i)}
-						{@const minutes = p.to - p.from}
-						<button
-							type="button"
-							class="event {p.interval.source}"
-							class:ignored={!!p.interval.ignoreId}
-							class:cont-before={p.continuesBefore}
-							class:cont-after={p.continuesAfter}
-							style={boxStyle(p)}
-							title={describe(p)}
-							aria-label="{p.interval.source === 'manual' ? 'Edit: ' : ''}{describe(p)}"
-							onclick={() => onopen(p.interval)}
-						>
-							<span class="elabel">{labelOf(p.interval)}</span>
-							{#if minutes >= 45}<span class="etime">{clock(p.from)} – {clock(p.to)}</span>{/if}
-						</button>
-					{/each}
+			<div
+				class="column"
+				role="group"
+				aria-label="Times on {weekdayName(day, 'long')}. Tap empty time to block it."
+				onpointerdown={(e) => down(e, day)}
+				onpointermove={move}
+				onpointerup={up}
+				onpointercancel={cancel}
+			>
+				{#each timed as p, i (i)}
+					{@const minutes = p.to - p.from}
+					<button
+						type="button"
+						class="event {p.interval.source}"
+						class:ignored={!!p.interval.ignoreId}
+						class:cont-before={p.continuesBefore}
+						class:cont-after={p.continuesAfter}
+						class:short={minutes < 45}
+						style={boxStyle(p)}
+						title={describe(p)}
+						aria-label="{p.interval.source === 'manual' ? 'Edit: ' : ''}{describe(p)}"
+						onclick={() => onopen(p.interval)}
+					>
+						<span class="elabel">{labelOf(p.interval)}</span>
+						<span class="etime">{clock(p.from)} – {clock(p.to)}</span>
+					</button>
+				{/each}
 
-					{#if selection && selection.day === day}
-						<div class="selection" style="top:{top(selection.from)};height:{((selection.to - selection.from) / DAY_MINUTES) * 100}%">
-							{clock(selection.from)} – {clock(selection.to)}
-						</div>
-					{/if}
+				{#if selection && selection.day === day}
+					<div class="selection" style="top:{top(selection.from)};height:{((selection.to - selection.from) / DAY_MINUTES) * 100}%">
+						{clock(selection.from)} – {clock(selection.to)}
+					</div>
+				{/if}
 
-					{#if day === today && nowMinutes !== null && nowMinutes >= 0 && nowMinutes <= DAY_MINUTES}
-						<div class="now" style="top: {top(nowMinutes)}" aria-hidden="true"></div>
-					{/if}
-				</div>
-			{/each}
+				{#if nowMinutes !== null && nowMinutes >= 0 && nowMinutes <= DAY_MINUTES}
+					<div class="now" style="top: {top(nowMinutes)}" aria-hidden="true"></div>
+				{/if}
+			</div>
 		</div>
 	</div>
 </div>
 
 <style>
-	.wtg {
-		--gutter-w: 38px;
-		--hour: 44px;
+	.dtg {
+		--gutter-w: 48px;
+		/* At least 48px an hour so every slot is an easy target. */
+		--hour: 52px;
 		display: flex;
 		flex-direction: column;
 		min-width: 0;
+		min-height: 0;
+		height: var(--grid-h, auto);
 		user-select: none;
 	}
-	.row,
-	.body {
-		display: grid;
-		grid-template-columns: var(--gutter-w) repeat(var(--cols), minmax(0, 1fr));
-	}
-	.head {
-		padding-bottom: 8px;
-		border-bottom: 1px solid var(--line);
-	}
-	.dayhead {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 2px;
-		line-height: 1.1;
-	}
-	.dname {
-		font-size: 11px;
-		font-weight: 600;
-		color: var(--muted);
-	}
-	.dnum {
-		font-family: var(--font-display);
-		font-size: 17px;
-		font-weight: 650;
-		width: 30px;
-		height: 30px;
-		display: grid;
-		place-items: center;
-		border-radius: 999px;
-	}
-	.dayhead.today .dname {
-		color: var(--accent-ink);
-	}
-	.dayhead.today .dnum {
-		background: var(--accent);
-		color: var(--on-accent);
-	}
-
-	.allday {
-		padding: 6px 0;
-		border-bottom: 1px solid var(--line);
-	}
-	.label {
-		font-size: 10px;
-		font-weight: 600;
-		color: var(--muted);
-		align-self: center;
-		line-height: 1.1;
-	}
-	.allday-cell {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
-		padding: 0 2px;
-		min-width: 0;
-	}
-	.chip {
-		font-size: 10px;
-		font-weight: 600;
-		border-radius: 6px;
-		padding: 3px 5px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
 	.scroller {
-		max-height: min(62dvh, 640px);
+		height: var(--grid-h, min(60dvh, 620px));
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		padding-top: 8px;
@@ -272,6 +187,8 @@
 	}
 	.body {
 		position: relative;
+		display: grid;
+		grid-template-columns: var(--gutter-w) minmax(0, 1fr);
 		height: calc(var(--hour) * 24);
 	}
 	.hours {
@@ -279,9 +196,9 @@
 	}
 	.hour {
 		position: absolute;
-		right: 6px;
+		right: 8px;
 		transform: translateY(-50%);
-		font-size: 10px;
+		font-size: 11px;
 		font-variant-numeric: tabular-nums;
 		color: var(--muted);
 	}
@@ -295,25 +212,18 @@
 		cursor: cell;
 		touch-action: pan-y;
 	}
-	.column.today {
-		background-color: color-mix(in srgb, var(--accent-soft) 35%, transparent);
-	}
-
-	.event,
-	.chip {
-		border: 1px solid transparent;
-	}
 	.event {
 		position: absolute;
-		border-radius: 8px;
-		padding: 3px 5px;
+		border: 1px solid transparent;
+		border-radius: 10px;
+		padding: 5px 8px;
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
-		font-size: 11px;
-		line-height: 1.2;
-		min-height: 14px;
+		font-size: 13px;
+		line-height: 1.25;
+		min-height: 18px;
 		text-align: left;
 		align-items: stretch;
 		justify-content: flex-start;
@@ -322,16 +232,18 @@
 			transform 0.12s ease,
 			box-shadow 0.15s ease;
 	}
-	.event:hover,
-	.chip:hover {
+	/* Short items put the time beside the name. */
+	.event.short {
+		flex-direction: row;
+		align-items: center;
+		gap: 8px;
+		padding-block: 0 1px;
+	}
+	.event:hover {
 		box-shadow: 0 6px 16px -10px var(--shadow);
 	}
 	.event:active {
 		transform: scale(0.98);
-	}
-	.chip {
-		cursor: pointer;
-		text-align: left;
 	}
 	.manual {
 		background: var(--stripe-manual), var(--surface);
@@ -343,8 +255,6 @@
 		border-color: var(--busy-line);
 		border-left: 3px solid var(--busy-line);
 		color: var(--ink);
-	}
-	.event.calendar {
 		backdrop-filter: blur(6px);
 	}
 	/* Marked not busy: a faded dashed outline. */
@@ -368,31 +278,29 @@
 		text-overflow: ellipsis;
 	}
 	.etime {
-		font-size: 10px;
+		font-size: 12px;
 		opacity: 0.8;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		font-variant-numeric: tabular-nums;
 	}
-
 	.selection {
 		position: absolute;
-		left: 2px;
-		right: 2px;
-		border-radius: 8px;
+		left: 4px;
+		right: 4px;
+		border-radius: 10px;
 		background: var(--accent-soft);
 		border: 1.5px dashed var(--accent);
 		color: var(--accent-ink);
-		font-size: 10px;
+		font-size: 12px;
 		font-weight: 650;
-		padding: 3px 5px;
+		padding: 4px 8px;
 		pointer-events: none;
 		font-variant-numeric: tabular-nums;
 		overflow: hidden;
 		white-space: nowrap;
 	}
-
 	.now {
 		position: absolute;
 		left: -1px;
@@ -410,22 +318,5 @@
 		height: 8px;
 		border-radius: 50%;
 		background: var(--warn);
-	}
-
-	@media (min-width: 900px) {
-		.wtg {
-			--gutter-w: 48px;
-			--hour: 48px;
-		}
-		.event {
-			font-size: 12px;
-			padding: 4px 6px;
-		}
-		.etime {
-			font-size: 11px;
-		}
-		.chip {
-			font-size: 11px;
-		}
 	}
 </style>

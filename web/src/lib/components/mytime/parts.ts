@@ -1,11 +1,10 @@
 /**
- * "My time" week view model: days across the top, hours down the side, and
- * every busy interval placed at its exact start and end. Overlapping intervals
- * share the column side by side; intervals covering whole days sit in the
- * all-day row.
+ * "My time" day model: every busy interval placed at its exact start and end
+ * within each day. Overlapping intervals share the column side by side;
+ * intervals covering whole days sit in the all-day row.
  */
 import type { BusyInterval, ManualBlock } from '#lib/types';
-import { addDays, dayKeyIn, eachDay, minutesIntoDay, timeIn, weekdayOf, zonedToIso } from '#lib/client/dates';
+import { addDays, dayKeyIn, minutesIntoDay, timeIn, weekdayOf, zonedToIso } from '#lib/client/dates';
 import { WEEKDAY_NAMES } from '#lib/client/requirements';
 import { formatDayKey } from '#lib/client/format';
 
@@ -29,7 +28,7 @@ export interface PlacedInterval {
 	continuesAfter: boolean;
 }
 
-export interface WeekLayout {
+export interface DaysLayout {
 	days: string[];
 	/** Intervals that cover whole days, per day. */
 	allDay: Map<string, BusyInterval[]>;
@@ -69,15 +68,25 @@ export function assignLanes<T extends { from: number; to: number }>(items: T[]):
 	return out;
 }
 
-export function layoutWeek(weekStart: string, intervals: readonly BusyInterval[], timeZone: string): WeekLayout {
-	const days = eachDay(weekStart, addDays(weekStart, 6));
+/**
+ * Lays out busy time for any run of days (the list's days, or one day in the day sheet).
+ * Intervals are bucketed by the days they touch first, so long ranges stay cheap.
+ */
+export function layoutDays(days: readonly string[], intervals: readonly BusyInterval[], timeZone: string): DaysLayout {
+	const wanted = new Set(days);
+	const byDay = new Map<string, BusyInterval[]>(days.map((d) => [d, []]));
+	for (const interval of intervals) {
+		const first = dayKeyIn(interval.start, timeZone);
+		const last = dayKeyIn(interval.end, timeZone);
+		for (let d = first; d <= last; d = addDays(d, 1)) if (wanted.has(d)) byDay.get(d)!.push(interval);
+	}
+
 	const allDay = new Map<string, BusyInterval[]>(days.map((d) => [d, []]));
 	const timed = new Map<string, PlacedInterval[]>();
-
 	for (const day of days) {
 		const length = dayLength(day, timeZone);
 		const pieces: Omit<PlacedInterval, 'lane' | 'lanes'>[] = [];
-		for (const interval of intervals) {
+		for (const interval of byDay.get(day)!) {
 			const start = minutesIntoDay(interval.start, day, timeZone);
 			const end = minutesIntoDay(interval.end, day, timeZone);
 			if (end <= 0 || start >= length) continue;
@@ -98,14 +107,7 @@ export function layoutWeek(weekStart: string, intervals: readonly BusyInterval[]
 		}
 		timed.set(day, assignLanes(pieces));
 	}
-	return { days, allDay, timed };
-}
-
-/** Where to scroll to first: an hour before the earliest timed interval, but no later than 07:00. */
-export function initialScrollMinutes(layout: WeekLayout): number {
-	let earliest = 7 * 60;
-	for (const list of layout.timed.values()) for (const p of list) earliest = Math.min(earliest, p.from);
-	return Math.max(0, Math.floor(earliest / 60) * 60 - 60);
+	return { days: [...days], allDay, timed };
 }
 
 /** A drag between two points, snapped outwards to quarter hours, at least one step long. */

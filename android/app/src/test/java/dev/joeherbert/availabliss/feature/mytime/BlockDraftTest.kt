@@ -103,6 +103,40 @@ class BlockDraftTest {
     }
 
     @Test
+    fun evening_isTodayUntilSixThenTomorrow() {
+        val before = BlockDraft.evening(day.atTime(17, 59))
+        assertEquals(day, before.date)
+        assertEquals(LocalTime.of(18, 0), before.start)
+        assertEquals(LocalTime.MIDNIGHT, before.end)
+        assertEquals(day.atTime(18, 0) to day.plusDays(1).atStartOfDay(), before.range())
+        assertEquals("This evening", BlockDraft.eveningLabel(day.atTime(17, 59)))
+        assertEquals(day.plusDays(1), BlockDraft.evening(day.atTime(18, 0)).date)
+        assertEquals("Tomorrow evening", BlockDraft.eveningLabel(day.atTime(20, 0)))
+    }
+
+    @Test
+    fun away_coversEveryDayInclusive() {
+        val draft = BlockDraft.away(day, day.plusDays(4))
+        assertEquals(BlockWhen.AllDay, draft.whenOption)
+        assertTrue(draft.isMultiDay)
+        assertEquals(day.atStartOfDay() to day.plusDays(5).atStartOfDay(), draft.range())
+        assertTrue(draft.toRequest().allDay)
+        // One day picked is just that day.
+        assertFalse(BlockDraft.away(day, day).isMultiDay)
+        assertEquals(day.atStartOfDay() to day.plusDays(1).atStartOfDay(), BlockDraft.allDay(day).range())
+    }
+
+    @Test
+    fun multiDayAllDayBlock_roundTrips() {
+        val original = block(LocalTime.MIDNIGHT, LocalTime.MIDNIGHT, endDate = day.plusDays(3), allDay = true)
+        val draft = draftOf(original)
+        assertEquals(day.plusDays(2), draft.lastDay)
+        val request = draft.toRequest()
+        assertEquals(original.start, request.start)
+        assertEquals(original.end, request.end)
+    }
+
+    @Test
     fun repeatWireNames_matchTheApi() {
         assertEquals(listOf("none", "weekly", "fortnightly"), Repeat.entries.map { it.wireName })
     }

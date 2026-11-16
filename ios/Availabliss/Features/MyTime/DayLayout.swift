@@ -1,11 +1,11 @@
 import Foundation
 
-/// The "My time" week, laid out: days across the top, minutes down the side, and every
-/// busy interval at its exact start and end. Overlapping intervals share the column side
-/// by side; intervals covering whole days go in the all-day row.
+/// "My time" days, laid out: for each day, every busy interval at its exact start and end on a
+/// 24-hour axis. Overlapping intervals share the column side by side; intervals covering whole
+/// days go with the all-day items.
 ///
 /// Pure value logic (no UI) so it can be unit tested. Mirrors `web/src/lib/components/mytime/parts.ts`.
-struct WeekLayout: Sendable {
+struct DayLayout: Sendable {
     static let dayMinutes = 24 * 60
     /// Tapping an empty slot suggests an hour.
     static let defaultBlockMinutes = 60
@@ -36,8 +36,7 @@ struct WeekLayout: Sendable {
 
     var hasAllDay: Bool { allDay.values.contains { !$0.isEmpty } }
 
-    init(weekStart: CalendarDay, intervals: [BusyInterval], calendar: Calendar = .current) {
-        let days = (0..<7).map { weekStart.adding(days: $0, calendar: calendar) }
+    init(days: [CalendarDay], intervals: [BusyInterval], calendar: Calendar = .current) {
         var allDay: [CalendarDay: [BusyInterval]] = [:]
         var timed: [CalendarDay: [Placed]] = [:]
         let ordered = intervals.sorted { ($0.start, $0.end) < ($1.start, $1.end) }
@@ -49,7 +48,9 @@ struct WeekLayout: Sendable {
             let scale = Double(Self.dayMinutes) / length
             var whole: [BusyInterval] = []
             var pieces: [Placed] = []
+            let dayEnd = midnight.addingTimeInterval(length * 60)
             for interval in ordered {
+                if interval.start >= dayEnd { break }
                 let start = interval.start.timeIntervalSince(midnight) / 60
                 let end = interval.end.timeIntervalSince(midnight) / 60
                 if end <= 0 || start >= length { continue }
@@ -122,15 +123,6 @@ struct WeekLayout: Sendable {
         }
         flush()
         return out
-    }
-
-    /// Where to scroll to first: an hour before the earliest timed interval, but no later than 06:00.
-    var initialScrollMinutes: Int {
-        var earliest = Double(7 * 60)
-        for pieces in timed.values {
-            for piece in pieces { earliest = min(earliest, piece.from) }
-        }
-        return max(0, Int(earliest / 60) * 60 - 60)
     }
 
     /// The range a tap on an empty slot suggests: the hour it falls in (23:xx → 23:00–24:00).

@@ -11,7 +11,7 @@ import java.time.ZoneId
 import kotlin.math.roundToInt
 
 /** Ported from web `mytime/parts.test.ts`. */
-class WeekLayoutTest {
+class DaysLayoutTest {
     private val london = ZoneId.of("Europe/London")
 
     // Monday 2 November 2026 (GMT, so UTC = London).
@@ -21,6 +21,9 @@ class WeekLayoutTest {
         BusyInterval(start, end, source, label = null, calendarId = null, blockId = if (source == BusySource.Manual) "b" else null)
 
     private fun date(s: String) = LocalDate.parse(s)
+
+    private fun layoutWeek(start: LocalDate, intervals: List<BusyInterval>, zone: ZoneId) =
+        layoutDays((0L until 7L).map(start::plusDays), intervals, zone)
 
     @Test
     fun placesIntervalsAtExactMinutesOnTheirDay() {
@@ -102,28 +105,8 @@ class WeekLayoutTest {
     }
 
     @Test
-    fun initialScrollStartsAnHourBeforeTheEarliestItem_noLaterThan0600() {
-        assertEquals(6 * 60, initialScrollMinutes(layoutWeek(week, emptyList(), london)))
-        val early = layoutWeek(week, listOf(busy("2026-11-04T05:30:00Z", "2026-11-04T06:00:00Z")), london)
-        assertEquals(4 * 60, initialScrollMinutes(early))
-        val late = layoutWeek(week, listOf(busy("2026-11-02T09:00:00Z", "2026-11-02T17:30:00Z")), london)
-        assertEquals(6 * 60, initialScrollMinutes(late))
-    }
-
-    @Test
     fun clockFormatsMinutes() {
         assertEquals("09:15", clock(555f))
         assertEquals("24:00", clock(1440f))
-    }
-
-    @Test
-    fun blockedCountsDistinctManualOccurrences() {
-        val intervals = listOf(
-            busy("2026-11-02T09:00:00Z", "2026-11-02T17:30:00Z"),
-            busy("2026-11-02T09:00:00Z", "2026-11-02T17:30:00Z"),
-            busy("2026-11-09T09:00:00Z", "2026-11-09T17:30:00Z"),
-            busy("2026-11-03T09:00:00Z", "2026-11-03T10:00:00Z", BusySource.Calendar),
-        )
-        assertEquals(2, blockedOccurrences(intervals))
     }
 }

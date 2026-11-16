@@ -29,6 +29,7 @@ import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.Repeat
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvDatePickerDialog
+import dev.joeherbert.availabliss.designsystem.component.AvDateRangePickerDialog
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvTimePickerDialog
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
@@ -43,7 +44,7 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import java.time.LocalDate
 import java.time.LocalTime
 
-private enum class PickerTarget { Date, Start, End, Until }
+private enum class PickerTarget { Date, Dates, Start, End, Until }
 
 private val whenSegments = BlockWhen.entries.map { Segment(it, it.label) }
 
@@ -69,6 +70,8 @@ fun BlockTimeSheet(
     onSave: () -> Unit,
     /** Shown when editing an existing block; deletes every occurrence. */
     onDelete: () -> Unit = {},
+    /** All day over several days: the first and last day. */
+    onDates: (LocalDate, LocalDate) -> Unit = { start, _ -> onDate(start) },
 ) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
@@ -76,7 +79,12 @@ fun BlockTimeSheet(
 
     AvBottomSheet(title = if (draft.isEditing) "Edit busy time" else "Block a time", onDismissRequest = onDismiss) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FieldTile("Date", DateTimes.shortDay(draft.date), onClick = { picker = PickerTarget.Date }, modifier = Modifier.weight(1f))
+            FieldTile(
+                if (draft.isMultiDay) "Dates" else "Date",
+                draft.dateLabel,
+                onClick = { picker = if (draft.isMultiDay) PickerTarget.Dates else PickerTarget.Date },
+                modifier = Modifier.weight(1f),
+            )
             FieldTile(
                 "Time",
                 draft.timeLabel,
@@ -90,7 +98,7 @@ fun BlockTimeSheet(
                 FieldTile("From", DateTimes.time(draft.start), onClick = { picker = PickerTarget.Start }, modifier = Modifier.weight(1f))
                 FieldTile("To", DateTimes.time(draft.end), onClick = { picker = PickerTarget.End }, modifier = Modifier.weight(1f))
             }
-            if (draft.endsNextDay) {
+            if (draft.endsNextDay && draft.end != LocalTime.MIDNIGHT) {
                 Text("Runs past midnight, ending the next day.", style = type.caption, color = colors.muted)
             }
         }
@@ -144,6 +152,12 @@ fun BlockTimeSheet(
             onPick = onDate,
             onDismiss = { picker = null },
             minDate = DateTimes.today(),
+        )
+        PickerTarget.Dates -> AvDateRangePickerDialog(
+            initialStart = draft.date,
+            initialEnd = draft.lastDay,
+            onPick = onDates,
+            onDismiss = { picker = null },
         )
         PickerTarget.Until -> AvDatePickerDialog(
             initial = draft.until ?: draft.date.plusMonths(3),

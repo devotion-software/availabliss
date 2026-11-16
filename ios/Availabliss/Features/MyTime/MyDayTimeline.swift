@@ -1,116 +1,43 @@
 import SwiftUI
 
-/// Week view of your busy time: days across the top, hours down the side, every
-/// interval at its exact times. Tap empty time to block that hour; tap busy time to open it.
-struct WeekTimeGrid: View {
-    let layout: WeekLayout
-    /// Bumped when a new week's intervals land, to re-run the initial scroll.
-    let scrollKey: CalendarDay?
-    /// A tap on empty time: the day and the hour it fell in (minutes since midnight).
-    let onSelect: (CalendarDay, Int, Int) -> Void
-    /// A tap on busy time (a box or an all-day chip): your own block, or an interval from a calendar.
+/// One day of your busy time, hours down the side and every interval at its exact times.
+/// Tap empty time to block that hour; tap busy time to open it.
+struct MyDayTimeline: View {
+    let day: CalendarDay
+    let pieces: [DayLayout.Placed]
+    /// A tap on empty time: the hour it fell in (minutes since midnight).
+    let onSelect: (Int, Int) -> Void
+    /// A tap on busy time: your own block, or an interval from a calendar.
     let onOpen: (BusyInterval) -> Void
 
-    static let hourHeight: CGFloat = 44
-    static let gutterWidth: CGFloat = 38
-    static let visibleHeight: CGFloat = 440
-    private static let bodyPadding: CGFloat = 8
+    static let hourHeight: CGFloat = 56
+    static let gutterWidth: CGFloat = 48
+    /// Space above 00:00 and below 24:00 so their labels aren't cut off.
+    static let verticalPadding: CGFloat = 10
     private var bodyHeight: CGFloat { Self.hourHeight * 24 }
 
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-                .padding(.bottom, 8)
-            theme.line.frame(height: 1)
-            if layout.hasAllDay {
-                allDayRow
-                    .padding(.vertical, 6)
-                theme.line.frame(height: 1)
-            }
-            ScrollViewReader { proxy in
-                ScrollView(.vertical) {
-                    timeBody
-                        .padding(.vertical, Self.bodyPadding)
-                        .background(alignment: .top) { scrollAnchors }
-                }
-                .scrollIndicators(.hidden)
-                .frame(height: Self.visibleHeight)
-                .task(id: scrollKey) {
-                    guard scrollKey != nil else { return }
-                    proxy.scrollTo(layout.initialScrollMinutes / 60, anchor: .top)
-                }
-            }
-        }
-    }
-
-    // MARK: Header
-
-    private var header: some View {
-        HStack(spacing: 0) {
-            Color.clear.frame(width: Self.gutterWidth, height: 1)
-            ForEach(layout.days, id: \.self) { day in
-                let isToday = day == .today()
-                VStack(spacing: 2) {
-                    Text(Weekday.short(day.weekday()))
-                        .bodyFont(11, .semibold, relativeTo: .caption2)
-                        .foregroundStyle(isToday ? theme.accentInk : theme.muted)
-                    Text("\(day.day)")
-                        .displayFont(17, .semibold, relativeTo: .headline)
-                        .monospacedDigit()
-                        .foregroundStyle(isToday ? theme.onAccent : theme.ink)
-                        .frame(width: 30, height: 30)
-                        .background { if isToday { Circle().fill(theme.accent) } }
-                }
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(Weekday.full(day.weekday())) \(day.day)\(isToday ? ", today" : "")")
-            }
-        }
-    }
-
-    private var allDayRow: some View {
-        HStack(alignment: .top, spacing: 0) {
-            Text("All day")
-                .bodyFont(10, .semibold, relativeTo: .caption2)
-                .foregroundStyle(theme.muted)
-                .frame(width: Self.gutterWidth, alignment: .leading)
-                .frame(maxHeight: .infinity)
-            ForEach(layout.days, id: \.self) { day in
-                VStack(spacing: 3) {
-                    ForEach(Array((layout.allDay[day] ?? []).enumerated()), id: \.offset) { _, interval in
-                        AllDayChip(interval: interval) { onOpen(interval) }
-                    }
-                }
-                .padding(.horizontal, 2)
-                .frame(maxWidth: .infinity, alignment: .top)
-            }
-        }
-    }
-
-    // MARK: Body
-
-    private var timeBody: some View {
         HStack(spacing: 0) {
             hourGutter
-            ForEach(layout.days, id: \.self) { day in
-                DayColumn(
-                    day: day,
-                    pieces: layout.timed[day] ?? [],
-                    height: bodyHeight,
-                    onTapEmpty: { minutes in
-                        let range = WeekLayout.tapRange(at: minutes)
-                        onSelect(day, range.from, range.to)
-                    },
-                    onOpen: onOpen
-                )
-            }
+            DayColumn(
+                day: day,
+                pieces: pieces,
+                height: bodyHeight,
+                onTapEmpty: { minutes in
+                    let range = DayLayout.tapRange(at: minutes)
+                    onSelect(range.from, range.to)
+                },
+                onOpen: onOpen
+            )
         }
         .frame(height: bodyHeight)
+        .padding(.vertical, Self.verticalPadding)
+        .background(alignment: .top) { scrollAnchors }
     }
 
-    /// One scroll target per hour, so scrolling to an hour leaves its line just below the top padding.
+    /// One scroll target per hour (ids 0–23), so scrolling to an hour leaves its line just below the top padding.
     private var scrollAnchors: some View {
         VStack(spacing: 0) {
             ForEach(0..<24, id: \.self) { hour in
@@ -122,12 +49,12 @@ struct WeekTimeGrid: View {
 
     private var hourGutter: some View {
         ZStack(alignment: .topTrailing) {
-            ForEach(1..<24, id: \.self) { hour in
+            ForEach(0...24, id: \.self) { hour in
                 Text(String(format: "%02d:00", hour))
-                    .bodyFont(10, relativeTo: .caption2)
+                    .bodyFont(11, relativeTo: .caption2)
                     .monospacedDigit()
                     .foregroundStyle(theme.muted)
-                    .padding(.trailing, 6)
+                    .padding(.trailing, 8)
                     .frame(height: 14)
                     .offset(y: CGFloat(hour) * Self.hourHeight - 7)
             }
@@ -140,14 +67,14 @@ struct WeekTimeGrid: View {
 /// One day's column: hour lines, busy boxes, and (today) the current-time line.
 private struct DayColumn: View {
     let day: CalendarDay
-    let pieces: [WeekLayout.Placed]
+    let pieces: [DayLayout.Placed]
     let height: CGFloat
     let onTapEmpty: (Double) -> Void
     let onOpen: (BusyInterval) -> Void
     @Environment(\.theme) private var theme
 
     private var isToday: Bool { day == .today() }
-    private func y(_ minutes: Double) -> CGFloat { CGFloat(minutes / Double(WeekLayout.dayMinutes)) * height }
+    private func y(_ minutes: Double) -> CGFloat { CGFloat(minutes / Double(DayLayout.dayMinutes)) * height }
 
     var body: some View {
         GeometryReader { proxy in
@@ -156,7 +83,7 @@ private struct DayColumn: View {
                 gridLines
                     .contentShape(Rectangle())
                     .onTapGesture(coordinateSpace: .local) { point in
-                        onTapEmpty(Double(point.y / height) * Double(WeekLayout.dayMinutes))
+                        onTapEmpty(Double(point.y / height) * Double(DayLayout.dayMinutes))
                     }
                 ForEach(pieces) { piece in
                     let laneWidth = width / CGFloat(piece.lanes)
@@ -195,8 +122,8 @@ private struct DayColumn: View {
 
     private var nowLine: some View {
         TimelineView(.everyMinute) { context in
-            let minutes = WeekLayout.minutesIntoDay(context.date, on: day)
-            if minutes >= 0, minutes <= Double(WeekLayout.dayMinutes) {
+            let minutes = DayLayout.minutesIntoDay(context.date, on: day)
+            if minutes >= 0, minutes <= Double(DayLayout.dayMinutes) {
                 ZStack(alignment: .leading) {
                     Rectangle().fill(theme.warn).frame(height: 2)
                     Circle().fill(theme.warn).frame(width: 8, height: 8).offset(x: -4)
@@ -212,7 +139,7 @@ private struct DayColumn: View {
 
 /// A busy interval at its exact times: striped for blocks you made, faded for calendar busy.
 private struct BusyBox: View {
-    let piece: WeekLayout.Placed
+    let piece: DayLayout.Placed
     let height: CGFloat
     @Environment(\.theme) private var theme
 
@@ -229,10 +156,10 @@ private struct BusyBox: View {
         VStack(alignment: .leading, spacing: 1) {
             // Narrow lanes clip the label rather than collapsing it to "…".
             Text(piece.interval.label ?? "Busy")
-                .bodyFont(11, .semibold, relativeTo: .caption2)
+                .bodyFont(13, .semibold, relativeTo: .footnote)
                 .fixedSize()
             if piece.minutes >= 45 {
-                let from = WeekLayout.clock(piece.from), to = WeekLayout.clock(piece.to)
+                let from = DayLayout.clock(piece.from), to = DayLayout.clock(piece.to)
                 ViewThatFits(in: .horizontal) {
                     Text("\(from) – \(to)").fixedSize()
                     if piece.minutes >= 75 {
@@ -240,19 +167,19 @@ private struct BusyBox: View {
                     }
                     Text(from).fixedSize()
                 }
-                .bodyFont(10, relativeTo: .caption2)
+                .bodyFont(12, relativeTo: .caption)
                 .monospacedDigit()
                 .opacity(0.8)
             }
         }
         .lineLimit(nil)
         .foregroundStyle(isManual ? theme.accentInk : theme.ink)
-        .padding(.vertical, 3)
-        .padding(.leading, isManual ? 5 : 6)
-        .padding(.trailing, 4)
+        .padding(.vertical, 4)
+        .padding(.leading, isManual ? 8 : 9)
+        .padding(.trailing, 6)
         // minWidth 0: take the lane's width even when the (fixed-size) text is wider.
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
-        .frame(height: max(14, height), alignment: .topLeading)
+        .frame(height: max(18, height), alignment: .topLeading)
         .clipped()
         .background { BusyFill(isManual: isManual, isIgnored: piece.interval.isIgnored, shape: shape) }
         .clipShape(shape)
@@ -267,12 +194,12 @@ private struct BusyBox: View {
         let what = isManual ? "Blocked by you\(label.map { ": \($0)" } ?? "")"
             : piece.interval.isIgnored ? "Marked not busy, from \(label ?? "a calendar")" : "Busy from \(label ?? "a calendar")"
         let edit = isManual ? "Edit: " : ""
-        return "\(edit)\(what), \(Formatting.longDay(piece.day.startDate())) \(WeekLayout.clock(piece.from)) to \(WeekLayout.clock(piece.to))"
+        return "\(edit)\(what), \(Formatting.longDay(piece.day.startDate())) \(DayLayout.clock(piece.from)) to \(DayLayout.clock(piece.to))"
     }
 }
 
-/// An all-day interval in the row under the header.
-private struct AllDayChip: View {
+/// An all-day interval, as a chip above the timeline.
+struct AllDayChip: View {
     let interval: BusyInterval
     let onTap: () -> Void
     @Environment(\.theme) private var theme
@@ -280,14 +207,14 @@ private struct AllDayChip: View {
     private var isManual: Bool { interval.source == .manual }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         Text(interval.label ?? "Busy")
-            .bodyFont(10, .semibold, relativeTo: .caption2)
+            .bodyFont(14, .semibold, relativeTo: .subheadline)
             .lineLimit(1)
             .foregroundStyle(isManual ? theme.accentInk : theme.ink)
-            .padding(.vertical, 3)
-            .padding(.leading, isManual ? 5 : 6)
-            .padding(.trailing, 4)
+            .padding(.vertical, 10)
+            .padding(.leading, isManual ? 10 : 12)
+            .padding(.trailing, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background { BusyFill(isManual: isManual, isIgnored: interval.isIgnored, shape: shape) }
             .clipShape(shape)
