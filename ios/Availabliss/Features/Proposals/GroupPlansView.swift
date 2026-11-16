@@ -21,9 +21,13 @@ struct GroupPlansView: View {
                 }
                 if !detail.plansLoaded {
                     StatusView(kind: .loading)
-                } else {
+                } else if detail.proposals.contains(where: { $0.status == .open }) || detail.events.isEmpty {
                     proposalsSection
                     eventsSection
+                } else {
+                    // Everything's settled: what's coming up first, then a quiet note.
+                    eventsSection
+                    nothingWaiting
                 }
             }
             .padding(.horizontal, 20)
@@ -53,6 +57,23 @@ struct GroupPlansView: View {
                 .buttonStyle(.pressable)
             }
         }
+    }
+
+    private var nothingWaiting: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(theme.muted)
+                .accessibilityHidden(true)
+            Text("No dates waiting for confirmation")
+                .bodyFont(14, relativeTo: .subheadline)
+                .foregroundStyle(theme.muted)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 52)
+        .glass(cornerRadius: 18)
+        .padding(.top, 6)
     }
 
     @ViewBuilder
