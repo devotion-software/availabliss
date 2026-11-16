@@ -84,6 +84,30 @@ struct DaySummary: Equatable, Sendable {
         return best
     }
 
+    /// Free minutes between 06:00 and 24:00.
+    var freeMinutes: Double {
+        let busyInWindow = busy.reduce(0.0) { total, range in
+            total + max(0, min(range.upperBound, Self.windowEnd) - max(range.lowerBound, Self.windowStart))
+        }
+        return Self.windowEnd - Self.windowStart - busyInWindow
+    }
+
+    /// How free the day is, for the month heat map: 3 = 12h or more, 2 = 6h or more, 1 = at least
+    /// half an hour, 0 = busy all day.
+    var freeLevel: Int {
+        let free = freeMinutes
+        if free >= 12 * 60 { return 3 }
+        if free >= 6 * 60 { return 2 }
+        if free >= Self.minimumFree { return 1 }
+        return 0
+    }
+
+    /// You blocked some of this day yourself.
+    var hasOwnBlock: Bool { segments.contains(where: \.manual) }
+
+    /// The longest free stretch (minutes on the 24h axis), as `text` describes it; nil when busy all day.
+    var longestFree: ClosedRange<Double>? { Self.longestFree(busy) }
+
     static func describe(_ free: ClosedRange<Double>?) -> String {
         guard let free else { return "Busy all day" }
         switch (free.lowerBound <= windowStart, free.upperBound >= windowEnd) {

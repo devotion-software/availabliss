@@ -14,6 +14,7 @@
 			'<path d="M3 10h18M8 3v4M16 3v4"/><path d="M21 11V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h5"/><path d="M21.5 17.5a4 4 0 1 1-1.17-2.83"/><path d="M20.6 12.2v2.7h-2.7"/>',
 		'calendar-search': '<path d="M3 10h18M8 3v4M16 3v4"/><path d="M21 11V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h5"/><circle cx="17.5" cy="17.5" r="3"/><path d="M19.7 19.7L22 22"/>',
 		'calendar-plus': '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/>',
+		list: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
 		clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
 		pencil: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',
 		home: '<path d="M4 10.5L12 4l8 6.5"/><path d="M6 9v10a1 1 0 0 0 1 1h3.5v-6h3v6H17a1 1 0 0 0 1-1V9"/>',

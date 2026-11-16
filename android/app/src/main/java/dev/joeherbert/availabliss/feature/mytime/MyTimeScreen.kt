@@ -1,7 +1,7 @@
 package dev.joeherbert.availabliss.feature.mytime
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,16 +13,13 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
@@ -33,21 +30,15 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -56,19 +47,17 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.BusyInterval
 import dev.joeherbert.availabliss.core.network.model.BusySource
+import dev.joeherbert.availabliss.core.network.model.Repeat
 import dev.joeherbert.availabliss.designsystem.component.AvDatePickerDialog
 import dev.joeherbert.availabliss.designsystem.component.AvDateRangePickerDialog
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
@@ -76,7 +65,6 @@ import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
-import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.PillTone
 import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
@@ -86,36 +74,46 @@ import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
-import dev.joeherbert.availabliss.designsystem.theme.AvWeights
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
-import dev.joeherbert.availabliss.designsystem.theme.DisplayFontFamily
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 import java.time.LocalDate
+import java.time.YearMonth
 
-/** "My time" tab: a list of days from today, a day sheet per day, repeating blocks and "Block time". */
+/**
+ * "My time" tab: a month heat map of how free each day is (or an agenda list), opening a week
+ * view with the day's timeline; repeating blocks and "Block time".
+ */
 @Composable
 fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::messageShown)
+    BackHandler(enabled = state.openDay != null) { viewModel.closeDay() }
 
     val currentOnOpenCalendars by rememberUpdatedState(onOpenCalendars)
     // One instance for the screen's lifetime so unchanged parts skip recomposition.
     val actions = remember(viewModel) {
         MyTimeActions(
             onOpenCalendars = { currentOnOpenCalendars() },
-            onJumpTo = viewModel::jumpTo,
-            onScrollHandled = viewModel::scrollHandled,
+            onSetMode = viewModel::setMode,
+            onPreviousMonth = viewModel::previousMonth,
+            onNextMonth = viewModel::nextMonth,
+            onThisMonth = viewModel::thisMonth,
             onOpenDay = viewModel::openDay,
+            onCloseDay = viewModel::closeDay,
+            onStepDay = viewModel::stepDay,
+            onStepWeek = viewModel::stepWeek,
             onNearEnd = viewModel::onNearEnd,
             onBlockEvening = viewModel::blockEvening,
             onBlockAllDay = viewModel::blockAllDay,
             onBlockAway = viewModel::blockAway,
             onBlockSomethingElse = viewModel::openBlockSheet,
+            onBlockOn = viewModel::openBlockSheetOn,
+            onBlockFree = viewModel::blockFree,
+            onEmptyTap = viewModel::onEmptyTapped,
+            onIntervalClick = viewModel::onIntervalTapped,
             onOpenRecurring = viewModel::openEditor,
             onDeleteRecurring = viewModel::deleteBlock,
             onRefresh = viewModel::pullRefresh,
@@ -123,21 +121,6 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
         )
     }
     MyTimeContent(state = state, snackbar = snackbar, actions = actions)
-
-    state.openDay?.let { day ->
-        DaySheet(
-            day = day,
-            today = state.today,
-            row = state.days.firstOrNull { it.date == day },
-            allDay = state.layout.allDay[day].orEmpty(),
-            placed = state.layout.timed[day].orEmpty(),
-            onPrevious = { viewModel.stepDay(-1) },
-            onNext = { viewModel.stepDay(1) },
-            onDismiss = viewModel::closeDay,
-            onEmptyTap = viewModel::onEmptyTapped,
-            onIntervalClick = viewModel::onIntervalTapped,
-        )
-    }
 
     state.calendarBusy?.let { info ->
         CalendarBusySheet(
@@ -171,163 +154,61 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
 /** Callbacks for [MyTimeContent]. */
 data class MyTimeActions(
     val onOpenCalendars: () -> Unit = {},
-    val onJumpTo: (LocalDate) -> Unit = {},
-    val onScrollHandled: () -> Unit = {},
+    val onSetMode: (MyTimeMode) -> Unit = {},
+    val onPreviousMonth: () -> Unit = {},
+    val onNextMonth: () -> Unit = {},
+    val onThisMonth: () -> Unit = {},
+    /** Opens the week view on a day. */
     val onOpenDay: (LocalDate) -> Unit = {},
-    /** The list is close to its last loaded day. */
+    val onCloseDay: () -> Unit = {},
+    val onStepDay: (Long) -> Unit = {},
+    val onStepWeek: (Long) -> Unit = {},
+    /** The agenda is close to its last loaded day. */
     val onNearEnd: () -> Unit = {},
     val onBlockEvening: () -> Unit = {},
     val onBlockAllDay: (LocalDate) -> Unit = {},
     val onBlockAway: (LocalDate, LocalDate) -> Unit = { _, _ -> },
     val onBlockSomethingElse: () -> Unit = {},
+    /** The block sheet on a given day (the week view's "+ Block"). */
+    val onBlockOn: (LocalDate) -> Unit = {},
+    /** The agenda's free row: block the day's longest free stretch. */
+    val onBlockFree: (LocalDate, DaySummary) -> Unit = { _, _ -> },
+    val onEmptyTap: (LocalDate, MinuteRange) -> Unit = { _, _ -> },
+    val onIntervalClick: (BusyInterval) -> Unit = {},
     val onOpenRecurring: (String) -> Unit = {},
     val onDeleteRecurring: (String) -> Unit = {},
     val onRefresh: () -> Unit = {},
     val onRetry: () -> Unit = {},
 )
 
-/** What the list shows, in order. */
-private sealed interface Entry {
-    val key: String
-
-    data object BlockTime : Entry {
-        override val key = "block"
-    }
-
-    data object CalendarHint : Entry {
-        override val key = "hint"
-    }
-
-    data class Error(val message: String) : Entry {
-        override val key = "error"
-    }
-
-    data object Loading : Entry {
-        override val key = "loading"
-    }
-
-    data class Heading(val text: String, override val key: String) : Entry
-
-    data class Day(val row: DayRowUi) : Entry {
-        override val key get() = "d${row.date}"
-    }
-
-    data class Recurring(val block: RecurringBlockUi) : Entry {
-        override val key get() = "r${block.id}"
-    }
-
-    data object LoadingMore : Entry {
-        override val key = "more"
-    }
-}
-
-/** Week sections of days, with "Every week" after the first one. */
-private fun entries(state: MyTimeUiState): List<Entry> = buildList {
-    add(Entry.BlockTime)
-    if (state.showCalendarHint) add(Entry.CalendarHint)
-    state.error?.let { add(Entry.Error(it)) }
-    if (state.loading && state.days.isEmpty()) {
-        add(Entry.Loading)
-        return@buildList
-    }
-    val weeks = state.days.groupBy { DateTimes.startOfWeek(it.date) }.entries.toList()
-    weeks.forEachIndexed { i, (weekStart, days) ->
-        add(Entry.Heading(weekHeading(weekStart, state.today), "w$weekStart"))
-        days.forEach { add(Entry.Day(it)) }
-        if (i == 0 && state.recurring.isNotEmpty()) {
-            add(Entry.Heading("Every week", "every-week"))
-            state.recurring.forEach { add(Entry.Recurring(it)) }
-        }
-    }
-    if (state.loadingMore) add(Entry.LoadingMore)
-}
-
-private enum class DatePick { AllDay, Away, Jump }
+private enum class DatePick { AllDay, Away }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: MyTimeActions) {
-    val colors = AvailablissTheme.colors
-    val type = AvailablissTheme.type
-    val list = rememberLazyListState()
-    val entries = remember(state.days, state.recurring, state.error, state.showCalendarHint, state.loading, state.loadingMore, state.today) {
-        entries(state)
-    }
+    // Kept here so the month and agenda keep their place while the week view is open.
+    val agendaList = rememberLazyListState()
+    val monthScroll = rememberScrollState()
     var pick by rememberSaveable { mutableStateOf<DatePick?>(null) }
-
-    // Load further weeks as the end of the list comes into view.
-    val nearEnd by rememberUpdatedState(actions.onNearEnd)
-    LaunchedEffect(list) {
-        snapshotFlow {
-            val info = list.layoutInfo
-            info.totalItemsCount > 0 && (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 8
-        }
-            .distinctUntilChanged()
-            .filter { it }
-            .collect { nearEnd() }
-    }
-
-    // "Jump to date": scroll once the day is in the list (it may need loading first).
-    LaunchedEffect(state.scrollTo, entries) {
-        val target = state.scrollTo ?: return@LaunchedEffect
-        val index = entries.indexOfFirst { it is Entry.Day && it.row.date == target }
-        if (index >= 0) {
-            // Show the week's heading too when it's the first day of a section.
-            val heading = if (index > 0 && entries[index - 1] is Entry.Heading) index - 1 else index
-            list.animateScrollToItem(heading)
-            actions.onScrollHandled()
-        }
+    val top: @Composable () -> Unit = {
+        TopCards(state, actions, onAllDay = { pick = DatePick.AllDay }, onAway = { pick = DatePick.Away })
     }
 
     AvailablissBackground(OrbLayout.MyTime) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            Row(
-                Modifier.padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = Spacing.m),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.m),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("My time", style = type.headlineMedium, color = colors.ink, modifier = Modifier.semantics { heading() })
-                    Text("What groups see as busy", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
-                }
-                GlassIconButton(AvIcons.Calendar, "Jump to date", { pick = DatePick.Jump })
-                GlassIconButton(AvIcons.CalendarSync, "Connected calendars", actions.onOpenCalendars)
-            }
-
-            PullToRefreshBox(
-                isRefreshing = state.refreshing,
-                onRefresh = actions.onRefresh,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            ) {
-                val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                LazyColumn(
-                    state = list,
-                    modifier = Modifier.fillMaxSize(),
-                    // Clear the floating tab bar.
-                    contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, top = Spacing.xxs, bottom = Spacing.tabBarClearance + navBar),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        val day = state.openDay
+        if (day != null) {
+            WeekView(state, day, actions)
+        } else {
+            Column(Modifier.fillMaxSize().statusBarsPadding()) {
+                ScreenHeader(state.mode, actions)
+                PullToRefreshBox(
+                    isRefreshing = state.refreshing,
+                    onRefresh = actions.onRefresh,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                 ) {
-                    items(entries, key = { it.key }, contentType = { it::class }) { entry ->
-                        when (entry) {
-                            Entry.BlockTime -> BlockTimeButton(
-                                onEvening = actions.onBlockEvening,
-                                onAllDay = { pick = DatePick.AllDay },
-                                onAway = { pick = DatePick.Away },
-                                onSomethingElse = actions.onBlockSomethingElse,
-                                modifier = Modifier.padding(bottom = Spacing.xs),
-                            )
-                            Entry.CalendarHint -> CalendarHintCard(actions.onOpenCalendars)
-                            is Entry.Error -> ErrorBanner(entry.message, onRetry = actions.onRetry)
-                            Entry.Loading -> LoadingIndicator()
-                            is Entry.Heading -> SectionHeading(entry.text)
-                            is Entry.Day -> DayRow(entry.row, isToday = entry.row.date == state.today, onClick = { actions.onOpenDay(entry.row.date) })
-                            is Entry.Recurring -> RecurringBlockRow(
-                                entry.block,
-                                onClick = { actions.onOpenRecurring(entry.block.id) },
-                                onDelete = { actions.onDeleteRecurring(entry.block.id) },
-                            )
-                            Entry.LoadingMore -> LoadingIndicator()
-                        }
+                    when (state.mode) {
+                        MyTimeMode.Month -> MonthView(state, monthScroll, actions, top)
+                        MyTimeMode.Agenda -> AgendaView(state, agendaList, actions, top)
                     }
                 }
             }
@@ -348,18 +229,76 @@ fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: My
             onPick = actions.onBlockAway,
             onDismiss = { pick = null },
         )
-        DatePick.Jump -> AvDatePickerDialog(
-            initial = state.today,
-            onPick = actions.onJumpTo,
-            onDismiss = { pick = null },
-            minDate = state.today,
-        )
         null -> Unit
     }
 }
 
+/** "My time" / "What groups see as busy", the month / agenda switch and "Connected calendars". */
 @Composable
-private fun SectionHeading(text: String) {
+private fun ScreenHeader(mode: MyTimeMode, actions: MyTimeActions) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    Row(
+        Modifier.padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = Spacing.m),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("My time", style = type.headlineMedium, color = colors.ink, modifier = Modifier.semantics { heading() })
+            Text("What groups see as busy", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+        }
+        ViewSwitch(mode, onSwitch = { actions.onSetMode(if (mode == MyTimeMode.Month) MyTimeMode.Agenda else MyTimeMode.Month) })
+        GlassIconButton(AvIcons.CalendarSync, "Connected calendars", actions.onOpenCalendars)
+    }
+}
+
+/** In the month: a list icon and "Agenda"; in the agenda: a calendar icon and "Month". */
+@Composable
+private fun ViewSwitch(mode: MyTimeMode, onSwitch: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    val toAgenda = mode == MyTimeMode.Month
+    val description = if (toAgenda) "Show as a list" else "Show as a month"
+    Row(
+        Modifier
+            .height(44.dp)
+            .glass(CircleShape)
+            .clickable(role = Role.Button, onClick = onSwitch)
+            .clearAndSetSemantics {
+                contentDescription = description
+                role = Role.Button
+                onClick { onSwitch(); true }
+            }
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(if (toAgenda) AvIcons.ListBullets else AvIcons.Calendar, null, tint = colors.ink, modifier = Modifier.size(18.dp))
+        Text(if (toAgenda) "Agenda" else "Month", style = AvailablissTheme.type.label, color = colors.ink)
+    }
+}
+
+/** "Block time", the connect-a-calendar hint and any error, above the month or agenda. */
+@Composable
+private fun TopCards(state: MyTimeUiState, actions: MyTimeActions, onAllDay: () -> Unit, onAway: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        BlockTimeButton(
+            onEvening = actions.onBlockEvening,
+            onAllDay = onAllDay,
+            onAway = onAway,
+            onSomethingElse = actions.onBlockSomethingElse,
+            modifier = Modifier.padding(bottom = Spacing.xs),
+        )
+        if (state.showCalendarHint) CalendarHintCard(actions.onOpenCalendars)
+        state.error?.let { ErrorBanner(it, onRetry = actions.onRetry) }
+    }
+}
+
+/** Bottom padding that clears the floating tab bar. */
+@Composable
+internal fun tabBarClearance(): Dp = Spacing.tabBarClearance + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+@Composable
+internal fun SectionHeading(text: String) {
     Text(
         text,
         style = AvailablissTheme.type.label,
@@ -427,94 +366,9 @@ private fun CalendarHintCard(onOpenCalendars: () -> Unit) {
     }
 }
 
-/** One day: date on the left, the 06:00–24:00 strip and a one-line summary on the right. Whole row tappable. */
-@Composable
-fun DayRow(row: DayRowUi, isToday: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = AvailablissTheme.colors
-    val type = AvailablissTheme.type
-    Row(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = 60.dp)
-            .glass(Shapes.controlLarge, shadow = false)
-            .clickable(onClick = onClick)
-            .clearAndSetSemantics {
-                contentDescription = row.accessibility
-                onClick(label = "See the day") { onClick(); true }
-            }
-            .padding(start = Spacing.m, end = Spacing.l, top = Spacing.s, bottom = Spacing.s),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.l),
-    ) {
-        Column(Modifier.width(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                DateTimes.shortWeekday(DateTimes.apiWeekday(row.date)),
-                style = type.micro,
-                color = if (isToday) colors.accentInk else colors.muted,
-            )
-            Box(
-                Modifier.size(30.dp).clip(CircleShape).then(if (isToday) Modifier.background(colors.accent) else Modifier),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    row.date.dayOfMonth.toString(),
-                    fontFamily = DisplayFontFamily,
-                    fontSize = 17.sp,
-                    lineHeight = 17.sp,
-                    fontWeight = AvWeights.Display650,
-                    color = if (isToday) colors.onAccent else colors.ink,
-                )
-            }
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(
-                buildAnnotatedString {
-                    append(row.summary.label)
-                    row.names?.let { names ->
-                        withStyle(SpanStyle(color = colors.muted, fontWeight = FontWeight.Normal)) { append(" · $names") }
-                    }
-                },
-                style = type.bodySmallStrong,
-                color = colors.ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            BusyStrip(row)
-        }
-        Icon(AvIcons.Forward, null, tint = colors.muted, modifier = Modifier.size(12.dp))
-    }
-}
-
-/** Busy time from 06:00 to 24:00: calendar time faded, your blocks in the accent; ticks at 12:00 and 18:00. */
-@Composable
-private fun BusyStrip(row: DayRowUi) {
-    val colors = AvailablissTheme.colors
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(10.dp)
-            .drawBehind {
-                val span = (DAY_MINUTES - STRIP_FROM).toFloat()
-                fun x(minutes: Int) = ((minutes - STRIP_FROM).coerceIn(0, DAY_MINUTES - STRIP_FROM) / span) * size.width
-                val radius = CornerRadius(size.height / 2)
-                drawRoundRect(colors.line2, cornerRadius = radius)
-                fun draw(spans: List<BusySpan>, color: androidx.compose.ui.graphics.Color) = spans.forEach { s ->
-                    val left = x(s.from)
-                    val right = x(s.to)
-                    if (right > left) drawRoundRect(color, Offset(left, 0f), Size(maxOf(right - left, 2.dp.toPx()), size.height), radius)
-                }
-                draw(row.calendarSpans, colors.busyLine)
-                draw(row.manualSpans, colors.accent)
-                listOf(12 * 60, 18 * 60).forEach { tick ->
-                    drawRect(colors.line3, Offset(x(tick) - 0.5.dp.toPx(), -2.dp.toPx()), Size(1.dp.toPx(), size.height + 4.dp.toPx()))
-                }
-            },
-    )
-}
-
 /** Glass row for a repeating block ("Choir · Every Tuesday · 19:00 – 21:30 · Private"). */
 @Composable
-private fun RecurringBlockRow(block: RecurringBlockUi, onClick: () -> Unit, onDelete: () -> Unit) {
+internal fun RecurringBlockRow(block: RecurringBlockUi, onClick: () -> Unit, onDelete: () -> Unit) {
     val colors = AvailablissTheme.colors
     GlassPanel(
         modifier = Modifier.fillMaxWidth(),
@@ -559,12 +413,16 @@ internal object MyTimeSamples {
     }
 
     fun state(): MyTimeUiState {
-        val days = (0L until 13L).map(today::plusDays)
+        val days = (0L until 45L).map(today::plusDays)
         val layout = layoutDays(days, intervals())
+        val rows = days.map { dayRow(it, layout.allDay[it].orEmpty(), layout.timed[it].orEmpty(), today) }
         return MyTimeUiState(
             today = today,
+            month = YearMonth.from(today),
             layout = layout,
-            days = days.map { dayRow(it, layout.allDay[it].orEmpty(), layout.timed[it].orEmpty(), today) },
+            days = rows,
+            rows = rows.associateBy { it.date },
+            repeats = mapOf("b1" to Repeat.Weekly),
             recurring = listOf(RecurringBlockUi("b1", "Choir", "Every Tuesday · 19:00 – 21:30")),
             loading = false,
             showCalendarHint = true,
@@ -572,7 +430,7 @@ internal object MyTimeSamples {
     }
 }
 
-@Preview(name = "My time", widthDp = 390, heightDp = 844)
+@Preview(name = "My time · month", widthDp = 390, heightDp = 844)
 @Composable
 private fun MyTimePreview() {
     AvailablissPreviewTheme {
@@ -580,14 +438,21 @@ private fun MyTimePreview() {
     }
 }
 
-@Preview(name = "Day rows", widthDp = 390)
+@Preview(name = "My time · agenda", widthDp = 390, heightDp = 844)
 @Composable
-private fun DayRowPreview() {
-    val state = MyTimeSamples.state()
+private fun MyTimeAgendaPreview() {
     AvailablissPreviewTheme {
-        Column(Modifier.background(AvailablissTheme.colors.bg).padding(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            state.days.take(6).forEach { DayRow(it, isToday = it.date == state.today, onClick = {}) }
-        }
+        MyTimeContent(state = MyTimeSamples.state().copy(mode = MyTimeMode.Agenda), snackbar = SnackbarHostState(), actions = MyTimeActions())
     }
 }
+
+@Preview(name = "My time · week", widthDp = 390, heightDp = 844)
+@Composable
+private fun MyTimeWeekPreview() {
+    val state = MyTimeSamples.state()
+    AvailablissPreviewTheme {
+        MyTimeContent(state = state.copy(openDay = state.today.plusDays(1)), snackbar = SnackbarHostState(), actions = MyTimeActions())
+    }
+}
+
 // endregion

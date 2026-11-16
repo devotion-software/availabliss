@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
-	import { invalidate } from '$app/navigation';
+	import { invalidate, pushState, replaceState } from '$app/navigation';
+	import { page } from '$app/state';
 	import type { BusyInterval, ManualBlock } from '#lib/types';
 	import { createBlock, deleteBlock } from '#lib/client/blocks';
 	import { getMyBusy } from '#lib/client/me';
-	import { addDays, eachDay, minutesIntoDay, zonedToIso } from '#lib/client/dates';
+	import { addDays, addMonths, eachDay, endOfMonth, minutesIntoDay, startOfMonth, startOfWeek, zonedToIso } from '#lib/client/dates';
 	import { weekdayName } from '#lib/client/format';
 	import { live } from '#lib/client/live.svelte';
 	import { toasts } from '#lib/client/toast.svelte';
@@ -13,40 +14,78 @@
 	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import Icon, { type IconName } from '#lib/components/ui/Icon.svelte';
-	import GlassPanel from '#lib/components/ui/GlassPanel.svelte';
 	import Sheet from '#lib/components/ui/Sheet.svelte';
 	import Spinner from '#lib/components/ui/Spinner.svelte';
-	import TextField from '#lib/components/ui/TextField.svelte';
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import BlockRow from '#lib/components/mytime/BlockRow.svelte';
 	import BlockTimeSheet from '#lib/components/mytime/BlockTimeSheet.svelte';
 	import CalendarBusySheet from '#lib/components/mytime/CalendarBusySheet.svelte';
-	import DayRow from '#lib/components/mytime/DayRow.svelte';
-	import DayDetail from '#lib/components/mytime/DayDetail.svelte';
+	import MonthHeat from '#lib/components/mytime/MonthHeat.svelte';
+	import AgendaDay from '#lib/components/mytime/AgendaDay.svelte';
+	import WeekView from '#lib/components/mytime/WeekView.svelte';
 	import { clock, layoutDays, rangeToIso } from '#lib/components/mytime/parts';
-	import { CHUNK_DAYS, eveningPreset, groupWeeks, longDate } from '#lib/components/mytime/days';
+	import {
+		agendaItems,
+		busyRanges,
+		CHUNK_DAYS,
+		dayCellLabel,
+		dayMarks,
+		describeDay,
+		dayNames,
+		eveningPreset,
+		freeLevel,
+		freeSummary,
+		groupWeeks,
+		longestFree,
+		type Range
+	} from '#lib/components/mytime/days';
 
 	let { data } = $props();
 
 	const tz = $derived(data.user.timezone);
 	const today = $derived(data.today);
-	/** How far ahead the list (and "Jump to date") goes. */
+	/** How far ahead you can look: today and the next 365 days. */
 	const MAX_DAYS = 366;
+	const lastDay = $derived(addDays(today, MAX_DAYS - 1));
 	const wide = new MediaQuery('(min-width: 900px)', false);
+
+	// ── Month or agenda, remembered on this device ─────────────────────────
+	type View = 'month' | 'agenda';
+	const VIEW_KEY = 'availabliss:my-time-view';
+	let view = $state<View>('month');
+	onMount(() => {
+		try {
+			if (localStorage.getItem(VIEW_KEY) === 'agenda') view = 'agenda';
+		} catch {
+			// Storage blocked: stay on the month.
+		}
+	});
+	function toggleView() {
+		view = view === 'month' ? 'agenda' : 'month';
+		try {
+			localStorage.setItem(VIEW_KEY, view);
+		} catch {
+			// Not remembered, but still switched.
+		}
+	}
 
 	// ── Days, loaded a few weeks at a time ─────────────────────────────────
 	/** Chunks after the first (which comes with the page), each CHUNK_DAYS long. */
 	let more = $state<{ start: string; intervals: BusyInterval[] }[]>([]);
 	let loadingMore = $state(false);
-	let moreFor = '';
-	// A new day (after midnight) starts the list again.
+	let moreFor = untrack(() => data.today);
+	/** The month on screen (first of the month). */
+	let month = $state(untrack(() => startOfMonth(data.today)));
+	// A new day (after midnight) starts again.
 	$effect.pre(() => {
 		if (moreFor !== today) {
 			moreFor = today;
 			more = [];
+			if (month < startOfMonth(today)) month = startOfMonth(today);
 		}
 	});
 
+	/** Busy time is loaded for today up to (not including) `end`. */
 	const end = $derived(addDays(today, CHUNK_DAYS * (1 + more.length)));
 	const days = $derived(eachDay(today, addDays(end, -1)));
 	const intervals = $derived.by(() => {
@@ -66,6 +105,12 @@
 	const repeating = $derived(data.blocks.filter((b) => b.repeat !== 'none'));
 	const atLimit = $derived(days.length >= MAX_DAYS);
 
+	/** A loaded day's busy time; null if it hasn't loaded yet. */
+	function dayData(day: string) {
+		if (day < today || day >= end) return null;
+		return { timed: layout.timed.get(day) ?? [], allDay: layout.allDay.get(day) ?? [] };
+	}
+
 	const fetchChunk = (start: string) =>
 		getMyBusy(zonedToIso(start, '00:00', tz), zonedToIso(addDays(start, CHUNK_DAYS), '00:00', tz)).then((intervals) => ({ start, intervals }));
 
@@ -81,16 +126,26 @@
 		}
 	}
 
-	/** Loads chunks until `day` is in the list. */
+	/** Loads chunks until `day` has loaded. */
 	async function ensureLoaded(day: string) {
 		while (day >= end && !atLimit) {
+			if (loadingMore) {
+				await new Promise((r) => setTimeout(r, 100));
+				continue;
+			}
 			const before = more.length;
 			await loadMore();
 			if (more.length === before) return;
 		}
 	}
 
-	// Load the next weeks as the end of the list comes into view.
+	// The month on screen (and the next, for the next swipe) and the open week always have their busy time.
+	$effect(() => {
+		const wanted = weekDay ? addDays(startOfWeek(weekDay), 6) : endOfMonth(addMonths(month, 1));
+		ensureLoaded(wanted < lastDay ? wanted : lastDay);
+	});
+
+	// In the agenda, load the next weeks as the end of the list comes into view.
 	let sentinel = $state<HTMLElement>();
 	$effect(() => {
 		if (!sentinel) return;
@@ -133,22 +188,40 @@
 		}
 	}
 
-	// ── The day sheet (phones) / panel (wide screens) ──────────────────────
-	let selectedDay = $state('');
-	const shownDay = $derived(selectedDay && selectedDay >= today ? selectedDay : today);
-	let dayOpen = $state(false);
-	const shownLayout = $derived(shownDay < end ? layout : layoutDays([shownDay], intervals, tz));
+	// ── The month's days ───────────────────────────────────────────────────
+	function monthInfo(day: string) {
+		const d = dayData(day);
+		if (!d) return null;
+		const busy = busyRanges(d.timed, d.allDay);
+		return { level: freeLevel(busy), label: dayCellLabel(day, today, busy), mine: dayMarks(d.timed, d.allDay).mine };
+	}
 
+	// ── The week view: a history entry of its own, so the browser's back closes it ──
+	const weekDay = $derived.by(() => {
+		const d = page.state.myTimeDay;
+		return d && d >= today && d <= lastDay ? d : '';
+	});
+	let returnScroll = 0;
 	function openDay(day: string) {
-		selectedDay = day;
-		if (!wide.current) dayOpen = true;
+		returnScroll = window.scrollY;
+		pushState('', { myTimeDay: day });
+		window.scrollTo(0, 0);
 	}
-	async function stepDay(by: number) {
-		const day = addDays(shownDay, by);
-		if (day < today) return;
-		selectedDay = day;
-		await ensureLoaded(day);
+	function selectDay(day: string) {
+		replaceState('', { myTimeDay: day });
+		// Paging the month along keeps the month you go back to near the week you looked at.
+		if (view === 'month') month = startOfMonth(day);
 	}
+	function closeWeek() {
+		history.back();
+	}
+	// Back where you were in the month or agenda.
+	let wasOpen = false;
+	$effect(() => {
+		const open = !!weekDay;
+		if (wasOpen && !open) tick().then(() => window.scrollTo(0, returnScroll));
+		wasOpen = open;
+	});
 
 	// ── Blocking time ──────────────────────────────────────────────────────
 	let sheetOpen = $state(false);
@@ -209,7 +282,7 @@
 			},
 			{ label: 'All day…', sub: 'Pick a day', icon: 'sun', go: () => openNew(today, { allDay: true }) },
 			{ label: 'Away for a few days…', sub: 'Pick the first and last day', icon: 'map-pin', go: () => openNew(today, { allDay: true, lastDay: addDays(today, 2) }) },
-			{ label: 'Something else…', sub: 'Choose the times, or make it repeat', icon: 'clock', go: () => openNew(shownDay) }
+			{ label: 'Something else…', sub: 'Choose the times, or make it repeat', icon: 'clock', go: () => openNew(weekDay || today) }
 		];
 		return list;
 	});
@@ -217,6 +290,9 @@
 		choicesOpen = false;
 		go();
 	}
+
+	/** The agenda's free row: block that stretch (or the whole day). */
+	const blockFree = (day: string, range: Range | null) => (range ? openNew(day, { range }) : openNew(day, { allDay: true }));
 
 	// ── Repeating blocks ───────────────────────────────────────────────────
 	let deleting = $state<ManualBlock | null>(null);
@@ -228,28 +304,6 @@
 	async function confirmDelete() {
 		if (!deleting) return;
 		await run(() => deleteBlock(deleting!.id));
-	}
-
-	// ── Jump to a date ─────────────────────────────────────────────────────
-	let jumpOpen = $state(false);
-	let jumpDate = $state('');
-	let jumping = $state(false);
-	function openJump() {
-		jumpDate = shownDay;
-		jumpOpen = true;
-	}
-	async function jump(e: SubmitEvent) {
-		e.preventDefault();
-		const last = addDays(today, MAX_DAYS - 1);
-		const day = jumpDate < today ? today : jumpDate > last ? last : jumpDate;
-		if (!day) return;
-		jumping = true;
-		await ensureLoaded(day);
-		jumping = false;
-		jumpOpen = false;
-		selectedDay = day;
-		await tick();
-		document.getElementById(`day-${day}`)?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 	}
 
 	const showCalendarHint = $derived(data.hasCalendar === false && !intervals.some((i) => i.source === 'calendar'));
@@ -268,92 +322,96 @@
 	</section>
 {/snippet}
 
-<div class="page">
-	<PageHeader title="My time" subtitle="What groups see as busy" backHref="/app" backLabel="Home" backIcon="home">
-		{#snippet actions()}
-			<IconButton icon="calendar-search" label="Jump to a date" onclick={openJump} />
-			<IconButton href="/app/calendars" icon="calendar-sync" label="Connected calendars" />
-		{/snippet}
-	</PageHeader>
+{#if weekDay}
+	<div class="week-page">
+		<WeekView
+			day={weekDay}
+			{today}
+			last={lastDay}
+			timeZone={tz}
+			get={dayData}
+			backLabel={view === 'month' ? 'Month' : 'Agenda'}
+			onback={closeWeek}
+			onday={selectDay}
+			onselect={select}
+			onopen={open}
+			onblock={() => openNew(weekDay)}
+		/>
+	</div>
+{:else}
+	<div class="page">
+		<PageHeader title="My time" subtitle="What groups see as busy" backHref="/app" backLabel="Home" backIcon="home">
+			{#snippet actions()}
+				<button type="button" class="glass switch" aria-label={view === 'month' ? 'Show as a list' : 'Show as a month'} onclick={toggleView}>
+					<Icon name={view === 'month' ? 'list' : 'calendar'} size={16} strokeWidth={2.2} />
+					<span>{view === 'month' ? 'Agenda' : 'Month'}</span>
+				</button>
+				<IconButton href="/app/calendars" icon="calendar-sync" label="Connected calendars" />
+			{/snippet}
+		</PageHeader>
 
-	<div class="layout">
-		<div class="list-col">
-			<Button size="lg" variant="accent" icon="plus" block onclick={() => (choicesOpen = true)}>Block time</Button>
+		<div class="layout">
+			<div class="top">
+				<Button size="lg" variant="accent" icon="plus" block onclick={() => (choicesOpen = true)}>Block time</Button>
 
-			{#if showCalendarHint}
-				<a class="glass hint" href="/app/calendars">
-					<span class="hint-icon"><Icon name="calendar-sync" size={18} /></span>
-					<span class="hint-text">Connect a calendar so your busy time fills in by itself</span>
-					<Icon name="chevron-right" size={16} />
-				</a>
-			{/if}
-
-			{#each weeks as week, w (week.start)}
-				<section class="week" aria-labelledby="week-{week.start}">
-					<h2 class="eyebrow" id="week-{week.start}">{week.heading}</h2>
-					<div class="glass days">
-						{#each week.days as day (day)}
-							<div class="day" id="day-{day}">
-								<DayRow
-									{day}
-									{today}
-									timed={layout.timed.get(day) ?? []}
-									allDay={layout.allDay.get(day) ?? []}
-									selected={wide.current && day === shownDay}
-									onclick={() => openDay(day)}
-								/>
-							</div>
-						{/each}
-					</div>
-				</section>
-				{#if w === 0}{@render everyWeek()}{/if}
-			{/each}
-
-			<div class="end" bind:this={sentinel}>
-				{#if loadingMore}
-					<Spinner size={20} />
-				{:else if atLimit}
-					<span>That's a year ahead</span>
-				{:else}
-					<Button variant="ghost" size="sm" onclick={loadMore}>Show more weeks</Button>
+				{#if showCalendarHint}
+					<a class="glass hint" href="/app/calendars">
+						<span class="hint-icon"><Icon name="calendar-sync" size={18} /></span>
+						<span class="hint-text">Connect a calendar so your busy time fills in by itself</span>
+						<Icon name="chevron-right" size={16} />
+					</a>
 				{/if}
 			</div>
+
+			<div class="main">
+				{#if view === 'month'}
+					<div class="glass month-card">
+						<MonthHeat {month} {today} last={lastDay} info={monthInfo} onmonth={(m) => (month = m)} onselect={openDay} />
+					</div>
+				{:else}
+					{#each weeks as week, w (week.start)}
+						<section class="week" aria-labelledby="week-{week.start}">
+							<h2 class="eyebrow" id="week-{week.start}">{week.heading}</h2>
+							<div class="glass days">
+								{#each week.days as day (day)}
+									{@const timed = layout.timed.get(day) ?? []}
+									{@const allDay = layout.allDay.get(day) ?? []}
+									{@const busy = busyRanges(timed, allDay)}
+									<AgendaDay
+										{day}
+										{today}
+										summary={freeSummary(busy)}
+										label={describeDay(day, busy, dayNames(timed, allDay))}
+										items={agendaItems(timed, allDay, data.blocks)}
+										free={longestFree(busy)}
+										onday={() => openDay(day)}
+										onopen={open}
+										onblock={(range) => blockFree(day, range)}
+									/>
+								{/each}
+							</div>
+						</section>
+						{#if w === 0 && !wide.current}{@render everyWeek()}{/if}
+					{/each}
+
+					<div class="end" bind:this={sentinel}>
+						{#if loadingMore}
+							<Spinner size={20} />
+						{:else if atLimit}
+							<span>That's a year ahead</span>
+						{:else}
+							<Button variant="ghost" size="sm" onclick={loadMore}>Show more weeks</Button>
+						{/if}
+					</div>
+				{/if}
+			</div>
+
+			{#if view === 'month' || wide.current}
+				<div class="side">{@render everyWeek()}</div>
+			{/if}
 		</div>
-
-		<aside class="panel-col" aria-label="Day">
-			<GlassPanel padding="16px" class="day-panel">
-				<DayDetail
-					day={shownDay}
-					{today}
-					timeZone={tz}
-					title={longDate(shownDay)}
-					timed={shownLayout.timed.get(shownDay) ?? []}
-					allDay={shownLayout.allDay.get(shownDay) ?? []}
-					atStart={shownDay <= today}
-					onprev={() => stepDay(-1)}
-					onnext={() => stepDay(1)}
-					onselect={select}
-					onopen={open}
-				/>
-			</GlassPanel>
-		</aside>
 	</div>
-</div>
-
-<Sheet bind:open={dayOpen} title={longDate(shownDay)} tall>
-	<DayDetail
-		day={shownDay}
-		{today}
-		timeZone={tz}
-		timed={shownLayout.timed.get(shownDay) ?? []}
-		allDay={shownLayout.allDay.get(shownDay) ?? []}
-		atStart={shownDay <= today}
-		onprev={() => stepDay(-1)}
-		onnext={() => stepDay(1)}
-		onselect={select}
-		onopen={open}
-	/>
-</Sheet>
+{/if}
 
 <Sheet bind:open={choicesOpen} title="Block time" width={420}>
 	<div class="choices">
@@ -368,13 +426,6 @@
 			</button>
 		{/each}
 	</div>
-</Sheet>
-
-<Sheet bind:open={jumpOpen} title="Jump to a date" width={400}>
-	<form class="jump" onsubmit={jump}>
-		<TextField label="Date" type="date" bind:value={jumpDate} min={today} max={addDays(today, MAX_DAYS - 1)} required />
-		<Button type="submit" variant="accent" block loading={jumping}>Go to this day</Button>
-	</form>
 </Sheet>
 
 <BlockTimeSheet
@@ -404,7 +455,8 @@
 		gap: 16px;
 	}
 	.layout,
-	.list-col,
+	.top,
+	.main,
 	.week,
 	.every-week {
 		display: flex;
@@ -412,9 +464,10 @@
 		min-width: 0;
 	}
 	.layout {
-		gap: 16px;
+		gap: 18px;
 	}
-	.list-col {
+	.top,
+	.main {
 		gap: 18px;
 	}
 	.week,
@@ -424,17 +477,32 @@
 	.eyebrow {
 		padding: 0 6px;
 	}
+	.switch {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		height: 44px;
+		padding: 0 12px 0 10px;
+		border-radius: 999px;
+		font-size: 13px;
+		font-weight: 650;
+		color: var(--ink);
+	}
+	.switch:hover {
+		background: var(--surface);
+	}
+	.month-card {
+		border-radius: var(--radius-card);
+		padding: 12px 12px 14px;
+	}
 	.days {
 		border-radius: var(--radius-card);
 		padding: 4px;
 		display: flex;
 		flex-direction: column;
 	}
-	.day + .day {
+	.days > :global(.day + .day) {
 		border-top: 1px solid var(--line);
-	}
-	.day {
-		scroll-margin: 96px 0 calc(var(--tabbar-space) + 16px);
 	}
 	.none {
 		font-size: 13px;
@@ -472,10 +540,10 @@
 		font-size: 13px;
 		color: var(--muted);
 	}
-
-	/* The side panel only exists on wide screens; phones open the day in a sheet. */
-	.panel-col {
-		display: none;
+	.week-page {
+		max-width: 760px;
+		width: 100%;
+		margin: 0 auto;
 	}
 
 	.choices {
@@ -523,26 +591,31 @@
 		font-size: 13px;
 		color: var(--muted);
 	}
-	.jump {
-		display: flex;
-		flex-direction: column;
-		gap: 14px;
-	}
 
+	/* Wide screens: the month or agenda in the main column, blocking and repeats beside it. */
 	@media (min-width: 900px) {
 		.layout {
 			display: grid;
-			grid-template-columns: minmax(0, 600px) minmax(360px, 520px);
-			gap: 24px;
+			grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+			grid-template-areas:
+				'main top'
+				'main side';
+			grid-template-rows: auto 1fr;
+			gap: 18px 24px;
 			align-items: start;
 		}
-		.panel-col {
-			display: block;
-			position: sticky;
-			top: 20px;
+		.top {
+			grid-area: top;
 		}
-		.panel-col :global(.day-panel) {
-			height: min(calc(100dvh - 40px), 820px);
+		.main {
+			grid-area: main;
+		}
+		.side {
+			grid-area: side;
+		}
+		.month-card {
+			padding: 18px;
+			border-radius: 28px;
 		}
 	}
 </style>

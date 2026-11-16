@@ -60,11 +60,13 @@ final class AppTourUITests: XCTestCase {
         // Main tabs.
         // Labels can carry state ("Activity, new", "Appearance, System · Dawn"), so match by prefix.
         tapIfPresent(button(startingWith: "My time")) { snapshot("10-my-time") }
-        // Today's row opens the day sheet.
-        tapIfPresent(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", ", today,")).firstMatch) {
-            snapshot("10-my-time-day")
+        // Today in the month opens its week, with the day's timeline.
+        tapIfPresent(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Today, ")).firstMatch) {
+            snapshot("10-my-time-week")
         }
-        tapIfPresent(app.buttons["Close"]) {}
+        tapIfPresent(app.buttons["Back to month"]) {}
+        tapIfPresent(app.buttons["Show as a list"]) { snapshot("10-my-time-agenda") }
+        tapIfPresent(app.buttons["Show as a month"]) {}
         tapIfPresent(button(startingWith: "Activity")) { snapshot("11-activity") }
         tapIfPresent(button(startingWith: "You")) { snapshot("12-you") }
         tapIfPresent(button(startingWith: "Appearance")) { snapshot("13-appearance") }

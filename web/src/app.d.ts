@@ -14,6 +14,10 @@ declare global {
 			user: User | null;
 			session: Session | null;
 		}
+		interface PageState {
+			/** My time: the day open in the week view. */
+			myTimeDay?: string;
+		}
 	}
 }
 

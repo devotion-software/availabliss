@@ -11,6 +11,7 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.YearMonth
 import java.time.ZoneId
 
 /** A repeating manual block listed under the grid ("Choir · Every Tuesday · 19:00 – 21:30"). */
@@ -180,31 +181,40 @@ data class BlockDraft(
 
 data class MyTimeUiState(
     val today: LocalDate = DateTimes.today(),
+    /** Month (default) or agenda; remembered per device. */
+    val mode: MyTimeMode = MyTimeMode.Month,
+    /** The month on screen in the month view. */
+    val month: YearMonth = YearMonth.from(DateTimes.today()),
     /** Busy time laid out for every loaded day, from today. */
     val layout: DaysLayout = DaysLayout.Empty,
-    /** One row per loaded day. */
+    /** One summary per loaded day, in order. */
     val days: List<DayRowUi> = emptyList(),
+    /** [days] by date. */
+    val rows: Map<LocalDate, DayRowUi> = emptyMap(),
+    /** Each of your blocks' repeat, by block id (the agenda's "Weekly" tags). */
+    val repeats: Map<String, Repeat> = emptyMap(),
     val recurring: List<RecurringBlockUi> = emptyList(),
     /** The first load (nothing to show yet). */
     val loading: Boolean = true,
-    /** Loading further weeks at the bottom of the list. */
+    /** Loading further weeks at the bottom of the agenda. */
     val loadingMore: Boolean = false,
     /** Pull to refresh. */
     val refreshing: Boolean = false,
     val error: String? = null,
     /** No calendar is connected: show the "Connect a calendar" hint. */
     val showCalendarHint: Boolean = false,
-    /** The day open in the day sheet. */
+    /** The day selected in the week view; null when the month or agenda is showing. */
     val openDay: LocalDate? = null,
-    /** "Jump to date": scroll the list to this day once it's loaded. */
-    val scrollTo: LocalDate? = null,
     val draft: BlockDraft? = null,
     /** Set while the "Busy from your calendar" sheet is open. */
     val calendarBusy: CalendarBusyUi? = null,
     val savingDraft: Boolean = false,
     val message: UserMessage? = null,
 ) {
-    val lastLoadedDay: LocalDate? get() = layout.days.lastOrNull()
+    /** The last day My time goes to. */
+    val lastDay: LocalDate get() = today.plusDays(MY_TIME_DAYS_AHEAD)
+
+    val months: ClosedRange<YearMonth> get() = monthRange(today)
 }
 
 /** "Every Tuesday · 19:00 – 21:30", "Every other Friday · All day", "Sat 21 Nov · All day". */

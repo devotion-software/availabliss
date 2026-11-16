@@ -7,11 +7,11 @@ import java.time.LocalDate
 import kotlin.math.roundToInt
 
 /*
- * The "My time" day list: one row per day with a strip of busy time from 06:00
- * to 24:00 and a one-line summary ("Free from 18:00"). Pure, so it is unit-testable.
+ * "My time" per-day summary: the busy time from 06:00 to 24:00, how much of it is
+ * free and a one-line summary ("Free from 18:00"). Pure, so it is unit-testable.
  */
 
-/** The part of the day the strip and the summary look at: 06:00 – 24:00. */
+/** The part of the day the summary and the free-time level look at: 06:00 – 24:00. */
 const val STRIP_FROM = 6 * 60
 
 /** Free gaps shorter than this don't count as free in the summary (a minute between two things isn't free). */
@@ -47,18 +47,50 @@ sealed interface DaySummary {
     }
 }
 
-/** One row of the day list. */
+/** One day, summarised (the month cell, the agenda's day header and the week strip). */
 data class DayRowUi(
     val date: LocalDate,
-    /** Calendar busy time, merged; drawn faded. */
+    /** Calendar busy time, merged. */
     val calendarSpans: List<BusySpan>,
-    /** Your own blocks, merged; drawn in the accent. */
+    /** Your own blocks, merged. */
     val manualSpans: List<BusySpan>,
     val summary: DaySummary,
     /** Names of your blocks that day ("Choir, Gym"), or null. */
     val names: String?,
     val accessibility: String,
-)
+    /** Free minutes between 06:00 and 24:00. */
+    val freeMinutes: Int = WINDOW_MINUTES,
+) {
+    /** You've blocked some of this day yourself. */
+    val hasBlock: Boolean get() = manualSpans.isNotEmpty()
+
+    /** A connected calendar makes you busy some of this day. */
+    val hasCalendarBusy: Boolean get() = calendarSpans.isNotEmpty()
+
+    /** How free the day is, 0 (busy all day) to 3 (12 hours or more free). */
+    val level: Int get() = freeLevel(freeMinutes)
+}
+
+/** Length of the 06:00 – 24:00 window. */
+const val WINDOW_MINUTES = DAY_MINUTES - STRIP_FROM
+
+/** Free minutes between 06:00 and 24:00 given the day's [busy] spans (any order, may overlap). */
+fun freeMinutes(busy: List<BusySpan>): Int {
+    val inWindow = mergeSpans(busy.mapNotNull { s ->
+        val from = maxOf(s.from, STRIP_FROM)
+        val to = minOf(s.to, DAY_MINUTES)
+        if (to > from) BusySpan(from, to) else null
+    })
+    return WINDOW_MINUTES - inWindow.sumOf { it.minutes }
+}
+
+/** The month's fill for a day: 12h+ free → 3, 6h+ → 2, 30 min+ → 1, otherwise 0. */
+fun freeLevel(freeMinutes: Int): Int = when {
+    freeMinutes >= 12 * 60 -> 3
+    freeMinutes >= 6 * 60 -> 2
+    freeMinutes >= 30 -> 1
+    else -> 0
+}
 
 /** Merges overlapping or touching spans; the result is sorted. */
 fun mergeSpans(spans: List<BusySpan>): List<BusySpan> {
@@ -129,6 +161,7 @@ fun dayRow(date: LocalDate, allDay: List<BusyInterval>, timed: List<PlacedInterv
         summary = summary,
         names = names,
         accessibility = describeDay(date, busy, summary, names, isToday = date == today),
+        freeMinutes = freeMinutes(busy),
     )
 }
 

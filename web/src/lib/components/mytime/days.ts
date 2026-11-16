@@ -1,9 +1,10 @@
 /**
- * "My time" day list: what each day's row says ("Free from 18:00"), what a
- * screen reader hears, the week headings and the "Block time" presets.
+ * "My time" day summaries: how free each day is (the month's heat map), what a
+ * day says ("Free from 18:00"), what a screen reader hears, the agenda's rows,
+ * the week headings and the "Block time" presets.
  */
-import type { BusyInterval } from '#lib/types';
-import { addDays, startOfWeek } from '#lib/client/dates';
+import type { BusyInterval, ManualBlock } from '#lib/types';
+import { addDays, endOfMonth, startOfWeek, weekdayOf } from '#lib/client/dates';
 import { dayNumber, formatDayRange, weekdayName } from '#lib/client/format';
 import { clock, DAY_MINUTES } from './parts';
 
@@ -60,20 +61,45 @@ export function freeGaps(busy: readonly Range[], from = STRIP_FROM, to = STRIP_T
 	return gaps;
 }
 
+/** The longest free stretch of at least half an hour, 06:00 – 24:00 (ties go to the later one: evenings matter most, as on iOS and Android). */
+export function longestFree(busy: readonly Range[]): Range | null {
+	let best: Range | null = null;
+	for (const g of freeGaps(busy)) if (g.to - g.from >= MIN_FREE_MINUTES && (!best || g.to - g.from >= best.to - best.from)) best = g;
+	return best;
+}
+
+/** The free stretch spans the whole waking day. */
+export const isWholeDay = (r: Range) => r.from === STRIP_FROM && r.to === STRIP_TO;
+
 /**
- * One line for a day row: "Free all day", "Busy all day", "Free from 18:00",
+ * One line for a day: "Free all day", "Busy all day", "Free from 18:00",
  * "Free until 09:00" or "Free 12:00 – 14:00" (the longest free stretch, 06:00 – 24:00).
  */
 export function freeSummary(busy: readonly Range[]): string {
-	const gaps = freeGaps(busy);
-	if (gaps.length === 1 && gaps[0].from === STRIP_FROM && gaps[0].to === STRIP_TO) return 'Free all day';
-	let best: Range | null = null;
-	// Ties go to the later stretch (evenings matter most), as on iOS and Android.
-	for (const g of gaps) if (g.to - g.from >= MIN_FREE_MINUTES && (!best || g.to - g.from >= best.to - best.from)) best = g;
+	const best = longestFree(busy);
 	if (!best) return 'Busy all day';
+	if (isWholeDay(best)) return 'Free all day';
 	if (best.to === STRIP_TO) return `Free from ${clock(best.from)}`;
 	if (best.from === STRIP_FROM) return `Free until ${clock(best.to)}`;
 	return `Free ${clock(best.from)} – ${clock(best.to)}`;
+}
+
+/** Free minutes within 06:00 – 24:00 (1080 when nothing's busy). */
+export function freeMinutes(busy: readonly Range[]): number {
+	let taken = 0;
+	for (const b of mergeRanges(busy)) taken += Math.max(0, Math.min(b.to, STRIP_TO) - Math.max(b.from, STRIP_FROM));
+	return STRIP_TO - STRIP_FROM - taken;
+}
+
+export type FreeLevel = 0 | 1 | 2 | 3;
+
+/** How free a day is, for the month's heat map: 3 = 12h+ free, 2 = 6h+, 1 = half an hour+, 0 = busy all day. */
+export function freeLevel(busy: readonly Range[]): FreeLevel {
+	const free = freeMinutes(busy);
+	if (free >= 12 * 60) return 3;
+	if (free >= 6 * 60) return 2;
+	if (free >= MIN_FREE_MINUTES) return 1;
+	return 0;
 }
 
 /** Your own block notes that day ("Choir"), once each, in time order. Calendar labels are calendar names, not events, so they're left out. */
@@ -98,6 +124,72 @@ export function describeDay(day: string, busy: readonly Range[], names: readonly
 	if (names.length) parts.push(names.join(', '));
 	return parts.join(', ');
 }
+
+/** What a screen reader hears for a day in the month: "Monday 23 November, today, free from 17:30". */
+export function dayCellLabel(day: string, today: string, busy: readonly Range[] | null): string {
+	const parts = [longDate(day)];
+	if (day === today) parts.push('today');
+	if (busy) {
+		const summary = freeSummary(busy);
+		parts.push(summary.charAt(0).toLowerCase() + summary.slice(1).replace(' – ', ' to '));
+	}
+	return parts.join(', ');
+}
+
+/** The week view's line under the strip: "Today · Free from 17:30 · Choir". */
+export function dayLine(day: string, today: string, busy: readonly Range[], names: readonly string[] = []): string {
+	return [day === today ? 'Today' : longDate(day), freeSummary(busy), ...names].join(' · ');
+}
+
+/** What's on a day, for the dots on the week strip and month: one of your blocks, calendar busy. */
+export function dayMarks(timed: readonly DayPiece[], allDay: readonly BusyInterval[]): { mine: boolean; calendar: boolean } {
+	const items = [...allDay, ...timed.map((p) => p.interval)].filter(counts);
+	return { mine: items.some((i) => i.source === 'manual'), calendar: items.some((i) => i.source === 'calendar') };
+}
+
+/** The month as cells, Monday first: blanks (null) before the 1st, then every day. */
+export function monthCells(month: string): (string | null)[] {
+	const first = month.slice(0, 8) + '01';
+	const cells: (string | null)[] = Array.from({ length: weekdayOf(first) }, () => null);
+	for (let d = first, last = endOfMonth(first); d <= last; d = addDays(d, 1)) cells.push(d);
+	return cells;
+}
+
+/** One row in the agenda: a busy item that day. */
+export interface AgendaItem {
+	interval: BusyInterval;
+	/** Null for all day. */
+	range: Range | null;
+	title: string;
+	tag: string;
+}
+
+/** "Weekly", "Every other week", "Your block" or "Calendar". */
+export function sourceTag(interval: BusyInterval, blocks: readonly ManualBlock[]): string {
+	if (interval.source === 'calendar') return 'Calendar';
+	const repeat = blocks.find((b) => b.id === interval.blockId)?.repeat;
+	return repeat === 'weekly' ? 'Weekly' : repeat === 'fortnightly' ? 'Every other week' : 'Your block';
+}
+
+/** A day's busy items for the agenda: all day first, then by start; events marked not busy left out. */
+export function agendaItems(timed: readonly DayPiece[], allDay: readonly BusyInterval[], blocks: readonly ManualBlock[]): AgendaItem[] {
+	const item = (interval: BusyInterval, range: Range | null): AgendaItem => ({
+		interval,
+		range,
+		title: (interval.source === 'manual' && interval.label?.trim()) || 'Busy',
+		tag: sourceTag(interval, blocks)
+	});
+	return [
+		...allDay.filter(counts).map((i) => item(i, null)),
+		...timed
+			.filter((p) => counts(p.interval))
+			.sort((a, b) => a.from - b.from || a.to - b.to)
+			.map((p) => item(p.interval, { from: p.from, to: p.to }))
+	];
+}
+
+/** `day`, kept between `first` and `last`. */
+export const clampDay = (day: string, first: string, last: string) => (day < first ? first : day > last ? last : day);
 
 const monthLong = (day: string) => new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'UTC' }).format(new Date(`${day}T00:00:00Z`));
 

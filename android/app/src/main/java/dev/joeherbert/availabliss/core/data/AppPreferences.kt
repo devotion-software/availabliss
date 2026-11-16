@@ -108,6 +108,13 @@ class AppPreferences @Inject constructor(
         }
     }
 
+    /** My time's last view ("Month" / "Agenda"), remembered per device. */
+    val myTimeView: Flow<String?> = store.data.map { it[KEY_MY_TIME_VIEW] }
+
+    suspend fun setMyTimeView(view: String) {
+        store.edit { it[KEY_MY_TIME_VIEW] = view }
+    }
+
     suspend fun pushToken(): String? = store.data.first()[KEY_PUSH_TOKEN]
 
     suspend fun setPushToken(token: String?) {
@@ -145,5 +152,6 @@ class AppPreferences @Inject constructor(
         val KEY_DEVICE_SYNC_RANGES = stringPreferencesKey("device_sync_ranges")
         val KEY_DEVICE_SYNC_HORIZON = longPreferencesKey("device_sync_horizon")
         val KEY_PUSH_TOKEN = stringPreferencesKey("push_token")
+        val KEY_MY_TIME_VIEW = stringPreferencesKey("my_time_view")
     }
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.UserMessage
+import dev.joeherbert.availabliss.core.data.AppPreferences
 import dev.joeherbert.availabliss.core.data.BlocksRepository
 import dev.joeherbert.availabliss.core.data.CalendarsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
@@ -23,14 +24,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.time.LocalTime
+import java.time.YearMonth
 import javax.inject.Inject
 
-/** Weeks fetched per page as the day list scrolls (each request stays well under the 120-day limit). */
+/** Days fetched per page as the agenda scrolls (each request stays well under the 120-day limit). */
 private const val PAGE_DAYS = 28
 
 /** The busy endpoint takes at most 120 days per call. */
@@ -41,6 +44,7 @@ class MyTimeViewModel @Inject constructor(
     private val blocksRepository: BlocksRepository,
     private val users: UserRepository,
     private val calendars: CalendarsRepository,
+    private val prefs: AppPreferences,
     liveEvents: LiveEvents,
 ) : ViewModel() {
 
@@ -48,10 +52,15 @@ class MyTimeViewModel @Inject constructor(
     private var intervals: List<BusyInterval> = emptyList()
     private var blocks: List<ManualBlock> = emptyList()
 
-    /** The list runs from [start] to [loadedThrough] (inclusive); [wantedThrough] is how far it should reach. */
+    /** Loaded days run from [start] to [loadedThrough] (inclusive); [wantedThrough] is how far they should reach. */
     private var start: LocalDate = DateTimes.today()
     private var loadedThrough: LocalDate? = null
-    private var wantedThrough: LocalDate = endOfWeek(start).plusDays(PAGE_DAYS - 7L)
+
+    /** A few weeks, and at least the whole of this month and the next (the month view swipes ahead). */
+    private var wantedThrough: LocalDate = maxOf(
+        endOfWeek(start).plusDays(PAGE_DAYS - 7L),
+        endOfWeek(YearMonth.from(start).plusMonths(1).atEndOfMonth()),
+    )
 
     private val _state = MutableStateFlow(MyTimeUiState())
     val state: StateFlow<MyTimeUiState> = _state.asStateFlow()
@@ -61,6 +70,10 @@ class MyTimeViewModel @Inject constructor(
 
     init {
         load()
+        viewModelScope.launch {
+            val saved = runCatching { prefs.myTimeView.first() }.getOrNull()
+            MyTimeMode.entries.firstOrNull { it.name == saved }?.let { mode -> _state.update { it.copy(mode = mode) } }
+        }
         viewModelScope.launch {
             liveEvents.payloads.filterIsInstance<LivePayload.AvailabilityChanged>().collect { event ->
                 if (event.userId == users.user.value?.id) load(silent = true)
@@ -130,7 +143,8 @@ class MyTimeViewModel @Inject constructor(
 
     /** Makes sure [date] (and the rest of its week) is loaded. */
     private fun ensureLoaded(date: LocalDate) {
-        wantedThrough = maxOf(wantedThrough, endOfWeek(date))
+        val last = endOfWeek(DateTimes.today().plusDays(MY_TIME_DAYS_AHEAD))
+        wantedThrough = maxOf(wantedThrough, minOf(endOfWeek(date), last))
         if (loadJob?.isActive != true) loadMore()
     }
 
@@ -164,28 +178,50 @@ class MyTimeViewModel @Inject constructor(
     }
     // endregion
 
-    // region Jump to date and the day sheet
-    fun jumpTo(date: LocalDate) {
-        val target = maxOf(date, start)
-        _state.update { it.copy(scrollTo = target) }
-        ensureLoaded(target)
+    // region Views: month / agenda, the month on screen, the week view
+    /** Month or agenda; remembered on this device. */
+    fun setMode(mode: MyTimeMode) {
+        _state.update { it.copy(mode = mode) }
+        viewModelScope.launch { runCatching { prefs.setMyTimeView(mode.name) } }
     }
 
-    fun scrollHandled() = _state.update { it.copy(scrollTo = null) }
+    fun previousMonth() = showMonth(_state.value.month.minusMonths(1))
 
+    fun nextMonth() = showMonth(_state.value.month.plusMonths(1))
+
+    fun thisMonth() = showMonth(YearMonth.from(DateTimes.today()))
+
+    /** Shows [month] (within today's month .. a year ahead), loading it and the month after. */
+    private fun showMonth(month: YearMonth) {
+        val range = monthRange(DateTimes.today())
+        if (month < range.start || month > range.endInclusive) return
+        _state.update { it.copy(month = month) }
+        ensureLoaded(month.plusMonths(1).atEndOfMonth())
+    }
+
+    /** Opens the week view on [date] (today or later). */
     fun openDay(date: LocalDate) {
-        _state.update { it.copy(openDay = date) }
-        ensureLoaded(date)
+        val today = DateTimes.today()
+        val day = date.coerceIn(today, today.plusDays(MY_TIME_DAYS_AHEAD))
+        _state.update { it.copy(openDay = day) }
+        ensureLoaded(day)
     }
 
+    /** Back to the month or agenda, as they were. */
     fun closeDay() = _state.update { it.copy(openDay = null) }
 
-    /** The day sheet's previous / next arrows; never before today. */
+    /** The timeline's swipe: the previous / next day, never before today or past a year ahead. */
     fun stepDay(days: Long) {
         val current = _state.value.openDay ?: return
-        val next = current.plusDays(days)
-        if (next.isBefore(start)) return
-        openDay(next)
+        val today = DateTimes.today()
+        steppedDay(current, days, today, today.plusDays(MY_TIME_DAYS_AHEAD))?.let(::openDay)
+    }
+
+    /** The week strip's swipe: the same weekday a week earlier / later (clamped to today). */
+    fun stepWeek(weeks: Long) {
+        val current = _state.value.openDay ?: return
+        val today = DateTimes.today()
+        steppedWeek(current, weeks, today, today.plusDays(MY_TIME_DAYS_AHEAD))?.let(::openDay)
     }
     // endregion
 
@@ -293,6 +329,14 @@ class MyTimeViewModel @Inject constructor(
     /** "Something else…": the sheet as it comes, on today. */
     fun openBlockSheet() = openDraft(BlockDraft(date = DateTimes.today()))
 
+    /** The week view's "+ Block": the sheet on the selected day. */
+    fun openBlockSheetOn(date: LocalDate) = openDraft(BlockDraft(date = date))
+
+    /** The agenda's free row: the sheet prefilled with the day's longest free stretch. */
+    fun blockFree(date: LocalDate, summary: DaySummary) {
+        blockDraftForFree(date, summary)?.let(::openDraft)
+    }
+
     /** "This evening" (or tomorrow evening once it's past 18:00). */
     fun blockEvening() = openDraft(BlockDraft.evening(DateTimes.now().toLocalDateTime()))
 
@@ -378,6 +422,8 @@ class MyTimeViewModel @Inject constructor(
                 today = today,
                 layout = layout,
                 days = rows,
+                rows = rows.associateBy { it.date },
+                repeats = blocks.associate { it.id to it.repeat },
                 recurring = blocks
                     .filter { it.repeat != Repeat.None }
                     .sortedBy { it.start }

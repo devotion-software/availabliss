@@ -16,6 +16,7 @@ object AvIcons {
     val Back = line("Back", "M15 5l-7 7 7 7", stroke = 2.2f)
     val Forward = line("Forward", "M9 5l7 7-7 7", stroke = 2.2f)
     val ChevronDown = line("ChevronDown", "M6 9l6 6 6-6")
+    val ListBullets = line("ListBullets", "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01", stroke = 2.2f)
     val Plus = line("Plus", "M12 5v14M5 12h14", stroke = 2.4f)
     val Close = line("Close", "M6 6l12 12M18 6L6 18", stroke = 2.6f)
     val Check = line("Check", "M5 12l5 5L20 7", stroke = 3f)

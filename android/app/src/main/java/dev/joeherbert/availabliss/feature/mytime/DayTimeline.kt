@@ -87,7 +87,7 @@ private val TextlessBoxWidth = 28.dp
 private val Tabular = TextStyle(fontFeatureSettings = "tnum")
 
 /**
- * One day's busy time on a tall 24-hour timeline (the "My time" day sheet). Tapping
+ * One day's busy time on a tall 24-hour timeline (the "My time" week view). Tapping
  * empty time calls [onEmptyTap] with the hour tapped; [onIntervalClick] makes busy
  * boxes tappable (null = display only). Opens scrolled so [initialHour] is at the top.
  */
