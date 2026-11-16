@@ -9,18 +9,20 @@
 	interface Props {
 		eventId: string;
 		item: CalendarItem;
-		size?: 'md' | 'lg';
+		size?: 'sm' | 'md' | 'lg';
 		/** Stack the two buttons instead of placing them side by side. */
 		stacked?: boolean;
+		/** Put the Google Calendar link beside the button (for small cards, like the chat's "Everyone's in" banner). */
+		inline?: boolean;
 	}
-	let { eventId, item, size = 'md', stacked = false }: Props = $props();
+	let { eventId, item, size = 'md', stacked = false, inline = false }: Props = $props();
 
 	const fmt = useFormat();
 	let added = $state(false);
 	const google = $derived(googleCalendarUrl(item, fmt.current.dayKey));
 </script>
 
-<div class="add" class:stacked>
+<div class="add" class:stacked class:inline>
 	<Button
 		href={eventIcsUrl(eventId)}
 		download
@@ -35,7 +37,7 @@
 	</Button>
 	<a class="google" href={google} target="_blank" rel="noopener noreferrer">
 		<BrandIcon brand="google" size={16} />
-		Google Calendar
+		<span>Google<span class="cal">&nbsp;Calendar</span></span>
 		<span class="sr-only">(opens in a new tab)</span>
 	</a>
 </div>
@@ -66,6 +68,28 @@
 	.google:hover {
 		background: var(--surface);
 		color: var(--ink);
+	}
+	.inline {
+		container-type: inline-size;
+		flex-direction: row;
+		align-items: center;
+		gap: 4px;
+	}
+	.inline > :global(.btn) {
+		flex: 0 1 auto;
+		width: auto;
+		min-width: 0;
+	}
+	.inline .google {
+		flex: none;
+		min-height: 38px;
+		font-size: 13px;
+	}
+	/* Narrow cards (phones): "Google" alone, so the main button keeps its full label. */
+	@container (max-width: 330px) {
+		.inline .cal {
+			display: none;
+		}
 	}
 	.stacked .google {
 		align-self: stretch;

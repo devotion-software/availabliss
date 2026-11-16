@@ -11,6 +11,8 @@
 	import PollCard from './PollCard.svelte';
 	import ProposalCard from './ProposalCard.svelte';
 	import EventCard from './EventCard.svelte';
+	import ConfirmedBanner from './ConfirmedBanner.svelte';
+	import { isConfirmationMessage } from '#lib/client/confirmation';
 	import ReadReceipt from './ReadReceipt.svelte';
 	import MessageInfoSheet from './MessageInfoSheet.svelte';
 	import MessageMenu, { type MessageMenuAnchor } from './MessageMenu.svelte';
@@ -165,7 +167,9 @@
 			{@const m = item.m}
 			{#if item.divider}<span class="divider">{item.divider}</span>{/if}
 			<div class="item" class:tight={!item.first}>
-				{#if m.kind === 'system'}
+				{#if isConfirmationMessage(m)}
+					<ConfirmedBanner message={m} {compact} />
+				{:else if m.kind === 'system'}
 					<p class="system">{m.body}</p>
 				{:else if m.kind === 'poll' && m.poll}
 					<PollCard
