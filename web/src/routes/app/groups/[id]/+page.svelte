@@ -2,7 +2,7 @@
 	import { untrack } from 'svelte';
 	import { fly } from 'svelte/transition';
 	import { prefersReducedMotion } from 'svelte/motion';
-	import type { DayAvailability, Slot } from '#lib/types';
+	import type { Availability, DayAvailability, Slot } from '#lib/types';
 	import { getAvailability, getDayAvailability } from '#lib/client/availability';
 	import { addDays, addMonths, endOfMonth, startOfMonth } from '#lib/client/dates';
 	import { formatDayKey, formatDayRange, monthTitle, useFormat } from '#lib/client/format';
@@ -60,9 +60,11 @@
 		if (next === seededFrom) return;
 		seededFrom = next;
 		untrack(() => {
+			forgetCached();
 			month = data.month;
 			availability = next;
 			selected = defaultSelection(next, data.month);
+			seedCache(data.month, next);
 		});
 	});
 	let loadingMonth = $state(false);
@@ -92,20 +94,83 @@
 		return today.slice(0, 7) === m.slice(0, 7) ? today : m;
 	}
 
+	// Months and days already fetched, and ones on their way (a page change or a prefetch), so paging
+	// to a neighbouring month or week shows it straight away instead of waiting on the network.
+	// Cleared when something changes (busy time, the timing).
+	let months = new Map<string, Promise<Availability>>();
+	let dayCache = new Map<string, Promise<DayAvailability>>();
+	const monthsReady = new Map<string, Availability>();
+	const daysReady = new Map<string, DayAvailability>();
+
+	function fetchMonth(m: string): Promise<Availability> {
+		let request = months.get(m);
+		if (!request) {
+			const cache = months;
+			request = getAvailability(group.id, m, endOfMonth(m));
+			cache.set(m, request);
+			request.then(
+				(a) => cache === months && monthsReady.set(m, a),
+				() => cache.delete(m)
+			);
+		}
+		return request;
+	}
+
+	function fetchDay(date: string): Promise<DayAvailability> {
+		let request = dayCache.get(date);
+		if (!request) {
+			const cache = dayCache;
+			request = getDayAvailability(group.id, date);
+			cache.set(date, request);
+			request.then(
+				(d) => cache === dayCache && daysReady.set(date, d),
+				() => cache.delete(date)
+			);
+		}
+		return request;
+	}
+
+	function forgetCached() {
+		months = new Map();
+		dayCache = new Map();
+		monthsReady.clear();
+		daysReady.clear();
+	}
+
+	/** Caches the month the page loaded with, and fetches the months either side for the first swipe. */
+	function seedCache(m: string, a: Availability) {
+		monthsReady.set(m, a);
+		months.set(m, Promise.resolve(a));
+		fetchMonth(addMonths(m, 1)).catch(() => {});
+		fetchMonth(addMonths(m, -1)).catch(() => {});
+	}
+	$effect(() => untrack(() => seedCache(month, availability)));
+
 	let monthRequest = 0;
 	async function loadMonth(m: string) {
 		const id = ++monthRequest;
-		loadingMonth = true;
-		try {
-			const next = await getAvailability(group.id, m, endOfMonth(m));
-			if (id !== monthRequest) return;
-			availability = next;
+		// Already fetched (usually: neighbours are prefetched): show it as the page slides in.
+		const ready = monthsReady.get(m);
+		if (ready) {
+			availability = ready;
 			month = m;
-		} catch (err) {
-			toasts.error(err);
-		} finally {
-			if (id === monthRequest) loadingMonth = false;
+			loadingMonth = false;
+		} else {
+			month = m;
+			loadingMonth = true;
+			try {
+				const next = await fetchMonth(m);
+				if (id !== monthRequest) return;
+				availability = next;
+			} catch (err) {
+				toasts.error(err);
+				return;
+			} finally {
+				if (id === monthRequest) loadingMonth = false;
+			}
 		}
+		fetchMonth(addMonths(m, 1)).catch(() => {});
+		fetchMonth(addMonths(m, -1)).catch(() => {});
 	}
 
 	let weekRequest = 0;
@@ -116,20 +181,24 @@
 		if (!force && key === weekKey) return;
 		weekKey = key;
 		const id = ++weekRequest;
-		weekDays = new Map();
-		const results = await Promise.all(
-			dates.map((d) => (days.get(d)?.status === 'hidden' ? null : getDayAvailability(group.id, d).catch(() => null)))
-		);
+		const wanted = (d: string) => days.get(d)?.status !== 'hidden';
+		// Cached (usually: the next week is prefetched): show it at once.
+		weekDays = dates.every((d) => !wanted(d) || daysReady.has(d))
+			? new Map(dates.map((d) => [d, daysReady.get(d) ?? null]))
+			: new Map();
+		const results = await Promise.all(dates.map((d) => (wanted(d) ? fetchDay(d).catch(() => null) : null)));
 		if (id === weekRequest) weekDays = new Map(dates.map((d, i) => [d, results[i]]));
+		// The next week the user is likely to swipe to.
+		for (const d of dates) fetchDay(addDays(d, 7 * lastStep)).catch(() => {});
 	}
 
 	let dayRequest = 0;
 	async function loadDay() {
 		const id = ++dayRequest;
 		const date = selected;
-		if (dayDetail?.date !== date) dayDetail = null;
+		if (dayDetail?.date !== date) dayDetail = daysReady.get(date) ?? null;
 		try {
-			const detail = await getDayAvailability(group.id, date);
+			const detail = await fetchDay(date);
 			if (id === dayRequest) dayDetail = detail;
 		} catch (err) {
 			toasts.error(err);
@@ -156,6 +225,7 @@
 		const id = group.id;
 		const refresh = () =>
 			untrack(() => {
+				forgetCached();
 				loadMonth(month);
 				loadDetails(true);
 			});
@@ -175,7 +245,9 @@
 		if (startOfMonth(date) !== month) loadMonth(startOfMonth(date));
 	}
 
+	let lastStep: 1 | -1 = 1;
 	function step(direction: 1 | -1) {
+		lastStep = direction;
 		if (view === 'month') {
 			const m = addMonths(month, direction);
 			loadMonth(m);
@@ -201,15 +273,19 @@
 
 	// Swipe sideways on a touch screen for the previous / next month or week; the page follows the finger.
 	let touch: { x: number; y: number } | null = null;
+	// The last two moves, for the flick speed.
+	let moves: { x: number; t: number }[] = [];
 	let dragX = $state(0);
 	function touchStart(e: TouchEvent) {
 		touch = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+		moves = [];
 	}
 	function touchMove(e: TouchEvent) {
 		if (!touch) return;
 		const dx = e.touches[0].clientX - touch.x;
 		const dy = e.touches[0].clientY - touch.y;
-		dragX = Math.abs(dx) > Math.abs(dy) * 1.5 ? dx * 0.35 : 0;
+		dragX = Math.abs(dx) > Math.abs(dy) * 1.5 ? dx : 0;
+		moves = [...moves.slice(-1), { x: e.touches[0].clientX, t: e.timeStamp }];
 	}
 	function touchEnd(e: TouchEvent) {
 		if (!touch) return;
@@ -217,7 +293,11 @@
 		const dy = e.changedTouches[0].clientY - touch.y;
 		touch = null;
 		dragX = 0;
-		if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) step(dx < 0 ? 1 : -1);
+		const [a, b] = moves;
+		const speed = a && b && b.t > a.t ? (b.x - a.x) / (b.t - a.t) : 0; // px per ms
+		const sideways = Math.abs(dx) > Math.abs(dy) * 1.5;
+		// A long enough drag, or a quick flick.
+		if (sideways && (Math.abs(dx) > 60 || (Math.abs(speed) > 0.6 && Math.abs(dx) > 20))) step(dx < 0 ? 1 : -1);
 	}
 
 	let proposeOpen = $state(false);

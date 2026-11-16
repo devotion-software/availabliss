@@ -12,8 +12,6 @@ struct GroupAvailabilityView: View {
     @State private var proposalDraft: ProposalDraft?
     /// Which side the next calendar page slides in from (trailing = later).
     @State private var pageEdge: Edge = .trailing
-    /// How far a sideways swipe has dragged the page.
-    @State private var dragX: CGFloat = 0
     /// The optional AI planner: offered only when the server has it set up; Pro to use.
     @State private var aiPlanner: Plan.AIPlanner?
     @State private var showsPlanner = false
@@ -141,9 +139,8 @@ struct GroupAvailabilityView: View {
     /// The previous / next month or week, sliding the grid across, then loading it.
     private func page(by delta: Int) {
         pageEdge = delta > 0 ? .trailing : .leading
-        withAnimation(.spring(response: 0.38, dampingFraction: 0.9)) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
             model.advance(by: delta)
-            dragX = 0
         }
         Task { await model.load() }
     }
@@ -187,7 +184,7 @@ struct GroupAvailabilityView: View {
         if model.isLoading {
             StatusView(kind: .loading)
         } else {
-            ZStack {
+            SwipePager(onSwipe: model.noteSwipe, onPage: page(by:)) {
                 SwiftUI.Group {
                     switch model.mode {
                     case .month: MonthGrid(model: model, group: group, me: app.session.user?.id)
@@ -200,29 +197,47 @@ struct GroupAvailabilityView: View {
                 .id(PageID(mode: model.mode, key: model.pageKey))
                 .transition(pageTransition)
             }
-            .offset(x: dragX)
-            // Swipe sideways for the previous / next month or week; the page follows your finger.
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 30)
-                    .onChanged { drag in
-                        let dx = drag.translation.width, dy = drag.translation.height
-                        guard abs(dx) > abs(dy) * 1.5 else { return }
-                        dragX = dx * 0.35
-                    }
-                    .onEnded { drag in
-                        let dx = drag.translation.width, dy = drag.translation.height
-                        if abs(dx) > 60, abs(dx) > abs(dy) * 1.5 {
-                            page(by: dx < 0 ? 1 : -1)
-                        } else {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { dragX = 0 }
-                        }
-                    }
-            )
             DayDetailCard(model: model, group: group, me: app.session.user?.id) { draft in
                 proposalDraft = draft
             }
             if model.mode == .month { planWithAI }
         }
+    }
+}
+
+/// Swipe sideways for the previous / next month or week: the page follows your finger, then slides
+/// on (or springs back). The drag lives here so following the finger redraws only this, not the
+/// whole screen.
+private struct SwipePager<Content: View>: View {
+    let onSwipe: () -> Void
+    let onPage: (Int) -> Void
+    @ViewBuilder let content: Content
+    @State private var dragX: CGFloat = 0
+
+    var body: some View {
+        ZStack { content }
+            .offset(x: dragX)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 20)
+                    .onChanged { drag in
+                        let dx = drag.translation.width, dy = drag.translation.height
+                        guard abs(dx) > abs(dy) * 1.5 else { return }
+                        dragX = dx
+                        onSwipe()
+                    }
+                    .onEnded { drag in
+                        let dx = drag.translation.width, dy = drag.translation.height
+                        if dragX != 0 { onSwipe() }
+                        // A quick flick counts too, not just a long drag.
+                        let projected = drag.predictedEndTranslation.width
+                        if abs(dx) > abs(dy) * 1.5, abs(dx) > 60 || abs(projected) > 160 {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { dragX = 0 }
+                            onPage(dx < 0 ? 1 : -1)
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { dragX = 0 }
+                        }
+                    }
+            )
     }
 }
 

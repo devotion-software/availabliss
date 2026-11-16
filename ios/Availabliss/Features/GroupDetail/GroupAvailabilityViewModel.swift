@@ -21,6 +21,19 @@ final class GroupAvailabilityViewModel {
 
     private let groupId: String
     private let api: APIClient
+    /// Months already fetched, and ones on their way (a page change or a prefetch), so paging to a
+    /// neighbouring month shows it straight away instead of waiting on the network.
+    private var months: [CalendarDay: Availability] = [:]
+    private var monthRequests: [CalendarDay: Task<Availability, Error>] = [:]
+    /// Day details on their way, shared between what's on screen and prefetching.
+    private var dayRequests: [CalendarDay: Task<DayAvailability, Error>] = [:]
+    /// Bumped by `invalidate()`, so answers to requests made before it are dropped.
+    private var generation = 0
+    /// The way the user last paged (1 = later), to prefetch the next week that way.
+    private var lastDelta = 1
+    /// When a sideways swipe last moved the page. The page follows the finger, so lifting it
+    /// would otherwise also tap the day it started on.
+    @ObservationIgnored private var lastSwipeAt: Date?
 
     init(groupId: String, api: APIClient) {
         self.groupId = groupId
@@ -85,6 +98,7 @@ final class GroupAvailabilityViewModel {
     /// Moves to the previous / next month or week without loading, so the change can be animated.
     /// Follow with `load()`.
     func advance(by delta: Int) {
+        lastDelta = delta < 0 ? -1 : 1
         switch mode {
         case .month:
             month = month.addingMonths(delta)
@@ -93,13 +107,19 @@ final class GroupAvailabilityViewModel {
         case .week: selectedDay = selectedDay.adding(days: 7 * delta)
         }
         if mode != .month, selectedDay.firstOfMonth != month { month = selectedDay.firstOfMonth }
+        // Already fetched (usually: neighbours are prefetched): show it as the page slides in.
+        if let cached = months[month] { show(cached) }
     }
+
+    /// A sideways swipe is moving the page: taps that end it aren't picks.
+    func noteSwipe() { lastSwipeAt = .now }
 
     /// What one page of the calendar shows: the month, or the week of the selected day.
     var pageKey: CalendarDay { mode == .month ? month : selectedDay.startOfWeek() }
 
     /// A day tapped in the month or week grid: its detail shows underneath.
     func pick(_ date: CalendarDay) {
+        if let lastSwipeAt, Date.now.timeIntervalSince(lastSwipeAt) < 0.4 { return }
         selectedDay = date
         userPickedDay = true
     }
@@ -109,50 +129,108 @@ final class GroupAvailabilityViewModel {
         if dayDetails[selectedDay] == nil { await loadDay(selectedDay) }
     }
 
+    /// Something changed (busy time, the timing): forget what's cached and reload what's on screen.
     func invalidate() async {
+        generation += 1
+        monthRequests.values.forEach { $0.cancel() }
+        dayRequests.values.forEach { $0.cancel() }
+        monthRequests = [:]
+        dayRequests = [:]
+        months = [:]
         dayDetails = [:]
         await load()
+    }
+
+    /// The displayed month's availability, picking a day that works unless the user chose one.
+    private func show(_ loaded: Availability) {
+        availability = loaded
+        // Start on a day that works rather than one outside the group's timing.
+        if !userPickedDay, let firstMatch = loaded.days.first(where: { $0.status == .match }) {
+            selectedDay = firstMatch.date
+        }
     }
 
     private func loadMonth() async {
         isLoading = availability == nil
         defer { isLoading = false }
         let requested = month
-        do {
-            let loaded: Availability = try await api.send(API.GroupAvailability.range(groupId: groupId, from: requested, to: requested.lastOfMonth()))
-            guard requested == month else { return }
-            availability = loaded
-            // Start on a day that works rather than one outside the group's timing.
-            if !userPickedDay, let firstMatch = loaded.days.first(where: { $0.status == .match }) {
-                selectedDay = firstMatch.date
+        if let cached = months[requested] {
+            if availability?.from != cached.from { show(cached) }
+        } else {
+            do {
+                let loaded = try await fetchMonth(requested)
+                guard requested == month else { return }
+                show(loaded)
+            } catch where !error.isCancellation {
+                self.error = error.userMessage
+                return
+            } catch {
+                return
             }
-        } catch where !error.isCancellation {
-            self.error = error.userMessage
-        } catch {}
+        }
+        prefetchMonth(requested.addingMonths(1))
+        prefetchMonth(requested.addingMonths(-1))
+    }
+
+    /// One month's availability: from the cache, the request already on its way, or a new one.
+    private func fetchMonth(_ month: CalendarDay) async throws -> Availability {
+        if let cached = months[month] { return cached }
+        let task = monthRequests[month] ?? {
+            let api = self.api, groupId = self.groupId
+            let task = Task { try await api.send(API.GroupAvailability.range(groupId: groupId, from: month, to: month.lastOfMonth())) }
+            monthRequests[month] = task
+            return task
+        }()
+        let generation = self.generation
+        defer { if generation == self.generation { monthRequests[month] = nil } }
+        let loaded = try await task.value
+        if generation == self.generation { months[month] = loaded }
+        return loaded
+    }
+
+    private func prefetchMonth(_ month: CalendarDay) {
+        guard months[month] == nil, monthRequests[month] == nil else { return }
+        Task { _ = try? await fetchMonth(month) }
     }
 
     private func loadWeek() async {
         if availability == nil || selectedDay.firstOfMonth != availability?.from.firstOfMonth { await loadMonth() }
-        let days = weekDays.filter { dayDetails[$0] == nil }
-        let api = self.api
-        let groupId = self.groupId
-        let results = await withTaskGroup(of: (CalendarDay, DayAvailability?).self) { group in
-            for day in days {
-                group.addTask { (day, try? await api.send(API.GroupAvailability.day(groupId: groupId, date: day))) }
+        let week = weekDays
+        await withTaskGroup(of: Void.self) { group in
+            for day in week where dayDetails[day] == nil {
+                group.addTask { [weak self] in _ = try? await self?.fetchDay(day) }
             }
-            var collected: [CalendarDay: DayAvailability] = [:]
-            for await (day, detail) in group { if let detail { collected[day] = detail } }
-            return collected
         }
-        dayDetails.merge(results) { _, new in new }
+        // The next week the user is likely to swipe to.
+        let next = week.map { $0.adding(days: 7 * lastDelta) }
+        for day in next where dayDetails[day] == nil && dayRequests[day] == nil {
+            Task { _ = try? await fetchDay(day) }
+        }
     }
 
     private func loadDay(_ date: CalendarDay) async {
         do {
-            dayDetails[date] = try await api.send(API.GroupAvailability.day(groupId: groupId, date: date))
+            _ = try await fetchDay(date)
         } catch where !error.isCancellation {
             self.error = error.userMessage
         } catch {}
+    }
+
+    /// Who's free on one day: from the cache, the request already on its way, or a new one.
+    @discardableResult
+    private func fetchDay(_ date: CalendarDay) async throws -> DayAvailability {
+        if let cached = dayDetails[date] { return cached }
+        let task = dayRequests[date] ?? {
+            let api = self.api, groupId = self.groupId
+            let task = Task { try await api.send(API.GroupAvailability.day(groupId: groupId, date: date)) }
+            dayRequests[date] = task
+            return task
+        }()
+        let generation = self.generation
+        defer { if generation == self.generation { dayRequests[date] = nil } }
+        let detail = try await task.value
+        if generation == self.generation { dayDetails[date] = detail }
+        return detail
     }
 
     // MARK: Actions

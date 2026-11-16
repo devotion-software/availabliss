@@ -28,6 +28,7 @@ import dev.joeherbert.availabliss.designsystem.component.availability.MonthCellU
 import dev.joeherbert.availabliss.designsystem.component.availability.TimelineRowUi
 import dev.joeherbert.availabliss.designsystem.component.availability.WeekColumnUi
 import dev.joeherbert.availabliss.navigation.GroupRoute
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -113,6 +114,17 @@ class GroupCalendarViewModel @Inject constructor(
     private var dayJob: Job? = null
     private var liveRefreshJob: Job? = null
 
+    // Months and days already fetched, and ones on their way (a page change or a prefetch), so
+    // paging to a neighbouring month or week shows it straight away instead of waiting on the network.
+    private val months = mutableMapOf<YearMonth, Availability>()
+    private val monthRequests = mutableMapOf<YearMonth, Deferred<ApiResult<Availability>>>()
+    private val days = mutableMapOf<LocalDate, DayAvailability>()
+    private val dayRequests = mutableMapOf<LocalDate, Deferred<ApiResult<DayAvailability>>>()
+    /** Bumped by [refresh], so answers to requests made before it are dropped. */
+    private var generation = 0
+    /** The way the user last paged (1 = later), to prefetch the next week that way. */
+    private var lastDelta = 1L
+
     val uiState: StateFlow<GroupCalendarUiState> = combine(raw, groups.group(groupId), users.user, plans.plan) { r, group, user, plan ->
         toUi(r, group, user?.id).copy(
             aiPlanner = plan?.aiPlanner ?: AiPlannerAccess(),
@@ -159,6 +171,11 @@ class GroupCalendarViewModel @Inject constructor(
 
     fun refresh() {
         liveRefreshJob?.cancel()
+        generation++
+        monthRequests.clear()
+        dayRequests.clear()
+        months.clear()
+        days.clear()
         loadMonth(silent = true)
         loadForView()
     }
@@ -198,12 +215,17 @@ class GroupCalendarViewModel @Inject constructor(
     // endregion
 
     private fun step(delta: Long) {
+        lastDelta = if (delta < 0) -1 else 1
         val r = raw.value
         when (r.view) {
             CalendarView.Month -> {
                 val month = r.month.plusMonths(delta)
                 val selected = if (YearMonth.from(DateTimes.today()) == month) DateTimes.today() else month.atDay(1)
-                raw.update { it.copy(month = month, selected = selected, userPicked = false) }
+                raw.update { s ->
+                    val moved = s.copy(month = month, selected = selected, userPicked = false)
+                    // Already fetched (usually: neighbours are prefetched): show it as the page slides in.
+                    months[month]?.let { moved.copy(availability = it, selected = defaultSelection(moved, it)) } ?: moved
+                }
                 loadMonth()
             }
             CalendarView.Week -> {
@@ -217,7 +239,7 @@ class GroupCalendarViewModel @Inject constructor(
     private fun syncMonthToSelection() {
         val month = YearMonth.from(raw.value.selected)
         if (month != raw.value.month) {
-            raw.update { it.copy(month = month) }
+            raw.update { s -> s.copy(month = month, availability = months[month] ?: s.availability) }
             loadMonth()
         }
     }
@@ -226,17 +248,56 @@ class GroupCalendarViewModel @Inject constructor(
         monthJob?.cancel()
         monthJob = viewModelScope.launch {
             val month = raw.value.month
-            if (!silent) raw.update { it.copy(loading = it.availability == null, error = null) }
-            when (val result = groups.availability(groupId, month.atDay(1).toString(), month.atEndOfMonth().toString())) {
+            val cached = months[month]
+            if (!silent && cached == null) raw.update { it.copy(loading = it.availability == null, error = null) }
+            when (val result = cached?.let { ApiResult.Success(it) } ?: fetchMonth(month)) {
                 is ApiResult.Success -> {
+                    if (raw.value.month != month) return@launch
                     raw.update { s ->
                         s.copy(loading = false, availability = result.value, error = null, selected = defaultSelection(s, result.value))
                     }
                     if (raw.value.day?.date != raw.value.selected.toString() || silent) loadDay()
+                    prefetchMonth(month.plusMonths(1))
+                    prefetchMonth(month.minusMonths(1))
                 }
                 is ApiResult.Failure -> raw.update { it.copy(loading = false, error = result.error.message) }
             }
         }
+    }
+
+    /** One month's availability: from the cache, the request already on its way, or a new one. */
+    private suspend fun fetchMonth(month: YearMonth): ApiResult<Availability> {
+        months[month]?.let { return ApiResult.Success(it) }
+        val gen = generation
+        val request = monthRequests.getOrPut(month) {
+            viewModelScope.async { groups.availability(groupId, month.atDay(1).toString(), month.atEndOfMonth().toString()) }
+        }
+        val result = request.await()
+        if (gen == generation) {
+            monthRequests.remove(month)
+            result.getOrNull()?.let { months[month] = it }
+        }
+        return result
+    }
+
+    private fun prefetchMonth(month: YearMonth) {
+        if (month in months || month in monthRequests) return
+        viewModelScope.launch { fetchMonth(month) }
+    }
+
+    /** Who's free on one day: from the cache, the request already on its way, or a new one. */
+    private suspend fun fetchDay(date: LocalDate): ApiResult<DayAvailability> {
+        days[date]?.let { return ApiResult.Success(it) }
+        val gen = generation
+        val request = dayRequests.getOrPut(date) {
+            viewModelScope.async { groups.dayAvailability(groupId, date.toString()) }
+        }
+        val result = request.await()
+        if (gen == generation) {
+            dayRequests.remove(date)
+            result.getOrNull()?.let { days[date] = it }
+        }
+        return result
     }
 
     /** Keeps a day the user picked; otherwise the first day that works, then today, then the 1st. */
@@ -251,9 +312,13 @@ class GroupCalendarViewModel @Inject constructor(
     private fun loadDay() {
         dayJob?.cancel()
         val date = raw.value.selected
+        days[date]?.let { cached ->
+            raw.update { it.copy(dayLoading = false, day = cached) }
+            return
+        }
         dayJob = viewModelScope.launch {
             raw.update { it.copy(dayLoading = true) }
-            val day = groups.dayAvailability(groupId, date.toString())
+            val day = fetchDay(date)
             raw.update { it.copy(dayLoading = false, day = day.getOrNull() ?: it.day.takeIf { d -> d?.date == date.toString() }, error = (day as? ApiResult.Failure)?.error?.message) }
         }
     }
@@ -265,13 +330,19 @@ class GroupCalendarViewModel @Inject constructor(
         detailJob = when (r.view) {
             CalendarView.Month -> null
             CalendarView.Week -> viewModelScope.launch {
-                raw.update { it.copy(weekLoading = true) }
                 val columns = AvailabilityUiMapper.columns(r.availability)
                 val weekStart = DateTimes.startOfWeek(r.selected)
                 val dates = columns.map { weekStart.plusDays(it.toLong()) }
-                val results = dates.map { date -> async { groups.dayAvailability(groupId, date.toString()) } }.awaitAll()
+                // Cached (usually: the next week is prefetched): show it at once, not the last week's.
+                val cached = dates.mapNotNull { days[it] }
+                raw.update { it.copy(weekLoading = cached.size < dates.size, week = if (cached.size == dates.size) cached else emptyList()) }
+                val results = dates.map { date -> async { fetchDay(date) } }.awaitAll()
                 val failure = results.firstOrNull { it is ApiResult.Failure } as? ApiResult.Failure
                 raw.update { it.copy(weekLoading = false, week = results.mapNotNull { res -> res.getOrNull() }, error = failure?.error?.message) }
+                // The next week the user is likely to swipe to.
+                dates.map { it.plusWeeks(lastDelta) }.filter { it !in days && it !in dayRequests }.forEach { date ->
+                    launch { fetchDay(date) }
+                }
             }
         }
     }
