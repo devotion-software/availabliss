@@ -107,16 +107,6 @@ class BlockDraftTest {
     }
 
     @Test
-    fun evening_isTodayUntilSixThenTomorrow() {
-        val before = BlockDraft.evening(day.atTime(17, 59))
-        assertEquals(day, before.date)
-        assertEquals(day.atTime(18, 0) to day.plusDays(1).atStartOfDay(), before.range.start to before.range.end)
-        assertEquals("This evening", BlockDraft.eveningLabel(day.atTime(17, 59)))
-        assertEquals(day.plusDays(1), BlockDraft.evening(day.atTime(18, 0)).date)
-        assertEquals("Tomorrow evening", BlockDraft.eveningLabel(day.atTime(20, 0)))
-    }
-
-    @Test
     fun away_coversEveryDayInclusive() {
         val draft = BlockDraft.away(day, day.plusDays(4))
         assertTrue(draft.range.allDay)

@@ -147,7 +147,7 @@ private fun RangeSide(
     modifier: Modifier = Modifier,
 ) {
     val type = AvailablissTheme.type
-    Column(modifier, horizontalAlignment = Alignment.Start) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         RangeChip(
             text = DateTimes.shortDay(date),
             style = type.bodyMedium,
@@ -182,7 +182,7 @@ private fun RangeChip(text: String, style: TextStyle, open: Boolean, description
                 if (open) stateDescription = "Picker open"
             }
             .padding(horizontal = 10.dp, vertical = 4.dp),
-        contentAlignment = Alignment.CenterStart,
+        contentAlignment = Alignment.Center,
     ) {
         Text(text, style = style, color = if (open) colors.accentInk else colors.ink, maxLines = 1)
     }

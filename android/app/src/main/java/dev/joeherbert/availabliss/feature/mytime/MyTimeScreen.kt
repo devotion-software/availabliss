@@ -106,9 +106,6 @@ fun MyTimeScreen(onOpenCalendars: () -> Unit, viewModel: MyTimeViewModel = hiltV
             onStepDay = viewModel::stepDay,
             onStepWeek = viewModel::stepWeek,
             onNearEnd = viewModel::onNearEnd,
-            onBlockEvening = viewModel::blockEvening,
-            onBlockAllDay = viewModel::blockAllDay,
-            onBlockAway = viewModel::blockAway,
             onBlockSomethingElse = viewModel::openBlockSheet,
             onBlockOn = viewModel::openBlockSheetOn,
             onBlockFree = viewModel::blockFree,
@@ -161,9 +158,6 @@ data class MyTimeActions(
     val onStepWeek: (Long) -> Unit = {},
     /** The agenda is close to its last loaded day. */
     val onNearEnd: () -> Unit = {},
-    val onBlockEvening: () -> Unit = {},
-    val onBlockAllDay: (LocalDate) -> Unit = {},
-    val onBlockAway: (LocalDate, LocalDate) -> Unit = { _, _ -> },
     val onBlockSomethingElse: () -> Unit = {},
     /** The block sheet on a given day (the week view's "+ Block"). */
     val onBlockOn: (LocalDate) -> Unit = {},
@@ -177,17 +171,14 @@ data class MyTimeActions(
     val onRetry: () -> Unit = {},
 )
 
-private enum class DatePick { AllDay, Away }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: MyTimeActions) {
     // Kept here so the month and agenda keep their place while the week view is open.
     val agendaList = rememberLazyListState()
     val monthScroll = rememberScrollState()
-    var pick by rememberSaveable { mutableStateOf<DatePick?>(null) }
     val top: @Composable () -> Unit = {
-        TopCards(state, actions, onAllDay = { pick = DatePick.AllDay }, onAway = { pick = DatePick.Away })
+        TopCards(state, actions)
     }
 
     AvailablissBackground(OrbLayout.MyTime) {
@@ -210,22 +201,6 @@ fun MyTimeContent(state: MyTimeUiState, snackbar: SnackbarHostState, actions: My
             }
         }
         AvSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = Spacing.tabBarClearance))
-    }
-
-    when (pick) {
-        DatePick.AllDay -> AvDatePickerDialog(
-            initial = state.today,
-            onPick = actions.onBlockAllDay,
-            onDismiss = { pick = null },
-            minDate = state.today,
-        )
-        DatePick.Away -> AvDateRangePickerDialog(
-            initialStart = null,
-            initialEnd = null,
-            onPick = actions.onBlockAway,
-            onDismiss = { pick = null },
-        )
-        null -> Unit
     }
 }
 
@@ -275,14 +250,14 @@ private fun ViewSwitch(mode: MyTimeMode, onSwitch: () -> Unit) {
 
 /** "Block time", the connect-a-calendar hint and any error, above the month or agenda. */
 @Composable
-private fun TopCards(state: MyTimeUiState, actions: MyTimeActions, onAllDay: () -> Unit, onAway: () -> Unit) {
+private fun TopCards(state: MyTimeUiState, actions: MyTimeActions) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        BlockTimeButton(
-            onEvening = actions.onBlockEvening,
-            onAllDay = onAllDay,
-            onAway = onAway,
-            onSomethingElse = actions.onBlockSomethingElse,
-            modifier = Modifier.padding(bottom = Spacing.xs),
+        // Straight to the block sheet.
+        PrimaryButton(
+            text = "Block time",
+            onClick = actions.onBlockSomethingElse,
+            icon = AvIcons.Plus,
+            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.xs),
         )
         if (state.showCalendarHint) CalendarHintCard(actions.onOpenCalendars)
         state.error?.let { ErrorBanner(it, onRetry = actions.onRetry) }
@@ -300,42 +275,6 @@ internal fun SectionHeading(text: String) {
         style = AvailablissTheme.type.label,
         color = AvailablissTheme.colors.muted,
         modifier = Modifier.padding(top = Spacing.l, bottom = Spacing.xxs, start = Spacing.xxs).semantics { heading() },
-    )
-}
-
-/** "Block time", with quick presets before the full sheet. */
-@Composable
-private fun BlockTimeButton(
-    onEvening: () -> Unit,
-    onAllDay: () -> Unit,
-    onAway: () -> Unit,
-    onSomethingElse: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var open by remember { mutableStateOf(false) }
-    val colors = AvailablissTheme.colors
-    Box(modifier) {
-        PrimaryButton(text = "Block time", onClick = { open = true }, icon = AvIcons.Plus, modifier = Modifier.fillMaxWidth())
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bg) {
-            val eveningLabel = remember(open) { BlockDraft.eveningLabel(DateTimes.now().toLocalDateTime()) }
-            listOf(
-                Triple(eveningLabel, AvIcons.Moon, onEvening),
-                Triple("All day…", AvIcons.Sun, onAllDay),
-                Triple("Away for a few days…", AvIcons.Calendar, onAway),
-                Triple("Something else…", AvIcons.Pencil, onSomethingElse),
-            ).forEach { (label, icon, onClick) -> PresetItem(label, icon) { open = false; onClick() } }
-        }
-    }
-}
-
-@Composable
-private fun PresetItem(label: String, icon: ImageVector, onClick: () -> Unit) {
-    val colors = AvailablissTheme.colors
-    DropdownMenuItem(
-        text = { Text(label, style = AvailablissTheme.type.bodySmallStrong, color = colors.ink) },
-        leadingIcon = { Icon(icon, null, tint = colors.ink, modifier = Modifier.size(18.dp)) },
-        onClick = onClick,
-        modifier = Modifier.semantics { role = Role.Button },
     )
 }
 

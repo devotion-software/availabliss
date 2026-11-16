@@ -113,15 +113,6 @@ data class BlockDraft(
             return BlockDraft(TimeRangeDraft.timed(start, end))
         }
 
-        /** "This evening": 18:00 to midnight today, or tomorrow once it's past 18:00. */
-        fun evening(now: LocalDateTime): BlockDraft {
-            val date = if (now.toLocalTime() >= EVENING) now.toLocalDate().plusDays(1) else now.toLocalDate()
-            return BlockDraft(TimeRangeDraft.timed(date.atTime(EVENING), date.plusDays(1).atStartOfDay()))
-        }
-
-        /** "Tomorrow evening" once this evening has started (see [evening]). */
-        fun eveningLabel(now: LocalDateTime): String = if (now.toLocalTime() >= EVENING) "Tomorrow evening" else "This evening"
-
         /** The whole of [date]. */
         fun allDay(date: LocalDate): BlockDraft = BlockDraft(TimeRangeDraft.allDay(date))
 
@@ -130,8 +121,6 @@ data class BlockDraft(
             val (first, last) = if (to.isBefore(from)) to to from else from to to
             return BlockDraft(TimeRangeDraft.allDay(first, last))
         }
-
-        private val EVENING = LocalTime.of(18, 0)
 
         /** Prefills the sheet from an existing block so every part of it can be edited. */
         fun fromBlock(block: ManualBlock, zone: ZoneId = DateTimes.zone): BlockDraft? {

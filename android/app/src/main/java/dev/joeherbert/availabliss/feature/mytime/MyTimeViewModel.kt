@@ -337,15 +337,6 @@ class MyTimeViewModel @Inject constructor(
         blockDraftForFree(date, summary)?.let(::openDraft)
     }
 
-    /** "This evening" (or tomorrow evening once it's past 18:00). */
-    fun blockEvening() = openDraft(BlockDraft.evening(DateTimes.now().toLocalDateTime()))
-
-    /** "All day…" once the day is picked. */
-    fun blockAllDay(date: LocalDate) = openDraft(BlockDraft.allDay(date))
-
-    /** "Away for a few days…" once the dates are picked. */
-    fun blockAway(from: LocalDate, to: LocalDate) = openDraft(BlockDraft.away(from, to))
-
     private fun openDraft(draft: BlockDraft) = _state.update { it.copy(draft = draft, savingDraft = false) }
 
     fun closeBlockSheet() = _state.update { it.copy(draft = null, savingDraft = false) }
