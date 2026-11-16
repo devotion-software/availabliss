@@ -33,6 +33,7 @@ struct ProfileView: View {
             .padding(.top, 28)
             .padding(.bottom, 24)
         }
+        .tabBarScrollInset()
         .screenBackground(OrbLayout.appearance)
         .foregroundStyle(theme.ink)
         .chromeless()

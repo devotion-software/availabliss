@@ -116,9 +116,30 @@ struct RouteDestination: View {
 }
 
 extension View {
+    /// For a tab's main scroll view: ends the content just above the tab bar's top edge rather than
+    /// reserving the bar's whole height, so no empty band is left when the bar shrinks on scroll.
+    func tabBarScrollInset() -> some View {
+        modifier(TabBarScrollInset())
+    }
+
     /// Hides the system navigation bar — screens draw their own glass headers.
     func chromeless() -> some View {
         toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+private struct TabBarScrollInset: ViewModifier {
+    /// From the bottom of the screen: just clear of the full tab bar, and close to the shrunk one.
+    static let bottom: CGFloat = 60
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .ignoresSafeArea(.container, edges: .bottom)
+                .contentMargins(.bottom, Self.bottom, for: .scrollContent)
+        } else {
+            content
+        }
     }
 }
 

@@ -138,6 +138,7 @@ struct MyTimeView: View {
             .padding(.top, 20)
             .padding(.bottom, 24)
         }
+        .tabBarScrollInset()
         .refreshable { await model.load() }
     }
 

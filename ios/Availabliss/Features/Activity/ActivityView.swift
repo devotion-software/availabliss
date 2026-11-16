@@ -61,6 +61,7 @@ struct ActivityView: View {
             .padding(.top, 28)
             .padding(.bottom, 24)
         }
+        .tabBarScrollInset()
         .screenBackground(OrbLayout.proposal)
         .foregroundStyle(theme.ink)
         .chromeless()
