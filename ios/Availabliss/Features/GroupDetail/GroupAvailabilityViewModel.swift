@@ -111,6 +111,22 @@ final class GroupAvailabilityViewModel {
         if let cached = months[month] { show(cached) }
     }
 
+    /// The month or week on screen doesn't include today, so "Today" is offered.
+    var isAwayFromToday: Bool {
+        let today = CalendarDay.today()
+        return mode == .month ? month != today.firstOfMonth : selectedDay.startOfWeek() != today.startOfWeek()
+    }
+
+    /// Back to today's month or week, with today selected. Follow with `load()`.
+    func jumpToToday() {
+        let today = CalendarDay.today()
+        lastDelta = (mode == .month ? today.firstOfMonth > month : today > selectedDay) ? 1 : -1
+        month = today.firstOfMonth
+        selectedDay = today
+        userPickedDay = true
+        if let cached = months[month] { show(cached) }
+    }
+
     /// A sideways swipe is moving the page: taps that end it aren't picks.
     func noteSwipe() { lastSwipeAt = .now }
 

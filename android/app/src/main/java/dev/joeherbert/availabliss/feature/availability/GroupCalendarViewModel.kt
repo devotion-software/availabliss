@@ -79,6 +79,10 @@ data class GroupCalendarUiState(
     val aiPlanner: AiPlannerAccess = AiPlannerAccess(),
     /** Some time works for everyone (the planner only picks from those). */
     val hasSlots: Boolean = false,
+    /** The month or week on screen doesn't include today, so "Today" is offered. */
+    val awayFromToday: Boolean = false,
+    /** Today is later than what's on screen (which way "Today" slides). */
+    val todayIsLater: Boolean = true,
 )
 
 private data class RawState(
@@ -166,6 +170,20 @@ class GroupCalendarViewModel @Inject constructor(
     }
 
     fun previous() = step(-1)
+
+    /** Back to today's month or week, with today selected. */
+    fun jumpToToday() {
+        val today = DateTimes.today()
+        val r = raw.value
+        lastDelta = if (today.isAfter(r.selected)) 1 else -1
+        val month = YearMonth.from(today)
+        raw.update { s ->
+            val moved = s.copy(month = month, selected = today, userPicked = true)
+            months[month]?.let { moved.copy(availability = it) } ?: moved
+        }
+        if (r.month != month) loadMonth() else loadDay()
+        loadForView()
+    }
 
     fun next() = step(1)
 
@@ -358,7 +376,13 @@ class GroupCalendarViewModel @Inject constructor(
             CalendarView.Week -> if (weekDates.isEmpty()) "" else DateTimes.weekRange(weekDates.first(), weekDates.last()).let { shortenMonth(it, weekDates) }
         }
         val day = r.day?.takeIf { it.date == r.selected.toString() }
+        val awayFromToday = when (r.view) {
+            CalendarView.Month -> r.month != YearMonth.from(today)
+            CalendarView.Week -> weekStart != DateTimes.startOfWeek(today)
+        }
         return GroupCalendarUiState(
+            awayFromToday = awayFromToday,
+            todayIsLater = if (r.view == CalendarView.Month) YearMonth.from(today).isAfter(r.month) else today.isAfter(r.selected),
             loading = r.loading,
             groupName = group?.name.orEmpty(),
             membersLine = group?.let {

@@ -9,6 +9,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -131,6 +132,7 @@ fun GroupCalendarTab(
         onSelectDate = viewModel::selectDate,
         onPrevious = viewModel::previous,
         onNext = viewModel::next,
+        onToday = viewModel::jumpToToday,
         onRetry = viewModel::refresh,
         onPropose = { slot ->
             val (start, end, allDay) = viewModel.proposalFor(slot)
@@ -163,6 +165,8 @@ fun GroupCalendarContent(
     onNext: () -> Unit,
     onRetry: () -> Unit,
     onPropose: (Slot) -> Unit,
+    /** "Today": back to today's month or week. */
+    onToday: () -> Unit = {},
     snackbar: @Composable () -> Unit = {},
     /** "Propose anyway" on a day that doesn't work for everyone. */
     onProposeDay: (LocalDate) -> Unit = {},
@@ -191,7 +195,8 @@ fun GroupCalendarContent(
                 var forward by remember { mutableStateOf(true) }
                 val previous = { forward = false; onPrevious() }
                 val next = { forward = true; onNext() }
-                HeadingRow(state, onSelectView, previous, next)
+                val today = { forward = state.todayIsLater; onToday() }
+                HeadingRow(state, onSelectView, previous, next, today)
                 state.coverageNote?.let { CoverageNote(it) }
                 state.error?.let { ErrorBanner(it, onRetry = onRetry) }
                 AnimatedContent(
@@ -315,7 +320,7 @@ private fun TimingChip(summary: String, editable: Boolean, onClick: () -> Unit) 
 }
 
 @Composable
-private fun HeadingRow(state: GroupCalendarUiState, onSelectView: (CalendarView) -> Unit, onPrevious: () -> Unit, onNext: () -> Unit) {
+private fun HeadingRow(state: GroupCalendarUiState, onSelectView: (CalendarView) -> Unit, onPrevious: () -> Unit, onNext: () -> Unit, onToday: () -> Unit) {
     val colors = AvailablissTheme.colors
     val unit = when (state.view) {
         CalendarView.Month -> "month"
@@ -327,6 +332,20 @@ private fun HeadingRow(state: GroupCalendarUiState, onSelectView: (CalendarView)
             PlainIconButton(AvIcons.Back, "Previous $unit", onPrevious, size = 32.dp, iconSize = 16.dp)
             Text(state.heading, style = AvailablissTheme.type.titleSmall, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             PlainIconButton(AvIcons.Forward, "Next $unit", onNext, size = 32.dp, iconSize = 16.dp)
+            if (state.awayFromToday) {
+                Text(
+                    "Today",
+                    style = AvailablissTheme.type.label,
+                    color = colors.accentInk,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .padding(start = 2.dp)
+                        .clip(CircleShape)
+                        .background(colors.accentSoft)
+                        .clickable(role = Role.Button, onClickLabel = "Go back to this $unit", onClick = onToday)
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                )
+            }
         }
         SegmentedControl(
             segments = CalendarView.entries.map { Segment(it, it.label) },

@@ -4,7 +4,7 @@
 	import { prefersReducedMotion } from 'svelte/motion';
 	import type { Availability, DayAvailability, Slot } from '#lib/types';
 	import { getAvailability, getDayAvailability } from '#lib/client/availability';
-	import { addDays, addMonths, endOfMonth, startOfMonth } from '#lib/client/dates';
+	import { addDays, addMonths, endOfMonth, startOfMonth, startOfWeek } from '#lib/client/dates';
 	import { formatDayKey, formatDayRange, monthTitle, useFormat } from '#lib/client/format';
 	import { live } from '#lib/client/live.svelte';
 	import { groupSubtitle, isAdminRole, memberMap } from '#lib/client/members';
@@ -245,6 +245,19 @@
 		if (startOfMonth(date) !== month) loadMonth(startOfMonth(date));
 	}
 
+	// The month or week on screen doesn't include today, so "Today" is offered.
+	const todayKey = $derived(fmt.current.today());
+	const awayFromToday = $derived(
+		view === 'month' ? month !== startOfMonth(todayKey) : startOfWeek(selected) !== startOfWeek(todayKey)
+	);
+	/** Back to today's month or week, with today selected. */
+	function jumpToToday() {
+		const today = todayKey;
+		lastStep = today > selected ? 1 : -1;
+		if (startOfMonth(today) !== month) loadMonth(startOfMonth(today));
+		selected = today;
+	}
+
 	let lastStep: 1 | -1 = 1;
 	function step(direction: 1 | -1) {
 		lastStep = direction;
@@ -381,10 +394,12 @@
 				<span class="nav desk-flex">
 					<IconButton icon="chevron-left" label="Previous {view}" variant="surface" shape="rounded" size={40} onclick={() => step(-1)} />
 					<IconButton icon="chevron-right" label="Next {view}" variant="surface" shape="rounded" size={40} onclick={() => step(1)} />
+					{#if awayFromToday}<button type="button" class="today-btn" onclick={jumpToToday}>Today</button>{/if}
 				</span>
 				<span class="nav phone-flex">
 					<IconButton icon="chevron-left" label="Previous {view}" variant="plain" shape="rounded" size={36} onclick={() => step(-1)} />
 					<IconButton icon="chevron-right" label="Next {view}" variant="plain" shape="rounded" size={36} onclick={() => step(1)} />
+					{#if awayFromToday}<button type="button" class="today-btn" onclick={jumpToToday}>Today</button>{/if}
 				</span>
 				<span class="phone-only">
 					<SegmentedControl options={VIEWS} bind:value={view} label="Calendar view" size="sm" />
@@ -683,5 +698,21 @@
 			position: sticky;
 			top: 20px;
 		}
+	}
+	/* "Today": back to today's month or week. */
+	.today-btn {
+		align-self: center;
+		padding: 5px 11px;
+		border: 0;
+		border-radius: 999px;
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		font: inherit;
+		font-size: 13px;
+		font-weight: 650;
+		cursor: pointer;
+	}
+	.today-btn:hover {
+		filter: brightness(0.97);
 	}
 </style>

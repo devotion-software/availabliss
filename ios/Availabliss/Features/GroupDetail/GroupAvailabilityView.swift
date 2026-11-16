@@ -145,6 +145,15 @@ struct GroupAvailabilityView: View {
         Task { await model.load() }
     }
 
+    /// "Today": back to today's month or week, sliding in from the side it's on.
+    private func jumpToToday() {
+        let today = CalendarDay.today()
+        let later = model.mode == .month ? today.firstOfMonth > model.month : today > model.selectedDay
+        pageEdge = later ? .trailing : .leading
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { model.jumpToToday() }
+        Task { await model.load() }
+    }
+
     private var headingRow: some View {
         HStack(spacing: 6) {
             Button { page(by: -1) } label: { chevron("chevron.left") }
@@ -156,6 +165,19 @@ struct GroupAvailabilityView: View {
                 .accessibilityAddTraits(.isHeader)
             Button { page(by: 1) } label: { chevron("chevron.right") }
                 .accessibilityLabel("Next")
+            if model.isAwayFromToday {
+                Button("Today", action: jumpToToday)
+                    .bodyFont(12, .semibold, relativeTo: .caption)
+                    .foregroundStyle(theme.accentInk)
+                    .padding(.horizontal, 10)
+                    .frame(height: 28)
+                    .background(Capsule().fill(theme.accentSoft))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    .accessibilityHint("Goes back to this \(model.mode == .month ? "month" : "week")")
+            }
             Spacer(minLength: 4)
             SegmentedControl(
                 selection: $model.mode,
