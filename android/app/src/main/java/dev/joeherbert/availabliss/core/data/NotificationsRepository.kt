@@ -23,10 +23,10 @@ class NotificationsRepository @Inject constructor(
     suspend fun refresh(): ApiResult<NotificationsResponse> =
         call { api.getNotifications() }.onSuccess { _unread.value = it.unread }
 
-    /** Marks [ids] read, or everything when null. */
+    /** Marks [ids] read, or everything but chats when null (refresh after for the new count). */
     suspend fun markRead(ids: List<String>? = null): ApiResult<Unit> =
         call { api.markNotificationsRead(ReadNotificationsRequest(ids)) }.onSuccess {
-            _unread.value = if (ids == null) 0 else (_unread.value - ids.size).coerceAtLeast(0)
+            if (ids != null) _unread.value = (_unread.value - ids.size).coerceAtLeast(0)
         }
 
     fun clear() {

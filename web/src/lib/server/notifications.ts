@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { AppNotification, NotificationKind } from '#lib/types';
 import { db } from './db';
 import { devices, notifications } from './db/schema';
@@ -13,8 +13,12 @@ interface NotifyInput {
 	body: string;
 	/** Deep-link data (proposalId, eventId, messageId …). */
 	data?: Record<string, string>;
-	/** Chat messages push but don't clutter the Activity list. */
-	record?: boolean;
+	/**
+	 * true (default): a new Activity item. 'per-group' (chat): one item per group,
+	 * brought to the top with each message and unread until the chat is read
+	 * (`markChatRead`), with `data.count` messages since. false: push only.
+	 */
+	record?: boolean | 'per-group';
 }
 
 type Row = typeof notifications.$inferSelect;
@@ -35,7 +39,9 @@ export async function notify(userIds: string[], input: NotifyInput): Promise<voi
 	if (!userIds.length) return;
 	const data = { ...input.data, kind: input.kind, ...(input.groupId && { groupId: input.groupId }) };
 
-	if (input.record !== false) {
+	if (input.record === 'per-group' && input.groupId) {
+		await upsertPerGroup(userIds, input.groupId, input, data);
+	} else if (input.record !== false) {
 		const rows = userIds.map((userId) => ({
 			id: newId(),
 			userId,
@@ -60,6 +66,54 @@ export async function notify(userIds: string[], input: NotifyInput): Promise<voi
 	void sendPush(userIds, { title: input.title, body: input.body, data });
 }
 
+/** The group's one Activity item for each user, created or brought up to date (see `record`). */
+async function upsertPerGroup(userIds: string[], groupId: string, input: NotifyInput, data: Record<string, string>) {
+	const existing = await db
+		.select()
+		.from(notifications)
+		.where(and(inArray(notifications.userId, userIds), eq(notifications.groupId, groupId), eq(notifications.kind, input.kind)));
+	const byUser = new Map(existing.map((row) => [row.userId, row]));
+	const now = new Date();
+	for (const userId of userIds) {
+		const prev = byUser.get(userId);
+		const count = prev && !prev.readAt ? (Number(prev.data.count) || 1) + 1 : 1;
+		const row: Row = {
+			id: prev?.id ?? newId(),
+			userId,
+			groupId,
+			kind: input.kind,
+			title: input.title,
+			body: input.body,
+			data: { ...data, count: String(count) },
+			readAt: null,
+			createdAt: now
+		};
+		if (prev) {
+			await db
+				.update(notifications)
+				.set({ title: row.title, body: row.body, data: row.data, readAt: null, createdAt: now })
+				.where(eq(notifications.id, prev.id));
+		} else {
+			await db.insert(notifications).values(row);
+		}
+		publishToUsers([userId], { type: 'notification.created', groupId, payload: toNotification(row) });
+	}
+}
+
+/** Reading a group's chat reads its Activity item; the user's other devices are told. */
+export async function markChatRead(userId: string, groupId: string): Promise<void> {
+	const unread = await db
+		.select()
+		.from(notifications)
+		.where(and(eq(notifications.userId, userId), eq(notifications.groupId, groupId), eq(notifications.kind, 'message'), isNull(notifications.readAt)));
+	if (!unread.length) return;
+	const readAt = new Date();
+	await db.update(notifications).set({ readAt }).where(inArray(notifications.id, unread.map((r) => r.id)));
+	for (const row of unread) {
+		publishToUsers([userId], { type: 'notification.created', groupId, payload: toNotification({ ...row, readAt }) });
+	}
+}
+
 export async function listNotifications(userId: string) {
 	const [rows, [{ unread }]] = await Promise.all([
 		db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(100),
@@ -71,8 +125,12 @@ export async function listNotifications(userId: string) {
 	return { notifications: rows.map(toNotification), unread: Number(unread) };
 }
 
+/**
+ * Marks the given notifications read, or all of them except chats, which stay
+ * unread until the chat itself is read (`markChatRead`).
+ */
 export async function markRead(userId: string, ids?: string[]): Promise<void> {
-	const scope = ids?.length ? inArray(notifications.id, ids) : undefined;
+	const scope = ids?.length ? inArray(notifications.id, ids) : ne(notifications.kind, 'message');
 	await db
 		.update(notifications)
 		.set({ readAt: new Date() })

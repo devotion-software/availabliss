@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -149,7 +150,7 @@ fun ActivityContent(
                     state.items.isEmpty() && state.error == null -> item(key = "empty") {
                         EmptyState(
                             title = "Nothing yet",
-                            body = "Proposals, plans and messages from your groups will show up here.",
+                            body = "Chats, proposals and plans from your groups will show up here.",
                             icon = AvIcons.Bell,
                         )
                     }
@@ -189,8 +190,17 @@ private fun NotificationRow(item: NotificationUi, onClick: () -> Unit) {
                         color = colors.ink,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f, fill = false),
                     )
+                    item.newCount?.let { count ->
+                        Text(
+                            "$count new",
+                            style = type.micro.copy(fontWeight = FontWeight.Bold),
+                            color = colors.onAccent,
+                            modifier = Modifier.clip(Shapes.pill).background(colors.accent).padding(horizontal = 7.dp, vertical = 1.dp),
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
                     Text(item.time, style = type.micro.copy(fontWeight = FontWeight.Medium), color = colors.muted)
                     if (item.unread) Box(Modifier.size(8.dp).clip(Shapes.pill).background(colors.accent))
                 }

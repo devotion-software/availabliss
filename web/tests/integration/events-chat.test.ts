@@ -161,9 +161,39 @@ describe('notifications and devices', () => {
 		await markRead(owner, [notifications[0].id]);
 		expect((await listNotifications(owner)).unread).toBe(unread - 1);
 		await markRead(owner);
+		// Everything but chats, which wait for the chat to be read.
 		const after = await listNotifications(owner);
-		expect(after.unread).toBe(0);
-		expect(after.notifications.every((n) => n.readAt !== null)).toBe(true);
+		expect(after.notifications.filter((n) => n.kind !== 'message').every((n) => n.readAt !== null)).toBe(true);
+		expect(after.unread).toBe(after.notifications.filter((n) => n.kind === 'message' && !n.readAt).length);
+	});
+
+	test("a group's chat is one Activity item, kept to its latest message until the chat is read", async () => {
+		const reader = await fx.user({ name: 'Rae' });
+		const g = (await createGroup(reader, { name: 'Chatty', requirement: everyDay() }, 'UTC')).id;
+		await fx.join(g, member);
+		const chatItems = async (userId: string) => (await listNotifications(userId)).notifications.filter((n) => n.groupId === g && n.kind === 'message');
+
+		await sendText(g, member, 'First');
+		const last = await sendText(g, member, 'Second');
+		let items = await chatItems(reader);
+		expect(items).toHaveLength(1);
+		expect(items[0]).toMatchObject({ title: 'Chatty', readAt: null, data: expect.objectContaining({ count: '2', messageId: last.id }) });
+		expect(items[0].body).toEndWith(': Second');
+		// The author doesn't get one for their own messages.
+		expect(await chatItems(member)).toHaveLength(0);
+
+		// Opening Activity doesn't read it; reading the chat does.
+		await markRead(reader);
+		expect((await chatItems(reader))[0].readAt).toBeNull();
+		await markReceipts(g, reader, last.id, 'seen');
+		items = await chatItems(reader);
+		expect(items[0].readAt).not.toBeNull();
+
+		// The next message starts the count again, on the same item.
+		await sendText(g, member, 'Third');
+		const again = await chatItems(reader);
+		expect(again).toHaveLength(1);
+		expect(again[0]).toMatchObject({ id: items[0].id, readAt: null, data: expect.objectContaining({ count: '1' }) });
 	});
 
 	test('a device token moves to whoever registered it last', async () => {

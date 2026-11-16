@@ -2,13 +2,13 @@
 import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import type { Message, MessageInfo, MessageKind, Poll } from '#lib/types';
 import { db } from './db';
-import { messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
+import { groups, messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
 import { badRequest, conflict, forbidden, notFound } from './http';
 import { alias } from 'drizzle-orm/mysql-core';
 import { newId } from './ids';
 import { memberIds, requireMember } from './groups';
 import { publishToGroup } from './realtime';
-import { notify } from './notifications';
+import { markChatRead, notify } from './notifications';
 import { displayName } from './names';
 
 type MessageRow = typeof messages.$inferSelect;
@@ -122,6 +122,7 @@ export async function markReceipts(groupId: string, userId: string, upTo: string
 	await requireMember(groupId, userId);
 	const anchor = await db.query.messages.findFirst({ where: and(eq(messages.id, upTo), eq(messages.groupId, groupId)) });
 	if (!anchor) throw notFound('Message not found');
+	if (state === 'seen') await markChatRead(userId, groupId);
 
 	// Aliased: the insert below targets message_receipts too, and its ON DUPLICATE
 	// KEY UPDATE must only see the target table.
@@ -254,17 +255,21 @@ export async function postMessage(groupId: string, authorId: string | null, inpu
 	await publishToGroup(groupId, 'message.created', message);
 
 	if (authorId && (input.kind === 'text' || input.kind === 'poll')) {
-		const author = await db.query.user.findFirst({ where: eq(user.id, authorId), columns: { name: true, email: true } });
+		const [author, group] = await Promise.all([
+			db.query.user.findFirst({ where: eq(user.id, authorId), columns: { name: true, email: true } }),
+			db.query.groups.findFirst({ where: eq(groups.id, groupId), columns: { name: true } })
+		]);
 		const poll = message.poll ? `Poll: ${message.poll.question}` : null;
+		// One Activity row per group's chat, kept to its latest message ("Sam: See you there").
 		await notify(
 			members.filter((m) => m !== authorId),
 			{
 				kind: 'message',
 				groupId,
-				title: displayName(author, 'New message'),
-				body: pushPreview(poll ?? input.body ?? ''),
+				title: group?.name ?? 'New message',
+				body: pushPreview(`${displayName(author, 'Someone')}: ${poll ?? input.body ?? ''}`),
 				data: { messageId: id },
-				record: false
+				record: 'per-group'
 			}
 		);
 	}

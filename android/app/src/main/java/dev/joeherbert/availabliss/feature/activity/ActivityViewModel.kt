@@ -29,6 +29,8 @@ data class NotificationUi(
     val time: String,
     val unread: Boolean,
     val link: DeepLink?,
+    /** "3 new" on a group's unread chat item with more than one message. */
+    val newCount: Int? = null,
 )
 
 data class ActivityUiState(
@@ -54,10 +56,7 @@ class ActivityViewModel @Inject constructor(
         refresh()
         viewModelScope.launch {
             liveEvents.payloads.filterIsInstance<LivePayload.NotificationCreated>().collect { event ->
-                if (raw.none { it.id == event.notification.id }) {
-                    raw = listOf(event.notification) + raw
-                    publish()
-                }
+                upsert(event.notification)
                 notifications.refresh()
             }
         }
@@ -90,20 +89,36 @@ class ActivityViewModel @Inject constructor(
         return item.link
     }
 
+    /** Everything but chats, which stay unread until the chat is read. */
     fun markAllRead() {
-        if (raw.none { it.readAt == null }) return
+        if (raw.none { it.readAt == null && it.kind != NotificationKind.Message }) return
         val now = DateTimes.toIso(java.time.Instant.now())
         val before = raw
-        raw = raw.map { it.copy(readAt = it.readAt ?: now) }
+        raw = raw.map { if (it.kind == NotificationKind.Message) it else it.copy(readAt = it.readAt ?: now) }
         publish()
         viewModelScope.launch {
             val result = notifications.markRead(null)
+            notifications.refresh()
             if (result is ApiResult.Failure) {
                 raw = before
                 publish()
                 _state.update { it.copy(message = UserMessage(result.error.message)) }
             }
         }
+    }
+
+    /**
+     * A new item, or an update to one we have (a group's chat item gets a new message, or is
+     * read): replaced in place, or moved to the top when newer.
+     */
+    private fun upsert(notification: AppNotification) {
+        val prev = raw.firstOrNull { it.id == notification.id }
+        raw = when {
+            prev == null -> listOf(notification) + raw
+            notification.createdAt > prev.createdAt -> listOf(notification) + raw.filter { it.id != notification.id }
+            else -> raw.map { if (it.id == notification.id) notification else it }
+        }
+        publish()
     }
 
     fun messageShown(message: UserMessage) = _state.update { if (it.message?.id == message.id) it.copy(message = null) else it }
@@ -119,6 +134,7 @@ class ActivityViewModel @Inject constructor(
         body = body,
         time = DateTimes.relative(createdAt),
         unread = readAt == null,
+        newCount = data["count"]?.toIntOrNull()?.takeIf { kind == NotificationKind.Message && readAt == null && it > 1 },
         link = DeepLink.fromPushData(
             buildMap {
                 putAll(data)

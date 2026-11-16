@@ -610,9 +610,16 @@ interface Notification {
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/notifications` | | `{ notifications: Notification[]; unread: number }` |
-| POST 🔒 | `/notifications/read` | `{ ids?: string[] }` (omit = all) | `204` |
+| POST 🔒 | `/notifications/read` | `{ ids?: string[] }` (omit = all except chats) | `204` |
 | POST 🔒 | `/devices` | `{ platform: 'ios' \| 'android', token, name? }` | `204` (registers APNs / FCM token) |
 | DELETE 🔒 | `/devices/:token` | | `204` |
+
+Chats (`kind: 'message'`) get **one Activity item per group**: each new message brings it to
+the top with `title` = the group's name, `body` = `"Sam: See you there"` and `data.count` = messages
+since it was last read. It stays unread until the chat itself is read (a `seen` receipt), not
+when Activity is opened. Updates to an existing item (a new message, or it being read) arrive
+as `notification.created` with the **same id**: replace the item you have, and move it to the
+top when its `createdAt` is newer.
 
 Push payloads carry `{ kind, groupId, proposalId?, eventId?, messageId?, token? }` (`token`: an
 `invite.received` invite, opened like `/invite/:token`) so the app

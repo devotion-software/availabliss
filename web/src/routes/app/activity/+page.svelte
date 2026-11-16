@@ -39,7 +39,7 @@
 <svelte:head><title>Activity · Availabliss</title></svelte:head>
 
 <div class="activity">
-	<PageHeader title="Activity" subtitle="Proposals, replies and nudges from your groups" backHref="/app" backLabel="Back to groups" backOnPhoneOnly />
+	<PageHeader title="Activity" subtitle="Chats, proposals and nudges from your groups" backHref="/app" backLabel="Back to groups" backOnPhoneOnly />
 
 	{#if items.length}
 		<ul class="list glass" aria-live="polite">
@@ -48,7 +48,11 @@
 					<a href={notificationHref(n)} class:unread={unreadIds.has(n.id) || !n.readAt}>
 						<span class="icon"><Icon name={ICON[n.kind] ?? 'bell'} size={18} /></span>
 						<span class="text">
-							<span class="title">{n.title}</span>
+							<span class="title"
+								>{n.title}{#if n.kind === 'message' && !n.readAt && Number(n.data.count) > 1}<span class="count"
+										>{n.data.count} new</span
+									>{/if}</span
+							>
 							<span class="body">{n.body}</span>
 						</span>
 						<time datetime={n.createdAt}>{fmt.current.relative(n.createdAt)}</time>
@@ -139,5 +143,15 @@
 	}
 	.empty {
 		border-radius: 28px;
+	}
+	.count {
+		margin-left: 8px;
+		padding: 1px 7px;
+		border-radius: 999px;
+		background: var(--accent);
+		color: var(--on-accent);
+		font-size: 11px;
+		font-weight: 700;
+		vertical-align: 1px;
 	}
 </style>

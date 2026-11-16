@@ -25,9 +25,19 @@ final class ActivityViewModel {
         } catch {}
     }
 
-    func prepend(_ notification: AppNotification) {
-        guard !notifications.contains(where: { $0.id == notification.id }) else { return }
-        notifications.insert(notification, at: 0)
+    /// A new item, or an update to one we have (a group's chat item gets a new message, or is
+    /// read): replaced in place, or moved to the top when newer.
+    func upsert(_ notification: AppNotification) {
+        if let index = notifications.firstIndex(where: { $0.id == notification.id }) {
+            if notification.createdAt > notifications[index].createdAt {
+                notifications.remove(at: index)
+                notifications.insert(notification, at: 0)
+            } else {
+                notifications[index] = notification
+            }
+        } else {
+            notifications.insert(notification, at: 0)
+        }
     }
 }
 
@@ -44,7 +54,7 @@ struct ActivityView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeader(title: "Activity", subtitle: "Proposals, plans and nudges")
+                ScreenHeader(title: "Activity", subtitle: "Chats, proposals, plans and nudges")
                 content
             }
             .padding(.horizontal, 20)
@@ -64,7 +74,7 @@ struct ActivityView: View {
                 if event.kind == .reconnected {
                     await model.load()
                 } else if let notification = event.payload(as: AppNotification.self) {
-                    model.prepend(notification)
+                    model.upsert(notification)
                 }
             }
         }
@@ -111,6 +121,7 @@ private struct NotificationRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(notification.title).bodyFont(14, .semibold).lineLimit(2)
+                    if let newCount { CountBadge(count: newCount) }
                     Spacer()
                     Text(Formatting.relative(notification.createdAt)).bodyFont(11, relativeTo: .caption2).foregroundStyle(theme.muted)
                 }
@@ -124,6 +135,12 @@ private struct NotificationRow: View {
         .padding(14)
         .glass(cornerRadius: 22)
         .accessibilityElement(children: .combine)
+    }
+
+    /// "3 new" on a group's unread chat item with more than one message.
+    private var newCount: Int? {
+        guard notification.kind == .message, notification.readAt == nil, let count = Int(notification.data["count"] ?? ""), count > 1 else { return nil }
+        return count
     }
 
     private var icon: String {
@@ -144,5 +161,20 @@ private struct NotificationRow: View {
         case .nudge: (theme.warnBg, theme.warnInk)
         default: (theme.accentSoft, theme.accentInk)
         }
+    }
+}
+
+/// "3 new", next to a chat's title in Activity.
+private struct CountBadge: View {
+    let count: Int
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Text("\(count) new")
+            .bodyFont(11, .bold, relativeTo: .caption2)
+            .foregroundStyle(theme.onAccent)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 1)
+            .background(Capsule().fill(theme.accent))
     }
 }

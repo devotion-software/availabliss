@@ -19,6 +19,8 @@ final class AppModel {
     let groupDetails = GroupDetailStore()
 
     private(set) var unreadNotifications = 0
+    /// Activity items known to be unread, so an update to one doesn't count it twice.
+    @ObservationIgnored private var unreadIDs: Set<String> = []
     /// Bumped when another account is merged into this one, so screens showing account data reload.
     private(set) var accountVersion = 0
     /// Bumped when a timing template is saved, so the You screen's list reloads.
@@ -120,15 +122,28 @@ final class AppModel {
 
     func refreshUnread() async {
         guard let response = try? await api.send(API.Notifications.list()) else { return }
+        unreadIDs = Set(response.notifications.filter { $0.readAt == nil }.map(\.id))
         unreadNotifications = response.unread
         push.setBadge(response.unread)
     }
 
+    /// Opening Activity reads everything but chats, which stay unread until the chat is read.
     func markNotificationsRead() async {
         guard unreadNotifications > 0 else { return }
-        unreadNotifications = 0
-        push.setBadge(0)
         _ = try? await api.send(API.Notifications.markRead())
+        await refreshUnread()
+    }
+
+    /// A new Activity item, or an update to one (a group's chat item gets a new message or is read).
+    private func noteNotification(_ notification: AppNotification) {
+        let wasUnread = unreadIDs.contains(notification.id)
+        if notification.readAt == nil {
+            unreadIDs.insert(notification.id)
+            if !wasUnread { unreadNotifications += 1 }
+        } else {
+            unreadIDs.remove(notification.id)
+            if wasUnread { unreadNotifications = max(0, unreadNotifications - 1) }
+        }
     }
 
     // MARK: - Private
@@ -152,6 +167,7 @@ final class AppModel {
         liveTask?.cancel()
         liveTask = nil
         unreadNotifications = 0
+        unreadIDs = []
         push.forget()
         push.setBadge(0)
         router.reset()
@@ -170,9 +186,10 @@ final class AppModel {
                         _ = try? await self.api.send(API.Chat.receipts(groupId: message.groupId, upTo: message.id, state: .delivered))
                     }
                 case .notificationCreated:
-                    self.unreadNotifications += 1
+                    guard let notification = event.payload(as: AppNotification.self) else { break }
+                    self.noteNotification(notification)
                     // Decided here, not in ActivityView, so the two subscribers can't race.
-                    if self.router.tab == .activity {
+                    if self.router.tab == .activity, notification.readAt == nil, notification.kind != .message {
                         await self.markNotificationsRead()
                     } else {
                         self.push.setBadge(self.unreadNotifications)
