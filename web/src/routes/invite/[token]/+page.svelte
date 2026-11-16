@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resetAppearance } from '#lib/client/session';
 	import { acceptInvite } from '#lib/client/groups';
 	import { toasts } from '#lib/client/toast.svelte';
 	import { daysBetween, todayIn } from '#lib/client/dates';
@@ -30,6 +31,7 @@
 		switching = true;
 		const { authClient } = await import('#lib/auth-client');
 		await authClient.signOut();
+		resetAppearance();
 		await goto(signInHref, { invalidateAll: true });
 	}
 	const tileLetters = $derived(monogram(data.invite?.groupName ?? '?'));

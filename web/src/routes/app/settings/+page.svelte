@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { deleteMe, removeAvatar, setAvatar, updateMe } from '#lib/client/me';
-	import { signOutAndLeave } from '#lib/client/session';
+	import { resetAppearance, signOutAndLeave } from '#lib/client/session';
 	import { toasts } from '#lib/client/toast.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import GlassPanel from '#lib/components/ui/GlassPanel.svelte';
@@ -108,6 +108,7 @@
 	async function removeAccount() {
 		try {
 			await deleteMe();
+			resetAppearance();
 			await goto('/', { invalidateAll: true });
 		} catch (err) {
 			toasts.error(err);

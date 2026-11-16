@@ -114,9 +114,15 @@ class AppPreferences @Inject constructor(
         store.edit { if (token == null) it.remove(KEY_PUSH_TOKEN) else it[KEY_PUSH_TOKEN] = token }
     }
 
-    /** Clears account-scoped data on sign out. Device id and appearance are kept. */
+    /**
+     * Clears account-scoped data on sign out. The device id is kept. Appearance goes back to the
+     * defaults so the sign-in screen follows the device, like a new account's wizard does; the
+     * account's own choice comes back when it signs in.
+     */
     suspend fun clearSession() {
         store.edit {
+            it.remove(KEY_THEME_MODE)
+            it.remove(KEY_COLOR_THEME)
             it.remove(KEY_USER)
             it.remove(KEY_BUSY_CALENDARS)
             it.remove(KEY_LAST_DEVICE_SYNC)

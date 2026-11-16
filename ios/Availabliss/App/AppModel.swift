@@ -138,6 +138,9 @@ final class AppModel {
     }
 
     private func didSignOut() {
+        // Signed-out screens follow the device, like a new account's wizard does, rather than the
+        // last account's choice (which comes back when they sign in again).
+        appearance.reset()
         live.stop(endingSession: true)
         liveTask?.cancel()
         liveTask = nil
@@ -187,8 +190,8 @@ private final class UnauthorizedRelay {
     }
 }
 
-/// The user's appearance choice. Cached locally so the sign-in screen and launch use it too;
-/// saved to the account with `PATCH /me`.
+/// The user's appearance choice. Cached locally so launch uses it before the account loads;
+/// saved to the account with `PATCH /me`. Reset on sign-out.
 @MainActor
 @Observable
 final class AppearanceStore {
@@ -210,6 +213,12 @@ final class AppearanceStore {
     /// Takes the server's values (on sign-in / refresh).
     func adopt(_ user: User) {
         apply(mode: user.themeMode, colorTheme: user.colorTheme)
+    }
+
+    /// Back to the defaults (follow the system, Dawn), e.g. after signing out.
+    func reset() {
+        saveTask?.cancel()
+        apply(mode: .system, colorTheme: .fallback)
     }
 
     /// Applies instantly, then saves to the account (debounced so quick taps send one request).
