@@ -79,6 +79,9 @@
 			onsend={(b) => thread.send(b)}
 			onpoll={() => (pollOpen = true)}
 			onpropose={() => (proposeOpen = true)}
+			editing={thread.editing}
+			onsaveedit={(b) => thread.saveEdit(b)}
+			oncanceledit={() => thread.cancelEdit()}
 		/>
 	</div>
 </div>

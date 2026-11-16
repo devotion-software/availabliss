@@ -38,7 +38,12 @@
 	<div class="messages">
 		<MessageList {thread} {group} meId={me.id} compact />
 	</div>
-	<Composer groupId={group.id} compact onsend={(b) => thread.send(b)} onpoll={() => (pollOpen = true)} {onpropose} />
+	<Composer groupId={group.id} compact onsend={(b) => thread.send(b)} onpoll={() => (pollOpen = true)}
+		{onpropose}
+		editing={thread.editing}
+		onsaveedit={(b) => thread.saveEdit(b)}
+		oncanceledit={() => thread.cancelEdit()}
+	/>
 </section>
 
 <PollComposerSheet bind:open={pollOpen} onsubmit={(poll) => thread.sendPoll(poll)} />

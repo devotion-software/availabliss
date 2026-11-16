@@ -13,6 +13,8 @@
 	import EventCard from './EventCard.svelte';
 	import ReadReceipt from './ReadReceipt.svelte';
 	import MessageInfoSheet from './MessageInfoSheet.svelte';
+	import MessageMenu, { type MessageMenuAnchor } from './MessageMenu.svelte';
+	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 
 	/** The scrolling message log for a thread. Reports visibility so `seen` receipts are honest. */
 	interface Props {
@@ -31,6 +33,11 @@
 	let sentinel: HTMLElement | undefined = $state();
 	let infoOpen = $state(false);
 	let infoMessage = $state<Message | null>(null);
+	// Info / Edit / Delete on one of your messages.
+	let menuAnchor = $state<MessageMenuAnchor | null>(null);
+	let menuMessage: Message | null = null;
+	let confirmOpen = $state(false);
+	let deleting = $state<Message | null>(null);
 
 	// Plain (non-reactive) bookkeeping for scroll behaviour.
 	let atBottom = true;
@@ -39,7 +46,8 @@
 	const RUN_GAP_MS = 5 * 60_000;
 	const items = $derived.by(() => {
 		const list = thread.messages;
-		const lastMine = list.findLastIndex((m) => m.authorId === meId && (m.kind === 'text' || m.kind === 'poll'));
+		// The read receipt sits under your newest text or poll (not a deleted one).
+		const lastMine = list.findLastIndex((m) => m.authorId === meId && !m.deleted && (m.kind === 'text' || m.kind === 'poll'));
 		return list.map((m, i) => {
 			const prev = list[i - 1];
 			const next = list[i + 1];
@@ -81,6 +89,20 @@
 		};
 	});
 
+	// Stay pinned to the newest message when the list or its box changes size while you're at the bottom:
+	// cards that load after the first scroll, the edit strip above the composer, the phone keyboard.
+	$effect(() => {
+		const el = scroller;
+		const log = el?.firstElementChild;
+		if (!el || !log) return;
+		const observer = new ResizeObserver(() => {
+			if (atBottom) el.scrollTop = el.scrollHeight;
+		});
+		observer.observe(el);
+		observer.observe(log);
+		return () => observer.disconnect();
+	});
+
 	// Follow new messages when you're already at the bottom (or just sent one).
 	$effect.pre(() => {
 		const last = thread.messages.at(-1);
@@ -104,6 +126,25 @@
 		if (m.id.startsWith('temp-')) return;
 		infoMessage = m;
 		infoOpen = true;
+	}
+
+	function openMenu(message: Message, anchor: MessageMenuAnchor) {
+		menuMessage = message;
+		menuAnchor = anchor;
+	}
+
+	function confirmDelete(message: Message) {
+		deleting = message;
+		confirmOpen = true;
+	}
+
+	async function remove() {
+		if (!deleting) return;
+		try {
+			await thread.deleteMessage(deleting);
+		} catch {
+			// The thread already toasted.
+		}
 	}
 </script>
 
@@ -149,7 +190,10 @@
 						first={item.first}
 						last={item.last}
 						{compact}
+						showEdited={!item.receipt}
+						canModify={thread.canModify(m)}
 						oninfo={openInfo}
+						onmenu={openMenu}
 					/>
 				{/if}
 				{#if item.receipt}
@@ -162,6 +206,23 @@
 </div>
 
 <MessageInfoSheet bind:open={infoOpen} message={infoMessage} {members} {meId} />
+
+<MessageMenu
+	anchor={menuAnchor}
+	onclose={() => (menuAnchor = null)}
+	oninfo={() => menuMessage && openInfo(menuMessage)}
+	onedit={() => menuMessage && thread.startEdit(menuMessage)}
+	ondelete={() => menuMessage && confirmDelete(menuMessage)}
+/>
+
+<ConfirmSheet
+	bind:open={confirmOpen}
+	title="Delete this message?"
+	message="It'll show as deleted for everyone."
+	confirmLabel="Delete"
+	destructive
+	onconfirm={remove}
+/>
 
 <style>
 	.scroller {

@@ -11,6 +11,9 @@
 	}
 	let { message, members, onopen }: Props = $props();
 
+	// "Edited · Seen by …" when the message has been edited.
+	const edited = $derived(!!message.editedAt && !message.deleted);
+
 	const r = $derived(message.receipt);
 	// Readers in the order they saw it (Message.receipt.seenBy).
 	const seenIds = $derived(r?.seenBy ?? []);
@@ -31,7 +34,8 @@
 	});
 </script>
 
-<button type="button" class="receipt" onclick={onopen} aria-label="{text}. Show message info">
+<button type="button" class="receipt" onclick={onopen} aria-label="{edited ? 'Edited. ' : ''}{text}. Show message info">
+	{#if edited}<span class="edited">Edited ·</span>{/if}
 	{#if people.length}<AvatarStack {people} size={16} max={4} ringOn="bg" />{/if}
 	{text}
 	<span class="tick" class:seen={(r?.seen ?? 0) > 0}>
@@ -54,6 +58,9 @@
 	}
 	.receipt:hover {
 		color: var(--ink);
+	}
+	.edited {
+		margin-right: -2px;
 	}
 	.tick {
 		color: var(--muted);

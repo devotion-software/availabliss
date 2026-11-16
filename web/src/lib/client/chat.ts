@@ -21,3 +21,5 @@ export const sendReceipt = (groupId: string, upTo: string, state: 'delivered' | 
 export const getMessageInfo = (messageId: string) => api.get<MessageInfo>(`/messages/${messageId}/info`);
 export const votePoll = (pollId: string, optionIds: string[]) => api.post<Poll>(`/polls/${pollId}/vote`, { optionIds });
 export const closePoll = (pollId: string) => api.post<Poll>(`/polls/${pollId}/close`);
+export const editMessage = (messageId: string, body: string) => api.patch<Message>(`/messages/${messageId}`, { body });
+export const deleteMessage = (messageId: string) => api.del(`/messages/${messageId}`);

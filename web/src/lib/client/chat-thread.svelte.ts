@@ -5,7 +5,19 @@
  */
 import type { Message, Poll } from '#lib/types';
 import { live, receiptUpdates } from './live.svelte';
-import { closePoll, listMessages, sendMessage, sendPoll, sendReceipt, votePoll, type MessagePage, type PollInput } from './chat';
+import {
+	closePoll,
+	deleteMessage,
+	editMessage,
+	listMessages,
+	sendMessage,
+	sendPoll,
+	sendReceipt,
+	votePoll,
+	type MessagePage,
+	type PollInput
+} from './chat';
+import { applyMessageUpdate, canModifyMessage, deletedCopy, isTempMessage } from './chat-messages';
 import { toasts } from './toast.svelte';
 
 const PAGE = 50;
@@ -13,7 +25,7 @@ let tempSeq = 0;
 
 /** Strict "is `a` newer than `b`" on messages (createdAt, then id). */
 const newer = (a: Message, b: Message | null) => !b || a.createdAt > b.createdAt || (a.createdAt === b.createdAt && a.id > b.id);
-const isTemp = (m: Message) => m.id.startsWith('temp-');
+const isTemp = isTempMessage;
 
 export class ChatThread {
 	messages = $state<Message[]>([]);
@@ -22,6 +34,8 @@ export class ChatThread {
 	loadingOlder = $state(false);
 	/** Messages from others that arrived since loading and haven't been seen yet. */
 	unseen = $state(0);
+	/** Your message being edited in the composer, or null. */
+	editing = $state<Message | null>(null);
 
 	readonly groupId: string;
 	readonly meId: string;
@@ -101,6 +115,50 @@ export class ChatThread {
 		}
 	}
 
+	/** Your own text messages can be edited and deleted. */
+	canModify(message: Message) {
+		return canModifyMessage(message, this.meId);
+	}
+
+	startEdit(message: Message) {
+		if (this.canModify(message)) this.editing = message;
+	}
+
+	cancelEdit() {
+		this.editing = null;
+	}
+
+	/** Saves the message being edited. Unchanged text just leaves edit mode; failures toast and throw (staying in edit mode). */
+	async saveEdit(body: string) {
+		const target = this.editing;
+		const text = body.trim();
+		if (!target || !text) return;
+		if (text === target.body) {
+			this.editing = null;
+			return;
+		}
+		try {
+			this.messages = applyMessageUpdate(this.messages, await editMessage(target.id, text));
+			if (this.editing?.id === target.id) this.editing = null;
+		} catch (err) {
+			toasts.error(err);
+			throw err;
+		}
+	}
+
+	/** Deletes one of your messages; it stays in the chat as deleted. Failures toast and throw. */
+	async deleteMessage(message: Message) {
+		try {
+			await deleteMessage(message.id);
+		} catch (err) {
+			toasts.error(err);
+			throw err;
+		}
+		const current = this.messages.find((m) => m.id === message.id);
+		if (current) this.messages = applyMessageUpdate(this.messages, deletedCopy(current));
+		if (this.editing?.id === message.id) this.editing = null;
+	}
+
 	async sendPoll(poll: PollInput) {
 		const message = await sendPoll(this.groupId, poll);
 		this.#insert(message);
@@ -150,6 +208,11 @@ export class ChatThread {
 					this.#queueSeen();
 				}
 			}),
+			live.on('message.updated', ({ groupId, payload }) => {
+				if ((groupId ?? payload.groupId) !== this.groupId) return;
+				this.messages = applyMessageUpdate(this.messages, payload);
+				if (payload.deleted && this.editing?.id === payload.id) this.editing = null;
+			}),
 			live.on('poll.updated', ({ groupId, payload }) => {
 				if (groupId === null || groupId === this.groupId) this.#replacePoll(payload);
 			}),
@@ -179,6 +242,7 @@ export class ChatThread {
 			const fresh = new Map(page.messages.map((m) => [m.id, m]));
 			// Refresh receipts and polls on messages we already have, then add the new ones.
 			this.messages = this.messages.map((m) => fresh.get(m.id) ?? m);
+			if (this.editing && fresh.get(this.editing.id)?.deleted) this.editing = null;
 			for (const message of page.messages) {
 				const known = this.messages.some((m) => m.id === message.id);
 				this.#insert(message);

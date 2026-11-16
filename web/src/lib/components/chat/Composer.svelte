@@ -1,26 +1,73 @@
 <script lang="ts">
+	import { tick, untrack } from 'svelte';
 	import { fly } from 'svelte/transition';
+	import type { Message } from '#lib/types';
 	import Icon from '#lib/components/ui/Icon.svelte';
 
-	/** Message box with a + menu for Poll / Propose a time / Add event (Chat.dc.html). */
+	/**
+	 * Message box with a + menu for Poll / Propose a time / Add event (Chat.dc.html).
+	 * While `editing` one of your messages it holds that text, and send becomes Save; cancelling restores your draft.
+	 */
 	interface Props {
 		groupId: string;
 		onsend: (body: string) => Promise<unknown> | unknown;
 		onpoll: () => void;
 		onpropose: () => void;
 		compact?: boolean;
+		editing?: Message | null;
+		/** Saves the edit; should throw on failure (stays in edit mode). */
+		onsaveedit?: (body: string) => Promise<unknown> | unknown;
+		oncanceledit?: () => void;
 	}
-	let { groupId, onsend, onpoll, onpropose, compact = false }: Props = $props();
+	let { groupId, onsend, onpoll, onpropose, compact = false, editing = null, onsaveedit, oncanceledit }: Props = $props();
 
 	const uid = $props.id();
 	let body = $state('');
 	let menu = $state(false);
 	let input: HTMLInputElement | undefined = $state();
+	let saving = $state(false);
+
+	// Entering edit mode keeps your draft aside and fills in the message; leaving it (save, cancel, deleted) gives the draft back.
+	let draft = '';
+	let editingId: string | null = null;
+	$effect(() => {
+		const message = editing;
+		const id = message?.id ?? null;
+		untrack(() => {
+			if (id === editingId) return;
+			if (editingId === null) draft = body;
+			editingId = id;
+			if (message) {
+				menu = false;
+				body = message.body ?? '';
+				tick().then(() => {
+					input?.focus();
+					input?.setSelectionRange(body.length, body.length);
+				});
+			} else {
+				body = draft;
+				draft = '';
+			}
+		});
+	});
 
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
 		const text = body.trim();
 		if (!text) return;
+		if (editing) {
+			if (saving) return;
+			saving = true;
+			try {
+				await onsaveedit?.(text);
+			} catch {
+				// The thread already toasted; stay in edit mode with the text.
+			} finally {
+				saving = false;
+			}
+			input?.focus();
+			return;
+		}
 		body = '';
 		try {
 			await onsend(text);
@@ -40,7 +87,15 @@
 		if (e.key === 'Escape' && menu) {
 			e.stopPropagation();
 			menu = false;
+		} else if (e.key === 'Escape' && editing) {
+			e.stopPropagation();
+			oncanceledit?.();
 		}
+	}
+
+	function cancelEdit() {
+		oncanceledit?.();
+		input?.focus();
 	}
 </script>
 
@@ -62,6 +117,16 @@
 		</div>
 	{/if}
 
+	{#if editing}
+		<div class="editing" transition:fly={{ y: 8, duration: 180 }}>
+			<Icon name="pencil" size={16} />
+			<span class="editing-label" id="composer-editing-{uid}">Editing message</span>
+			<button type="button" class="cancel-edit" aria-label="Cancel editing" title="Cancel editing" onclick={cancelEdit}>
+				<Icon name="x" size={16} strokeWidth={2.4} />
+			</button>
+		</div>
+	{/if}
+
 	<form class="bar" class:glass={!compact} onsubmit={submit}>
 		<button
 			type="button"
@@ -79,14 +144,21 @@
 			bind:this={input}
 			id="composer-{uid}"
 			bind:value={body}
-			placeholder="Message the group"
+			placeholder={editing ? 'Edit your message' : 'Message the group'}
 			autocomplete="off"
-			enterkeyhint="send"
+			enterkeyhint={editing ? 'done' : 'send'}
 			maxlength={4000}
+			aria-describedby={editing ? `composer-editing-${uid}` : undefined}
 		/>
-		<button type="submit" class="send" aria-label="Send" disabled={!body.trim()}>
-			<Icon name="send" size={18} strokeWidth={2.2} />
-		</button>
+		{#if editing}
+			<button type="submit" class="send" aria-label="Save" title="Save" disabled={!body.trim() || saving}>
+				<Icon name="check" size={20} strokeWidth={2.4} />
+			</button>
+		{:else}
+			<button type="submit" class="send" aria-label="Send" disabled={!body.trim()}>
+				<Icon name="send" size={18} strokeWidth={2.2} />
+			</button>
+		{/if}
 	</form>
 </div>
 
@@ -130,6 +202,33 @@
 	.menu a:hover {
 		color: var(--ink);
 		background: var(--accent-soft);
+	}
+	.editing {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 0 4px 0 14px;
+		min-height: 36px;
+		border-radius: 14px;
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		font-size: 13px;
+		font-weight: 600;
+	}
+	.editing-label {
+		flex: 1;
+	}
+	.cancel-edit {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--accent-ink);
+	}
+	.cancel-edit:hover {
+		background: var(--surface);
 	}
 	.bar {
 		border-radius: 24px;
