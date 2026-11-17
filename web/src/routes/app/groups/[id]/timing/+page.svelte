@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { invalidate } from '$app/navigation';
+	import { beforeNavigate, goto, invalidate } from '$app/navigation';
 	import type { Requirement } from '#lib/types';
 	import { requirementSchema } from '#lib/schemas';
 	import { createPreview } from '#lib/client/requirement-preview.svelte';
@@ -14,6 +14,7 @@
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
+	import Sheet from '#lib/components/ui/Sheet.svelte';
 	import RequirementsEditor from '#lib/components/timing/RequirementsEditor.svelte';
 	import PreferencesPanel from '#lib/components/group/PreferencesPanel.svelte';
 	import SaveTemplate from '#lib/components/timing/SaveTemplate.svelte';
@@ -74,11 +75,38 @@
 			: summarize(draft)
 	);
 
-	async function save() {
+	// Leaving with unsaved changes asks whether to save or discard them first (closing the
+	// tab or reloading gets the browser's own prompt).
+	let leaving = $state<{ url: URL; delta?: number } | null>(null);
+	let confirmsLeave = $state(false);
+	let allowLeave = false;
+	beforeNavigate((nav) => {
+		if (allowLeave || !admin || !dirty) return;
+		nav.cancel();
+		if (nav.type === 'leave' || !nav.to || busy) return;
+		leaving = { url: nav.to.url, delta: nav.type === 'popstate' ? nav.delta : undefined };
+		confirmsLeave = true;
+	});
+	function leave() {
+		const target = leaving;
+		confirmsLeave = false;
+		leaving = null;
+		if (!target) return;
+		allowLeave = true;
+		if (target.delta) history.go(target.delta);
+		else if (target.url.origin !== location.origin) location.href = target.url.href;
+		else goto(target.url);
+	}
+	async function saveAndLeave() {
+		if (await save()) leave();
+		else confirmsLeave = false;
+	}
+
+	async function save(): Promise<boolean> {
 		const parsed = requirementSchema.safeParse({ ...draft, timezone: draft.timezone || data.user.timezone });
 		if (!parsed.success) {
 			toasts.error(parsed.error.issues[0]?.message ?? 'Check the timing');
-			return;
+			return false;
 		}
 		busy = true;
 		try {
@@ -86,8 +114,10 @@
 			await Promise.all([invalidate('app:group'), invalidate('app:groups')]);
 			changedElsewhere = false;
 			toasts.success('Timing saved. Finding new times…');
+			return true;
 		} catch (err) {
 			toasts.error(err);
+			return false;
 		} finally {
 			busy = false;
 		}
@@ -142,6 +172,20 @@
 		{/if}
 	</div>
 </div>
+
+<Sheet
+	bind:open={confirmsLeave}
+	title="Save your changes?"
+	description="You've changed the timing but haven't saved it yet."
+	width={420}
+	onclose={() => (leaving = null)}
+>
+	{#snippet children()}{/snippet}
+	{#snippet footer()}
+		<Button variant="secondary" onclick={leave}>Discard changes</Button>
+		<Button variant="solid" loading={busy} onclick={saveAndLeave}>Save timing</Button>
+	{/snippet}
+</Sheet>
 
 <style>
 	.page {
