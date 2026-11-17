@@ -126,14 +126,8 @@ class TimingEditor(
         RequirementPresets.withLength(d, l.copy(endDay = end.day, endTime = DateTimes.toWireTime(end.time)), null)
     }
 
-    fun setRangeFrom(date: LocalDate) = edit { d ->
-        val to = DateTimes.parseDate(d.range.to)?.takeIf { !it.isBefore(date) } ?: date.plusMonths(3)
-        d.copy(range = DateRange(date.toString(), to.toString()))
-    }
-
-    fun setRangeTo(date: LocalDate) = edit { d ->
-        val from = DateTimes.parseDate(d.range.from)?.takeIf { !it.isAfter(date) } ?: date
-        d.copy(range = DateRange(from.toString(), date.toString()))
+    fun setRange(from: LocalDate, to: LocalDate) = edit { d ->
+        d.copy(range = DateRange(minOf(from, to).toString(), maxOf(from, to).toString()))
     }
 
     /** Adds a range, joining it with any it overlaps or runs straight on from. One already covered adds nothing. */
@@ -161,8 +155,7 @@ class TimingEditor(
         onEndTime = ::setEndTime,
         onSpanStart = ::setSpanStart,
         onSpanEnd = ::setSpanEnd,
-        onRangeFrom = ::setRangeFrom,
-        onRangeTo = ::setRangeTo,
+        onRange = ::setRange,
         onAddRange = ::addRange,
         onRemoveRange = ::removeRange,
         onSave = onSave,

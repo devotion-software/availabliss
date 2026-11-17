@@ -40,7 +40,9 @@ import dev.joeherbert.availabliss.core.network.model.GroupPreference
 import dev.joeherbert.availabliss.core.network.model.NewGroupPreference
 import dev.joeherbert.availabliss.core.network.model.PreferenceWindow
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
+import dev.joeherbert.availabliss.designsystem.component.AvDateRangePickerDialog
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
+import dev.joeherbert.availabliss.designsystem.component.FieldTile
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.Segment
@@ -174,8 +176,9 @@ private fun AddPreferenceSheet(saving: Boolean, error: String?, onDismiss: () ->
     var timing by remember { mutableStateOf("any") }
     var from by remember { mutableStateOf("16:00") }
     var to by remember { mutableStateOf("22:00") }
-    var fromDate by remember { mutableStateOf(DateTimes.today().toString()) }
-    var toDate by remember { mutableStateOf(DateTimes.today().toString()) }
+    var fromDate by remember { mutableStateOf(DateTimes.today()) }
+    var toDate by remember { mutableStateOf(DateTimes.today()) }
+    var pickingDates by remember { mutableStateOf(false) }
     AvBottomSheet(title = "Add a preferred time", onDismissRequest = onDismiss) {
         SegmentedControl(segments = listOf(Segment("weekly", "Repeating"), Segment("dates", "Specific dates")), selected = kind, onSelect = { kind = it })
         if (kind == "weekly") {
@@ -202,8 +205,8 @@ private fun AddPreferenceSheet(saving: Boolean, error: String?, onDismiss: () ->
             }
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AvTextField(fromDate, { fromDate = it.take(10) }, label = "From (YYYY-MM-DD)", modifier = Modifier.weight(1f))
-                AvTextField(toDate, { toDate = it.take(10) }, label = "To (YYYY-MM-DD)", modifier = Modifier.weight(1f))
+                FieldTile("From", DateTimes.dayMonthYear(fromDate), onClick = { pickingDates = true }, modifier = Modifier.weight(1f))
+                FieldTile("To", DateTimes.dayMonthYear(toDate), onClick = { pickingDates = true }, modifier = Modifier.weight(1f))
             }
         }
         error?.let { Text(it, color = colors.warnInk, style = AvailablissTheme.type.caption) }
@@ -211,7 +214,7 @@ private fun AddPreferenceSheet(saving: Boolean, error: String?, onDismiss: () ->
             "Save preference",
             {
                 onSave(
-                    if (kind == "dates") NewGroupPreference(kind = "dates", from = fromDate, to = toDate)
+                    if (kind == "dates") NewGroupPreference(kind = "dates", from = fromDate.toString(), to = toDate.toString())
                     else NewGroupPreference(
                         kind = "weekly",
                         days = days.sorted(),
@@ -226,5 +229,8 @@ private fun AddPreferenceSheet(saving: Boolean, error: String?, onDismiss: () ->
             loading = saving,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+    if (pickingDates) {
+        AvDateRangePickerDialog(fromDate, toDate, { from, to -> fromDate = from; toDate = to }, { pickingDates = false })
     }
 }

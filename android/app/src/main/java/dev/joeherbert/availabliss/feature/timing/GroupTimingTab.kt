@@ -51,7 +51,6 @@ import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.DateRange
 import dev.joeherbert.availabliss.core.network.model.RequirementLength
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
-import dev.joeherbert.availabliss.designsystem.component.AvDatePickerDialog
 import dev.joeherbert.availabliss.designsystem.component.AvDateRangePickerDialog
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTimePickerDialog
@@ -87,7 +86,7 @@ import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import java.time.LocalDate
 
 /** Which picker is open; UI-only state. */
-private enum class TimingPicker { None, StartTime, EndTime, SpanStart, SpanEnd, RangeFrom, RangeTo, Dates, SchoolHolidays }
+private enum class TimingPicker { None, StartTime, EndTime, SpanStart, SpanEnd, SearchRange, Dates, SchoolHolidays }
 
 /** Group timing editor (Requirements.dc.html). Read-only for non-admins. */
 @Composable
@@ -156,8 +155,7 @@ data class TimingActions(
     val onEndTime: (java.time.LocalTime) -> Unit = {},
     val onSpanStart: (SpanEnd) -> Unit = {},
     val onSpanEnd: (SpanEnd) -> Unit = {},
-    val onRangeFrom: (LocalDate) -> Unit = {},
-    val onRangeTo: (LocalDate) -> Unit = {},
+    val onRange: (LocalDate, LocalDate) -> Unit = { _, _ -> },
     val onAddRange: (RangeList, LocalDate, LocalDate) -> Unit = { _, _, _ -> },
     val onRemoveRange: (RangeList, DateRange) -> Unit = { _, _ -> },
     val onSave: () -> Unit = {},
@@ -423,14 +421,14 @@ private fun RangeSection(state: TimingEditorUiState, canEdit: Boolean, draft: Ti
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ValueBox(
                 DateTimes.dayMonthYear(state.rangeFrom),
-                onClick = { if (canEdit) openPicker(TimingPicker.RangeFrom) },
+                onClick = { if (canEdit) openPicker(TimingPicker.SearchRange) },
                 contentDescription = "From ${DateTimes.dayMonthYear(state.rangeFrom)}",
                 modifier = Modifier.weight(1f),
             )
             Icon(AvIcons.ArrowRight, null, tint = colors.muted, modifier = Modifier.size(16.dp))
             ValueBox(
                 DateTimes.dayMonthYear(state.rangeTo),
-                onClick = { if (canEdit) openPicker(TimingPicker.RangeTo) },
+                onClick = { if (canEdit) openPicker(TimingPicker.SearchRange) },
                 contentDescription = "To ${DateTimes.dayMonthYear(state.rangeTo)}",
                 modifier = Modifier.weight(1f),
             )
@@ -491,8 +489,7 @@ private fun TimingPickers(state: TimingEditorUiState, picker: TimingPicker, acti
         TimingPicker.EndTime -> AvTimePickerDialog("Ends", state.endTime, actions.onEndTime, close)
         TimingPicker.SpanStart -> SpanEndSheet("Starts", state.spanStart, onDone = { actions.onSpanStart(it); close() }, onDismiss = close)
         TimingPicker.SpanEnd -> SpanEndSheet("Ends", state.spanEnd, onDone = { actions.onSpanEnd(it); close() }, onDismiss = close)
-        TimingPicker.RangeFrom -> AvDatePickerDialog(state.rangeFrom, actions.onRangeFrom, close)
-        TimingPicker.RangeTo -> AvDatePickerDialog(state.rangeTo, actions.onRangeTo, close, minDate = state.rangeFrom)
+        TimingPicker.SearchRange -> AvDateRangePickerDialog(state.rangeFrom, state.rangeTo, actions.onRange, close)
         TimingPicker.Dates -> RangePicker(state.draft, RangeList.Dates, actions, close)
         TimingPicker.SchoolHolidays -> RangePicker(state.draft, RangeList.SchoolHolidays, actions, close)
     }
