@@ -366,13 +366,33 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
                 modifier = Modifier.scale(bloom.value * breathe).alpha(((bloom.value - 0.6f) / 0.4f).coerceIn(0f, 1f)),
             )
             Text("Everyone's in.", style = AvailablissTheme.type.displayLarge, color = colors.ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
-            val where = state.location?.let { " in $it" }.orEmpty()
-            Text(
-                "All ${state.total} of you can make\n${state.range}$where.",
-                style = AvailablissTheme.type.bodyLarge.copy(lineHeight = AvailablissTheme.type.bodyLarge.fontSize * 1.4f),
-                color = colors.muted,
-                textAlign = TextAlign.Center,
-            )
+            // "All 4 of you can make", then the date and time large on their own lines, then the place.
+            Column(
+                Modifier.semantics(mergeDescendants = true) {},
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    "All ${state.total} of you can make",
+                    style = AvailablissTheme.type.bodyLarge,
+                    color = colors.muted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 2.dp),
+                )
+                Text(state.rangeDate.ifEmpty { state.range }, style = AvailablissTheme.type.displaySmall, color = colors.ink, textAlign = TextAlign.Center)
+                state.rangeTime?.let {
+                    Text(it, style = AvailablissTheme.type.titleLarge, color = colors.ink, textAlign = TextAlign.Center)
+                }
+                state.location?.let {
+                    Text(
+                        "in $it",
+                        style = AvailablissTheme.type.bodyLarge,
+                        color = colors.muted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
         }
         GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.cardLarge, contentPadding = PaddingValues(14.dp)) {
             CalendarPickerRow(state.calendar, actions.onSelectCalendar)
@@ -408,7 +428,7 @@ private fun ProposalPendingPreview() {
 private fun ProposalConfirmedPreview() {
     AvailablissPreviewTheme(dark = true) {
         ProposalContent(
-            ProposalUiState(loading = false, groupName = "Lake District crew", range = "Fri 13 – Sun 15 Nov", total = 6, location = "Keswick", status = ProposalStatus.Confirmed),
+            ProposalUiState(loading = false, groupName = "Lake District crew", range = "Sat 14 Nov · 18:30 – 21:00", rangeDate = "Sat 14 Nov", rangeTime = "18:30 – 21:00", total = 6, location = "Keswick", status = ProposalStatus.Confirmed),
             ProposalActions(),
         )
     }

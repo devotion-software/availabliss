@@ -52,6 +52,9 @@ data class ProposalUiState(
     val title: String? = null,
     /** "Fri 13 – Sun 15 Nov" */
     val range: String = "",
+    /** [range] split for the confirmed screen: the date ("Wed 11 Nov") and, within a day, the time ("18:30 – 21:00"). */
+    val rangeDate: String = "",
+    val rangeTime: String? = null,
     /** "From Fri 18:00 · Keswick" */
     val detail: String = "",
     val accepted: Int = 0,
@@ -225,6 +228,7 @@ class ProposalViewModel @Inject constructor(
         }
         val proposerName = directory.displayName(p.createdBy, youSuffix = false).let { if (p.createdBy == meId) "You" else it }
         val key = p.eventId ?: p.id
+        val rangeParts = DateTimes.rangeParts(p.start, p.end, p.allDay)
         return ProposalUiState(
             loading = loading,
             error = error,
@@ -232,6 +236,8 @@ class ProposalViewModel @Inject constructor(
             proposedBy = "$proposerName proposed · ${DateTimes.relative(p.createdAt)}",
             title = p.title?.takeIf { it.isNotBlank() },
             range = ProposalFormatting.rangeLabel(p),
+            rangeDate = rangeParts.first,
+            rangeTime = rangeParts.second,
             detail = ProposalFormatting.detailLine(p),
             accepted = ProposalFormatting.acceptedCount(p),
             total = ProposalFormatting.totalCount(p, g?.memberCount ?: 0),

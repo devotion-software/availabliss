@@ -129,17 +129,26 @@ object DateTimes {
      * the day before (matching the server's labels).
      */
     fun rangeLabel(startIso: String, endIso: String, allDay: Boolean, zone: ZoneId = this.zone): String {
-        val start = localDateTime(startIso, zone) ?: return ""
-        val end = localDateTime(endIso, zone) ?: return shortDay(start.toLocalDate())
+        val (date, time) = rangeParts(startIso, endIso, allDay, zone)
+        return if (time != null) "$date · $time" else date
+    }
+
+    /**
+     * [rangeLabel] split into its date ("Wed 11 Nov", "Fri 13 – Sun 15 Nov") and, within a day,
+     * its time ("18:30 – 21:00", "from 18:00"), for layouts that show them on separate lines.
+     */
+    fun rangeParts(startIso: String, endIso: String, allDay: Boolean, zone: ZoneId = this.zone): Pair<String, String?> {
+        val start = localDateTime(startIso, zone) ?: return "" to null
+        val end = localDateTime(endIso, zone) ?: return shortDay(start.toLocalDate()) to null
         val endsAtMidnight = end.toLocalTime() == LocalTime.MIDNIGHT
         val lastDay = if (endsAtMidnight) end.toLocalDate().minusDays(1) else end.toLocalDate()
         val firstDay = start.toLocalDate()
         return when {
-            firstDay == lastDay && allDay -> shortDay(firstDay)
-            firstDay == lastDay && endsAtMidnight -> "${shortDay(firstDay)} · from ${time(start)}"
-            firstDay == lastDay -> "${shortDay(firstDay)} · ${time(start)} – ${time(end)}"
-            firstDay.month == lastDay.month -> "${weekdayAndDay(firstDay)} – ${shortDay(lastDay)}"
-            else -> "${shortDay(firstDay)} – ${shortDay(lastDay)}"
+            firstDay == lastDay && allDay -> shortDay(firstDay) to null
+            firstDay == lastDay && endsAtMidnight -> shortDay(firstDay) to "from ${time(start)}"
+            firstDay == lastDay -> shortDay(firstDay) to "${time(start)} – ${time(end)}"
+            firstDay.month == lastDay.month -> "${weekdayAndDay(firstDay)} – ${shortDay(lastDay)}" to null
+            else -> "${shortDay(firstDay)} – ${shortDay(lastDay)}" to null
         }
     }
 
