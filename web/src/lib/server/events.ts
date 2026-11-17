@@ -7,6 +7,7 @@ import { badRequest, forbidden, notFound } from './http';
 import { newId } from './ids';
 import { getGroupRow, memberIds, requireMember } from './groups';
 import { publishToGroup } from './realtime';
+import { unarchiveOnActivity } from './auto-archive';
 import { notify } from './notifications';
 import { postMessage } from './chat';
 import { dayLabel } from './availability/labels';
@@ -93,6 +94,7 @@ export async function createEvent(groupId: string, userId: string, input: EventI
 	const group = await getGroupRow(groupId);
 
 	await postMessage(groupId, userId, { kind: 'event', eventId: id });
+	await unarchiveOnActivity(groupId);
 	await publishToGroup(groupId, 'event.changed', event);
 	await notify(
 		(await memberIds(groupId)).filter((m) => m !== userId),

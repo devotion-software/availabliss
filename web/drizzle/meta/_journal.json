@@ -141,6 +141,13 @@
       "when": 1794957595464,
       "tag": "0019_thick_phalanx",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1794958954001,
+      "tag": "0020_simple_umar",
+      "breakpoints": true
     }
   ]
 }

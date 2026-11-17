@@ -133,6 +133,8 @@ export interface GroupSummary {
 export interface Group extends Omit<GroupSummary, 'status' | 'unreadCount' | 'memberPreview'> {
 	requirement: Requirement;
 	members: Member[];
+	/** Archived automatically once its latest event has passed and nothing else is planned (admins choose). */
+	autoArchive: boolean;
 	createdAt: string;
 }
 

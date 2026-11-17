@@ -108,8 +108,11 @@ export const createGroupSchema = z.object({
 	requirement: requirementSchema.optional()
 });
 
-/** `archived` moves the group to (true) or out of (false) the archived section of everyone's groups list. */
-export const updateGroupSchema = createGroupSchema.partial().extend({ archived: z.boolean().optional() });
+/**
+ * `archived` moves the group to (true) or out of (false) the archived section of everyone's groups list;
+ * `autoArchive` archives it by itself once its latest event has passed.
+ */
+export const updateGroupSchema = createGroupSchema.partial().extend({ archived: z.boolean().optional(), autoArchive: z.boolean().optional() });
 
 export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
 

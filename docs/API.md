@@ -167,9 +167,16 @@ interface GroupSummary {
 interface Group extends Omit<GroupSummary, 'status' | 'unreadCount' | 'memberPreview'> {
   requirement: Requirement;
   members: Member[];
+  autoArchive: boolean;     // archive it automatically once its event has passed (see below); off by default
   createdAt: string;
 }
 ```
+
+**Automatic archiving.** With `autoArchive` on, the server archives the group (for everyone, as an admin
+archiving it would; `group.updated` is published) once its latest event has ended and nothing else is planned:
+no event still to come or under way, and no open proposal for a time still ahead. It's checked every 15 minutes.
+It happens once per event: after someone unarchives it, it isn't archived again until a newer event has passed.
+A new proposal or event in an archived group with `autoArchive` on unarchives it.
 
 ## Requirements
 
@@ -414,7 +421,7 @@ interface ManualBlock {
 | GET 🔒 | `/groups` | | `{ groups: GroupSummary[] }` |
 | POST 🔒 | `/groups` | `{ name, color?, requirement? }` | `Group` (creator is owner; `402 upgrade_required` past the free limit) |
 | GET 🔒 | `/groups/:id` | | `Group` |
-| PATCH 👑 | `/groups/:id` | `{ name?, color?, requirement?, archived? }` | `Group` (publishes `group.updated`; `archived: true` archives it for everyone, `false` unarchives) |
+| PATCH 👑 | `/groups/:id` | `{ name?, color?, requirement?, archived?, autoArchive? }` | `Group` (publishes `group.updated`; `archived: true` archives it for everyone, `false` unarchives; `autoArchive` turns automatic archiving on or off) |
 | PUT 👑 | `/groups/:id/image` | the image bytes (as `/me/avatar`) | `Group` (`image` shrunk to fit 512 px; publishes `group.updated`) |
 | DELETE 👑 | `/groups/:id/image` | | `Group` (no photo: the monogram tile) |
 | DELETE ⭐ | `/groups/:id` | | `204` |

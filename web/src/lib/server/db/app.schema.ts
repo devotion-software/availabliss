@@ -184,6 +184,13 @@ export const groups = mysqlTable('groups', {
 	lastNudgedAt: instant('last_nudged_at'),
 	/** When an admin archived the group (it moves to the archived section of the groups list); null = active. */
 	archivedAt: instant('archived_at'),
+	/** Archive it automatically once its latest event has passed and nothing else is planned (admins choose; off by default). */
+	autoArchive: boolean('auto_archive').default(false).notNull(),
+	/**
+	 * The end of the latest event that has already archived it automatically, or that had passed when someone
+	 * unarchived it: it isn't archived automatically again until an event ending after this has passed.
+	 */
+	autoArchivedThrough: instant('auto_archived_through'),
 	createdAt: createdAt(),
 	updatedAt: updatedAt()
 });

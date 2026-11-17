@@ -11,6 +11,7 @@ import { conflict, forbidden, notFound } from './http';
 import { newId } from './ids';
 import { getGroupRow, memberIds, requireMember } from './groups';
 import { publishToGroup } from './realtime';
+import { unarchiveOnActivity } from './auto-archive';
 import { notify } from './notifications';
 import { postMessage } from './chat';
 import { insertEvent, toGroupEvent } from './events';
@@ -158,6 +159,7 @@ export async function createProposal(groupId: string, userId: string, input: Pro
 	const when = slotLabel({ start: Date.parse(input.start), end: Date.parse(input.end) }, group.requirement);
 
 	await postMessage(groupId, userId, { kind: 'proposal', proposalId: id });
+	await unarchiveOnActivity(groupId);
 	const proposal = await fetchProposal(id);
 	await publishToGroup(groupId, 'proposal.created', proposal);
 	await notify(

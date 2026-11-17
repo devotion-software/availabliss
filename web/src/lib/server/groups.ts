@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lte, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/mysql-core';
 import type { Group, Member, Requirement, Role, TileColor } from '#lib/types';
 import { TILE_COLORS } from '#lib/types';
@@ -95,13 +95,14 @@ export function groupBase(row: GroupRow, role: Role, members: Member[]) {
 		memberCount: members.length,
 		syncedCount: members.filter((m) => m.synced).length,
 		requirementSummary: requirementSummary(row.requirement)
-	} satisfies Omit<Group, 'requirement' | 'members' | 'createdAt'>;
+	} satisfies Omit<Group, 'requirement' | 'members' | 'autoArchive' | 'createdAt'>;
 }
 
 const toGroup = (row: GroupRow, role: Role, members: Member[]): Group => ({
 	...groupBase(row, role, members),
 	requirement: row.requirement,
 	members,
+	autoArchive: row.autoArchive,
 	createdAt: row.createdAt.toISOString()
 });
 
@@ -109,6 +110,17 @@ export async function getGroupRow(groupId: string): Promise<GroupRow> {
 	const row = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
 	if (!row) throw notFound('Group not found');
 	return row;
+}
+
+/** The end of the group's latest event that had ended by `now`, or null when none has. */
+export async function latestEventEnd(groupId: string, now: Date): Promise<Date | null> {
+	const [row] = await db
+		.select({ end: events.end })
+		.from(events)
+		.where(and(eq(events.groupId, groupId), lte(events.end, now)))
+		.orderBy(desc(events.end))
+		.limit(1);
+	return row?.end ?? null;
 }
 
 export async function getGroup(groupId: string, userId: string): Promise<Group> {
@@ -158,7 +170,10 @@ export async function createGroup(
 export async function updateGroup(
 	groupId: string,
 	userId: string,
-	{ archived, ...patch }: { name?: string; color?: TileColor; requirement?: Requirement; archived?: boolean }
+	{
+		archived,
+		...patch
+	}: { name?: string; color?: TileColor; requirement?: Requirement; archived?: boolean; autoArchive?: boolean }
 ): Promise<Group> {
 	await requireMember(groupId, userId, 'admin');
 	const set: Partial<GroupRow> = { ...patch };
@@ -166,6 +181,11 @@ export async function updateGroup(
 	if (archived !== undefined) {
 		const before = await getGroupRow(groupId);
 		set.archivedAt = archived ? (before.archivedAt ?? new Date()) : null;
+		// Unarchived on purpose: don't archive it automatically again until a newer event has passed.
+		if (!archived && before.archivedAt) {
+			const passed = await latestEventEnd(groupId, new Date());
+			if (passed && (!before.autoArchivedThrough || passed > before.autoArchivedThrough)) set.autoArchivedThrough = passed;
+		}
 	}
 	if (Object.keys(set).length) await db.update(groups).set(set).where(eq(groups.id, groupId));
 	// The search range may now reach past what members' calendars cover.

@@ -4,6 +4,7 @@ import { auth } from '#lib/auth';
 import { COLOR_THEMES, THEME_MODES, type ColorTheme, type ThemeMode } from '#lib/types';
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
 import type { RequestEvent } from '@sveltejs/kit';
+import { autoArchiveGroups } from '#lib/server/auto-archive';
 import { checkCaldavConnections, syncStaleConnections } from '#lib/server/calendars';
 import { isForbiddenCrossSite, selfOrigins } from '#lib/server/csrf';
 import { env } from '#lib/server/env';
@@ -15,10 +16,12 @@ const ALLOWED_ORIGINS = selfOrigins(env.baseUrl, env.trustedOrigins);
 const CALENDAR_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 /** iCloud / CalDAV can't notify us, so their change tags are checked this often instead. */
 const CALDAV_CHECK_INTERVAL_MS = 2 * 60 * 1000;
+/** How often groups that archive themselves are checked for a passed event. */
+const AUTO_ARCHIVE_INTERVAL_MS = 15 * 60 * 1000;
 
 /**
- * Keeps Google / Microsoft / CalDAV busy time fresh in the background, and checks
- * CalDAV change tags in between. Every instance runs the timers, but locks in the
+ * Keeps Google / Microsoft / CalDAV busy time fresh in the background, checks
+ * CalDAV change tags in between, and archives groups whose event has passed. Every instance runs the timers, but locks in the
  * shared store let only one of them run each per interval.
  */
 export const init: ServerInit = () => {
@@ -44,6 +47,14 @@ export const init: ServerInit = () => {
 			console.warn('[calendars] CalDAV change check failed', err);
 		}
 	}, CALDAV_CHECK_INTERVAL_MS).unref();
+	setInterval(async () => {
+		try {
+			if (!(await kv.setIfAbsent('lock:auto-archive', String(process.pid), AUTO_ARCHIVE_INTERVAL_MS / 1000 - 10))) return;
+			await autoArchiveGroups();
+		} catch (err) {
+			console.warn('[groups] auto-archive failed', err);
+		}
+	}, AUTO_ARCHIVE_INTERVAL_MS).unref();
 };
 
 const OTP_SEND_PATH = '/api/auth/email-otp/send-verification-otp';
