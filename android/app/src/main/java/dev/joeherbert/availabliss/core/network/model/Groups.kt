@@ -109,6 +109,10 @@ data class UpdateGroupRequest(
 @Serializable
 data class MemberRoleRequest(val role: Role)
 
+/** Leaving: the owner names the admin who becomes the owner (null otherwise, left out of the JSON). */
+@Serializable
+data class LeaveGroupRequest(val newOwnerId: String? = null)
+
 @Serializable
 data class NudgeResponse(val nudged: Int)
 

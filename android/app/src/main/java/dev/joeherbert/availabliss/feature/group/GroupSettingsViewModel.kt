@@ -12,6 +12,7 @@ import dev.joeherbert.availabliss.core.live.LiveEvents
 import dev.joeherbert.availabliss.core.live.LivePayload
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.Group
+import dev.joeherbert.availabliss.core.network.model.Member
 import dev.joeherbert.availabliss.core.network.model.Role
 import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.navigation.GroupSettingsRoute
@@ -40,6 +41,15 @@ data class GroupSettingsUiState(
     val deleting: Boolean = false,
     /** True once the group is deleted (navigate away). */
     val deleted: Boolean = false,
+    /** Everyone in the group, and who "me" is among them (for Leave group). */
+    val members: List<Member> = emptyList(),
+    val meId: String? = null,
+    val confirmingLeave: Boolean = false,
+    /** Leave group's pick: whom to make an admin, or which admin becomes the owner. */
+    val leavePick: String? = null,
+    val leaving: Boolean = false,
+    /** True once the user has left (navigate away). */
+    val left: Boolean = false,
     val message: UserMessage? = null,
 ) {
     /** Owners and admins can change the photo, name and colour, and archive the group. */
@@ -47,12 +57,21 @@ data class GroupSettingsUiState(
     /** Only the owner can delete the group. */
     val canDelete: Boolean get() = role == Role.Owner
     val nameChanged: Boolean get() = nameDraft.isNotBlank() && nameDraft.trim() != groupName
+
+    // Leaving. A group always keeps an owner (and so an admin), following the server's rules.
+    val otherMembers: List<Member> get() = members.filter { it.userId != meId }
+    val otherAdmins: List<Member> get() = otherMembers.filter { it.role.isAdmin }
+    /** Before an admin can go, someone else has to be an admin. */
+    val leaveNeedsAdmin: Boolean get() = role?.isAdmin == true && otherAdmins.isEmpty()
+    /** The owner picks which admin becomes the owner. */
+    val leaveChoosesOwner: Boolean get() = role == Role.Owner && otherAdmins.isNotEmpty()
 }
 
 /**
- * Group settings: photo, name, colour, archive and delete. Reads the group from [GroupsRepository]'s
+ * Group settings: photo, name, colour, archive, leave and delete. Reads the group from [GroupsRepository]'s
  * cache (kept live by the group's calendar underneath) and writes through it, so every screen of the
- * group shows a change straight away. Server rules: admins edit and archive, the owner deletes.
+ * group shows a change straight away. Server rules: admins edit and archive, the owner deletes,
+ * anyone leaves (the owner handing over to another admin; the last admin making someone else an admin first).
  */
 @HiltViewModel
 class GroupSettingsViewModel @Inject constructor(
@@ -154,6 +173,51 @@ class GroupSettingsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Opens Leave group's sheet: with nobody else an admin it first asks for someone to make an admin;
+     * the owner then picks which admin becomes the owner (picked for them when there's only one).
+     */
+    fun requestLeave() = _state.update { it.copy(confirmingLeave = true, leavePick = it.soleHeir()) }
+
+    fun dismissLeave() = _state.update { if (it.leaving) it else it.copy(confirmingLeave = false) }
+
+    fun pickForLeave(userId: String) = _state.update { it.copy(leavePick = userId) }
+
+    /** Members' Make admin, for whoever is picked; the sheet then moves on to leaving. */
+    fun makeAdminForLeave() {
+        val s = _state.value
+        val pick = s.leavePick ?: return
+        if (s.leaving) return
+        _state.update { it.copy(leaving = true) }
+        viewModelScope.launch {
+            when (val result = groups.setRole(groupId, pick, Role.Admin)) {
+                // Now the only other admin: as the owner, they're who takes over.
+                is ApiResult.Success -> _state.update { it.copy(leaving = false, leavePick = if (it.role == Role.Owner) pick else null) }
+                is ApiResult.Failure -> _state.update { it.copy(leaving = false, message = UserMessage(result.error.message)) }
+            }
+        }
+    }
+
+    fun leave() {
+        val s = _state.value
+        if (s.leaving || s.leaveNeedsAdmin || (s.leaveChoosesOwner && s.leavePick == null)) return
+        _state.update { it.copy(leaving = true) }
+        viewModelScope.launch {
+            when (val result = groups.leave(groupId, if (s.leaveChoosesOwner) s.leavePick else null)) {
+                is ApiResult.Success -> {
+                    _state.update { it.copy(leaving = false, confirmingLeave = false, left = true) }
+                    groups.refreshGroups()
+                }
+                is ApiResult.Failure -> _state.update { it.copy(leaving = false, message = UserMessage(result.error.message)) }
+            }
+        }
+    }
+
+    /** The only member can't leave: Leave group's sheet hands over to Delete group. */
+    fun deleteInsteadOfLeaving() = _state.update { it.copy(confirmingLeave = false, confirmingDelete = true) }
+
+    private fun GroupSettingsUiState.soleHeir(): String? = if (leaveChoosesOwner && otherAdmins.size == 1) otherAdmins[0].userId else null
+
     fun messageShown(message: UserMessage) = _state.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 
     private fun ApiResult<*>.messageOr(success: String) = when (this) {
@@ -174,6 +238,8 @@ class GroupSettingsViewModel @Inject constructor(
             archived = group.archived,
             role = group.members.firstOrNull { it.userId == me }?.role ?: group.role,
             nameDraft = draft,
+            members = group.members,
+            meId = me,
         )
     }
 }

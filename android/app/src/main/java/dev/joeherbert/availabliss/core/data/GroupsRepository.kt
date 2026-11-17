@@ -13,6 +13,7 @@ import dev.joeherbert.availabliss.core.network.model.GroupInvite
 import dev.joeherbert.availabliss.core.network.model.InviteLink
 import dev.joeherbert.availabliss.core.network.model.InvitePreview
 import dev.joeherbert.availabliss.core.network.model.Member
+import dev.joeherbert.availabliss.core.network.model.LeaveGroupRequest
 import dev.joeherbert.availabliss.core.network.model.MemberRoleRequest
 import dev.joeherbert.availabliss.core.network.model.Requirement
 import dev.joeherbert.availabliss.core.network.model.RequirementPreview
@@ -83,19 +84,19 @@ class GroupsRepository @Inject constructor(
             }
         }
 
-    /** Removes [userId]; when it is the caller this is "leave group". */
-    suspend fun removeMember(groupId: String, userId: String, isSelf: Boolean): ApiResult<Unit> =
+    /** Removes [userId] (someone else: leaving is [leave]). */
+    suspend fun removeMember(groupId: String, userId: String): ApiResult<Unit> =
         call { api.removeMember(groupId, userId) }.onSuccess {
-            if (isSelf) {
-                forget(groupId)
-            } else {
-                details.update { map ->
-                    val group = map[groupId] ?: return@update map
-                    val members = group.members.filterNot { it.userId == userId }
-                    map + (groupId to group.copy(members = members, memberCount = members.size))
-                }
+            details.update { map ->
+                val group = map[groupId] ?: return@update map
+                val members = group.members.filterNot { it.userId == userId }
+                map + (groupId to group.copy(members = members, memberCount = members.size))
             }
         }
+
+    /** Leaves the group; the owner names the admin ([newOwnerId]) who becomes the owner. */
+    suspend fun leave(groupId: String, newOwnerId: String?): ApiResult<Unit> =
+        call { api.leaveGroup(groupId, LeaveGroupRequest(newOwnerId)) }.onSuccess { forget(groupId) }
 
     suspend fun nudge(groupId: String): ApiResult<Int> = call { api.nudge(groupId) }.map { it.nudged }
 

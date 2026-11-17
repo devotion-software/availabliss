@@ -44,7 +44,6 @@ data class MemberUi(
 /** Destructive actions waiting for confirmation. */
 sealed interface ConfirmAction {
     data class Remove(val member: MemberUi) : ConfirmAction
-    data object Leave : ConfirmAction
 }
 
 /** "sam@example.com" / "@sam" + "Invited · invite expires Saturday 28 November", or the link. */
@@ -74,12 +73,11 @@ data class MembersUiState(
     val pendingShareUrl: String? = null,
     val confirm: ConfirmAction? = null,
     val working: Boolean = false,
-    /** True once the user has left the group (navigate away). */
+    /** True once the user is no longer in the group (removed, or left from Group settings): navigate away. */
     val left: Boolean = false,
     val message: UserMessage? = null,
 ) {
     val isAdmin: Boolean get() = myRole?.isAdmin == true
-    val isOwner: Boolean get() = myRole == Role.Owner
 }
 
 @HiltViewModel
@@ -226,23 +224,18 @@ class MembersViewModel @Inject constructor(
 
     fun requestRemove(member: MemberUi) = _state.update { it.copy(confirm = ConfirmAction.Remove(member)) }
 
-    fun requestLeave() = _state.update { it.copy(confirm = ConfirmAction.Leave) }
-
     fun dismissConfirm() = _state.update { it.copy(confirm = null) }
 
     fun confirm() {
         val action = _state.value.confirm ?: return
-        val meId = users.user.value?.id
         _state.update { it.copy(working = true) }
         viewModelScope.launch {
             val result: ApiResult<Unit> = when (action) {
-                is ConfirmAction.Remove -> groups.removeMember(groupId, action.member.userId, isSelf = false)
-                ConfirmAction.Leave -> meId?.let { groups.removeMember(groupId, it, isSelf = true) }
-                    ?: ApiResult.Success(Unit)
+                is ConfirmAction.Remove -> groups.removeMember(groupId, action.member.userId)
             }
             when (result) {
                 is ApiResult.Success -> _state.update {
-                    it.copy(working = false, confirm = null, left = action !is ConfirmAction.Remove)
+                    it.copy(working = false, confirm = null)
                 }
                 is ApiResult.Failure -> _state.update {
                     it.copy(working = false, confirm = null, message = UserMessage(result.error.message))

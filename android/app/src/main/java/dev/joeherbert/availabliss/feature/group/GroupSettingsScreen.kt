@@ -1,6 +1,7 @@
 package dev.joeherbert.availabliss.feature.group
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,16 +39,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.network.model.Role as GroupRole
+import dev.joeherbert.availabliss.core.network.model.Member
 import dev.joeherbert.availabliss.core.network.model.TileColor
+import dev.joeherbert.availabliss.designsystem.component.Avatar
+import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
+import dev.joeherbert.availabliss.designsystem.component.PillTone
+import dev.joeherbert.availabliss.designsystem.component.RowDivider
+import dev.joeherbert.availabliss.designsystem.component.StatusPill
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
@@ -72,10 +85,10 @@ import dev.joeherbert.availabliss.feature.common.rememberPhotoPicker
 import dev.joeherbert.availabliss.feature.newgroup.GroupColorPicker
 
 /**
- * Group settings, from the group's More menu: its photo, name and colour, Archive / Unarchive, and
- * Delete group (confirmed in a bottom sheet). Everyone can open it; only the owner and admins can
- * change things, and only the owner can delete the group. Each part is its own card, so further
- * settings slot in as more cards.
+ * Group settings, from the group's More menu: its photo, name and colour, Archive / Unarchive, Leave
+ * group and Delete group (each confirmed in a bottom sheet). Everyone can open it and leave; only the
+ * owner and admins can change things, and only the owner can delete the group. Each part is its own
+ * card, so further settings slot in as more cards. [onDeleted] also follows leaving: back to the groups.
  */
 @Composable
 fun GroupSettingsScreen(onBack: () -> Unit, onDeleted: () -> Unit, viewModel: GroupSettingsViewModel = hiltViewModel()) {
@@ -84,7 +97,7 @@ fun GroupSettingsScreen(onBack: () -> Unit, onDeleted: () -> Unit, viewModel: Gr
     UserMessageEffect(state.message, snackbar, viewModel::messageShown)
     val currentOnDeleted by rememberUpdatedState(onDeleted)
     val currentOnBack by rememberUpdatedState(onBack)
-    LaunchedEffect(state.deleted) { if (state.deleted) currentOnDeleted() }
+    LaunchedEffect(state.deleted, state.left) { if (state.deleted || state.left) currentOnDeleted() }
 
     val pickPhoto = rememberPhotoPicker(onUnreadable = viewModel::photoUnreadable, onPicked = viewModel::setPhoto)
     val actions = remember(viewModel) {
@@ -98,12 +111,23 @@ fun GroupSettingsScreen(onBack: () -> Unit, onDeleted: () -> Unit, viewModel: Gr
             onColor = viewModel::setColor,
             onToggleArchived = viewModel::toggleArchived,
             onDelete = viewModel::requestDelete,
+            onLeave = viewModel::requestLeave,
         )
     }
     GroupSettingsContent(state, snackbar, actions)
 
     if (state.confirmingDelete) {
         DeleteGroupSheet(state.groupName, state.deleting, onConfirm = viewModel::delete, onDismiss = viewModel::dismissDelete)
+    }
+    if (state.confirmingLeave) {
+        LeaveGroupSheet(
+            state,
+            onPick = viewModel::pickForLeave,
+            onMakeAdmin = viewModel::makeAdminForLeave,
+            onLeave = viewModel::leave,
+            onDeleteInstead = viewModel::deleteInsteadOfLeaving,
+            onDismiss = viewModel::dismissLeave,
+        )
     }
 }
 
@@ -117,6 +141,7 @@ data class GroupSettingsActions(
     val onColor: (TileColor) -> Unit = {},
     val onToggleArchived: () -> Unit = {},
     val onDelete: () -> Unit = {},
+    val onLeave: () -> Unit = {},
 )
 
 @Composable
@@ -146,6 +171,7 @@ fun GroupSettingsContent(state: GroupSettingsUiState, snackbar: SnackbarHostStat
                     PhotoCard(state, actions)
                     DetailsCard(state, actions)
                     if (state.canEdit) ArchiveCard(state, actions)
+                    LeaveCard(state, actions)
                     if (state.canDelete) {
                         Box(Modifier.fillMaxWidth().padding(top = Spacing.s), contentAlignment = Alignment.Center) {
                             TextAction("Delete group", actions.onDelete, color = colors.warnInk)
@@ -290,6 +316,163 @@ private fun ArchiveCard(state: GroupSettingsUiState, actions: GroupSettingsActio
     }
 }
 
+@Composable
+private fun LeaveCard(state: GroupSettingsUiState, actions: GroupSettingsActions) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    GlassPanel(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Leave group", style = type.bodySmallStrong, color = colors.ink)
+            Text(
+                if (state.role == GroupRole.Owner) "You'll choose an admin to become the owner. You'll need a new invite to come back."
+                else "You'll need a new invite to come back.",
+                style = type.caption.copy(fontWeight = FontWeight.Normal),
+                color = colors.muted,
+            )
+        }
+        WarningButton("Leave group", AvIcons.SignOut, onClick = actions.onLeave, height = 44.dp, shape = Shapes.controlSmall, textStyle = type.bodySmallStrong)
+    }
+}
+
+/**
+ * Confirms leaving, following the server's rules: a member (or an admin while another admin stays)
+ * just confirms; with nobody else an admin, you first pick someone to make an admin; the owner then
+ * picks which admin becomes the owner; the only member is sent to Delete group instead.
+ */
+@Composable
+private fun LeaveGroupSheet(
+    state: GroupSettingsUiState,
+    onPick: (String) -> Unit,
+    onMakeAdmin: () -> Unit,
+    onLeave: () -> Unit,
+    onDeleteInstead: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = AvailablissTheme.colors
+    val others = state.otherMembers
+    val title = when {
+        others.isEmpty() -> "You're the only member"
+        state.leaveNeedsAdmin -> "Make someone an admin"
+        else -> "Leave group?"
+    }
+    AvBottomSheet(title = title, onDismissRequest = onDismiss) {
+        when {
+            others.isEmpty() -> {
+                SheetCaption("Nobody else is in ${state.groupName}, so there's no one to hand it to. Delete the group instead if you're done with it.")
+                if (state.role == GroupRole.Owner) WarningButton("Delete group", AvIcons.Trash, onClick = onDeleteInstead)
+            }
+            state.leaveNeedsAdmin -> {
+                SheetCaption("A group needs an admin, and nobody else in ${state.groupName} is one. Choose someone to make an admin, then you can leave.")
+                MemberPicker(others, state.leavePick, onPick)
+                PrimaryButton(
+                    text = "Make admin",
+                    onClick = onMakeAdmin,
+                    icon = AvIcons.Shield,
+                    style = ButtonStyle.Accent,
+                    height = 52.dp,
+                    shape = Shapes.control,
+                    loading = state.leaving,
+                    enabled = state.leavePick != null && !state.leaving,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            else -> {
+                if (state.leaveChoosesOwner) {
+                    SheetCaption("Choose who becomes the owner. They'll look after ${state.groupName}, and its bank holidays will follow their region.")
+                    MemberPicker(state.otherAdmins, state.leavePick, onPick)
+                }
+                SheetCaption("You'll need a new invite to come back.")
+                WarningButton(
+                    "Leave group",
+                    AvIcons.SignOut,
+                    onClick = onLeave,
+                    loading = state.leaving,
+                    enabled = !state.leaving && (!state.leaveChoosesOwner || state.leavePick != null),
+                )
+            }
+        }
+        SecondaryButton("Cancel", onClick = onDismiss, height = 52.dp, enabled = !state.leaving, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun SheetCaption(text: String) = Text(text, style = AvailablissTheme.type.body, color = AvailablissTheme.colors.muted)
+
+/** One person to pick, as radio rows. */
+@Composable
+private fun MemberPicker(members: List<Member>, picked: String?, onPick: (String) -> Unit) {
+    val colors = AvailablissTheme.colors
+    GlassPanel(
+        Modifier.fillMaxWidth().selectableGroup(),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp),
+        verticalArrangement = Arrangement.Top,
+    ) {
+        members.forEachIndexed { i, member ->
+            if (i > 0) RowDivider()
+            val selected = member.userId == picked
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onPick(member.userId) }),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Avatar(AvatarPerson(member.userId, member.name, member.image), size = 34.dp)
+                Text(member.name, style = AvailablissTheme.type.bodySmallStrong, color = colors.ink, maxLines = 1, modifier = Modifier.weight(1f))
+                when (member.role) {
+                    GroupRole.Owner -> StatusPill("Owner", PillTone.Indigo)
+                    GroupRole.Admin -> StatusPill("Admin", PillTone.Mint)
+                    GroupRole.Member -> Unit
+                }
+                Box(
+                    Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .then(if (selected) Modifier.background(colors.accent) else Modifier.border(1.5.dp, colors.line2, CircleShape)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) Icon(AvIcons.Check, null, tint = colors.onAccent, modifier = Modifier.size(12.dp))
+                }
+            }
+        }
+    }
+}
+
+/** A destructive `warn-bg` / `warn-ink` button, as Delete group's. */
+@Composable
+private fun WarningButton(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    height: Dp = 52.dp,
+    shape: Shape = Shapes.control,
+    textStyle: TextStyle = AvailablissTheme.type.bodyStrong,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+) {
+    val colors = AvailablissTheme.colors
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(shape)
+            .background(colors.warnBg)
+            .alpha(if (enabled || loading) 1f else 0.5f)
+            .clickable(enabled = enabled && !loading, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(Modifier.size(20.dp), color = colors.warnInk, strokeWidth = 2.dp)
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(icon, null, tint = colors.warnInk, modifier = Modifier.size(18.dp))
+                Text(text, style = textStyle, color = colors.warnInk)
+            }
+        }
+    }
+}
+
 /** "Delete group?" with a destructive Delete and Cancel. Closing it keeps the group. */
 @Composable
 private fun DeleteGroupSheet(groupName: String, deleting: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
@@ -300,24 +483,7 @@ private fun DeleteGroupSheet(groupName: String, deleting: Boolean, onConfirm: ()
             style = AvailablissTheme.type.body,
             color = colors.muted,
         )
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .clip(Shapes.control)
-                .background(colors.warnBg)
-                .clickable(enabled = !deleting, role = Role.Button, onClick = onConfirm),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (deleting) {
-                CircularProgressIndicator(Modifier.size(20.dp), color = colors.warnInk, strokeWidth = 2.dp)
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(AvIcons.Trash, null, tint = colors.warnInk, modifier = Modifier.size(18.dp))
-                    Text("Delete group", style = AvailablissTheme.type.bodyStrong, color = colors.warnInk)
-                }
-            }
-        }
+        WarningButton("Delete group", AvIcons.Trash, onClick = onConfirm, loading = deleting)
         SecondaryButton("Cancel", onClick = onDismiss, height = 52.dp, enabled = !deleting, modifier = Modifier.fillMaxWidth())
     }
 }

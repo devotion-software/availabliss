@@ -37,6 +37,7 @@ import dev.joeherbert.availabliss.core.network.model.InviteLink
 import dev.joeherbert.availabliss.core.network.model.InvitePreview
 import dev.joeherbert.availabliss.core.network.model.ManualBlock
 import dev.joeherbert.availabliss.core.network.model.Member
+import dev.joeherbert.availabliss.core.network.model.LeaveGroupRequest
 import dev.joeherbert.availabliss.core.network.model.MemberRoleRequest
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
@@ -216,9 +217,13 @@ interface AvailablissApi {
         @Body body: MemberRoleRequest,
     ): Member
 
-    /** Removes a member, or leaves the group when [userId] is the caller. */
+    /** Removes a member (an admin removing someone else). */
     @DELETE("api/v1/groups/{id}/members/{userId}")
     suspend fun removeMember(@Path("id") groupId: String, @Path("userId") userId: String)
+
+    /** Leaves the group. The owner names the admin who becomes the owner. */
+    @POST("api/v1/groups/{id}/leave")
+    suspend fun leaveGroup(@Path("id") groupId: String, @Body body: LeaveGroupRequest)
 
     @POST("api/v1/groups/{id}/nudge")
     suspend fun nudge(@Path("id") groupId: String): NudgeResponse

@@ -68,7 +68,7 @@ import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import dev.joeherbert.availabliss.feature.common.InviteRecipient
 import dev.joeherbert.availabliss.feature.common.InviteRecipientsField
 
-/** Members & invites for one group. (The group's photo and Delete group are in Group settings.) */
+/** Members & invites for one group. (The group's photo, Leave group and Delete group are in Group settings.) */
 @Composable
 fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: MembersViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -102,7 +102,6 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
             onPromote = { viewModel.setRole(it, Role.Admin) },
             onDemote = { viewModel.setRole(it, Role.Member) },
             onRemove = viewModel::requestRemove,
-            onLeave = viewModel::requestLeave,
             onRetry = viewModel::refresh,
         )
     }
@@ -130,7 +129,6 @@ data class MembersActions(
     val onPromote: (MemberUi) -> Unit = {},
     val onDemote: (MemberUi) -> Unit = {},
     val onRemove: (MemberUi) -> Unit = {},
-    val onLeave: () -> Unit = {},
     val onRetry: () -> Unit = {},
 )
 
@@ -173,10 +171,6 @@ fun MembersContent(state: MembersUiState, snackbar: SnackbarHostState, actions: 
                             MemberRow(member, actions)
                         }
                     }
-                }
-
-                Column(Modifier.fillMaxWidth().padding(top = Spacing.s), horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (!state.isOwner) TextAction("Leave group", actions.onLeave, color = colors.warnInk)
                 }
             }
         }
@@ -237,7 +231,6 @@ private fun ConfirmDialog(action: ConfirmAction, groupName: String, working: Boo
     val colors = AvailablissTheme.colors
     val (title, body, cta) = when (action) {
         is ConfirmAction.Remove -> Triple("Remove ${action.member.name}?", "They'll lose access to $groupName and its chat.", "Remove")
-        ConfirmAction.Leave -> Triple("Leave $groupName?", "You'll need a new invite to come back.", "Leave")
     }
     AlertDialog(
         onDismissRequest = onDismiss,
