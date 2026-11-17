@@ -136,10 +136,11 @@ class TimingEditor(
         d.copy(range = DateRange(from.toString(), date.toString()))
     }
 
+    /** Adds a range, joining it with any it overlaps or runs straight on from. One already covered adds nothing. */
     fun addRange(list: RangeList, from: LocalDate, to: LocalDate) = edit { d ->
         val range = DateRange(minOf(from, to).toString(), maxOf(from, to).toString())
         val current = list.of(d)
-        if (range in current) d else list.with(d, (current + range).sortedBy { it.from })
+        if (DateRanges.covering(range, current) != null) d else list.with(d, DateRanges.merging(current + range))
     }
 
     fun removeRange(list: RangeList, range: DateRange) = edit { d -> list.with(d, list.of(d) - range) }
@@ -266,4 +267,45 @@ enum class RangeList {
         Dates -> draft.copy(dates = ranges)
         SchoolHolidays -> draft.copy(customSchoolHolidays = ranges)
     }
+}
+
+/** Keeps a list of date ranges free of repeats: no range inside another, and no two that overlap or touch. */
+object DateRanges {
+    /** The range in [ranges] that already holds every day of [range], if any (an identical one included). */
+    fun covering(range: DateRange, ranges: List<DateRange>): DateRange? =
+        ranges.firstOrNull { it.from <= range.from && range.to <= it.to }
+
+    /** The ranges in [ranges] that [range] overlaps or runs straight on from, so would be joined with it. */
+    fun joining(range: DateRange, ranges: List<DateRange>): List<DateRange> =
+        ranges.filter { dayAfter(it.to) >= range.from && dayAfter(range.to) >= it.from }
+
+    /** Sorted, with ranges that overlap or touch (one ends the day before the next starts) joined into one. */
+    fun merging(ranges: List<DateRange>): List<DateRange> {
+        val merged = mutableListOf<DateRange>()
+        for (range in ranges.sortedBy { it.from }) {
+            val last = merged.lastOrNull()
+            if (last != null && range.from <= dayAfter(last.to)) {
+                merged[merged.lastIndex] = last.copy(to = maxOf(last.to, range.to))
+            } else {
+                merged += range
+            }
+        }
+        return merged
+    }
+
+    /** What to tell someone picking [range]: why it can't be added, or what it'll be joined with. */
+    fun note(range: DateRange, ranges: List<DateRange>): String? {
+        covering(range, ranges)?.let { return if (it == range) "You\u2019ve already added these dates." else "Already included in ${label(it)}." }
+        val joining = joining(range, ranges)
+        return when (joining.size) {
+            0 -> null
+            1 -> "Joins up with ${label(joining[0])}, so they\u2019ll become one range."
+            else -> "Joins up with ${joining.size} of your ranges, so they\u2019ll become one."
+        }
+    }
+
+    private fun label(range: DateRange) = TimingLabels.dateRange(range.from, range.to)
+
+    /** ISO dates compare as strings, so only the day after needs real date maths. */
+    private fun dayAfter(date: String) = DateTimes.parseDate(date)?.plusDays(1)?.toString() ?: date
 }

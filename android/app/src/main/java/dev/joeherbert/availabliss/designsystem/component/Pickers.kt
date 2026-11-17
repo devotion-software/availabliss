@@ -15,6 +15,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
@@ -97,21 +98,24 @@ fun AvDateRangePickerDialog(
     initialEnd: LocalDate?,
     onPick: (LocalDate, LocalDate) -> Unit,
     onDismiss: () -> Unit,
+    /** A short line under the calendar about the picked range (e.g. why it can't be added), or null. */
+    note: (LocalDate, LocalDate) -> String? = { _, _ -> null },
+    /** Whether the picked range can be confirmed. */
+    canPick: (LocalDate, LocalDate) -> Boolean = { _, _ -> true },
 ) {
     val state = rememberDateRangePickerState(
         initialSelectedStartDateMillis = initialStart?.utcMillis(),
         initialSelectedEndDateMillis = initialEnd?.utcMillis(),
     )
     val colors = pickerColors()
+    val picked = state.selectedStartDateMillis?.let { s -> s.utcDate() to (state.selectedEndDateMillis ?: s).utcDate() }
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextAction("Done", {
-                val s = state.selectedStartDateMillis
-                val e = state.selectedEndDateMillis ?: s
-                if (s != null && e != null) onPick(s.utcDate(), e.utcDate())
+                if (picked != null) onPick(picked.first, picked.second)
                 onDismiss()
-            })
+            }, enabled = picked == null || canPick(picked.first, picked.second))
         },
         dismissButton = { TextAction("Cancel", onDismiss, color = AvailablissTheme.colors.muted) },
         shape = Shapes.cardLarge,
@@ -119,6 +123,14 @@ fun AvDateRangePickerDialog(
         tonalElevation = 0.dp,
     ) {
         DateRangePicker(state = state, colors = colors, showModeToggle = false, modifier = Modifier.heightIn(max = 520.dp))
+        picked?.let { note(it.first, it.second) }?.let {
+            Text(
+                it,
+                style = AvailablissTheme.type.body,
+                color = AvailablissTheme.colors.muted,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+        }
     }
 }
 

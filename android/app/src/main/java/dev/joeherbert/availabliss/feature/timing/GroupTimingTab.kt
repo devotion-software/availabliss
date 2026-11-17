@@ -493,13 +493,28 @@ private fun TimingPickers(state: TimingEditorUiState, picker: TimingPicker, acti
         TimingPicker.SpanEnd -> SpanEndSheet("Ends", state.spanEnd, onDone = { actions.onSpanEnd(it); close() }, onDismiss = close)
         TimingPicker.RangeFrom -> AvDatePickerDialog(state.rangeFrom, actions.onRangeFrom, close)
         TimingPicker.RangeTo -> AvDatePickerDialog(state.rangeTo, actions.onRangeTo, close, minDate = state.rangeFrom)
-        TimingPicker.Dates -> AvDateRangePickerDialog(null, null, { from, to -> actions.onAddRange(RangeList.Dates, from, to) }, close)
-        TimingPicker.SchoolHolidays -> AvDateRangePickerDialog(null, null, { from, to -> actions.onAddRange(RangeList.SchoolHolidays, from, to) }, close)
+        TimingPicker.Dates -> RangePicker(state.draft, RangeList.Dates, actions, close)
+        TimingPicker.SchoolHolidays -> RangePicker(state.draft, RangeList.SchoolHolidays, actions, close)
     }
 }
 
 /** Picks the weekday and time for one end of a span. */
 @OptIn(ExperimentalLayoutApi::class)
+/** Picks a range to add to [list]; one the list already covers can't be added, and one that overlaps says it'll be joined. */
+@Composable
+private fun RangePicker(draft: TimingDraft, list: RangeList, actions: TimingActions, close: () -> Unit) {
+    val existing = list.of(draft)
+    val range = { from: LocalDate, to: LocalDate -> DateRange(minOf(from, to).toString(), maxOf(from, to).toString()) }
+    AvDateRangePickerDialog(
+        null,
+        null,
+        { from, to -> actions.onAddRange(list, from, to) },
+        close,
+        note = { from, to -> DateRanges.note(range(from, to), existing) },
+        canPick = { from, to -> DateRanges.covering(range(from, to), existing) == null },
+    )
+}
+
 @Composable
 private fun SpanEndSheet(title: String, initial: SpanEnd, onDone: (SpanEnd) -> Unit, onDismiss: () -> Unit) {
     var day by remember { mutableStateOf(initial.day) }
