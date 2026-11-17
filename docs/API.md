@@ -575,6 +575,14 @@ interface Message {
   editedAt: string | null;              // when the author last edited it
   deleted: boolean;                     // deleted by its author: show "This message was deleted" (body is null)
   receipt: { delivered: number; seen: number; recipients: number; seenBy: string[] } | null; // only on your own messages; seenBy in the order they read it
+  replyTo: MessageReply | null;         // the message this one replies to (text messages only)
+}
+interface MessageReply {                // the quoted message, as it is now
+  id: string;
+  authorId: string | null; authorName: string | null;
+  kind: 'text' | 'poll' | 'proposal' | 'event' | 'system';
+  text: string | null;                  // one line, at most 140 characters (…): the text, or a poll's question; null once deleted
+  deleted: boolean;                     // deleted since: show "Deleted message"
 }
 interface Poll {
   id: string; question: string; multi: boolean; closed: boolean;
@@ -591,7 +599,7 @@ interface MessageInfo {
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/groups/:id/messages?before=<messageId>&limit=50` | | `{ messages: Message[]; hasMore: boolean }` (newest last) |
-| POST 🔒 | `/groups/:id/messages` | `{ body }` or `{ poll: { question, options: string[], multi? } }` | `Message` |
+| POST 🔒 | `/groups/:id/messages` | `{ body, replyToId? }` or `{ poll: { question, options: string[], multi? } }` | `Message`. `replyToId` must be a message in the same chat (else `400`), not a group update (`400`) and not deleted (`409`) |
 | POST 🔒 | `/groups/:id/messages/receipts` | `{ upTo: messageId, state: 'delivered' \| 'seen' }` | `204` |
 | PATCH 🔒 | `/messages/:id` | `{ body }` | `Message` (the sender's own text messages only) |
 | DELETE 🔒 | `/messages/:id` | | `204` (the sender's own text messages only; it stays in the chat as deleted) |
@@ -617,7 +625,8 @@ interface LiveEvent {
 ```
 
 Payloads by type: `message.created` → `Message`; `message.updated` → `Message`
-(edited or deleted; `receipt` is null, so keep your own); `poll.updated` → `Poll`;
+(edited or deleted; `receipt` is null, so keep your own; also refresh the `replyTo` of any
+loaded message quoting it, since quotes aren't republished); `poll.updated` → `Poll`;
 `proposal.created` / `proposal.updated` → `Proposal`; `proposal.confirmed` →
 `{ proposal: Proposal, event: GroupEvent }`; `event.changed` → `GroupEvent` (or
 `{ id, deleted: true }`); `group.updated` → `Group`; `member.changed` → `Member`

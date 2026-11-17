@@ -231,7 +231,7 @@ export const createEventSchema = z.object(eventShape).refine(endsAfterStart, { m
 export const updateEventSchema = z.object(eventShape).partial().refine(endsAfterStart, { message: 'Ends before it starts' });
 
 export const createMessageSchema = z.union([
-	z.object({ body: trimmed(4000) }),
+	z.object({ body: trimmed(4000), replyToId: z.string().min(1).max(36).nullish() }),
 	z.object({
 		poll: z.object({
 			question: trimmed(200),

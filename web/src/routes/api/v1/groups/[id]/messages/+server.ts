@@ -15,6 +15,6 @@ export const GET = authed<{ id: string }>(async ({ params, url, userId }) => {
 
 export const POST = authed<{ id: string }>(async ({ event, params, userId }) => {
 	const input = await body(event, createMessageSchema);
-	const message = 'poll' in input ? await sendPoll(params.id, userId, input.poll) : await sendText(params.id, userId, input.body);
+	const message = 'poll' in input ? await sendPoll(params.id, userId, input.poll) : await sendText(params.id, userId, input.body, input.replyToId ?? null);
 	return json(message, { status: 201 });
 });

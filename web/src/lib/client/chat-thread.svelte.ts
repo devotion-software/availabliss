@@ -103,7 +103,8 @@ export class ChatThread {
 			createdAt: new Date().toISOString(),
 			editedAt: null,
 			deleted: false,
-			receipt: { delivered: 0, seen: 0, recipients: this.#recipients, seenBy: [] }
+			receipt: { delivered: 0, seen: 0, recipients: this.#recipients, seenBy: [] },
+			replyTo: null
 		};
 		this.messages = [...this.messages, temp];
 		try {

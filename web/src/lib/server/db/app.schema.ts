@@ -369,6 +369,8 @@ export const messages = mysqlTable(
 		pollId: varchar('poll_id', { length: 36 }),
 		proposalId: varchar('proposal_id', { length: 36 }),
 		eventId: varchar('event_id', { length: 36 }),
+		// The message this one replies to (same group). No foreign key: messages are only soft-deleted.
+		replyToId: varchar('reply_to_id', { length: 36 }),
 		// Monotonic per insert so pagination and "read up to" never tie.
 		seq: int('seq').autoincrement().notNull().unique(),
 		createdAt: createdAt(),

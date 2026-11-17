@@ -302,6 +302,19 @@ export interface Message {
 	/** Deleted by its author: shown as "This message was deleted" (body is null). */
 	deleted: boolean;
 	receipt: { delivered: number; seen: number; recipients: number; seenBy: string[] } | null;
+	/** A compact preview of the message this one replies to, or null. */
+	replyTo: MessageReply | null;
+}
+
+/** The quoted message shown above a reply, as it is now (edits and deletion included). */
+export interface MessageReply {
+	id: string;
+	authorId: string | null;
+	authorName: string | null;
+	kind: MessageKind;
+	/** A short one-line snippet: the text, or a poll's question. Null once deleted. */
+	text: string | null;
+	deleted: boolean;
 }
 
 export interface MessageInfo {

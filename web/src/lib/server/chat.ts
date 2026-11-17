@@ -1,6 +1,6 @@
 /** Group chat: messages, polls and per-recipient delivery / read receipts. */
 import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
-import type { Message, MessageInfo, MessageKind, Poll } from '#lib/types';
+import type { Message, MessageInfo, MessageKind, MessageReply, Poll } from '#lib/types';
 import { db } from './db';
 import { groups, messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
 import { badRequest, conflict, forbidden, notFound } from './http';
@@ -190,10 +190,56 @@ export async function messageInfo(messageId: string, userId: string): Promise<Me
 	};
 }
 
+// ─── Replies ──────────────────────────────────────────────────────────────
+
+/** Quoted text is one line in the clients; a little more than fits is plenty. */
+const REPLY_SNIPPET_CHARS = 140;
+export const replySnippet = (text: string) => {
+	const line = text.replace(/\s+/g, ' ').trim();
+	return [...line].length > REPLY_SNIPPET_CHARS ? `${[...line].slice(0, REPLY_SNIPPET_CHARS - 1).join('').trimEnd()}…` : line;
+};
+
+/** Previews of the messages being replied to, as they are now (edits and deletion included). */
+async function loadReplies(ids: string[]): Promise<Map<string, MessageReply>> {
+	const result = new Map<string, MessageReply>();
+	if (!ids.length) return result;
+	const rows = await db
+		.select({
+			id: messages.id,
+			authorId: messages.authorId,
+			kind: messages.kind,
+			body: messages.body,
+			deletedAt: messages.deletedAt,
+			question: polls.question,
+			name: user.name,
+			email: user.email
+		})
+		.from(messages)
+		.leftJoin(polls, eq(polls.id, messages.pollId))
+		.leftJoin(user, eq(user.id, messages.authorId))
+		.where(inArray(messages.id, [...new Set(ids)]));
+	for (const r of rows) {
+		const deleted = r.deletedAt !== null;
+		const text = deleted ? null : r.kind === 'poll' ? r.question : r.body;
+		result.set(r.id, {
+			id: r.id,
+			authorId: r.authorId,
+			authorName: r.authorId ? displayName(r, 'Someone') : null,
+			kind: r.kind,
+			text: text ? replySnippet(text) : null,
+			deleted
+		});
+	}
+	return result;
+}
+
 // ─── Messages ─────────────────────────────────────────────────────────────
 
 async function toMessages(rows: MessageRow[], viewerId: string, groupSize: number): Promise<Message[]> {
-	const pollMap = await loadPolls(rows.flatMap((r) => (r.pollId ? [r.pollId] : [])));
+	const [pollMap, replies] = await Promise.all([
+		loadPolls(rows.flatMap((r) => (r.pollId ? [r.pollId] : []))),
+		loadReplies(rows.flatMap((r) => (r.replyToId ? [r.replyToId] : [])))
+	]);
 	const own = rows.filter((r) => r.authorId === viewerId);
 	const receipts = await receiptSummaries(own, groupSize);
 	return rows.map((r) => {
@@ -210,7 +256,8 @@ async function toMessages(rows: MessageRow[], viewerId: string, groupSize: numbe
 			createdAt: r.createdAt.toISOString(),
 			editedAt: r.editedAt?.toISOString() ?? null,
 			deleted: r.deletedAt !== null,
-			receipt: receipt ? { delivered: receipt.delivered, seen: receipt.seen, recipients: receipt.recipients, seenBy: receipt.seenBy } : null
+			receipt: receipt ? { delivered: receipt.delivered, seen: receipt.seen, recipients: receipt.recipients, seenBy: receipt.seenBy } : null,
+			replyTo: r.replyToId ? (replies.get(r.replyToId) ?? null) : null
 		};
 	});
 }
@@ -240,6 +287,7 @@ interface PostInput {
 	pollId?: string | null;
 	proposalId?: string | null;
 	eventId?: string | null;
+	replyToId?: string | null;
 }
 
 /** Messages can be 4000 characters, but APNs and FCM reject payloads over 4 KB. */
@@ -278,9 +326,18 @@ export async function postMessage(groupId: string, authorId: string | null, inpu
 	return message;
 }
 
-export async function sendText(groupId: string, userId: string, body: string): Promise<Message> {
+export async function sendText(groupId: string, userId: string, body: string, replyToId: string | null = null): Promise<Message> {
 	await requireMember(groupId, userId);
-	return postMessage(groupId, userId, { kind: 'text', body });
+	if (replyToId) {
+		const original = await db.query.messages.findFirst({
+			where: and(eq(messages.id, replyToId), eq(messages.groupId, groupId)),
+			columns: { kind: true, deletedAt: true }
+		});
+		if (!original) throw badRequest('The message being replied to is not in this chat');
+		if (original.kind === 'system') throw badRequest("Group updates can't be replied to");
+		if (original.deletedAt) throw conflict('That message was deleted');
+	}
+	return postMessage(groupId, userId, { kind: 'text', body, replyToId });
 }
 
 /** The author's own text message, for editing or deleting. */

@@ -119,6 +119,44 @@ describe('chat', () => {
 		expect((await apiError(deleteMessage(poll.id, member))).code).toBe('validation_error');
 	});
 
+	test('replies quote the original as it is now, from the same chat only', async () => {
+		const original = await sendText(groupId, owner, 'Who is bringing the snacks?\nAnd drinks?');
+		expect(original.replyTo).toBeNull();
+		const reply = await sendText(groupId, member, 'Me!', original.id);
+		expect(reply.replyTo).toEqual({
+			id: original.id,
+			authorId: owner,
+			authorName: 'Olive',
+			kind: 'text',
+			text: 'Who is bringing the snacks? And drinks?',
+			deleted: false
+		});
+
+		const poll = await sendPoll(groupId, admin, { question: 'Which park?', options: ['North', 'South'], multi: false });
+		expect((await sendText(groupId, owner, 'North, surely', poll.id)).replyTo).toMatchObject({ kind: 'poll', text: 'Which park?' });
+
+		// Long text is cut to one short line.
+		const long = await sendText(groupId, owner, 'word '.repeat(100));
+		const quoted = (await sendText(groupId, member, 'tl;dr?', long.id)).replyTo!;
+		expect([...quoted.text!].length).toBeLessThanOrEqual(140);
+		expect(quoted.text!.endsWith('…')).toBe(true);
+
+		// Edits and deletion show in the quote.
+		await editMessage(original.id, owner, 'Who is bringing drinks?');
+		const find = async () => (await listMessages(groupId, admin, null, 50)).messages.find((m) => m.id === reply.id)!;
+		expect((await find()).replyTo).toMatchObject({ text: 'Who is bringing drinks?', deleted: false });
+		await deleteMessage(original.id, owner);
+		expect((await find()).replyTo).toMatchObject({ id: original.id, text: null, deleted: true });
+		expect((await apiError(sendText(groupId, member, 'Too late', original.id))).code).toBe('conflict');
+
+		// Only messages in the same chat.
+		const other = (await createGroup(outsider, { name: 'Elsewhere', requirement: everyDay() }, 'UTC')).id;
+		await fx.join(other, owner);
+		const elsewhere = await sendText(other, outsider, 'Over here');
+		expect((await apiError(sendText(groupId, owner, 'Sneaky', elsewhere.id))).code).toBe('validation_error');
+		expect((await apiError(sendText(groupId, owner, 'Ghost', 'missing'))).code).toBe('validation_error');
+	});
+
 	test('unread counts skip history from before joining', async () => {
 		const g = (await createGroup(owner, { name: 'Late joiner', requirement: everyDay() }, 'UTC')).id;
 		await sendText(g, owner, 'Before you joined');
