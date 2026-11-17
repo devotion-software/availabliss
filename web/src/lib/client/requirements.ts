@@ -2,9 +2,9 @@
  * Group timing ("requirements"): the UI presets, mapped exactly as the table in
  * docs/API.md, and the one-line summaries shown around the app.
  */
-import type { Requirement, RequirementLength, TimeWindow, Weekday } from '#lib/types';
+import type { DateRange, Requirement, RequirementLength, TimeWindow, Weekday } from '#lib/types';
 import { addDays, addMonths } from './dates';
-import { formatMonthSpan, plural } from './format';
+import { formatDayRange, formatMonthSpan, plural } from './format';
 import { api } from './api';
 
 export const WEEKDAYS: readonly Weekday[] = [0, 1, 2, 3, 4, 5, 6];
@@ -169,4 +169,40 @@ export const previewRequirement = (requirement: Requirement) =>
 export function fitCountLabel(req: Requirement, count: number): string {
 	const noun = PRESETS.find((p) => p.id === presetOf(req))?.noun ?? 'option';
 	return plural(count, noun);
+}
+
+/** The range in `ranges` that already holds every day of `range`, if any (an identical one included). */
+export const coveringRange = (range: DateRange, ranges: readonly DateRange[]) =>
+	ranges.find((r) => r.from <= range.from && range.to <= r.to);
+
+/** The ranges that `range` overlaps or runs straight on from, so would be joined with it. */
+export const joiningRanges = (range: DateRange, ranges: readonly DateRange[]) =>
+	ranges.filter((r) => addDays(r.to, 1) >= range.from && addDays(range.to, 1) >= r.from);
+
+/** Sorted, with ranges that overlap or touch (one ends the day before the next starts) joined into one. */
+export function mergeRanges(ranges: readonly DateRange[]): DateRange[] {
+	const merged: DateRange[] = [];
+	for (const range of [...ranges].sort((a, b) => a.from.localeCompare(b.from))) {
+		const last = merged.at(-1);
+		if (last && range.from <= addDays(last.to, 1)) last.to = range.to > last.to ? range.to : last.to;
+		else merged.push({ ...range });
+	}
+	return merged;
+}
+
+/** What to tell someone adding `range`: why it can't be added (`blocked`), or what it'll be joined with. */
+export function rangeNote(range: DateRange, ranges: readonly DateRange[]): { text: string; blocked: boolean } | null {
+	const label = (r: DateRange) => formatDayRange(r.from, r.to, false);
+	const covering = coveringRange(range, ranges);
+	if (covering) {
+		const same = covering.from === range.from && covering.to === range.to;
+		return { text: same ? 'You\u2019ve already added these dates.' : `Already included in ${label(covering)}.`, blocked: true };
+	}
+	const joining = joiningRanges(range, ranges);
+	if (joining.length === 0) return null;
+	const text =
+		joining.length === 1
+			? `Joins up with ${label(joining[0])}, so they\u2019ll become one range.`
+			: `Joins up with ${joining.length} of your ranges, so they\u2019ll become one.`;
+	return { text, blocked: false };
 }

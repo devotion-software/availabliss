@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { DateRange } from '#lib/types';
 	import { formatDayRange } from '#lib/client/format';
+	import { coveringRange, mergeRanges } from '#lib/client/requirements';
 	import Chip from '#lib/components/ui/Chip.svelte';
 	import DateRangeSheet from './DateRangeSheet.svelte';
 
@@ -49,7 +50,10 @@
 	{start}
 	title={sheetTitle}
 	description={sheetDescription}
-	onadd={(r) => (ranges = [...ranges, r].sort((a, b) => a.from.localeCompare(b.from)))}
+	existing={ranges}
+	onadd={(r) => {
+		if (!coveringRange(r, ranges)) ranges = mergeRanges([...ranges, r]);
+	}}
 />
 
 <style>

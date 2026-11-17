@@ -2,6 +2,9 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import type { Requirement, RequirementLength } from '#lib/types';
 import {
 	applyPreset,
+	coveringRange,
+	mergeRanges,
+	rangeNote,
 	defaultRequirement,
 	detailLabel,
 	fitCountLabel,
@@ -118,5 +121,32 @@ describe('previewRequirement', () => {
 		const req = base();
 		expect((await previewRequirement(req)).count).toBe(13);
 		expect(sent!).toEqual({ url: '/api/v1/requirements/preview', body: { requirement: req } });
+	});
+});
+
+describe('date range lists', () => {
+	const christmas = { from: '2026-12-19', to: '2027-01-03' };
+
+	test('a range inside (or the same as) one already there is covered and blocked', () => {
+		expect(coveringRange(christmas, [christmas])).toEqual(christmas);
+		expect(coveringRange({ from: '2026-12-24', to: '2026-12-26' }, [christmas])).toEqual(christmas);
+		expect(coveringRange({ from: '2026-12-18', to: '2026-12-20' }, [christmas])).toBeUndefined();
+		expect(rangeNote(christmas, [christmas])?.blocked).toBe(true);
+		expect(rangeNote({ from: '2027-02-01', to: '2027-02-02' }, [christmas])).toBeNull();
+	});
+
+	test('ranges that overlap or touch are joined', () => {
+		const ranges = [
+			{ from: '2027-01-04', to: '2027-01-06' },
+			christmas,
+			{ from: '2026-12-10', to: '2026-12-20' },
+			{ from: '2027-02-01', to: '2027-02-02' }
+		];
+		expect(mergeRanges(ranges)).toEqual([
+			{ from: '2026-12-10', to: '2027-01-06' },
+			{ from: '2027-02-01', to: '2027-02-02' }
+		]);
+		expect(ranges[1]).toEqual(christmas);
+		expect(rangeNote({ from: '2027-01-04', to: '2027-01-05' }, [christmas])?.blocked).toBe(false);
 	});
 });
