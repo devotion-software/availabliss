@@ -152,6 +152,7 @@ struct TimingForm: View {
     @Environment(\.theme) private var theme
     @State private var editingEnds: TimingEndsSheet.Target?
     @State private var showsAddRange = false
+    @State private var showsSearchRange = false
     @State private var showsAuthorities = false
 
     var body: some View {
@@ -163,6 +164,9 @@ struct TimingForm: View {
         }
         .sheet(item: $editingEnds) { target in TimingEndsSheet(model: model, target: target) }
         .sheet(isPresented: $showsAddRange) { DateRangeSheet(existing: model.draft.dates) { model.addDateRange($0) } }
+        .sheet(isPresented: $showsSearchRange) {
+            SearchRangeSheet(range: model.draft.range) { model.draft.range = $0 }
+        }
         .sheet(isPresented: $showsAuthorities) {
             SearchablePicker(title: "School holidays", items: model.authorities.map { ($0.id, $0.name) }, selection: model.draft.schoolAuthority) {
                 model.draft.schoolAuthority = $0
@@ -240,9 +244,10 @@ struct TimingForm: View {
         GlassPanel {
             Text("Search between").sectionLabelStyle()
             HStack(spacing: 8) {
-                DayPickerPill(day: $model.draft.range.from, label: "Search from")
+                FieldTile(label: "From", value: Formatting.dayMonthYear(model.draft.range.from.startDate())) { showsSearchRange = true }
                 Image(systemName: "arrow.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(theme.muted)
-                DayPickerPill(day: $model.draft.range.to, label: "Search until")
+                    .accessibilityHidden(true)
+                FieldTile(label: "Until", value: Formatting.dayMonthYear(model.draft.range.to.startDate())) { showsSearchRange = true }
             }
             Text("Or only these dates").sectionLabelStyle().padding(.top, 4)
             FlowLayout(spacing: 8) {
@@ -398,22 +403,6 @@ struct TimingEndsSheet: View {
     }
 }
 
-/// A compact date picker styled as a `surface` pill.
-struct DayPickerPill: View {
-    @Binding var day: CalendarDay
-    let label: String
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        DatePicker(label, selection: Binding(get: { day.startDate() }, set: { day = CalendarDay($0) }), displayedComponents: .date)
-            .labelsHidden()
-            .datePickerStyle(.compact)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(theme.surface))
-            .accessibilityLabel(label)
-    }
-}
-
 private struct DateRangeChip: View {
     let range: DateRange
     let remove: () -> Void
@@ -438,27 +427,23 @@ private struct DateRangeChip: View {
     }
 }
 
-/// Pick a from/to range of days. A range the list already covers can't be added; one that overlaps is joined on.
+/// Pick a range of days on one calendar. A range the list already covers can't be added; one that overlaps is joined on.
 struct DateRangeSheet: View {
     var existing: [DateRange] = []
     let onAdd: (DateRange) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
-    @State private var from = CalendarDay.today()
-    @State private var to = CalendarDay.today().adding(days: 6)
+    @State private var picked: DateRange?
 
-    private var range: DateRange { DateRange(from: min(from, to), to: max(from, to)) }
-    private var covering: DateRange? { TimingEditorViewModel.covering(range, in: existing) }
+    private var covering: DateRange? { picked.flatMap { TimingEditorViewModel.covering($0, in: existing) } }
     private var joining: [DateRange] {
-        existing.filter { $0.from <= range.to.adding(days: 1) && range.from <= $0.to.adding(days: 1) }
+        guard let range = picked else { return [] }
+        return existing.filter { $0.from <= range.to.adding(days: 1) && range.from <= $0.to.adding(days: 1) }
     }
 
     var body: some View {
         BottomSheet(title: "Add date range") {
-            HStack(spacing: 8) {
-                DayPickerPill(day: $from, label: "From")
-                DayPickerPill(day: $to, label: "To")
-            }
+            DayRangePicker(range: $picked)
             if let note {
                 Text(note)
                     .bodyFont(13, relativeTo: .subheadline)
@@ -466,17 +451,18 @@ struct DateRangeSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             Button("Add") {
-                onAdd(range)
+                guard let picked else { return }
+                onAdd(picked)
                 dismiss()
             }
             .buttonStyle(.primary)
-            .disabled(covering != nil)
+            .disabled(picked == nil || covering != nil)
         }
     }
 
     private var note: String? {
         if let covering {
-            return covering == range ? "You\u{2019}ve already added these dates." : "Already included in \(Self.label(covering))."
+            return covering == picked ? "You\u{2019}ve already added these dates." : "Already included in \(Self.label(covering))."
         }
         guard let first = joining.first else { return nil }
         return joining.count == 1
@@ -486,6 +472,30 @@ struct DateRangeSheet: View {
 
     private static func label(_ range: DateRange) -> String {
         "\(Formatting.dayMonth(range.from)) \u{2013} \(Formatting.dayMonth(range.to))"
+    }
+}
+
+/// Pick the days to search between, on one calendar.
+struct SearchRangeSheet: View {
+    let onDone: (DateRange) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var picked: DateRange?
+
+    init(range: DateRange, onDone: @escaping (DateRange) -> Void) {
+        self.onDone = onDone
+        _picked = State(initialValue: range)
+    }
+
+    var body: some View {
+        BottomSheet(title: "Search between") {
+            DayRangePicker(range: $picked)
+            Button("Done") {
+                if let picked { onDone(picked) }
+                dismiss()
+            }
+            .buttonStyle(.primary)
+            .disabled(picked == nil)
+        }
     }
 }
 

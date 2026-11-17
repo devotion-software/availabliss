@@ -96,8 +96,7 @@ private struct AddPreferenceSheet: View {
     @State private var timing: Timing = .any
     @State private var from = WallTime(hour: 16, minute: 0).date()
     @State private var to = WallTime(hour: 22, minute: 0).date()
-    @State private var fromDay = CalendarDay.today()
-    @State private var toDay = CalendarDay.today()
+    @State private var dates: DateRange?
     @State private var isSaving = false
     @State private var error: String?
 
@@ -143,11 +142,7 @@ private struct AddPreferenceSheet: View {
                     .surfaceBackground(cornerRadius: 18)
                 }
             } else {
-                HStack(spacing: 8) {
-                    DayPickerPill(day: $fromDay, label: "From")
-                    Image(systemName: "arrow.right").foregroundStyle(theme.muted)
-                    DayPickerPill(day: $toDay, label: "To")
-                }
+                DayRangePicker(range: $dates)
             }
             Button {
                 Task { await submit() }
@@ -155,7 +150,7 @@ private struct AddPreferenceSheet: View {
                 LoadingLabel(title: "Save preference", isLoading: isSaving)
             }
             .buttonStyle(.filled(.primary, height: 54, cornerRadius: 18))
-            .disabled(isSaving || (kind == .dates && toDay < fromDay))
+            .disabled(isSaving || (kind == .dates && dates == nil))
         }
         .errorAlert($error)
     }
@@ -166,7 +161,8 @@ private struct AddPreferenceSheet: View {
         let body: NewGroupPreference
         switch kind {
         case .dates:
-            body = NewGroupPreference(kind: .dates, from: fromDay.description, to: toDay.description)
+            guard let dates else { return }
+            body = NewGroupPreference(kind: .dates, from: dates.from.description, to: dates.to.description)
         case .weekly:
             let window: GroupPreference.Window? = switch timing {
             case .any: nil
