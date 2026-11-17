@@ -9,6 +9,9 @@ import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.live.LiveEvents
 import dev.joeherbert.availabliss.core.live.LivePayload
+import dev.joeherbert.availabliss.core.network.ApiResult
+import dev.joeherbert.availabliss.core.network.model.GroupSummary
+import dev.joeherbert.availabliss.core.network.model.ReceiptState
 import dev.joeherbert.availabliss.navigation.GroupRoute
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -65,12 +68,7 @@ class GroupViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { groups.refreshGroup(groupId) }
-        viewModelScope.launch {
-            // Seed the badge from the groups list (refreshing it if it hasn't loaded yet).
-            val summary = groups.groups.value ?: run { groups.refreshGroups(); groups.groups.value }
-            val count = summary?.firstOrNull { it.id == groupId }?.unreadCount ?: 0
-            if (!chatVisible) unread.value = count
-        }
+        viewModelScope.launch { seedUnread() }
         viewModelScope.launch {
             liveEvents.payloadsFor(groupId).collect { payload ->
                 when (payload) {
@@ -78,13 +76,33 @@ class GroupViewModel @Inject constructor(
                         val me = users.user.value?.id ?: users.user.filterNotNull().first().id
                         if (!chatVisible && payload.message.authorId != me) unread.update { it + 1 }
                     }
+                    // Our own "seen" receipt (here or on another device) means the chat has been read.
+                    is LivePayload.MessageReceipts -> {
+                        val me = users.user.value?.id ?: users.user.filterNotNull().first().id
+                        if (payload.payload.userId == me && payload.payload.state == ReceiptState.Seen) unread.value = 0
+                    }
                     // The payload is the whole group: no need to refetch it.
                     is LivePayload.GroupUpdated -> groups.applyLiveUpdate(payload.group, users.user.value?.id)
                     else -> Unit
                 }
             }
         }
-        viewModelScope.launch { liveEvents.reconnected.collect { groups.refreshGroup(groupId) } }
+        viewModelScope.launch {
+            liveEvents.reconnected.collect {
+                groups.refreshGroup(groupId)
+                seedUnread()
+            }
+        }
+    }
+
+    /**
+     * Seeds the badge with the server's count, which only the groups list carries. Shows the cached
+     * list's count straight away, then refetches it: the cache may predate reading the chat.
+     */
+    private suspend fun seedUnread() {
+        fun countIn(list: List<GroupSummary>?) = list?.firstOrNull { it.id == groupId }?.unreadCount
+        countIn(groups.groups.value)?.let { if (!chatVisible) unread.value = it }
+        if (groups.refreshGroups() is ApiResult.Success && !chatVisible) unread.value = countIn(groups.groups.value) ?: 0
     }
 
     fun onChatVisible(visible: Boolean) {
