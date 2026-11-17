@@ -9,9 +9,12 @@ final class GroupDetailModel {
     let groupId: String
     private(set) var group: Group?
     private(set) var loadError: String?
+    /// Unread chat messages, for the Chat button's badge: the server's count from the groups list,
+    /// plus messages from others that arrive while the chat isn't on screen.
     var unreadCount = 0
     /// Whether the chat is on screen, so new messages there don't count as unread.
     @ObservationIgnored var isChatVisible = false
+    @ObservationIgnored private var unreadLoaded = false
 
     /// Proposals (by date) and upcoming events, for the calendar's Plans card and the Plans screen.
     private(set) var proposals: [Proposal] = []
@@ -20,12 +23,15 @@ final class GroupDetailModel {
 
     let api: APIClient
     @ObservationIgnored private let live: LiveEventsClient
+    /// The signed-in user, so our own messages don't count as unread.
+    @ObservationIgnored private let me: @MainActor () -> String?
     @ObservationIgnored nonisolated(unsafe) private var liveTask: Task<Void, Never>?
 
-    init(groupId: String, api: APIClient, live: LiveEventsClient) {
+    init(groupId: String, api: APIClient, live: LiveEventsClient, me: @escaping @MainActor () -> String?) {
         self.groupId = groupId
         self.api = api
         self.live = live
+        self.me = me
     }
 
     deinit { liveTask?.cancel() }
@@ -43,7 +49,15 @@ final class GroupDetailModel {
             }
         }
         if group == nil { await load() }
+        if !unreadLoaded { await loadUnread() }
         if !plansLoaded { try? await loadPlans() }
+    }
+
+    /// Seeds the Chat badge with the server's unread count (only the groups list carries it).
+    func loadUnread() async {
+        guard let summaries = try? await api.send(API.Groups.list()).groups else { return }
+        unreadLoaded = true
+        if !isChatVisible { unreadCount = summaries.first { $0.id == groupId }?.unreadCount ?? 0 }
     }
 
     func load() async {
@@ -70,6 +84,7 @@ final class GroupDetailModel {
         switch event.kind {
         case .reconnected:
             await load()
+            await loadUnread()
             try? await loadPlans()
         case .groupUpdated:
             if let updated = event.payload(as: Group.self) { group = updated }
@@ -90,7 +105,13 @@ final class GroupDetailModel {
         case .proposalCreated, .proposalUpdated, .proposalConfirmed, .eventChanged:
             try? await loadPlans()
         case .messageCreated:
-            if !isChatVisible { unreadCount += 1 }
+            guard let message = event.payload(as: Message.self), message.groupId == groupId else { return }
+            if !isChatVisible, message.authorId == nil || message.authorId != me() { unreadCount += 1 }
+        case .messageReceipts:
+            // Our own "seen" receipt (here or on another device) means the chat has been read.
+            if let payload = event.payload(as: MessageReceiptsPayload.self), payload.state == "seen", payload.userId == me() {
+                unreadCount = 0
+            }
         default:
             break
         }
@@ -105,10 +126,10 @@ final class GroupDetailStore {
     private struct Entry { weak var model: GroupDetailModel? }
     private var entries: [String: Entry] = [:]
 
-    func model(for groupId: String, api: APIClient, live: LiveEventsClient) -> GroupDetailModel {
+    func model(for groupId: String, api: APIClient, live: LiveEventsClient, me: @escaping @MainActor () -> String?) -> GroupDetailModel {
         if let model = entries[groupId]?.model { return model }
         entries = entries.filter { $0.value.model != nil }
-        let model = GroupDetailModel(groupId: groupId, api: api, live: live)
+        let model = GroupDetailModel(groupId: groupId, api: api, live: live, me: me)
         entries[groupId] = Entry(model: model)
         return model
     }

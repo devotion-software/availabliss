@@ -11,7 +11,7 @@ struct GroupContainerView: View {
 
     init(groupId: String, section: GroupSection?, app: AppModel) {
         self.section = section
-        _detail = State(initialValue: app.groupDetails.model(for: groupId, api: app.api, live: app.live))
+        _detail = State(initialValue: app.groupDetails.model(for: groupId, api: app.api, live: app.live, me: { [session = app.session] in session.user?.id }))
     }
 
     var body: some View {
