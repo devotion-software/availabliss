@@ -31,12 +31,15 @@ data class GroupSettingsUiState(
     val color: TileColor = TileColor.T1,
     val image: String? = null,
     val archived: Boolean = false,
+    /** The group archives itself once its event has passed. */
+    val autoArchive: Boolean = false,
     val role: Role? = null,
     /** The name being edited (starts as the group's name). */
     val nameDraft: String = "",
     val uploadingPhoto: Boolean = false,
     val savingName: Boolean = false,
     val archiving: Boolean = false,
+    val savingAutoArchive: Boolean = false,
     val confirmingDelete: Boolean = false,
     val deleting: Boolean = false,
     /** True once the group is deleted (navigate away). */
@@ -142,6 +145,22 @@ class GroupSettingsViewModel @Inject constructor(
         }
     }
 
+    /** Turns automatic archiving on or off; the switch moves straight away and moves back on failure. */
+    fun setAutoArchive(on: Boolean) {
+        val s = _state.value
+        if (!s.canEdit || s.savingAutoArchive || on == s.autoArchive) return
+        _state.update { it.copy(autoArchive = on, savingAutoArchive = true) }
+        viewModelScope.launch {
+            val result = groups.update(groupId, autoArchive = on)
+            _state.update {
+                when (result) {
+                    is ApiResult.Failure -> it.copy(autoArchive = !on, savingAutoArchive = false, message = UserMessage(result.error.message))
+                    else -> it.copy(savingAutoArchive = false, message = UserMessage(if (on) "Automatic archiving on" else "Automatic archiving off"))
+                }
+            }
+        }
+    }
+
     /** Uploads a picked group photo (already a JPEG), or removes it with null. */
     fun setPhoto(jpeg: ByteArray?) {
         if (!_state.value.canEdit || _state.value.uploadingPhoto) return
@@ -236,6 +255,8 @@ class GroupSettingsViewModel @Inject constructor(
             color = group.color,
             image = group.image,
             archived = group.archived,
+            // Mid-save, keep the switch where it was put.
+            autoArchive = if (savingAutoArchive) autoArchive else group.autoArchive,
             role = group.members.firstOrNull { it.userId == me }?.role ?: group.role,
             nameDraft = draft,
             members = group.members,

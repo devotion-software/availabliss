@@ -74,6 +74,7 @@ import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
 import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
 import dev.joeherbert.availabliss.designsystem.component.TextAction
+import dev.joeherbert.availabliss.designsystem.component.ToggleRow
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
@@ -110,6 +111,7 @@ fun GroupSettingsScreen(onBack: () -> Unit, onDeleted: () -> Unit, viewModel: Gr
             onSaveName = viewModel::saveName,
             onColor = viewModel::setColor,
             onToggleArchived = viewModel::toggleArchived,
+            onAutoArchive = viewModel::setAutoArchive,
             onDelete = viewModel::requestDelete,
             onLeave = viewModel::requestLeave,
         )
@@ -140,6 +142,7 @@ data class GroupSettingsActions(
     val onSaveName: () -> Unit = {},
     val onColor: (TileColor) -> Unit = {},
     val onToggleArchived: () -> Unit = {},
+    val onAutoArchive: (Boolean) -> Unit = {},
     val onDelete: () -> Unit = {},
     val onLeave: () -> Unit = {},
 )
@@ -312,6 +315,14 @@ private fun ArchiveCard(state: GroupSettingsUiState, actions: GroupSettingsActio
             shape = Shapes.controlSmall,
             enabled = !state.archiving,
             modifier = Modifier.fillMaxWidth(),
+        )
+        RowDivider()
+        ToggleRow(
+            title = "Archive automatically",
+            subtitle = "Once its last event has passed and nothing else is planned. A new plan brings it back.",
+            checked = state.autoArchive,
+            onCheckedChange = actions.onAutoArchive,
+            modifier = Modifier.alpha(if (state.savingAutoArchive) 0.5f else 1f),
         )
     }
 }

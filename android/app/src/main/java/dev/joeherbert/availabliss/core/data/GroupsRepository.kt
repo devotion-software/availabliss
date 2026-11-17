@@ -66,7 +66,8 @@ class GroupsRepository @Inject constructor(
         color: TileColor? = null,
         requirement: Requirement? = null,
         archived: Boolean? = null,
-    ): ApiResult<Group> = call { api.updateGroup(id, UpdateGroupRequest(name, color, requirement, archived)) }.onSuccess(::cache)
+        autoArchive: Boolean? = null,
+    ): ApiResult<Group> = call { api.updateGroup(id, UpdateGroupRequest(name, color, requirement, archived, autoArchive)) }.onSuccess(::cache)
 
     suspend fun delete(id: String): ApiResult<Unit> = call { api.deleteGroup(id) }.onSuccess { forget(id) }
 

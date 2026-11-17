@@ -76,6 +76,8 @@ data class Group(
     val requirementSummary: String,
     val requirement: Requirement,
     val members: List<Member>,
+    /** Archive it automatically once its event has passed and nothing else is planned (older servers omit it). */
+    val autoArchive: Boolean = false,
     val createdAt: String,
 )
 
@@ -104,6 +106,8 @@ data class UpdateGroupRequest(
     val requirement: Requirement? = null,
     /** true archives the group for everyone, false unarchives it. */
     val archived: Boolean? = null,
+    /** Archive it automatically once its event has passed. */
+    val autoArchive: Boolean? = null,
 )
 
 @Serializable
