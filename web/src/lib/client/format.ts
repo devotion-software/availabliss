@@ -73,6 +73,8 @@ export interface Formatter {
 	dateTime(iso: string): string;
 	/** "Wed 11 Nov · 18:30 – 21:00", "Fri 13 – Sun 15 Nov", "Sat 21 Nov" */
 	when(start: string, end: string, allDay?: boolean): string;
+	/** `when` split for layouts that show them on separate lines: { date: "Wed 11 Nov", time: "18:30 – 21:00" } (time null across days or all day). */
+	whenParts(start: string, end: string, allDay?: boolean): { date: string; time: string | null };
 	/** Start-time hint under a multi-day range: "From Fri 18:00" (empty for midnight starts). */
 	startsAt(start: string): string;
 	/** "now", "5m ago", "2h ago", "Yesterday", "Mon", "3 Nov" */
@@ -89,6 +91,14 @@ export function createFormatter(timeZone: string): Formatter {
 	/** Last calendar day an interval touches (an end at exactly midnight belongs to the day before). */
 	const lastDay = (end: string) => dayKey(new Date(new Date(end).getTime() - 1).toISOString());
 
+	function whenParts(start: string, end: string, allDay = false): { date: string; time: string | null } {
+		const first = dayKey(start);
+		const last = lastDay(end);
+		if (allDay || first !== last) return { date: formatDayRange(first, last < first ? first : last), time: null };
+		const endTime = time(end);
+		return { date: formatDayKey(first), time: `${time(start)} – ${endTime === '00:00' ? 'midnight' : endTime}` };
+	}
+
 	return {
 		timeZone,
 		today: () => todayIn(timeZone),
@@ -99,12 +109,10 @@ export function createFormatter(timeZone: string): Formatter {
 		date: (iso) => fmt(timeZone, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso)),
 		dateTime: (iso) => `${day(iso)} · ${time(iso)}`,
 		when(start, end, allDay = false) {
-			const first = dayKey(start);
-			const last = lastDay(end);
-			if (allDay || first !== last) return formatDayRange(first, last < first ? first : last);
-			const endTime = time(end);
-			return `${formatDayKey(first)} · ${time(start)} – ${endTime === '00:00' ? 'midnight' : endTime}`;
+			const { date, time } = whenParts(start, end, allDay);
+			return time ? `${date} · ${time}` : date;
 		},
+		whenParts,
 		startsAt(start) {
 			const t = time(start);
 			return t === '00:00' ? '' : `From ${weekdayName(dayKey(start))} ${t}`;

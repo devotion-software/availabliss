@@ -14,6 +14,7 @@
 
 	const fmt = useFormat();
 	const range = $derived(fmt.current.when(proposal.start, proposal.end, proposal.allDay));
+	const parts = $derived(fmt.current.whenParts(proposal.start, proposal.end, proposal.allDay));
 	const count = $derived(proposal.responses.length || group.members.length);
 
 	// The confirmed event's cover photo, if someone has added one.
@@ -44,8 +45,11 @@
 	<div class="hero">
 		<span class="bloom"><Logo size={132} /></span>
 		<h1>Everyone's in.</h1>
-		<p>
-			{count === 2 ? 'Both of you' : `All ${count} of you`} can make<br />{range}{proposal.location ? ` in ${proposal.location}` : ''}.
+		<p class="when">
+			<span class="lead">{count === 2 ? 'Both of you' : `All ${count} of you`} can make</span>
+			<span class="date">{parts.date}</span>
+			{#if parts.time}<span class="time">{parts.time}</span>{/if}
+			{#if proposal.location}<span class="place">in {proposal.location}</span>{/if}
 		</p>
 		{#if proposal.title}<p class="title">{proposal.title}</p>{/if}
 	</div>
@@ -124,6 +128,35 @@
 		font-size: 16px;
 		color: var(--muted);
 		line-height: 1.4;
+	}
+	.when {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+	}
+	.lead {
+		margin-bottom: 2px;
+	}
+	.date {
+		font-family: var(--font-display);
+		font-size: 30px;
+		font-weight: 700;
+		line-height: 1.05;
+		letter-spacing: -0.025em;
+		color: var(--ink);
+	}
+	.time {
+		font-family: var(--font-display);
+		font-size: 22px;
+		font-weight: 650;
+		line-height: 1.15;
+		letter-spacing: -0.025em;
+		font-variant-numeric: tabular-nums;
+		color: var(--ink);
+	}
+	.place {
+		margin-top: 2px;
 	}
 	.title {
 		font-weight: 600;
