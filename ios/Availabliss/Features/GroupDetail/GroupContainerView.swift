@@ -71,6 +71,7 @@ private struct GroupTopBar: View {
     let section: GroupSection?
     let unreadCount: Int
     @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
 
     var body: some View {
         SwiftUI.Group {
@@ -87,9 +88,12 @@ private struct GroupTopBar: View {
         .padding(.top, 8)
         .padding(.bottom, 10)
         .background {
-            Rectangle().fill(.ultraThinMaterial).mask {
-                LinearGradient(stops: [.init(color: .black, location: 0.75), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom)
-            }
+            // The page colour fading out at the bottom (as on Android and web), so the calendar
+            // scrolls away under the name; a plain material read as a flat grey band.
+            LinearGradient(
+                stops: [.init(color: theme.bg.opacity(0.92), location: 0.8), .init(color: theme.bg.opacity(0), location: 1)],
+                startPoint: .top, endPoint: .bottom
+            )
             .ignoresSafeArea(edges: .top)
         }
     }
