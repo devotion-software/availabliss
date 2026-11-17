@@ -146,9 +146,28 @@ final class TimingEditorViewModel {
         authorities = (try? await api.send(API.Regions.schoolAuthorities(country: country)).authorities) ?? []
     }
 
+    /// Adds a range, joining it with any it overlaps or runs straight on from. One already covered adds nothing.
     func addDateRange(_ range: DateRange) {
-        draft.dates.append(range)
-        draft.dates.sort { $0.from < $1.from }
+        guard Self.covering(range, in: draft.dates) == nil else { return }
+        draft.dates = Self.merging(draft.dates + [range])
+    }
+
+    /// The existing range that already holds every day of `range`, if any (an identical one included).
+    nonisolated static func covering(_ range: DateRange, in ranges: [DateRange]) -> DateRange? {
+        ranges.first { $0.from <= range.from && range.to <= $0.to }
+    }
+
+    /// Sorted, with ranges that overlap or touch (one ends the day before the next starts) joined into one.
+    nonisolated static func merging(_ ranges: [DateRange]) -> [DateRange] {
+        var merged: [DateRange] = []
+        for range in ranges.sorted(by: { $0.from < $1.from }) {
+            if let last = merged.last, range.from <= last.to.adding(days: 1) {
+                merged[merged.count - 1].to = max(last.to, range.to)
+            } else {
+                merged.append(range)
+            }
+        }
+        return merged
     }
 
     func removeDateRange(_ range: DateRange) {

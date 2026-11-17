@@ -162,7 +162,7 @@ struct TimingForm: View {
             rangeSection
         }
         .sheet(item: $editingEnds) { target in TimingEndsSheet(model: model, target: target) }
-        .sheet(isPresented: $showsAddRange) { DateRangeSheet { model.addDateRange($0) } }
+        .sheet(isPresented: $showsAddRange) { DateRangeSheet(existing: model.draft.dates) { model.addDateRange($0) } }
         .sheet(isPresented: $showsAuthorities) {
             SearchablePicker(title: "School holidays", items: model.authorities.map { ($0.id, $0.name) }, selection: model.draft.schoolAuthority) {
                 model.draft.schoolAuthority = $0
@@ -438,12 +438,20 @@ private struct DateRangeChip: View {
     }
 }
 
-/// Pick a from/to range of days.
+/// Pick a from/to range of days. A range the list already covers can't be added; one that overlaps is joined on.
 struct DateRangeSheet: View {
+    var existing: [DateRange] = []
     let onAdd: (DateRange) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
     @State private var from = CalendarDay.today()
     @State private var to = CalendarDay.today().adding(days: 6)
+
+    private var range: DateRange { DateRange(from: min(from, to), to: max(from, to)) }
+    private var covering: DateRange? { TimingEditorViewModel.covering(range, in: existing) }
+    private var joining: [DateRange] {
+        existing.filter { $0.from <= range.to.adding(days: 1) && range.from <= $0.to.adding(days: 1) }
+    }
 
     var body: some View {
         BottomSheet(title: "Add date range") {
@@ -451,12 +459,33 @@ struct DateRangeSheet: View {
                 DayPickerPill(day: $from, label: "From")
                 DayPickerPill(day: $to, label: "To")
             }
+            if let note {
+                Text(note)
+                    .bodyFont(13, relativeTo: .subheadline)
+                    .foregroundStyle(theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             Button("Add") {
-                onAdd(DateRange(from: min(from, to), to: max(from, to)))
+                onAdd(range)
                 dismiss()
             }
             .buttonStyle(.primary)
+            .disabled(covering != nil)
         }
+    }
+
+    private var note: String? {
+        if let covering {
+            return covering == range ? "You\u{2019}ve already added these dates." : "Already included in \(Self.label(covering))."
+        }
+        guard let first = joining.first else { return nil }
+        return joining.count == 1
+            ? "Joins up with \(Self.label(first)), so they\u{2019}ll become one range."
+            : "Joins up with \(joining.count) of your ranges, so they\u{2019}ll become one."
+    }
+
+    private static func label(_ range: DateRange) -> String {
+        "\(Formatting.dayMonth(range.from)) \u{2013} \(Formatting.dayMonth(range.to))"
     }
 }
 
