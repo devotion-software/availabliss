@@ -9,6 +9,7 @@
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';
+	import DateRangeCalendar from '#lib/components/ui/DateRangeCalendar.svelte';
 	import DayPicker from '#lib/components/timing/DayPicker.svelte';
 
 	/**
@@ -116,10 +117,7 @@
 					</div>
 				{/if}
 			{:else}
-				<div class="pair">
-					<TextField label="From" type="date" bind:value={fromDate} required />
-					<TextField label="To" type="date" bind:value={toDate} />
-				</div>
+				<DateRangeCalendar bind:from={fromDate} bind:to={toDate} label="Dates you prefer" />
 			{/if}
 			<div class="actions">
 				<Button type="button" variant="ghost" size="sm" onclick={() => (adding = false)}>Cancel</Button>

@@ -29,6 +29,9 @@ const tidy = (s: string) => s.replace(',', '');
 /** "Fri 13 Nov" from a date key. */
 export const formatDayKey = (key: string) => tidy(keyFmt(key, SHORT));
 
+/** "13 Nov 2026" from a date key, for dates that may be a year or more away. */
+export const formatDayKeyYear = (key: string) => keyFmt(key, { day: 'numeric', month: 'short', year: 'numeric' });
+
 /** "13", "Fri", "November 2026", … from a date key. */
 export const dayNumber = (key: string) => String(parseKey(key).getUTCDate());
 export const weekdayName = (key: string, style: 'short' | 'long' = 'short') => keyFmt(key, { weekday: style });

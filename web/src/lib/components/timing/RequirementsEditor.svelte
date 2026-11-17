@@ -17,6 +17,10 @@
 	import CustomLength from './CustomLength.svelte';
 	import SettingRow from './SettingRow.svelte';
 	import DateRangeChips from './DateRangeChips.svelte';
+	import Sheet from '#lib/components/ui/Sheet.svelte';
+	import Button from '#lib/components/ui/Button.svelte';
+	import DateRangeCalendar from '#lib/components/ui/DateRangeCalendar.svelte';
+	import { formatDayKeyYear } from '#lib/client/format';
 
 	/** The group timing editor (Requirements.dc.html). Read-only when `readonly`. */
 	interface Props {
@@ -46,6 +50,21 @@
 	const dayOptions = WEEKDAY_NAMES.map((n, i) => ({ value: String(i), label: n }));
 	const asDay = (v: string) => Number(v) as Weekday;
 	const valueOf = (e: Event) => (e.currentTarget as HTMLInputElement).value;
+
+	// "Search between": one range calendar in a sheet, applied on Done.
+	let pickingRange = $state(false);
+	let rangeFrom = $state('');
+	let rangeTo = $state('');
+	function openRange() {
+		rangeFrom = requirement.range.from;
+		rangeTo = requirement.range.to;
+		pickingRange = true;
+	}
+	function applyRange(e: SubmitEvent) {
+		e.preventDefault();
+		if (rangeFrom && rangeTo) requirement.range = { from: rangeFrom, to: rangeTo };
+		pickingRange = false;
+	}
 
 	function setPartOfDay(on: boolean) {
 		requirement.window = on ? { from: '18:00', to: '23:59' } : null;
@@ -170,27 +189,27 @@
 	<section class="glass card">
 		<h2 class="eyebrow">Search between</h2>
 		<div class="between">
-			<TextField
-				label="From"
-				hideLabel
-				type="date"
-				value={requirement.range.from}
-				onchange={(e) => (requirement.range.from = valueOf(e))}
-			/>
+			<button type="button" class="pick" aria-label="Search from {formatDayKeyYear(requirement.range.from)}" onclick={openRange}>
+				<span class="pick-label">From</span>
+				{formatDayKeyYear(requirement.range.from)}
+			</button>
 			<span class="arrow" aria-hidden="true">→</span>
-			<TextField
-				label="To"
-				hideLabel
-				type="date"
-				min={requirement.range.from}
-				value={requirement.range.to}
-				onchange={(e) => (requirement.range.to = valueOf(e))}
-			/>
+			<button type="button" class="pick" aria-label="Search until {formatDayKeyYear(requirement.range.to)}" onclick={openRange}>
+				<span class="pick-label">Until</span>
+				{formatDayKeyYear(requirement.range.to)}
+			</button>
 		</div>
 		<h2 class="eyebrow">Or only these dates</h2>
 		<DateRangeChips bind:ranges={requirement.dates} {readonly} start={requirement.range.from} emptyText="Any date in the search window." />
 	</section>
 </fieldset>
+
+<Sheet bind:open={pickingRange} title="Search between" placement="center" width={420}>
+	<form class="range-form" onsubmit={applyRange} novalidate>
+		<DateRangeCalendar bind:from={rangeFrom} bind:to={rangeTo} label="Search between" />
+		<Button type="submit" variant="solid" block disabled={!rangeFrom}>Done</Button>
+	</form>
+</Sheet>
 
 
 <style>
@@ -263,8 +282,39 @@
 		align-items: center;
 		gap: 8px;
 	}
-	.between > :global(.field) {
+	.pick {
 		flex: 1;
+		min-width: 0;
+		min-height: 56px;
+		border-radius: var(--radius-control);
+		border: 1px solid var(--line-2);
+		background: var(--surface);
+		padding: 6px 14px;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: flex-start;
+		gap: 2px;
+		font-size: 15px;
+		font-weight: 600;
+		color: var(--ink);
+		text-align: left;
+		white-space: nowrap;
+	}
+	.pick:focus-visible {
+		outline: none;
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px var(--accent-soft);
+	}
+	.pick-label {
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--muted);
+	}
+	.range-form {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
 	}
 	.arrow {
 		color: var(--muted);
