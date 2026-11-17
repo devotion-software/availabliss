@@ -38,6 +38,18 @@ export const dateRangeSchema = z
 	.object({ from: dateString, to: dateString })
 	.refine((r) => r.from <= r.to, { message: 'Range ends before it starts' });
 
+/** Drops repeats of an identical range (first one wins), so a doubled-up list from an older app still saves. */
+export function uniqueRanges<R extends { from: string; to: string }>(ranges: R[]): R[] {
+	const seen = new Set<string>();
+	return ranges.filter((r) => {
+		const key = `${r.from}/${r.to}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+}
+const dateRangeList = z.array(dateRangeSchema).max(50).transform(uniqueRanges);
+
 export const timeWindowSchema = z
 	.object({ from: timeString, to: timeString })
 	.refine((w) => w.from < w.to, { message: 'Window ends before it starts' });
@@ -60,9 +72,9 @@ export const requirementSchema = z.object({
 	bankHolidays: z.boolean(),
 	schoolHolidaysOnly: z.boolean(),
 	schoolAuthority: z.string().max(64).nullable(),
-	customSchoolHolidays: z.array(dateRangeSchema).max(50),
+	customSchoolHolidays: dateRangeList,
 	range: dateRangeSchema,
-	dates: z.array(dateRangeSchema).max(50),
+	dates: dateRangeList,
 	timezone
 });
 

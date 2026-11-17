@@ -138,7 +138,7 @@ interface Requirement {
   schoolAuthority: string | null;
   customSchoolHolidays: DateRange[];
   range: DateRange;                            // search window
-  dates: DateRange[];                          // if non-empty, ONLY these date ranges are considered
+  dates: DateRange[];                          // if non-empty, ONLY these date ranges are considered (repeats of an identical range are dropped on save)
   timezone: string;                            // IANA zone the times above are in
 }
 

@@ -77,6 +77,14 @@ describe('requirementSchema', () => {
 		expect(ok(requirementSchema, requirement({ customSchoolHolidays: [{ from: '2026-11-03', to: '2026-11-02' }] }))).toBe(false);
 		expect(ok(requirementSchema, requirement({ timezone: '' }))).toBe(false);
 	});
+
+	test('drops repeated date ranges instead of rejecting them', () => {
+		const a = { from: '2026-12-01', to: '2026-12-07' };
+		const b = { from: '2026-12-05', to: '2026-12-10' };
+		const parsed = requirementSchema.parse(requirement({ dates: [a, b, { ...a }, b], customSchoolHolidays: [b, b] }));
+		expect(parsed.dates).toEqual([a, b]);
+		expect(parsed.customSchoolHolidays).toEqual([b]);
+	});
 });
 
 describe('block schemas', () => {
