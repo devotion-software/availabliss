@@ -29,8 +29,12 @@ export interface InvitePreview {
 export const listGroups = (fetch?: Fetch) => api.get<{ groups: GroupSummary[] }>('/groups', { fetch }).then((r) => r.groups);
 export const getGroup = (id: string, fetch?: Fetch) => api.get<Group>(`/groups/${id}`, { fetch });
 export const createGroup = (body: GroupInput) => api.post<Group>('/groups', body);
-/** `archived` moves the group to (true) or out of (false) the Archived section of everyone's groups list. */
-export const updateGroup = (id: string, patch: Partial<GroupInput> & { archived?: boolean }) => api.patch<Group>(`/groups/${id}`, patch);
+/**
+ * `archived` moves the group to (true) or out of (false) the Archived section of everyone's groups list;
+ * `autoArchive` has it archive itself once its event has passed.
+ */
+export const updateGroup = (id: string, patch: Partial<GroupInput> & { archived?: boolean; autoArchive?: boolean }) =>
+	api.patch<Group>(`/groups/${id}`, patch);
 /**
  * Groups you're leaving or deleting from this tab, so the live "you're no longer in it" event
  * that follows doesn't announce it a second time.

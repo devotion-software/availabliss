@@ -6,6 +6,7 @@
 	import { toasts } from '#lib/client/toast.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
+	import Toggle from '#lib/components/ui/Toggle.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';
 	import GroupTile from '#lib/components/ui/GroupTile.svelte';
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
@@ -17,7 +18,8 @@
 	 * Group settings, from the group's More menu (and the sidebar): its photo, name and colour,
 	 * Archive / Unarchive, Leave group and Delete group. Everyone can open it and leave; only the
 	 * owner and admins can change things (the server's rules), and only the owner can delete the
-	 * group. Each part is its own card, so further settings slot in as more cards.
+	 * group. Each part is its own card. Admins can also have the group archive itself once its
+	 * event has passed.
 	 */
 	let { data } = $props();
 
@@ -36,6 +38,12 @@
 
 	let savingName = $state(false);
 	let archiving = $state(false);
+	// The switch moves straight away; it follows the saved setting (and goes back if saving fails).
+	let autoArchive = $state(false);
+	let savingAutoArchive = $state(false);
+	$effect.pre(() => {
+		autoArchive = group.autoArchive ?? false;
+	});
 	let deleteOpen = $state(false);
 	let leaveOpen = $state(false);
 
@@ -44,15 +52,23 @@
 		await goto('/app', { invalidateAll: true });
 	}
 
-	async function save(patch: { name?: string; color?: TileColor; archived?: boolean }, done: string) {
+	async function save(patch: { name?: string; color?: TileColor; archived?: boolean; autoArchive?: boolean }, done: string): Promise<boolean> {
 		try {
 			await updateGroup(group.id, patch);
 			// The group's own details and the groups list (sidebar and home) both show it.
 			await Promise.all([invalidate('app:group'), invalidate('app:groups')]);
 			toasts.success(done);
+			return true;
 		} catch (err) {
 			toasts.error(err);
+			return false;
 		}
+	}
+
+	async function setAutoArchive(on: boolean) {
+		savingAutoArchive = true;
+		if (!(await save({ autoArchive: on }, on ? 'Automatic archiving on' : 'Automatic archiving off'))) autoArchive = group.autoArchive ?? false;
+		savingAutoArchive = false;
 	}
 
 	async function saveName(e?: Event) {
@@ -144,6 +160,13 @@
 				<Button variant="secondary" icon="archive" loading={archiving} onclick={toggleArchived}>
 					{group.archived ? 'Unarchive group' : 'Archive group'}
 				</Button>
+				<div class="auto">
+					<div class="text">
+						<h3 id="auto-archive-title">Archive automatically</h3>
+						<p class="small">Once its last event has passed and nothing else is planned. A new plan brings it back.</p>
+					</div>
+					<Toggle bind:checked={autoArchive} labelledby="auto-archive-title" disabled={savingAutoArchive} onchange={setAutoArchive} />
+				</div>
 			</section>
 		{/if}
 
@@ -239,6 +262,21 @@
 	}
 	h2 {
 		font-size: 16px;
+		font-weight: 650;
+	}
+	.auto {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding-top: 14px;
+		border-top: 1px solid var(--line);
+	}
+	.auto .text {
+		flex: 1;
+		min-width: 0;
+	}
+	h3 {
+		font-size: 15px;
 		font-weight: 650;
 	}
 	.small {
