@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
 	import type { Member } from '#lib/types';
-	import { deleteGroup, removeMember, setMemberRole } from '#lib/client/groups';
+	import { leavingGroups, removeMember, setMemberRole } from '#lib/client/groups';
 	import { isAdminRole, memberMap, memberLabel, ROLE_LABEL, groupSubtitle } from '#lib/client/members';
 	import { toasts } from '#lib/client/toast.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
@@ -12,7 +12,6 @@
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import InvitePanel from '#lib/components/members/InvitePanel.svelte';
 	import MemberActionsSheet from '#lib/components/members/MemberActionsSheet.svelte';
-	import GroupPhotoPanel from '#lib/components/groups/GroupPhotoPanel.svelte';
 
 	let { data } = $props();
 
@@ -30,7 +29,6 @@
 	let removing = $state<Member | null>(null);
 	let removeOpen = $state(false);
 	let leaveOpen = $state(false);
-	let deleteOpen = $state(false);
 
 	const canManage = (m: Member) => admin && m.userId !== me && m.role !== 'owner';
 
@@ -58,22 +56,12 @@
 
 	async function leave() {
 		try {
+			leavingGroups.add(group.id);
 			await removeMember(group.id, me);
 			toasts.success(`You left ${group.name}`);
 			await goto('/app', { invalidateAll: true });
 		} catch (err) {
-			toasts.error(err);
-			throw err;
-		}
-	}
-
-	async function destroy() {
-		try {
-			await deleteGroup(group.id);
-			toasts.success(`${group.name} was deleted`);
-			await invalidate('app:groups');
-			await goto('/app');
-		} catch (err) {
+			leavingGroups.delete(group.id);
 			toasts.error(err);
 			throw err;
 		}
@@ -125,16 +113,17 @@
 
 		<div class="side">
 			{#if admin}
-				<GroupPhotoPanel {group} />
 				<InvitePanel groupId={group.id} groupName={group.name} />
 			{:else}
 				<p class="glass hint">Ask an admin for an invite link to add people.</p>
 			{/if}
 
-			<section class="glass danger" aria-label="Leave or delete">
+			<section class="glass danger" aria-label="Leave">
 				{#if group.role === 'owner'}
-					<p class="small">You own this group, so you can't leave it. Make someone else an admin first if you want them to carry on, or delete it.</p>
-					<Button variant="danger" icon="trash" onclick={() => (deleteOpen = true)}>Delete group</Button>
+					<p class="small">
+						You own this group, so you can't leave it. Make someone else an admin first if you want them to carry on, or delete it in
+						<a href="/app/groups/{group.id}/settings">Group settings</a>.
+					</p>
 				{:else}
 					<Button variant="danger" icon="logout" onclick={() => (leaveOpen = true)}>Leave group</Button>
 				{/if}
@@ -170,14 +159,6 @@
 	confirmLabel="Leave group"
 	destructive
 	onconfirm={leave}
-/>
-<ConfirmSheet
-	bind:open={deleteOpen}
-	title="Delete {group.name}?"
-	message="This removes the group, its chat, proposals and events for everyone. It can't be undone."
-	confirmLabel="Delete group"
-	destructive
-	onconfirm={destroy}
 />
 
 <style>

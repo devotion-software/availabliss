@@ -29,8 +29,20 @@ export interface InvitePreview {
 export const listGroups = (fetch?: Fetch) => api.get<{ groups: GroupSummary[] }>('/groups', { fetch }).then((r) => r.groups);
 export const getGroup = (id: string, fetch?: Fetch) => api.get<Group>(`/groups/${id}`, { fetch });
 export const createGroup = (body: GroupInput) => api.post<Group>('/groups', body);
-export const updateGroup = (id: string, patch: Partial<GroupInput>) => api.patch<Group>(`/groups/${id}`, patch);
-export const deleteGroup = (id: string) => api.del(`/groups/${id}`);
+/** `archived` moves the group to (true) or out of (false) the Archived section of everyone's groups list. */
+export const updateGroup = (id: string, patch: Partial<GroupInput> & { archived?: boolean }) => api.patch<Group>(`/groups/${id}`, patch);
+/**
+ * Groups you're leaving or deleting from this tab, so the live "you're no longer in it" event
+ * that follows doesn't announce it a second time.
+ */
+export const leavingGroups = new Set<string>();
+export const deleteGroup = (id: string) => {
+	leavingGroups.add(id);
+	return api.del(`/groups/${id}`).catch((err) => {
+		leavingGroups.delete(id);
+		throw err;
+	});
+};
 /** Sets the group's photo (admins; the server shrinks it to fit 512 px). */
 export const setGroupImage = (id: string, file: Blob) => api.put<Group>(`/groups/${id}/image`, file);
 /** Removes the group's photo, back to the monogram tile. */

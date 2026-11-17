@@ -6,11 +6,16 @@
 	import ProfileMenu from '#lib/components/app/ProfileMenu.svelte';
 	import GroupCard from '#lib/components/groups/GroupCard.svelte';
 	import UpNextCard from '#lib/components/groups/UpNextCard.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
 
 	let { data } = $props();
 	const fmt = useFormat();
 	const next = $derived(data.upcoming[0]);
 	const greeting = $derived(data.user.name?.trim() ? `Hi, ${firstName(data.user.name)}` : 'Hi');
+	const active = $derived(data.groups.filter((g) => !g.archived));
+	const archived = $derived(data.groups.filter((g) => g.archived));
+	// The Archived section starts collapsed.
+	let showsArchived = $state(false);
 </script>
 
 <svelte:head><title>Your groups · Availabliss</title></svelte:head>
@@ -35,11 +40,28 @@
 				<Button variant="glass" size="sm" icon="plus" class="new" onclick={newGroupSheet.show}>New group</Button>
 			</div>
 			{#if data.groups.length}
-				<div class="list">
-					{#each data.groups as group (group.id)}
-						<GroupCard {group} timeZone={data.user.timezone} />
-					{/each}
-				</div>
+				{#if active.length}
+					<div class="list">
+						{#each active as group (group.id)}
+							<GroupCard {group} timeZone={data.user.timezone} />
+						{/each}
+					</div>
+				{:else}
+					<p class="none">All your groups are archived.</p>
+				{/if}
+				{#if archived.length}
+					<button type="button" class="archived-toggle" aria-expanded={showsArchived} aria-controls="archived-groups" onclick={() => (showsArchived = !showsArchived)}>
+						<span>Archived ({archived.length})</span>
+						<span class="chevron" class:open={showsArchived}><Icon name="chevron-down" size={14} /></span>
+					</button>
+					{#if showsArchived}
+						<div class="list" id="archived-groups">
+							{#each archived as group (group.id)}
+								<GroupCard {group} timeZone={data.user.timezone} />
+							{/each}
+						</div>
+					{/if}
+				{/if}
 			{:else}
 				<div class="glass empty">
 					<EmptyState
@@ -114,6 +136,36 @@
 	}
 	.empty {
 		border-radius: 28px;
+	}
+	.none {
+		font-size: 14px;
+		color: var(--muted);
+	}
+	.archived-toggle {
+		align-self: flex-start;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-height: 44px;
+		padding: 0 4px;
+		background: none;
+		border: 0;
+		font: inherit;
+		font-size: 15px;
+		font-weight: 600;
+		color: var(--muted);
+		cursor: pointer;
+	}
+	.archived-toggle:hover {
+		color: var(--ink);
+	}
+	.chevron {
+		display: inline-flex;
+		transform: rotate(-90deg);
+		transition: transform 0.2s ease;
+	}
+	.chevron.open {
+		transform: none;
 	}
 	@media (min-width: 900px) {
 		.phone-only {

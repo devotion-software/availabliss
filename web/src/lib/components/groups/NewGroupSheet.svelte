@@ -15,6 +15,7 @@
 	import Chip from '#lib/components/ui/Chip.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import GroupTile from '#lib/components/ui/GroupTile.svelte';
+	import GroupColorPicker from './GroupColorPicker.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import StepDots from '#lib/components/onboarding/StepDots.svelte';
 	import RequirementsEditor from '#lib/components/timing/RequirementsEditor.svelte';
@@ -161,19 +162,7 @@
 				<TextField label="Group name" bind:value={name} placeholder="e.g. Lake District crew" maxlength={80} {error} autofocus />
 			</div>
 
-			<div class="colors" role="radiogroup" aria-label="Tile colour">
-				{#each TILE_COLORS as c (c)}
-					<button
-						type="button"
-						role="radio"
-						aria-checked={color === c}
-						aria-label="Colour {c.slice(1)}"
-						class:on={color === c}
-						style:background="var(--{c})"
-						onclick={() => (color = c)}
-					></button>
-				{/each}
-			</div>
+			<GroupColorPicker value={color} onchange={(c) => (color = c)} />
 
 			{#if templates.length}
 				<fieldset>
@@ -221,24 +210,6 @@
 	}
 	.name-row :global(.field) {
 		flex: 1;
-	}
-	.colors {
-		display: flex;
-		gap: 10px;
-	}
-	.colors button {
-		width: 44px;
-		height: 44px;
-		border-radius: 14px;
-		border: 1px solid var(--glass-border);
-		transition: transform 0.15s ease;
-	}
-	.colors button:hover {
-		transform: translateY(-2px);
-	}
-	.colors button.on {
-		outline: 2.5px solid var(--ink);
-		outline-offset: 3px;
 	}
 	fieldset {
 		border: 0;

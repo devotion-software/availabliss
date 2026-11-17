@@ -14,18 +14,21 @@
 	let { groups, currentId }: Props = $props();
 
 	const route = $derived(page.route.id ?? '');
+	// Archived groups stay off the list (they're under Archived on the groups page), unless open.
+	const shown = $derived(groups.filter((g) => !g.archived || g.id === currentId));
 	const SECTIONS: { path: string; label: string; icon: IconName; routes: string[] }[] = [
 		{ path: '', label: 'Calendar', icon: 'calendar', routes: ['/app/groups/[id]', '/app/groups/[id]/events/new'] },
 		{ path: '/chat', label: 'Chat', icon: 'chat', routes: ['/app/groups/[id]/chat'] },
 		{ path: '/proposals', label: 'Proposals', icon: 'check-circle', routes: ['/app/groups/[id]/proposals', '/app/proposals/[id]'] },
 		{ path: '/timing', label: 'Timing', icon: 'sliders', routes: ['/app/groups/[id]/timing'] },
-		{ path: '/members', label: 'Members', icon: 'users', routes: ['/app/groups/[id]/members'] }
+		{ path: '/members', label: 'Members', icon: 'users', routes: ['/app/groups/[id]/members'] },
+		{ path: '/settings', label: 'Settings', icon: 'settings', routes: ['/app/groups/[id]/settings'] }
 	];
 </script>
 
 <nav class="sidebar glass" aria-label="Your groups">
 	<span class="heading">Your groups</span>
-	{#each groups as g (g.id)}
+	{#each shown as g (g.id)}
 		<a href="/app/groups/{g.id}" class="group" class:open={g.id === currentId} aria-current={g.id === currentId && route === '/app/groups/[id]' ? 'page' : undefined}>
 			<GroupTile monogram={g.monogram} color={g.color} image={g.image} size={40} />
 			<span class="text">

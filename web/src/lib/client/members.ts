@@ -20,7 +20,8 @@ export const ROLE_LABEL: Record<Role, string> = { owner: 'Owner', admin: 'Admin'
 
 /** "6 members · you're an admin" */
 export function groupSubtitle(group: Group): string {
-	const count = `${group.members.length} member${group.members.length === 1 ? '' : 's'}`;
+	let count = `${group.members.length} member${group.members.length === 1 ? '' : 's'}`;
+	if (group.archived) count += ' · archived';
 	if (group.role === 'owner') return `${count} · you're the owner`;
 	if (group.role === 'admin') return `${count} · you're an admin`;
 	return count;

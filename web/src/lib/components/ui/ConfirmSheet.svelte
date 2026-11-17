@@ -10,9 +10,11 @@
 		cancelLabel?: string;
 		/** Styles the confirm button as destructive. */
 		destructive?: boolean;
+		/** `auto` slides up from the bottom on phones (a centred modal on wider screens). */
+		placement?: 'auto' | 'center';
 		onconfirm: () => Promise<unknown> | unknown;
 	}
-	let { open = $bindable(), title, message, confirmLabel, cancelLabel = 'Cancel', destructive = false, onconfirm }: Props =
+	let { open = $bindable(), title, message, confirmLabel, cancelLabel = 'Cancel', destructive = false, placement = 'center', onconfirm }: Props =
 		$props();
 
 	let busy = $state(false);
@@ -28,7 +30,7 @@
 	}
 </script>
 
-<Sheet bind:open {title} description={message} placement="center" width={420}>
+<Sheet bind:open {title} description={message} {placement} width={420}>
 	{#snippet children()}{/snippet}
 	{#snippet footer()}
 		<Button variant="secondary" onclick={() => (open = false)}>{cancelLabel}</Button>

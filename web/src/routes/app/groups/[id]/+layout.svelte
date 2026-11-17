@@ -7,6 +7,8 @@
 	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import Menu from '#lib/components/ui/Menu.svelte';
 	import { groupSubtitle, isAdminRole } from '#lib/client/members';
+	import { toasts } from '#lib/client/toast.svelte';
+	import { leavingGroups } from '#lib/client/groups';
 
 	let { data, children } = $props();
 
@@ -25,14 +27,25 @@
 			label: isAdmin ? 'Members and invites' : 'Members',
 			icon: isAdmin ? ('user-plus' as const) : ('users' as const),
 			onselect: () => goto(`${base}/members`)
-		}
+		},
+		{ label: 'Group settings', icon: 'settings' as const, onselect: () => goto(`${base}/settings`) }
 	]);
 
 	// Group details (name, members, roles, timing) change under us; refetch when they do.
 	$effect(() => {
 		const id = data.group.id;
 		const off = live.on(['group.updated', 'member.changed'], (e) => {
-			if (e.groupId === id) invalidate('app:group');
+			if (e.groupId !== id) return;
+			// You were removed, or the group was deleted: it's gone, so back to your groups.
+			const p = e.payload as { userId?: string; removed?: boolean } | null;
+			if (e.type === 'member.changed' && p?.removed && p.userId === data.user.id) {
+				// Left or deleted here: that page says so and goes back itself.
+				if (leavingGroups.delete(id)) return;
+				toasts.info(`You're no longer in ${data.group.name}`);
+				goto('/app', { invalidateAll: true });
+				return;
+			}
+			invalidate('app:group');
 		});
 		const offReconnect = live.onReconnect(() => invalidate('app:group'));
 		return () => {
