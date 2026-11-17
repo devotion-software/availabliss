@@ -50,8 +50,16 @@ export const removeGroupImage = (id: string) => api.del<Group>(`/groups/${id}/im
 
 export const setMemberRole = (groupId: string, userId: string, role: 'admin' | 'member') =>
 	api.patch<Member>(`/groups/${groupId}/members/${userId}`, { role });
-/** Removes someone, or leaves the group when `userId` is you. */
+/** Removes someone (an admin removing another member). */
 export const removeMember = (groupId: string, userId: string) => api.del(`/groups/${groupId}/members/${userId}`);
+/** Leaves the group. The owner names the admin who becomes the owner. */
+export const leaveGroup = (groupId: string, newOwnerId: string | null) => {
+	leavingGroups.add(groupId);
+	return api.post(`/groups/${groupId}/leave`, newOwnerId ? { newOwnerId } : {}).catch((err) => {
+		leavingGroups.delete(groupId);
+		throw err;
+	});
+};
 
 export const nudgeGroup = (groupId: string) => api.post<{ nudged: number }>(`/groups/${groupId}/nudge`);
 

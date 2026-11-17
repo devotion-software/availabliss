@@ -1,14 +1,13 @@
 <script lang="ts">
-	import { goto, invalidate } from '$app/navigation';
+	import { invalidate } from '$app/navigation';
 	import type { Member } from '#lib/types';
-	import { leavingGroups, removeMember, setMemberRole } from '#lib/client/groups';
+	import { removeMember, setMemberRole } from '#lib/client/groups';
 	import { isAdminRole, memberMap, memberLabel, ROLE_LABEL, groupSubtitle } from '#lib/client/members';
 	import { toasts } from '#lib/client/toast.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import Avatar from '#lib/components/ui/Avatar.svelte';
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
-	import Button from '#lib/components/ui/Button.svelte';
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import InvitePanel from '#lib/components/members/InvitePanel.svelte';
 	import MemberActionsSheet from '#lib/components/members/MemberActionsSheet.svelte';
@@ -28,7 +27,6 @@
 	let actionsOpen = $state(false);
 	let removing = $state<Member | null>(null);
 	let removeOpen = $state(false);
-	let leaveOpen = $state(false);
 
 	const canManage = (m: Member) => admin && m.userId !== me && m.role !== 'owner';
 
@@ -49,19 +47,6 @@
 			toasts.success(`${removing.name} was removed`);
 			await Promise.all([invalidate('app:group'), invalidate('app:groups')]);
 		} catch (err) {
-			toasts.error(err);
-			throw err;
-		}
-	}
-
-	async function leave() {
-		try {
-			leavingGroups.add(group.id);
-			await removeMember(group.id, me);
-			toasts.success(`You left ${group.name}`);
-			await goto('/app', { invalidateAll: true });
-		} catch (err) {
-			leavingGroups.delete(group.id);
 			toasts.error(err);
 			throw err;
 		}
@@ -117,17 +102,6 @@
 			{:else}
 				<p class="glass hint">Ask an admin for an invite link to add people.</p>
 			{/if}
-
-			<section class="glass danger" aria-label="Leave">
-				{#if group.role === 'owner'}
-					<p class="small">
-						You own this group, so you can't leave it. Make someone else an admin first if you want them to carry on, or delete it in
-						<a href="/app/groups/{group.id}/settings">Group settings</a>.
-					</p>
-				{:else}
-					<Button variant="danger" icon="logout" onclick={() => (leaveOpen = true)}>Leave group</Button>
-				{/if}
-			</section>
 		</div>
 	</div>
 </div>
@@ -151,14 +125,6 @@
 	confirmLabel="Remove"
 	destructive
 	onconfirm={remove}
-/>
-<ConfirmSheet
-	bind:open={leaveOpen}
-	title="Leave {group.name}?"
-	message="Your busy times stop counting and you won't see the chat. Someone can invite you back."
-	confirmLabel="Leave group"
-	destructive
-	onconfirm={leave}
 />
 
 <style>
@@ -225,17 +191,6 @@
 	.hint {
 		border-radius: 20px;
 		padding: 14px;
-		font-size: 13px;
-		color: var(--muted);
-	}
-	.danger {
-		border-radius: 24px;
-		padding: 16px;
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-	}
-	.small {
 		font-size: 13px;
 		color: var(--muted);
 	}

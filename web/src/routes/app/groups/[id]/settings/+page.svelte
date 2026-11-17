@@ -11,12 +11,13 @@
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import GroupPhotoPanel from '#lib/components/groups/GroupPhotoPanel.svelte';
 	import GroupColorPicker from '#lib/components/groups/GroupColorPicker.svelte';
+	import LeaveGroupSheet from '#lib/components/groups/LeaveGroupSheet.svelte';
 
 	/**
 	 * Group settings, from the group's More menu (and the sidebar): its photo, name and colour,
-	 * Archive / Unarchive, and Delete group. Everyone can open it; only the owner and admins can
-	 * change things (the server's rules), and only the owner can delete the group. Each part is
-	 * its own card, so further settings slot in as more cards.
+	 * Archive / Unarchive, Leave group and Delete group. Everyone can open it and leave; only the
+	 * owner and admins can change things (the server's rules), and only the owner can delete the
+	 * group. Each part is its own card, so further settings slot in as more cards.
 	 */
 	let { data } = $props();
 
@@ -36,6 +37,12 @@
 	let savingName = $state(false);
 	let archiving = $state(false);
 	let deleteOpen = $state(false);
+	let leaveOpen = $state(false);
+
+	async function left() {
+		toasts.success(`You left ${group.name}`);
+		await goto('/app', { invalidateAll: true });
+	}
 
 	async function save(patch: { name?: string; color?: TileColor; archived?: boolean }, done: string) {
 		try {
@@ -140,6 +147,18 @@
 			</section>
 		{/if}
 
+		<section class="glass card" aria-labelledby="leave-title">
+			<div class="text">
+				<h2 id="leave-title">Leave group</h2>
+				<p class="small">
+					{isOwner
+						? "You'll choose an admin to become the owner. You'll need a new invite to come back."
+						: "You'll need a new invite to come back."}
+				</p>
+			</div>
+			<Button variant="danger" icon="logout" onclick={() => (leaveOpen = true)}>Leave group</Button>
+		</section>
+
 		{#if isOwner}
 			<section class="glass card" aria-labelledby="delete-title">
 				<div class="text">
@@ -152,6 +171,16 @@
 	</div>
 </div>
 
+<LeaveGroupSheet
+	bind:open={leaveOpen}
+	{group}
+	me={data.user.id}
+	onleft={left}
+	ondeleteinstead={() => {
+		leaveOpen = false;
+		deleteOpen = true;
+	}}
+/>
 <ConfirmSheet
 	bind:open={deleteOpen}
 	title="Delete group?"
