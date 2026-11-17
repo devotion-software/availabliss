@@ -208,14 +208,64 @@ export async function setMemberRole(groupId: string, actorId: string, targetId: 
 	return member;
 }
 
-/** Admins can remove members; anyone can leave. The owner can't leave without deleting the group. */
+/**
+ * Admins can remove members (never the owner); anyone can remove themselves, which is
+ * leaving (see `leaveGroup`: the owner has to name a new owner, so can't leave this way).
+ */
 export async function removeMember(groupId: string, actorId: string, targetId: string): Promise<void> {
+	if (actorId === targetId) return void (await leaveGroup(groupId, actorId));
 	const actorRole = await requireMember(groupId, actorId);
 	const targetRole = await roleIn(groupId, targetId);
 	if (!targetRole) throw notFound('Member not found');
 	if (targetRole === 'owner') throw forbidden('The owner can only delete the group');
-	if (actorId !== targetId && !isAdmin(actorRole)) throw forbidden('Only group admins can remove people');
+	if (!isAdmin(actorRole)) throw forbidden('Only group admins can remove people');
 	await db.delete(groupMembers).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, targetId)));
+}
+
+/**
+ * Leaves the group. A group always keeps an owner and so at least one admin:
+ * - members, and admins while the owner stays, just leave;
+ * - the owner hands ownership to another admin (`newOwnerId`) as they go;
+ * - with no other admin, the owner must make someone an admin first (409);
+ * - the only member can't leave (409): they delete the group instead.
+ * Returns the new owner's `Member` when ownership moved, so the others can be told.
+ */
+export async function leaveGroup(groupId: string, userId: string, newOwnerId: string | null = null): Promise<Member | null> {
+	const moved = await db.transaction(async (tx) => {
+		// Lock the group so two admins leaving at once can't both count on the other staying.
+		await tx.select({ id: groups.id }).from(groups).where(eq(groups.id, groupId)).for('update');
+		const rows = await tx
+			.select({ userId: groupMembers.userId, role: groupMembers.role })
+			.from(groupMembers)
+			.where(eq(groupMembers.groupId, groupId));
+		const me = rows.find((r) => r.userId === userId);
+		if (!me) throw notFound('Group not found');
+		const others = rows.filter((r) => r.userId !== userId);
+		const otherAdmins = others.filter((r) => isAdmin(r.role));
+
+		if (others.length === 0) throw new ApiError('conflict', "You're the only member. Delete the group instead.");
+		if (isAdmin(me.role) && otherAdmins.length === 0) {
+			throw new ApiError('conflict', 'Make someone else an admin before you leave.');
+		}
+		let heir: string | null = null;
+		if (me.role === 'owner') {
+			if (!newOwnerId) throw new ApiError('validation_error', 'Choose who becomes the owner.', [{ path: 'newOwnerId', message: 'Required' }]);
+			if (!otherAdmins.some((r) => r.userId === newOwnerId)) {
+				throw new ApiError('validation_error', 'The new owner must be one of the group’s admins.', [
+					{ path: 'newOwnerId', message: 'Not an admin of this group' }
+				]);
+			}
+			heir = newOwnerId;
+			await tx
+				.update(groupMembers)
+				.set({ role: 'owner' })
+				.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, heir)));
+		}
+		await tx.delete(groupMembers).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)));
+		return heir;
+	});
+	if (!moved) return null;
+	return (await listMembers(groupId)).find((m) => m.userId === moved) ?? null;
 }
 
 // ─── Invites ──────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import {
 	acceptInvite,
 	createGroup,
 	createInvite,
+	leaveGroup,
 	listInvites,
 	revokeInvite,
 	deleteGroup,
@@ -162,7 +163,8 @@ describe('membership and roles', () => {
 
 		expect((await apiError(removeMember(groupId, member, kicked))).code).toBe('forbidden');
 		expect((await apiError(removeMember(groupId, admin, owner))).code).toBe('forbidden');
-		expect((await apiError(removeMember(groupId, owner, owner))).code).toBe('forbidden');
+		// Leaving as the owner needs a new owner, which removeMember can't name.
+		expect((await apiError(removeMember(groupId, owner, owner))).code).toBe('validation_error');
 		expect((await apiError(removeMember(groupId, admin, outsider))).code).toBe('not_found');
 		expect((await apiError(removeMember(groupId, outsider, member))).code).toBe('not_found');
 
@@ -170,6 +172,62 @@ describe('membership and roles', () => {
 		await removeMember(groupId, admin, kicked);
 		expect(await roleIn(groupId, leaver)).toBeNull();
 		expect(await roleIn(groupId, kicked)).toBeNull();
+	});
+
+	test('leaveGroup: a member leaves', async () => {
+		const [owner, admin, member] = await fx.users(3);
+		const g = await createGroup(owner, { name: 'Leaving' }, 'UTC');
+		await fx.join(g.id, member);
+		expect(await leaveGroup(g.id, member)).toBeNull();
+		expect(await roleIn(g.id, member)).toBeNull();
+		expect((await apiError(leaveGroup(g.id, member))).code).toBe('not_found');
+	});
+
+	test('leaveGroup: the only admin (the owner) must make someone else an admin first', async () => {
+		const [owner, admin, member] = await fx.users(3);
+		const g = await createGroup(owner, { name: 'Sole admin' }, 'UTC');
+		await fx.join(g.id, member);
+		const err = await apiError(leaveGroup(g.id, owner, member));
+		expect(err.code).toBe('conflict');
+		expect(await roleIn(g.id, owner)).toBe('owner');
+		expect(await roleIn(g.id, member)).toBe('member');
+	});
+
+	test('leaveGroup: the only member deletes the group instead', async () => {
+		const [owner, admin, member] = await fx.users(3);
+		const g = await createGroup(owner, { name: 'Alone' }, 'UTC');
+		expect((await apiError(leaveGroup(g.id, owner))).code).toBe('conflict');
+		expect(await roleIn(g.id, owner)).toBe('owner');
+	});
+
+	test('leaveGroup: an admin leaves while another admin (or the owner) stays', async () => {
+		const [owner, admin, member] = await fx.users(3);
+		const g = await createGroup(owner, { name: 'Two admins' }, 'UTC');
+		await fx.join(g.id, admin, 'admin');
+		await fx.join(g.id, member);
+		expect(await leaveGroup(g.id, admin)).toBeNull();
+		expect(await roleIn(g.id, admin)).toBeNull();
+		expect(await roleIn(g.id, owner)).toBe('owner');
+	});
+
+	test('leaveGroup: the owner hands ownership to an admin', async () => {
+		const [owner, admin, member] = await fx.users(3);
+		const g = await createGroup(owner, { name: 'Handover' }, 'UTC');
+		await fx.join(g.id, admin, 'admin');
+		await fx.join(g.id, member);
+		// A new owner has to be named, and has to be an admin already.
+		expect((await apiError(leaveGroup(g.id, owner))).code).toBe('validation_error');
+		expect((await apiError(leaveGroup(g.id, owner, member))).code).toBe('validation_error');
+		expect((await apiError(leaveGroup(g.id, owner, outsider))).code).toBe('validation_error');
+		expect(await roleIn(g.id, owner)).toBe('owner');
+
+		const heir = await leaveGroup(g.id, owner, admin);
+		expect(heir).toMatchObject({ userId: admin, role: 'owner' });
+		expect(await roleIn(g.id, owner)).toBeNull();
+		expect(await roleIn(g.id, admin)).toBe('owner');
+		expect((await getGroup(g.id, admin)).role).toBe('owner');
+		// The new owner is the only admin now, so it's their turn to hand over before leaving.
+		expect((await apiError(leaveGroup(g.id, admin, member))).code).toBe('conflict');
 	});
 
 	test('only the owner can delete the group', async () => {

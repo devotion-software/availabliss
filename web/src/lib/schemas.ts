@@ -113,6 +113,9 @@ export const updateGroupSchema = createGroupSchema.partial().extend({ archived: 
 
 export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
 
+/** Leaving: the owner names the admin who becomes owner. */
+export const leaveGroupSchema = z.object({ newOwnerId: z.string().min(1).nullish() });
+
 /**
  * Nothing: a link anyone can use. `emails` (or one `email`) and `usernames`: one invite each,
  * only that person can join.

@@ -419,7 +419,8 @@ interface ManualBlock {
 | DELETE 👑 | `/groups/:id/image` | | `Group` (no photo: the monogram tile) |
 | DELETE ⭐ | `/groups/:id` | | `204` |
 | PATCH 👑 | `/groups/:id/members/:userId` | `{ role: 'admin' \| 'member' }` | `Member` |
-| DELETE 👑/self | `/groups/:id/members/:userId` | | `204` (self = leave) |
+| DELETE 👑/self | `/groups/:id/members/:userId` | | `204` (an admin removes someone; never the owner. Yourself = leave, as `POST /groups/:id/leave` with no new owner) |
+| POST 🔒 | `/groups/:id/leave` | `{ newOwnerId?: string }` (the owner only: the admin who becomes owner) | `204` (see Leaving a group) |
 | POST 👑 | `/groups/:id/nudge` | | `{ nudged: number }` (push/email to unsynced members, rate limited to once per 12h) |
 | GET 🔒 | `/groups/:id/preferences` | | `{ preferences: GroupPreference[] }` (every member's) |
 | POST 🔒 | `/groups/:id/preferences` | `{ kind: 'dates', from, to }` or `{ kind: 'weekly', days?: Weekday[], window?: { from, to } \| null }` | `GroupPreference` |
@@ -429,6 +430,19 @@ interface ManualBlock {
 | DELETE 👑 | `/groups/:id/invites/:inviteId` | | 204 (the link stops working) |
 | GET | `/invites/:token` | | `{ groupName, inviterName, memberCount, expiresAt, email: string \| null, username: string \| null }` |
 | POST 🔒 | `/invites/:token/accept` | | `Group` (403 if the invite was for a different address or username) |
+
+**Leaving a group.** Anyone can leave, but a group always keeps an owner, so always at least one admin:
+
+- A member, or an admin while the owner stays, just leaves.
+- The owner names an existing admin (`newOwnerId`) who becomes the owner as they leave. No `newOwnerId`, or one that
+  isn't another admin of the group, is `400 validation_error` (issue path `newOwnerId`). Bank holidays then follow the
+  new owner's region.
+- If nobody else is an admin, leaving as an admin is `409 conflict` ("Make someone else an admin before you leave"):
+  promote someone with `PATCH /groups/:id/members/:userId` `{ role: 'admin' }` first.
+- The only member can't leave (`409 conflict`): they delete the group instead.
+
+Everyone left in the group gets `member.changed` with the new owner's `Member` (when ownership moved), then
+`{ userId, removed: true }` for the leaver; the leaver's own apps get that too, so they close the group.
 
 With no emails, an invite is a link anyone can use until it expires (14 days). With emails, each
 address gets its own emailed invite that only someone signed in with that address can accept; it's
