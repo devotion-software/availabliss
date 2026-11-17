@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.feature.timing
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -66,6 +67,7 @@ import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.RemovableChip
 import dev.joeherbert.availabliss.designsystem.component.RowDivider
+import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
 import dev.joeherbert.availabliss.designsystem.component.Segment
@@ -103,12 +105,39 @@ fun GroupTimingTab(
             onSaved()
         }
     }
+    // Back with unsaved changes (header or system back) asks whether to save or discard them.
+    var confirmsLeave by rememberSaveable { mutableStateOf(false) }
+    val guardedBack = { if (!state.canEdit || !state.dirty) onBack() else if (!state.saving) confirmsLeave = true }
+    BackHandler(enabled = state.canEdit && state.dirty) { if (!state.saving) confirmsLeave = true }
     GroupTimingContent(
         state = state,
-        actions = viewModel.editor.actions(onBack = onBack, onRetry = viewModel::load, onSave = viewModel::save)
+        actions = viewModel.editor.actions(onBack = guardedBack, onRetry = viewModel::load, onSave = viewModel::save)
             .copy(onSaveTemplate = viewModel::saveTemplate),
         snackbar = { AvSnackbarHost(snackbar) },
     )
+    if (confirmsLeave) {
+        UnsavedTimingSheet(
+            onSave = {
+                confirmsLeave = false
+                viewModel.save()
+            },
+            onDiscard = {
+                confirmsLeave = false
+                onBack()
+            },
+            onDismiss = { confirmsLeave = false },
+        )
+    }
+}
+
+/** Asked on going back from Timing with unsaved changes. Closing it keeps editing. */
+@Composable
+private fun UnsavedTimingSheet(onSave: () -> Unit, onDiscard: () -> Unit, onDismiss: () -> Unit) {
+    AvBottomSheet(title = "Save your changes?", onDismissRequest = onDismiss) {
+        Text("You've changed the timing but haven't saved it yet.", style = AvailablissTheme.type.body, color = AvailablissTheme.colors.muted)
+        PrimaryButton("Save timing", onClick = onSave, height = 52.dp, shape = Shapes.control, modifier = Modifier.fillMaxWidth())
+        SecondaryButton("Discard changes", onClick = onDiscard, height = 52.dp, modifier = Modifier.fillMaxWidth())
+    }
 }
 
 /** All callbacks of the timing editor, bundled to keep signatures readable. */
