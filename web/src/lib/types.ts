@@ -119,6 +119,8 @@ export interface GroupSummary {
 	/** The group's photo, shown instead of the monogram tile; null for none. */
 	image: string | null;
 	role: Role;
+	/** Archived by an admin: listed in the groups list's collapsed Archived section. */
+	archived: boolean;
 	memberCount: number;
 	syncedCount: number;
 	requirementSummary: string;

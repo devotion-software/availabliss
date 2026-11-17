@@ -182,6 +182,8 @@ export const groups = mysqlTable('groups', {
 	requirement: json('requirement').$type<Requirement>().notNull(),
 	createdBy: varchar('created_by', { length: 36 }).references(() => user.id, { onDelete: 'set null' }),
 	lastNudgedAt: instant('last_nudged_at'),
+	/** When an admin archived the group (it moves to the archived section of the groups list); null = active. */
+	archivedAt: instant('archived_at'),
 	createdAt: createdAt(),
 	updatedAt: updatedAt()
 });

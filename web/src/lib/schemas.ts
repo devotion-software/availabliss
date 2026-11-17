@@ -108,7 +108,8 @@ export const createGroupSchema = z.object({
 	requirement: requirementSchema.optional()
 });
 
-export const updateGroupSchema = createGroupSchema.partial();
+/** `archived` moves the group to (true) or out of (false) the archived section of everyone's groups list. */
+export const updateGroupSchema = createGroupSchema.partial().extend({ archived: z.boolean().optional() });
 
 export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
 

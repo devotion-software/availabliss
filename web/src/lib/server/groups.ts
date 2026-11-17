@@ -91,6 +91,7 @@ export function groupBase(row: GroupRow, role: Role, members: Member[]) {
 		monogram: monogram(row.name),
 		image: row.image ?? null,
 		role,
+		archived: row.archivedAt != null,
 		memberCount: members.length,
 		syncedCount: members.filter((m) => m.synced).length,
 		requirementSummary: requirementSummary(row.requirement)
@@ -157,10 +158,16 @@ export async function createGroup(
 export async function updateGroup(
 	groupId: string,
 	userId: string,
-	patch: { name?: string; color?: TileColor; requirement?: Requirement }
+	{ archived, ...patch }: { name?: string; color?: TileColor; requirement?: Requirement; archived?: boolean }
 ): Promise<Group> {
 	await requireMember(groupId, userId, 'admin');
-	if (Object.keys(patch).length) await db.update(groups).set(patch).where(eq(groups.id, groupId));
+	const set: Partial<GroupRow> = { ...patch };
+	// Archiving keeps the original date if it's already archived.
+	if (archived !== undefined) {
+		const before = await getGroupRow(groupId);
+		set.archivedAt = archived ? (before.archivedAt ?? new Date()) : null;
+	}
+	if (Object.keys(set).length) await db.update(groups).set(set).where(eq(groups.id, groupId));
 	// The search range may now reach past what members' calendars cover.
 	if (patch.requirement) await refreshCoverage(await memberIds(groupId));
 	return getGroup(groupId, userId);

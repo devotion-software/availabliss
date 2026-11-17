@@ -151,6 +151,7 @@ interface GroupSummary {
   monogram: string;         // 1–3 chars
   image: string | null;     // the group's photo, shown instead of the monogram tile
   role: Role;
+  archived: boolean;        // an admin archived it: list it in a collapsed "Archived" section
   memberCount: number;
   syncedCount: number;
   requirementSummary: string; // "A weekend · Fri 18:00 → Sun · Nov – Jan"
@@ -413,7 +414,7 @@ interface ManualBlock {
 | GET 🔒 | `/groups` | | `{ groups: GroupSummary[] }` |
 | POST 🔒 | `/groups` | `{ name, color?, requirement? }` | `Group` (creator is owner; `402 upgrade_required` past the free limit) |
 | GET 🔒 | `/groups/:id` | | `Group` |
-| PATCH 👑 | `/groups/:id` | `{ name?, color?, requirement? }` | `Group` |
+| PATCH 👑 | `/groups/:id` | `{ name?, color?, requirement?, archived? }` | `Group` (publishes `group.updated`; `archived: true` archives it for everyone, `false` unarchives) |
 | PUT 👑 | `/groups/:id/image` | the image bytes (as `/me/avatar`) | `Group` (`image` shrunk to fit 512 px; publishes `group.updated`) |
 | DELETE 👑 | `/groups/:id/image` | | `Group` (no photo: the monogram tile) |
 | DELETE ⭐ | `/groups/:id` | | `204` |

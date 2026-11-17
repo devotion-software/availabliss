@@ -132,6 +132,19 @@ describe('membership and roles', () => {
 		expect((await updateGroup(groupId, admin, {})).name).toBe('Renamed group');
 	});
 
+	test('admins archive and unarchive the group; members see it archived', async () => {
+		expect((await getGroup(groupId, member)).archived).toBe(false);
+		expect((await apiError(updateGroup(groupId, member, { archived: true }))).code).toBe('forbidden');
+		expect((await updateGroup(groupId, admin, { archived: true })).archived).toBe(true);
+		const { archivedAt } = (await db.query.groups.findFirst({ where: eq(groups.id, groupId) }))!;
+		// Archiving again keeps the original date; renaming leaves it archived.
+		await updateGroup(groupId, owner, { archived: true, name: 'Renamed group' });
+		const again = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
+		expect(again?.archivedAt?.getTime()).toBe(archivedAt?.getTime());
+		expect((await getGroup(groupId, member)).archived).toBe(true);
+		expect((await updateGroup(groupId, admin, { archived: false })).archived).toBe(false);
+	});
+
 	test('setMemberRole: admins promote and demote; the owner is fixed', async () => {
 		expect((await apiError(setMemberRole(groupId, member, admin, 'member'))).code).toBe('forbidden');
 		expect((await apiError(setMemberRole(groupId, admin, owner, 'member'))).code).toBe('forbidden');
