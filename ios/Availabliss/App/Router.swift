@@ -21,6 +21,14 @@ enum AppRoute: Hashable {
     case region
 }
 
+/// Set by a screen with unsaved changes while it's on screen (the group's Timing). Back — the
+/// header's back button or the swipe in from the screen's edge — asks it first; it returns false
+/// to stay put, and asks whether to save or discard instead.
+@MainActor
+enum LeaveGuard {
+    static var shouldLeave: (() -> Bool)?
+}
+
 /// Navigation state for the whole app: selected tab, one path per tab, and modal links.
 @MainActor
 @Observable
@@ -59,6 +67,12 @@ final class Router {
         case .activity: activityPath.append(route)
         case .you: youPath.append(route)
         }
+    }
+
+    /// Back from the header's back button: asks `LeaveGuard` first, so unsaved changes aren't lost.
+    func back() {
+        if let shouldLeave = LeaveGuard.shouldLeave, !shouldLeave() { return }
+        pop()
     }
 
     func pop() {

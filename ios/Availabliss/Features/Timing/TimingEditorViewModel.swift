@@ -200,6 +200,7 @@ final class TimingEditorViewModel {
         defer { isSaving = false }
         do {
             let group = try await api.send(API.Groups.update(id: groupId, UpdateGroupBody(requirement: draft)))
+            original = draft
             toast = "Timing saved"
             return group
         } catch {

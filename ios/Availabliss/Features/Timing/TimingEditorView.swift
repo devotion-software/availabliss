@@ -8,6 +8,10 @@ struct TimingEditorView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var model: TimingEditorViewModel
+    /// Back with unsaved changes: asks whether to save or discard them.
+    @State private var confirmsLeave = false
+    /// What was picked in that sheet, done once it has closed (so a save error can show its alert).
+    @State private var leaveChoice: UnsavedTimingSheet.Choice?
 
     init(detail: GroupDetailModel, group: Group, onDone: @escaping () -> Void) {
         self.detail = detail
@@ -39,6 +43,38 @@ struct TimingEditorView: View {
         .task(id: model.draft) { await model.refreshPreview() }
         .errorAlert($model.error)
         .toast($model.toast)
+        .onAppear {
+            LeaveGuard.shouldLeave = {
+                guard canEdit, model.hasChanges else { return true }
+                if !model.isSaving { confirmsLeave = true }
+                return false
+            }
+        }
+        .onDisappear { LeaveGuard.shouldLeave = nil }
+        .sheet(isPresented: $confirmsLeave, onDismiss: finishLeaving) {
+            UnsavedTimingSheet { choice in
+                leaveChoice = choice
+                confirmsLeave = false
+            }
+        }
+    }
+
+    private func finishLeaving() {
+        guard let choice = leaveChoice else { return }
+        leaveChoice = nil
+        switch choice {
+        case .save: save()
+        case .discard: onDone()
+        }
+    }
+
+    private func save() {
+        Task {
+            if let updated = await model.save() {
+                detail.update(updated)
+                onDone()
+            }
+        }
     }
 
     private var header: some View {
@@ -54,14 +90,7 @@ struct TimingEditorView: View {
             FitSummary(model: model)
             Spacer(minLength: 0)
             if canEdit {
-                Button {
-                    Task {
-                        if let updated = await model.save() {
-                            detail.update(updated)
-                            onDone()
-                        }
-                    }
-                } label: {
+                Button(action: save) {
                     LoadingLabel(title: "Save timing", isLoading: model.isSaving)
                 }
                 .buttonStyle(.filled(.primary, height: 48, cornerRadius: 16, fontSize: 15, fullWidth: false))
@@ -73,6 +102,25 @@ struct TimingEditorView: View {
         .glass(cornerRadius: 26)
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
+    }
+}
+
+/// Asked on going back from Timing with unsaved changes. Closing it keeps editing.
+struct UnsavedTimingSheet: View {
+    enum Choice { case save, discard }
+
+    let onChoose: (Choice) -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        BottomSheet(title: "Save your changes?") {
+            Text("You've changed the timing but haven't saved it yet.")
+                .bodyFont(15)
+                .foregroundStyle(theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Save timing") { onChoose(.save) }.buttonStyle(.primary)
+            Button("Discard changes") { onChoose(.discard) }.buttonStyle(.secondary)
+        }
     }
 }
 

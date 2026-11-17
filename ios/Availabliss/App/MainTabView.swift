@@ -151,6 +151,11 @@ extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
     }
 
     public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        viewControllers.count > 1
+        guard viewControllers.count > 1 else { return false }
+        // A screen with unsaved changes asks before it's swiped away.
+        if gestureRecognizer === interactivePopGestureRecognizer, let shouldLeave = LeaveGuard.shouldLeave {
+            return shouldLeave()
+        }
+        return true
     }
 }
