@@ -238,11 +238,7 @@ private struct ConfirmedView: View {
                 Text("Everyone's in.")
                     .displayFont(40, .heavy, relativeTo: .largeTitle)
                     .accessibilityAddTraits(.isHeader)
-                Text(message)
-                    .bodyFont(16)
-                    .foregroundStyle(theme.muted)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
+                when
             }
             .padding(.horizontal, 10)
             Spacer()
@@ -258,11 +254,35 @@ private struct ConfirmedView: View {
         .sensoryFeedback(.success, trigger: bloom)
     }
 
-    private var message: String {
-        guard let proposal = model.proposal else { return "" }
-        let when = Formatting.span(start: proposal.start, end: proposal.end, allDay: proposal.allDay)
-        let place = proposal.location.map { " in \($0)" } ?? ""
-        return "All \(model.memberCount) of you can make\n\(when)\(place)."
+    /// "All 4 of you can make", then the date and time large on their own lines, then the place.
+    @ViewBuilder
+    private var when: some View {
+        if let proposal = model.proposal {
+            let parts = Formatting.spanParts(start: proposal.start, end: proposal.end, allDay: proposal.allDay)
+            VStack(spacing: 6) {
+                Text("All \(model.memberCount) of you can make")
+                    .bodyFont(16)
+                    .foregroundStyle(theme.muted)
+                    .padding(.bottom, 2)
+                Text(parts.date)
+                    .displayFont(30, .bold, relativeTo: .title)
+                    .foregroundStyle(theme.ink)
+                if let time = parts.time {
+                    Text(time)
+                        .displayFont(22, .semibold, relativeTo: .title2)
+                        .foregroundStyle(theme.ink)
+                        .monospacedDigit()
+                }
+                if let location = proposal.location {
+                    Text("in \(location)")
+                        .bodyFont(16)
+                        .foregroundStyle(theme.muted)
+                        .padding(.top, 2)
+                }
+            }
+            .multilineTextAlignment(.center)
+            .accessibilityElement(children: .combine)
+        }
     }
 
     @ViewBuilder

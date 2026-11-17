@@ -47,14 +47,21 @@ enum Formatting {
     /// "Mon 2 Nov · from 18:00" for an evening that runs to midnight. The end is exclusive,
     /// so a span ending at midnight belongs to the day before (matching the server's labels).
     static func span(start: Date, end: Date, allDay: Bool, calendar: Calendar = .current) -> String {
+        let parts = spanParts(start: start, end: end, allDay: allDay, calendar: calendar)
+        return parts.time.map { "\(parts.date) · \($0)" } ?? parts.date
+    }
+
+    /// `span` split into its date ("Wed 11 Nov", "Fri 13 – Sun 15 Nov") and, within a day,
+    /// its time ("18:30 – 21:00", "from 18:00"), for layouts that show them on separate lines.
+    static func spanParts(start: Date, end: Date, allDay: Bool, calendar: Calendar = .current) -> (date: String, time: String?) {
         let lastInstant = end.addingTimeInterval(-1)
         if calendar.isDate(start, inSameDayAs: lastInstant) {
-            if allDay { return shortDay(start) }
+            if allDay { return (shortDay(start), nil) }
             let endsAtMidnight = calendar.startOfDay(for: end) == end
-            return endsAtMidnight ? "\(shortDay(start)) · from \(time(start))" : "\(shortDay(start)) · \(time(start)) – \(time(end))"
+            return (shortDay(start), endsAtMidnight ? "from \(time(start))" : "\(time(start)) – \(time(end))")
         }
         let startText = start.formatted(.dateTime.weekday(.abbreviated).day())
-        return "\(startText) – \(shortDay(lastInstant))"
+        return ("\(startText) – \(shortDay(lastInstant))", nil)
     }
 
     /// "2h ago", "now".
