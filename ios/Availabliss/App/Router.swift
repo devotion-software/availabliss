@@ -7,7 +7,7 @@ enum AppTab: Hashable, CaseIterable {
 
 /// A group's screens pushed over its calendar (the group's home).
 enum GroupSection: Hashable, CaseIterable {
-    case chat, plans, timing
+    case chat, plans, timing, settings
 }
 
 /// Every pushable screen.
@@ -122,6 +122,19 @@ final class Router {
         }
     }
 
+    /// Takes every screen of a group off every tab (it was deleted, or you're no longer in it).
+    func closeGroup(_ id: String) {
+        func cut(_ path: inout [AppRoute]) {
+            guard let index = path.firstIndex(where: { $0.groupId == id }) else { return }
+            path.removeSubrange(index...)
+        }
+        cut(&groupsPath)
+        cut(&myTimePath)
+        cut(&activityPath)
+        cut(&youPath)
+        if visibleChatGroupId == id { visibleChatGroupId = nil }
+    }
+
     func reset() {
         visibleChatGroupId = nil
         tab = .groups
@@ -129,5 +142,16 @@ final class Router {
         myTimePath = []
         activityPath = []
         youPath = []
+    }
+}
+
+extension AppRoute {
+    /// The group a route belongs to, if any.
+    var groupId: String? {
+        switch self {
+        case .group(let id), .groupSection(let id, _): id
+        case .members(let groupId): groupId
+        case .proposal, .appearance, .calendars, .region: nil
+        }
     }
 }

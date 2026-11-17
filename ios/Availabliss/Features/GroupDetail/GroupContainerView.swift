@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A group's screens: its calendar (the group's home), and Chat / Plans / Timing pushed over it.
+/// A group's screens: its calendar (the group's home), and Chat / Plans / Timing / Settings pushed over it.
 /// Each is its own route, and they all share one `GroupDetailModel` from `GroupDetailStore`,
 /// so pushing a section doesn't load or subscribe to the group again.
 struct GroupContainerView: View {
@@ -46,6 +46,8 @@ struct GroupContainerView: View {
                 GroupPlansView(detail: detail, group: group)
             case .timing:
                 TimingEditorView(detail: detail, group: group, onDone: { app.router.pop() })
+            case .settings:
+                GroupSettingsView(detail: detail, group: group)
             }
         } else if let error = detail.loadError {
             VStack {
@@ -65,7 +67,8 @@ struct GroupContainerView: View {
 }
 
 /// Pinned at the top of a group's screens. On the calendar: back to groups, name, role, Chat and More
-/// (Plans, Timing, Members). On a pushed section: back to the calendar, with the group's name.
+/// (Plans, Timing, Members, Group settings). On a pushed section: back to the calendar, with the group's
+/// name (Settings is titled "Group settings", with the name under it).
 private struct GroupTopBar: View {
     let group: Group
     let section: GroupSection?
@@ -75,7 +78,10 @@ private struct GroupTopBar: View {
 
     var body: some View {
         SwiftUI.Group {
-            if let section, app.router.isOverGroup(group.id) {
+            if section == .settings {
+                ScreenHeader(title: "Group settings", subtitle: group.name, titleSize: 22,
+                             backLabel: app.router.isOverGroup(group.id) ? "Back to calendar" : "Back", onBack: { app.router.back() })
+            } else if let section, app.router.isOverGroup(group.id) {
                 ScreenHeader(title: group.name, titleSize: 22, backLabel: "Back to calendar", onBack: { app.router.back() })
             } else if section != nil {
                 // Opened from elsewhere (Activity): back returns there; the name opens the group.
@@ -145,6 +151,9 @@ private struct GroupHeader: View {
             Button { app.router.push(.members(groupId: group.id)) } label: {
                 Label(canInvite ? "Members and invites" : "Members", systemImage: canInvite ? "person.badge.plus" : "person.2")
             }
+            Button { app.router.push(.groupSection(id: group.id, section: .settings)) } label: {
+                Label("Group settings", systemImage: "gearshape")
+            }
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 17, weight: .semibold))
@@ -160,7 +169,8 @@ private struct GroupHeader: View {
     private var canInvite: Bool { group.role != .member }
 
     private var subtitle: String {
-        let members = Formatting.plural(group.memberCount, "member")
+        var members = Formatting.plural(group.memberCount, "member")
+        if group.isArchived { members += " · archived" }
         switch group.role {
         case .owner: return "\(members) · you're the owner"
         case .admin: return "\(members) · you're an admin"

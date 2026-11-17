@@ -83,6 +83,8 @@ struct GroupSummary: Codable, Sendable, Identifiable, Equatable {
     /// The group's photo, drawn instead of the monogram tile; nil on older servers too.
     var image: String?
     var role: Role
+    /// Archived by an admin (nil from older servers): listed under Archived on the groups list.
+    var archived: Bool?
     var memberCount: Int
     var syncedCount: Int
     var requirementSummary: String
@@ -98,6 +100,7 @@ struct Group: Codable, Sendable, Identifiable, Equatable {
     var monogram: String
     var image: String?
     var role: Role
+    var archived: Bool?
     var memberCount: Int
     var syncedCount: Int
     var requirementSummary: String
@@ -105,8 +108,13 @@ struct Group: Codable, Sendable, Identifiable, Equatable {
     var members: [Member]
     var createdAt: Date
 
+    var isArchived: Bool { archived ?? false }
     func member(_ userId: String) -> Member? { members.first { $0.userId == userId } }
     var pendingMembers: [Member] { members.filter { !$0.synced } }
+}
+
+extension GroupSummary {
+    var isArchived: Bool { archived ?? false }
 }
 
 struct GroupsResponse: Decodable, Sendable { let groups: [GroupSummary] }
@@ -121,6 +129,8 @@ struct UpdateGroupBody: Encodable, Sendable {
     var name: String?
     var color: String?
     var requirement: Requirement?
+    /// true archives the group for everyone, false unarchives it.
+    var archived: Bool?
 }
 
 struct RoleBody: Encodable, Sendable { let role: Role }

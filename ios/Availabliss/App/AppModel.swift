@@ -200,6 +200,11 @@ final class AppModel {
                     }
                 case .reconnected:
                     await self.refreshUnread()
+                case .memberChanged:
+                    // Removed from a group, or it was deleted: leave its screens wherever they're open.
+                    if let groupId = event.groupId, let removed = event.removedMemberId, removed == self.session.user?.id {
+                        self.router.closeGroup(groupId)
+                    }
                 default:
                     break
                 }

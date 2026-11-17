@@ -87,7 +87,11 @@ final class GroupDetailModel {
             await loadUnread()
             try? await loadPlans()
         case .groupUpdated:
-            if let updated = event.payload(as: Group.self) { group = updated }
+            // The server builds the payload for whoever made the change, so its role is theirs: use ours.
+            if var updated = event.payload(as: Group.self) {
+                updated.role = updated.member(me() ?? "")?.role ?? group?.role ?? updated.role
+                group = updated
+            }
         case .memberChanged:
             if let removed = event.removedMemberId {
                 group?.members.removeAll { $0.userId == removed }

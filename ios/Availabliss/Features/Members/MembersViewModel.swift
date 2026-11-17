@@ -9,7 +9,6 @@ final class MembersViewModel {
     private(set) var invites: [GroupInvite] = []
     private(set) var isCreatingInvite = false
     private(set) var isSendingInvites = false
-    private(set) var isUploadingPhoto = false
     var error: String?
     var toast: String?
     /// The emails and usernames about to be invited.
@@ -93,21 +92,6 @@ final class MembersViewModel {
         }
     }
 
-    /// Sets (or with nil, removes) the group's photo. Returns the updated group.
-    func setPhoto(_ jpeg: Data?) async -> Group? {
-        isUploadingPhoto = true
-        defer { isUploadingPhoto = false }
-        do {
-            let updated = try await api.send(jpeg.map { API.Groups.setImage(id: groupId, jpeg: $0) } ?? API.Groups.removeImage(id: groupId))
-            group = updated
-            toast = jpeg == nil ? "Photo removed" : "Photo updated"
-            return updated
-        } catch {
-            self.error = error.userMessage
-            return nil
-        }
-    }
-
     func setRole(_ role: Role, for member: Member) async {
         do {
             let updated = try await api.send(API.Groups.setRole(groupId: groupId, userId: member.userId, role: role))
@@ -136,13 +120,4 @@ final class MembersViewModel {
         }
     }
 
-    func deleteGroup() async -> Bool {
-        do {
-            try await api.send(API.Groups.delete(id: groupId))
-            return true
-        } catch {
-            self.error = error.userMessage
-            return false
-        }
-    }
 }

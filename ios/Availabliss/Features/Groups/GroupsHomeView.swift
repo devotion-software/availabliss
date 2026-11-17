@@ -7,6 +7,8 @@ struct GroupsHomeView: View {
     @Environment(\.theme) private var theme
     @State private var model: GroupsHomeViewModel
     @State private var showsNewGroup = false
+    /// The Archived section starts collapsed.
+    @State private var showsArchived = false
 
     init(api: APIClient) {
         _model = State(initialValue: GroupsHomeViewModel(api: api))
@@ -110,20 +112,50 @@ struct GroupsHomeView: View {
         } else if model.groups.isEmpty {
             StatusView(kind: .empty(title: "No groups yet", message: "Start one and invite your people. We'll find the times that work.", systemImage: "circle.hexagongrid"))
         } else {
+            let active = model.groups.filter { !$0.isArchived }
+            let archived = model.groups.filter(\.isArchived)
             LazyVStack(spacing: 10) {
-                ForEach(model.groups) { group in
+                ForEach(active) { group in groupButton(group) }
+            }
+            if !archived.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
                     Button {
-                        app.router.push(.group(id: group.id))
+                        withAnimation(.snappy) { showsArchived.toggle() }
                     } label: {
-                        GroupRow(group: group) {
-                            app.router.push(.group(id: group.id))
-                            app.router.push(.groupSection(id: group.id, section: .chat))
+                        HStack(spacing: 6) {
+                            Text("Archived (\(archived.count))").bodyFont(15, .semibold)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 12, weight: .bold))
+                                .rotationEffect(.degrees(showsArchived ? 0 : -90))
+                            Spacer()
+                        }
+                        .foregroundStyle(theme.muted)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityValue(showsArchived ? "Shown" : "Hidden")
+                    if showsArchived {
+                        LazyVStack(spacing: 10) {
+                            ForEach(archived) { group in groupButton(group) }
                         }
                     }
-                    .buttonStyle(.pressable)
                 }
             }
         }
+    }
+
+    private func groupButton(_ group: GroupSummary) -> some View {
+        Button {
+            app.router.push(.group(id: group.id))
+        } label: {
+            GroupRow(group: group) {
+                app.router.push(.group(id: group.id))
+                app.router.push(.groupSection(id: group.id, section: .chat))
+            }
+        }
+        .buttonStyle(.pressable)
     }
 }
 

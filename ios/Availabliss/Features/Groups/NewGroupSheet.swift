@@ -10,7 +10,7 @@ struct NewGroupSheet: View {
     @Environment(\.theme) private var theme
     @State private var step = 1
     @State private var name = ""
-    @State private var color = NewGroupSheet.colors.randomElement() ?? "t1"
+    @State private var color = GroupColorPicker.colors.randomElement() ?? "t1"
     /// Your saved timings; picking one starts step 2 from it instead of the default.
     @State private var templates: [RequirementTemplate] = []
     @State private var templateId: String?
@@ -21,8 +21,6 @@ struct NewGroupSheet: View {
     @State private var timing: TimingEditorViewModel
     @State private var isSaving = false
     @State private var error: String?
-
-    private static let colors = ["t1", "t2", "t3", "t4", "t5"]
 
     init(api: APIClient, timezone: String, onCreated: @escaping (Group) -> Void) {
         self.api = api
@@ -79,22 +77,7 @@ struct NewGroupSheet: View {
         }
         VStack(alignment: .leading, spacing: 8) {
             Text("Colour").sectionLabelStyle()
-            HStack(spacing: 10) {
-                ForEach(Self.colors, id: \.self) { token in
-                    Button {
-                        color = token
-                    } label: {
-                        Circle()
-                            .fill(theme.tile(token))
-                            .frame(width: 40, height: 40)
-                            .overlay(Circle().strokeBorder(theme.ink, lineWidth: color == token ? 2.5 : 0).padding(-4))
-                            .frame(width: 48, height: 48)
-                    }
-                    .buttonStyle(.pressable)
-                    .accessibilityLabel("Colour \(token.dropFirst())")
-                    .accessibilityAddTraits(color == token ? .isSelected : [])
-                }
-            }
+            GroupColorPicker(selection: color) { color = $0 }
         }
         if !templates.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
@@ -203,5 +186,34 @@ struct NewGroupSheet: View {
         let words = name.split(separator: " ").prefix(2)
         let letters = words.compactMap(\.first).map { String($0).uppercased() }.joined()
         return letters.isEmpty ? "?" : letters
+    }
+}
+
+/// The group tile colours (`t1` … `t5`) as a row of swatches, the chosen one ringed.
+/// Used when creating a group and in its settings.
+struct GroupColorPicker: View {
+    static let colors = ["t1", "t2", "t3", "t4", "t5"]
+
+    let selection: String
+    let onPick: (String) -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ForEach(Self.colors, id: \.self) { token in
+                Button {
+                    onPick(token)
+                } label: {
+                    Circle()
+                        .fill(theme.tile(token))
+                        .frame(width: 40, height: 40)
+                        .overlay(Circle().strokeBorder(theme.ink, lineWidth: selection == token ? 2.5 : 0).padding(-4))
+                        .frame(width: 48, height: 48)
+                }
+                .buttonStyle(.pressable)
+                .accessibilityLabel("Colour \(token.dropFirst())")
+                .accessibilityAddTraits(selection == token ? .isSelected : [])
+            }
+        }
     }
 }
