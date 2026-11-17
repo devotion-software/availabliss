@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Group settings, from the group's More menu: its photo, name and colour, Archive / Unarchive, and
-/// Delete group. Everyone can open it; only the owner and admins can change things (the server's
-/// rules), and only the owner can delete the group. Each part is its own section, so more settings
-/// (leaving the group, auto-archiving) slot in as further sections.
+/// Group settings, from the group's More menu: its photo, name and colour, Archive / Unarchive, Leave
+/// group and Delete group. Everyone can open it and leave; only the owner and admins can change things
+/// (the server's rules), and only the owner can delete the group. Each part is its own section, so more
+/// settings (auto-archiving) slot in as further sections.
 struct GroupSettingsView: View {
     let detail: GroupDetailModel
     let group: Group
@@ -12,6 +12,9 @@ struct GroupSettingsView: View {
     @State private var name: String
     @State private var showsPhotoPicker = false
     @State private var confirmsDelete = false
+    @State private var confirmsLeave = false
+    /// Leave group's sheet sent the only member to Delete group: open it once that sheet has gone.
+    @State private var deletesAfterLeaveSheet = false
     @State private var isUploadingPhoto = false
     @State private var isSavingName = false
     @State private var isArchiving = false
@@ -36,6 +39,7 @@ struct GroupSettingsView: View {
                 photoCard
                 detailsCard
                 if canEdit { archiveCard }
+                leaveCard
                 if isOwner { deleteButton }
             }
             .padding(.horizontal, 20)
@@ -47,6 +51,12 @@ struct GroupSettingsView: View {
         // Renamed elsewhere (or by someone else): show the new name unless you're mid-edit.
         .onChange(of: group.name) { old, new in if name == old { name = new } }
         .sheet(isPresented: $confirmsDelete) { deleteSheet }
+        .sheet(isPresented: $confirmsLeave, onDismiss: {
+            if deletesAfterLeaveSheet {
+                deletesAfterLeaveSheet = false
+                confirmsDelete = true
+            }
+        }) { leaveSheet }
         .errorAlert($error)
         .toast($toast)
     }
@@ -209,6 +219,45 @@ struct GroupSettingsView: View {
             }
             .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
             .disabled(isArchiving)
+        }
+    }
+
+    // MARK: Leave
+
+    private var leaveCard: some View {
+        GlassPanel(cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Leave group").bodyFont(15, .semibold)
+                Text(leaveCaption)
+                    .bodyFont(13, relativeTo: .subheadline)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button { confirmsLeave = true } label: {
+                Label("Leave group", systemImage: "rectangle.portrait.and.arrow.right")
+            }
+            .buttonStyle(.filled(.warning, height: 44, cornerRadius: 14, fontSize: 14))
+        }
+    }
+
+    private var leaveCaption: String {
+        isOwner
+            ? "You\u{2019}ll choose an admin to become the owner. You\u{2019}ll need a new invite to come back."
+            : "You\u{2019}ll need a new invite to come back."
+    }
+
+    @ViewBuilder private var leaveSheet: some View {
+        if let me = app.session.user?.id {
+            LeaveGroupSheet(group: group, me: me, api: detail.api, onMemberUpdated: { member in
+                var updated = group
+                if let index = updated.members.firstIndex(where: { $0.userId == member.userId }) { updated.members[index] = member }
+                detail.update(updated)
+            }, onLeft: {
+                app.router.closeGroup(group.id)
+            }, onDeleteInstead: {
+                deletesAfterLeaveSheet = true
+                confirmsLeave = false
+            })
         }
     }
 

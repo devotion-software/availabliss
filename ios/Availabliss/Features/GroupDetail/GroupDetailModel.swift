@@ -101,6 +101,8 @@ final class GroupDetailModel {
                 } else {
                     group?.members.append(member)
                 }
+                // Made an admin, or handed the group by an owner who left: our own role changed.
+                if member.userId == me() { group?.role = member.role }
             }
             if let members = group?.members {
                 group?.memberCount = members.count

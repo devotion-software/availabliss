@@ -106,9 +106,13 @@ enum API {
         static func setRole(groupId: String, userId: String, role: Role) -> Endpoint<Member> {
             .init(.patch, "/groups/\(groupId.pathEncoded)/members/\(userId.pathEncoded)", body: RoleBody(role: role))
         }
-        /// Removes a member, or leaves the group when `userId` is yourself.
+        /// Removes a member (an admin removing someone else).
         static func removeMember(groupId: String, userId: String) -> Endpoint<EmptyResponse> {
             .init(.delete, "/groups/\(groupId.pathEncoded)/members/\(userId.pathEncoded)")
+        }
+        /// Leaves the group. The owner names the admin who becomes the owner.
+        static func leave(groupId: String, newOwnerId: String?) -> Endpoint<EmptyResponse> {
+            .init(.post, "/groups/\(groupId.pathEncoded)/leave", body: LeaveGroupBody(newOwnerId: newOwnerId))
         }
         /// The optional AI planner (Pro). Can take up to a minute.
         static func planner(groupId: String, notes: String?) -> Endpoint<PlannerResult> {

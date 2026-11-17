@@ -24,7 +24,6 @@ final class MembersViewModel {
     }
 
     var isAdmin: Bool { group?.role.isAdmin ?? false }
-    var isOwner: Bool { group?.role == .owner }
 
     var sortedMembers: [Member] {
         let order: [Role: Int] = [.owner: 0, .admin: 1, .member: 2]
@@ -107,16 +106,6 @@ final class MembersViewModel {
             group?.members.removeAll { $0.userId == member.userId }
         } catch {
             self.error = error.userMessage
-        }
-    }
-
-    func leave(me: String) async -> Bool {
-        do {
-            try await api.send(API.Groups.removeMember(groupId: groupId, userId: me))
-            return true
-        } catch {
-            self.error = error.userMessage
-            return false
         }
     }
 

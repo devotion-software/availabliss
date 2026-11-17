@@ -135,6 +135,8 @@ struct UpdateGroupBody: Encodable, Sendable {
 
 struct RoleBody: Encodable, Sendable { let role: Role }
 
+struct LeaveGroupBody: Encodable, Sendable { let newOwnerId: String? }
+
 struct NudgeResponse: Decodable, Sendable { let nudged: Int }
 
 struct InviteLink: Decodable, Sendable {

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Members & invites: share an invite link, manage roles, leave the group. (The group's photo and
+/// Members & invites: share an invite link, manage roles. (The group's photo, Leave group and
 /// Delete group are in Group settings.)
 struct MembersView: View {
     @Environment(AppModel.self) private var app
@@ -9,11 +9,10 @@ struct MembersView: View {
     @State private var confirmation: Confirmation?
 
     private enum Confirmation: Identifiable {
-        case remove(Member), leave
+        case remove(Member)
         var id: String {
             switch self {
             case .remove(let member): "remove-\(member.userId)"
-            case .leave: "leave"
             }
         }
     }
@@ -44,7 +43,6 @@ struct MembersView: View {
                 } else {
                     StatusView(kind: .loading)
                 }
-                dangerZone
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -64,10 +62,6 @@ struct MembersView: View {
             switch item {
             case .remove(let member):
                 Button("Remove \(member.firstName)", role: .destructive) { Task { await model.remove(member) } }
-            case .leave:
-                Button("Leave group", role: .destructive) {
-                    Task { if let me, await model.leave(me: me) { app.router.groupsPath = [] } }
-                }
             }
         }
         .errorAlert($model.error)
@@ -77,7 +71,6 @@ struct MembersView: View {
     private var confirmationTitle: String {
         switch confirmation {
         case .remove(let member): "Remove \(member.name) from the group?"
-        case .leave: "Leave this group? You'll need a new invite to come back."
         case nil: ""
         }
     }
@@ -139,15 +132,6 @@ struct MembersView: View {
 
     private func sendInvites() {
         Task { await model.sendInvites() }
-    }
-
-    private var dangerZone: some View {
-        VStack(spacing: 4) {
-            if model.group != nil && !model.isOwner {
-                Button("Leave group") { confirmation = .leave }.buttonStyle(.textAction).foregroundStyle(theme.warnInk)
-            }
-        }
-        .frame(maxWidth: .infinity)
     }
 }
 
