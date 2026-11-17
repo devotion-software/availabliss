@@ -106,9 +106,12 @@ struct Group: Codable, Sendable, Identifiable, Equatable {
     var requirementSummary: String
     var requirement: Requirement
     var members: [Member]
+    /// Archive it automatically once its event has passed and nothing else is planned (older servers omit it).
+    var autoArchive: Bool?
     var createdAt: Date
 
     var isArchived: Bool { archived ?? false }
+    var archivesAutomatically: Bool { autoArchive ?? false }
     func member(_ userId: String) -> Member? { members.first { $0.userId == userId } }
     var pendingMembers: [Member] { members.filter { !$0.synced } }
 }
@@ -131,6 +134,8 @@ struct UpdateGroupBody: Encodable, Sendable {
     var requirement: Requirement?
     /// true archives the group for everyone, false unarchives it.
     var archived: Bool?
+    /// Archive it automatically once its event has passed.
+    var autoArchive: Bool?
 }
 
 struct RoleBody: Encodable, Sendable { let role: Role }

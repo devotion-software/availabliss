@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Group settings, from the group's More menu: its photo, name and colour, Archive / Unarchive, Leave
 /// group and Delete group. Everyone can open it and leave; only the owner and admins can change things
-/// (the server's rules), and only the owner can delete the group. Each part is its own section, so more
-/// settings (auto-archiving) slot in as further sections.
+/// (the server's rules), and only the owner can delete the group. Each part is its own section. Admins
+/// can also have the group archive itself once its event has passed.
 struct GroupSettingsView: View {
     let detail: GroupDetailModel
     let group: Group
@@ -18,6 +18,7 @@ struct GroupSettingsView: View {
     @State private var isUploadingPhoto = false
     @State private var isSavingName = false
     @State private var isArchiving = false
+    @State private var isSavingAutoArchive = false
     @State private var isDeleting = false
     @State private var error: String?
     @State private var toast: String?
@@ -219,6 +220,28 @@ struct GroupSettingsView: View {
             }
             .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
             .disabled(isArchiving)
+            Divider().overlay(theme.line).padding(.vertical, 2)
+            Toggle(isOn: Binding(get: { group.archivesAutomatically }, set: setAutoArchive)) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Archive automatically").bodyFont(15, .semibold)
+                    Text("Once its last event has passed and nothing else is planned. A new plan brings it back.")
+                        .bodyFont(13, relativeTo: .subheadline)
+                        .foregroundStyle(theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.glassSwitch)
+            .disabled(isSavingAutoArchive)
+        }
+    }
+
+    private func setAutoArchive(_ on: Bool) {
+        Task {
+            isSavingAutoArchive = true
+            defer { isSavingAutoArchive = false }
+            if await update(UpdateGroupBody(autoArchive: on)) {
+                toast = on ? "Automatic archiving on" : "Automatic archiving off"
+            }
         }
     }
 
