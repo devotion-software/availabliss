@@ -49,6 +49,8 @@ data class GroupTileUi(
     val unread: Int,
     /** The group's photo, instead of the monogram. */
     val image: String? = null,
+    /** Listed in the collapsed Archived section. */
+    val archived: Boolean = false,
 )
 
 /** The "Up next" card. */
@@ -196,6 +198,7 @@ class HomeViewModel @Inject constructor(
             syncLabel = if (left == 0) "All synced" else "$left of ${g.memberCount} to sync",
             unread = g.unreadCount,
             image = g.image,
+            archived = g.archived,
         )
     }
 }

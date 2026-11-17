@@ -56,7 +56,8 @@ class GroupViewModel @Inject constructor(
             unreadCount = count,
             isAdmin = group?.role?.isAdmin == true,
             membersLine = group?.let {
-                val members = "${it.memberCount} ${if (it.memberCount == 1) "member" else "members"}"
+                val count = "${it.memberCount} ${if (it.memberCount == 1) "member" else "members"}"
+                val members = if (it.archived) "$count · archived" else count
                 when (it.role) {
                     dev.joeherbert.availabliss.core.network.model.Role.Owner -> "$members · you're the owner"
                     dev.joeherbert.availabliss.core.network.model.Role.Admin -> "$members · you're an admin"

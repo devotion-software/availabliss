@@ -43,6 +43,7 @@ import dev.joeherbert.availabliss.feature.chat.GroupChatTab
 import dev.joeherbert.availabliss.feature.events.EventEditorScreen
 import dev.joeherbert.availabliss.feature.events.EventsScreen
 import dev.joeherbert.availabliss.feature.group.GroupScreen
+import dev.joeherbert.availabliss.feature.group.GroupSettingsScreen
 import dev.joeherbert.availabliss.feature.group.GroupViewModel
 import dev.joeherbert.availabliss.feature.home.HomeScreen
 import dev.joeherbert.availabliss.feature.members.InviteScreen
@@ -76,6 +77,9 @@ fun MainNavHost(root: RootViewModel) {
         // The calendars screen consumes its own link so it can show "connected" / the error.
         if (link !is DeepLink.Calendars) root.consume(link)
     }
+
+    // A group you're no longer in (deleted, or you were removed): close its screens.
+    LaunchedEffect(root) { root.groupsLeft.collect { nav.closeGroup(it) } }
 
     val entry by nav.currentBackStackEntryAsState()
     val destination = entry?.destination
@@ -140,6 +144,7 @@ fun MainNavHost(root: RootViewModel) {
                     onOpenPlans = { nav.navigate(GroupPlansRoute(groupId)) },
                     onOpenTiming = { nav.navigate(GroupTimingRoute(groupId)) },
                     onOpenMembers = { nav.navigate(MembersRoute(groupId)) },
+                    onOpenSettings = { nav.navigate(GroupSettingsRoute(groupId)) },
                     onOpenProposal = { nav.navigate(ProposalRoute(it)) },
                     onCreateProposal = { p -> nav.navigate(CreateProposalRoute(groupId, p.start, p.end, p.allDay, p.title, p.note)) },
                 )
@@ -189,6 +194,12 @@ fun MainNavHost(root: RootViewModel) {
                 )
             }
             composable<GroupTimingRoute> { GroupTimingTab(onBack = { nav.popBackStack() }, onSaved = { nav.popBackStack() }) }
+            composable<GroupSettingsRoute> {
+                GroupSettingsScreen(
+                    onBack = { nav.popBackStack() },
+                    onDeleted = { nav.popBackStack(HomeRoute, inclusive = false) },
+                )
+            }
             composable<NewGroupRoute> {
                 NewGroupScreen(
                     onBack = { nav.popBackStack() },
@@ -301,6 +312,17 @@ internal inline fun <reified T : Any> NavHostController.openGroupSection(groupId
     if (top?.destination?.hasRoute<T>() == true && top.toRoute<T>() == section) return
     if (top?.destination?.hasRoute<GroupRoute>() != true || top.toRoute<GroupRoute>().groupId != groupId) navigate(GroupRoute(groupId))
     navigate(section)
+}
+
+/**
+ * Pops the screens of [groupId] (its calendar, sections, members, settings, events…) off the top
+ * of the back stack, so a group that's gone doesn't stay on screen. Every group screen's route
+ * carries a `groupId`.
+ */
+private fun NavHostController.closeGroup(groupId: String) {
+    while (currentBackStackEntry?.arguments?.getString("groupId") == groupId) {
+        if (!popBackStack()) break
+    }
 }
 
 /** The back stack entry of [groupId]'s calendar, if it's open under the current screen. */

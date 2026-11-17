@@ -17,6 +17,8 @@ data class GroupSummary(
     /** The group's photo, shown instead of the monogram tile. Absent on older servers. */
     val image: String? = null,
     val role: Role,
+    /** Archived by an admin: listed in the groups list's collapsed Archived section. Absent on older servers. */
+    val archived: Boolean = false,
     val memberCount: Int,
     val syncedCount: Int,
     val requirementSummary: String,
@@ -68,6 +70,7 @@ data class Group(
     /** The group's photo, shown instead of the monogram tile. */
     val image: String? = null,
     val role: Role,
+    val archived: Boolean = false,
     val memberCount: Int,
     val syncedCount: Int,
     val requirementSummary: String,
@@ -99,6 +102,8 @@ data class UpdateGroupRequest(
     val name: String? = null,
     val color: TileColor? = null,
     val requirement: Requirement? = null,
+    /** true archives the group for everyone, false unarchives it. */
+    val archived: Boolean? = null,
 )
 
 @Serializable

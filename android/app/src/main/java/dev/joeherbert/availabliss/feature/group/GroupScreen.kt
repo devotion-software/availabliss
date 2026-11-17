@@ -50,8 +50,8 @@ import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
 val GroupTopBarHeight = 64.dp
 
 /**
- * A group: its calendar, under a pinned header (back, name, chat, "More"). Chat, Plans, Timing
- * and Members are their own screens pushed on top. The app's tab bar stays at the bottom.
+ * A group: its calendar, under a pinned header (back, name, chat, "More"). Chat, Plans, Timing,
+ * Members and Group settings are their own screens pushed on top. The app's tab bar stays at the bottom.
  */
 @Composable
 fun GroupScreen(
@@ -60,6 +60,7 @@ fun GroupScreen(
     onOpenPlans: () -> Unit,
     onOpenTiming: () -> Unit,
     onOpenMembers: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenProposal: (String) -> Unit,
     onCreateProposal: (ProposalPrefill) -> Unit,
     viewModel: GroupViewModel = hiltViewModel(),
@@ -73,7 +74,7 @@ fun GroupScreen(
         )
         GroupTopBar(
             state,
-            GroupTopBarActions(onBack, onOpenChat, onOpenPlans, onOpenTiming, onOpenMembers),
+            GroupTopBarActions(onBack, onOpenChat, onOpenPlans, onOpenTiming, onOpenMembers, onOpenSettings),
             Modifier.align(Alignment.TopCenter),
         )
     }
@@ -85,6 +86,7 @@ private class GroupTopBarActions(
     val onOpenPlans: () -> Unit,
     val onOpenTiming: () -> Unit,
     val onOpenMembers: () -> Unit,
+    val onOpenSettings: () -> Unit,
 )
 
 @Composable
@@ -146,6 +148,7 @@ private fun MoreMenu(isAdmin: Boolean, actions: GroupTopBarActions) {
                 // Only owners and admins can invite, so only they see "invites".
                 if (isAdmin) Triple("Members and invites", AvIcons.AddPerson, actions.onOpenMembers)
                 else Triple("Members", AvIcons.People, actions.onOpenMembers),
+                Triple("Group settings", AvIcons.Settings, actions.onOpenSettings),
             ).forEach { (label, icon, onClick) -> MenuItem(label, icon) { open = false; onClick() } }
         }
     }
@@ -168,7 +171,7 @@ private fun GroupTopBarPreview() {
     AvailablissPreviewTheme {
         GroupTopBar(
             GroupShellUiState("Lake District crew", unreadCount = 3, isAdmin = true, membersLine = "6 members · you're an admin"),
-            GroupTopBarActions({}, {}, {}, {}, {}),
+            GroupTopBarActions({}, {}, {}, {}, {}, {}),
         )
     }
 }

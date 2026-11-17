@@ -12,7 +12,6 @@ import dev.joeherbert.availabliss.core.live.LivePayload
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.Role
-import dev.joeherbert.availabliss.core.network.model.TileColor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,7 +45,6 @@ data class MemberUi(
 sealed interface ConfirmAction {
     data class Remove(val member: MemberUi) : ConfirmAction
     data object Leave : ConfirmAction
-    data object DeleteGroup : ConfirmAction
 }
 
 /** "sam@example.com" / "@sam" + "Invited · invite expires Saturday 28 November", or the link. */
@@ -62,11 +60,6 @@ data class InviteUi(
 
 data class MembersUiState(
     val groupName: String = "",
-    val monogram: String = "",
-    val tileColor: TileColor = TileColor.T1,
-    /** The group's photo, instead of the monogram. */
-    val groupImage: String? = null,
-    val uploadingPhoto: Boolean = false,
     val members: List<MemberUi> = emptyList(),
     val myRole: Role? = null,
     val loading: Boolean = true,
@@ -81,7 +74,7 @@ data class MembersUiState(
     val pendingShareUrl: String? = null,
     val confirm: ConfirmAction? = null,
     val working: Boolean = false,
-    /** True once the user has left or deleted the group (navigate away). */
+    /** True once the user has left the group (navigate away). */
     val left: Boolean = false,
     val message: UserMessage? = null,
 ) {
@@ -235,8 +228,6 @@ class MembersViewModel @Inject constructor(
 
     fun requestLeave() = _state.update { it.copy(confirm = ConfirmAction.Leave) }
 
-    fun requestDelete() = _state.update { it.copy(confirm = ConfirmAction.DeleteGroup) }
-
     fun dismissConfirm() = _state.update { it.copy(confirm = null) }
 
     fun confirm() {
@@ -248,7 +239,6 @@ class MembersViewModel @Inject constructor(
                 is ConfirmAction.Remove -> groups.removeMember(groupId, action.member.userId, isSelf = false)
                 ConfirmAction.Leave -> meId?.let { groups.removeMember(groupId, it, isSelf = true) }
                     ?: ApiResult.Success(Unit)
-                ConfirmAction.DeleteGroup -> groups.delete(groupId)
             }
             when (result) {
                 is ApiResult.Success -> _state.update {
@@ -262,29 +252,6 @@ class MembersViewModel @Inject constructor(
         }
     }
     // endregion
-
-    /** Uploads a picked group photo (already a JPEG), or removes it with null. Admins only. */
-    fun setPhoto(jpeg: ByteArray?) {
-        if (!_state.value.isAdmin || _state.value.uploadingPhoto) return
-        viewModelScope.launch {
-            _state.update { it.copy(uploadingPhoto = true) }
-            // Success caches the group in GroupsRepository, which flows back here through groups.group().
-            val result = groups.setImage(groupId, jpeg)
-            _state.update {
-                it.copy(
-                    uploadingPhoto = false,
-                    message = UserMessage(
-                        when (result) {
-                            is ApiResult.Success -> if (jpeg == null) "Group photo removed" else "Group photo updated"
-                            is ApiResult.Failure -> result.error.message
-                        },
-                    ),
-                )
-            }
-        }
-    }
-
-    fun photoUnreadable() = showMessage("Couldn't read that photo.")
 
     fun messageShown(message: UserMessage) = _state.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 
@@ -311,9 +278,6 @@ class MembersViewModel @Inject constructor(
             }
         return copy(
             groupName = group.name,
-            monogram = group.monogram,
-            tileColor = group.color,
-            groupImage = group.image,
             members = members,
             myRole = myRole,
             loading = false,

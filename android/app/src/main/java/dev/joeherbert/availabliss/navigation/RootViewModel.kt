@@ -6,16 +6,20 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.auth.AuthState
 import dev.joeherbert.availabliss.core.auth.SessionManager
 import dev.joeherbert.availabliss.core.data.AppPreferences
+import dev.joeherbert.availabliss.core.data.GroupsRepository
+import dev.joeherbert.availabliss.core.live.LiveEvents
 import dev.joeherbert.availabliss.core.data.Appearance
 import dev.joeherbert.availabliss.core.data.NotificationsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.deeplink.DeepLink
 import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
 import dev.joeherbert.availabliss.core.network.ApiResult
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -36,6 +40,8 @@ class RootViewModel @Inject constructor(
     prefs: AppPreferences,
     private val deepLinkBus: DeepLinkBus,
     notifications: NotificationsRepository,
+    liveEvents: LiveEvents,
+    groups: GroupsRepository,
 ) : ViewModel() {
 
     private val loadFailed = MutableStateFlow(false)
@@ -55,6 +61,9 @@ class RootViewModel @Inject constructor(
 
     val pendingDeepLink: StateFlow<DeepLink?> = deepLinkBus.pending
     val unreadNotifications: StateFlow<Int> = notifications.unread
+
+    /** Groups you've just left, been removed from, or that were deleted: their screens close. */
+    val groupsLeft: Flow<String> = liveEvents.groupsLeft { users.user.value?.id }.onEach(groups::forget)
 
     init {
         viewModelScope.launch {

@@ -213,22 +213,7 @@ fun NewGroupContent(
                 }
                 GlassPanel(contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionLabel("Colour")
-                    Row(
-                        Modifier.fillMaxWidth().selectableGroup(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        TileColor.entries.forEachIndexed { index, tile ->
-                            val selected = tile == state.color
-                            Box(
-                                Modifier
-                                    .then(if (selected) Modifier.outlineOutside(RoundedCornerShape(16.dp), colors.ink, width = 2.5.dp, offset = 3.dp) else Modifier)
-                                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onColorChange(tile) })
-                                    .semantics { contentDescription = "Colour ${index + 1}" },
-                            ) {
-                                GroupTile(state.monogramPreview, colors.tile(tile), size = 48.dp, radius = 16.dp)
-                            }
-                        }
-                    }
+                    GroupColorPicker(state.color, state.monogramPreview, onColorChange)
                 }
                 if (state.templates.isNotEmpty()) {
                     GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -334,5 +319,30 @@ private fun StepDots(total: Int, step: Int) {
 private fun NewGroupPreview() {
     AvailablissPreviewTheme {
         NewGroupContent(NewGroupUiState(name = "Lake District crew", color = TileColor.T2), {}, {}, {}, {})
+    }
+}
+
+/**
+ * The group tile colours (`t1` … `t5`) as a row of tiles showing [monogram], the chosen one
+ * outlined. Used when creating a group and in its settings.
+ */
+@Composable
+fun GroupColorPicker(selected: TileColor, monogram: String, onPick: (TileColor) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val colors = AvailablissTheme.colors
+    Row(
+        modifier.fillMaxWidth().selectableGroup(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        TileColor.entries.forEachIndexed { index, tile ->
+            val isSelected = tile == selected
+            Box(
+                Modifier
+                    .then(if (isSelected) Modifier.outlineOutside(RoundedCornerShape(16.dp), colors.ink, width = 2.5.dp, offset = 3.dp) else Modifier)
+                    .selectable(selected = isSelected, enabled = enabled, role = Role.RadioButton, onClick = { onPick(tile) })
+                    .semantics { contentDescription = "Colour ${index + 1}" },
+            ) {
+                GroupTile(monogram, colors.tile(tile), size = 48.dp, radius = 16.dp)
+            }
+        }
     }
 }

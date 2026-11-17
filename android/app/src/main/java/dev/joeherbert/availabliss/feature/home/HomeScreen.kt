@@ -21,6 +21,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -101,6 +107,10 @@ fun HomeContent(
     onRetry: () -> Unit,
     snackbar: @Composable () -> Unit = {},
 ) {
+    // The Archived section starts collapsed.
+    var showsArchived by rememberSaveable { mutableStateOf(false) }
+    val active = state.groups.filterNot { it.archived }
+    val archived = state.groups.filter { it.archived }
     AvailablissBackground(OrbLayout.Main) {
         LazyColumn(
             Modifier.fillMaxSize().statusBarsPadding(),
@@ -127,9 +137,23 @@ fun HomeContent(
                     )
                 }
                 // The concept spaces tiles 10dp apart inside an 18dp-gap column.
-                else -> item(key = "groups") {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                        state.groups.forEach { tile -> GroupRow(tile, onClick = { onOpenGroup(tile.id) }, onOpenChat = { onOpenGroupChat(tile.id) }) }
+                else -> {
+                    if (active.isNotEmpty()) {
+                        item(key = "groups") {
+                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                                active.forEach { tile -> GroupRow(tile, onClick = { onOpenGroup(tile.id) }, onOpenChat = { onOpenGroupChat(tile.id) }) }
+                            }
+                        }
+                    }
+                    if (archived.isNotEmpty()) {
+                        item(key = "archived") {
+                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                                ArchivedToggle(archived.size, showsArchived) { showsArchived = !showsArchived }
+                                if (showsArchived) {
+                                    archived.forEach { tile -> GroupRow(tile, onClick = { onOpenGroup(tile.id) }, onOpenChat = { onOpenGroupChat(tile.id) }) }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -297,5 +321,27 @@ private fun SyncedTick() {
     val colors = AvailablissTheme.colors
     Box(Modifier.size(16.dp).clip(CircleShape).background(colors.ok), contentAlignment = Alignment.Center) {
         Icon(AvIcons.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp))
+    }
+}
+
+/** "Archived (2)" with a chevron: shows or hides the archived groups under it. */
+@Composable
+private fun ArchivedToggle(count: Int, expanded: Boolean, onToggle: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 44.dp)
+            .clip(Shapes.inner)
+            .clickable(role = Role.Button, onClick = onToggle)
+            .semantics {
+                heading()
+                stateDescription = if (expanded) "Shown" else "Hidden"
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Archived ($count)", style = AvailablissTheme.type.bodySmallStrong, color = colors.muted)
+        Icon(AvIcons.ChevronDown, null, tint = colors.muted, modifier = Modifier.size(14.dp).rotate(if (expanded) 0f else -90f))
     }
 }

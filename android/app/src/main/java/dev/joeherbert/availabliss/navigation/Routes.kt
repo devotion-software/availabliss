@@ -22,6 +22,8 @@ import kotlinx.serialization.Serializable
 /** Proposals and events ("Plans"). */
 @Serializable data class GroupPlansRoute(val groupId: String)
 @Serializable data class GroupTimingRoute(val groupId: String)
+/** Photo, name, colour, archive and delete. */
+@Serializable data class GroupSettingsRoute(val groupId: String)
 
 @Serializable data object NewGroupRoute
 @Serializable data class MembersRoute(val groupId: String)

@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -77,6 +78,15 @@ class LiveEvents @Inject constructor(
 
     /** Typed payloads for every group. */
     val payloads: Flow<LivePayload> = frames.map { it.payload }
+
+    /**
+     * Ids of groups the signed-in user ([meId]) is no longer in: removed, or the group was deleted
+     * (`member.changed` with their own `{ userId, removed: true }`).
+     */
+    fun groupsLeft(meId: () -> String?): Flow<String> = frames.mapNotNull { frame ->
+        val removed = frame.payload as? LivePayload.MemberRemoved ?: return@mapNotNull null
+        frame.event.groupId?.takeIf { removed.userId == meId() }
+    }
 
     @Synchronized
     fun start() {

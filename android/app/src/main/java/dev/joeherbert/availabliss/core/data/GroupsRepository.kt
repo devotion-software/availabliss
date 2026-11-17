@@ -64,7 +64,8 @@ class GroupsRepository @Inject constructor(
         name: String? = null,
         color: TileColor? = null,
         requirement: Requirement? = null,
-    ): ApiResult<Group> = call { api.updateGroup(id, UpdateGroupRequest(name, color, requirement)) }.onSuccess(::cache)
+        archived: Boolean? = null,
+    ): ApiResult<Group> = call { api.updateGroup(id, UpdateGroupRequest(name, color, requirement, archived)) }.onSuccess(::cache)
 
     suspend fun delete(id: String): ApiResult<Unit> = call { api.deleteGroup(id) }.onSuccess { forget(id) }
 
@@ -149,15 +150,20 @@ class GroupsRepository @Inject constructor(
 
     private fun cache(group: Group) {
         details.update { it + (group.id to group) }
-        // Keep the groups list's tile in step (rename, colour, photo) without refetching it.
+        // Keep the groups list's tile in step (rename, colour, photo, archived) without refetching it.
         _groups.update { list ->
             list?.map {
-                if (it.id == group.id) it.copy(name = group.name, color = group.color, monogram = group.monogram, image = group.image) else it
+                if (it.id == group.id) {
+                    it.copy(name = group.name, color = group.color, monogram = group.monogram, image = group.image, archived = group.archived)
+                } else {
+                    it
+                }
             }
         }
     }
 
-    private fun forget(id: String) {
+    /** Drops a group you're no longer in (deleted, or you were removed) from the caches. */
+    fun forget(id: String) {
         details.update { it - id }
         _groups.update { list -> list?.filterNot { it.id == id } }
     }
