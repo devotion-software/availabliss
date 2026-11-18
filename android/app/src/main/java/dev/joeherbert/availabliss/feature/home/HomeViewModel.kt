@@ -75,7 +75,8 @@ data class HomeUiState(
     val greeting: String = "Hi",
     val profileInitial: String = "",
     val profileImage: String? = null,
-    val upNext: UpNextUi? = null,
+    /** The next confirmed plans, soonest first (a few at most), for the Up next pager. */
+    val upNext: List<UpNextUi> = emptyList(),
     val groups: List<GroupTileUi> = emptyList(),
     val calendar: AddToCalendarState = AddToCalendarState(),
     val error: String? = null,
@@ -88,6 +89,9 @@ private data class HomeRaw(
     val error: String? = null,
     val message: UserMessage? = null,
 )
+
+/** How many plans Up next swipes through. */
+private const val UP_NEXT_LIMIT = 5
 
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -104,14 +108,13 @@ class HomeViewModel @Inject constructor(
 
     val uiState: StateFlow<HomeUiState> =
         combine(raw, groups.groups, users.user, addToCalendar.state) { r, list, user, calendar ->
-            val upNext = r.upcoming.firstOrNull()
             HomeUiState(
                 loading = r.loading && list == null,
                 dateLabel = DateTimes.longDay(DateTimes.today()),
                 greeting = user?.name?.firstName()?.takeIf { it.isNotBlank() }?.let { "Hi, $it" } ?: "Hi",
                 profileInitial = user?.name?.initial().orEmpty(),
                 profileImage = user?.image,
-                upNext = upNext?.let { toUpNext(it, list.orEmpty(), calendar.status(it.id)) },
+                upNext = r.upcoming.take(UP_NEXT_LIMIT).map { toUpNext(it, list.orEmpty(), calendar.status(it.id)) },
                 groups = list.orEmpty().map(::toTile),
                 calendar = calendar,
                 error = r.error,
@@ -155,8 +158,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun addUpNextToCalendar() {
-        val event = raw.value.upcoming.firstOrNull() ?: return
+    fun addToCalendar(eventId: String) {
+        val event = raw.value.upcoming.firstOrNull { it.id == eventId } ?: return
         val draft = CalendarEventDraft.from(event) ?: return
         viewModelScope.launch { addToCalendar.add(event.id, draft) }
     }

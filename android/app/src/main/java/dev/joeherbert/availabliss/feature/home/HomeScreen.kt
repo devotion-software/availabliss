@@ -1,5 +1,16 @@
 package dev.joeherbert.availabliss.feature.home
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -92,7 +103,7 @@ fun HomeScreen(
         onOpenUpNext = { upNext -> upNext.proposalId?.let(onOpenProposal) ?: onOpenGroupPlans(upNext.groupId) },
         onNewGroup = onNewGroup,
         onOpenProfile = onOpenProfile,
-        onAddToCalendar = viewModel::addUpNextToCalendar,
+        onAddToCalendar = viewModel::addToCalendar,
         onRetry = { viewModel.refresh() },
         snackbar = { AvSnackbarHost(snackbar) },
     )
@@ -106,7 +117,7 @@ fun HomeContent(
     onOpenUpNext: (UpNextUi) -> Unit,
     onNewGroup: () -> Unit,
     onOpenProfile: () -> Unit,
-    onAddToCalendar: () -> Unit,
+    onAddToCalendar: (eventId: String) -> Unit,
     onRetry: () -> Unit,
     snackbar: @Composable () -> Unit = {},
 ) {
@@ -121,8 +132,8 @@ fun HomeContent(
             verticalArrangement = Arrangement.spacedBy(Spacing.xxl),
         ) {
             item(key = "header") { Header(state, onOpenProfile) }
-            state.upNext?.let { upNext ->
-                item(key = "upnext") { UpNextCard(upNext, onOpen = { onOpenUpNext(upNext) }, onAddToCalendar = onAddToCalendar) }
+            if (state.upNext.isNotEmpty()) {
+                item(key = "upnext") { UpNextPager(state.upNext, onOpen = onOpenUpNext, onAddToCalendar = onAddToCalendar) }
             }
             state.error?.let { error -> item(key = "error") { ErrorBanner(error, onRetry = onRetry) } }
             item(key = "groups-title") {
@@ -190,36 +201,113 @@ private fun Header(state: HomeUiState, onOpenProfile: () -> Unit) {
     }
 }
 
+/**
+ * The next confirmed plans, one card each, swiped left and right with page dots under them (no
+ * dots when there's only one). Cards grow to match the tallest so the dots don't jump.
+ */
 @Composable
-private fun UpNextCard(upNext: UpNextUi, onOpen: () -> Unit, onAddToCalendar: () -> Unit) {
+private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAddToCalendar: (String) -> Unit) {
+    if (plans.size == 1) {
+        val plan = plans.first()
+        UpNextCard(plan, onOpen = { onOpen(plan) }, onAddToCalendar = { onAddToCalendar(plan.key) })
+        return
+    }
+    val pager = rememberPagerState { plans.size }
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    // The tallest card so far; every card is at least this tall.
+    var tallest by remember(plans.map { it.key }) { mutableIntStateOf(0) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        HorizontalPager(
+            state = pager,
+            // Spans the screen's full width, so the cards' shadows aren't cut off at the sides and the
+            // next card slides in from the screen's edge; the padding puts each card back in line.
+            modifier = Modifier.layout { measurable, constraints ->
+                val extra = (Spacing.screen * 2).roundToPx()
+                val width = constraints.maxWidth + extra
+                val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+                layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+            },
+            contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, bottom = 14.dp),
+            pageSpacing = Spacing.screen,
+            beyondViewportPageCount = plans.size,
+            verticalAlignment = Alignment.Top,
+            key = { plans[it].key },
+        ) { page ->
+            val plan = plans[page]
+            UpNextCard(
+                plan,
+                onOpen = { onOpen(plan) },
+                onAddToCalendar = { onAddToCalendar(plan.key) },
+                modifier = Modifier
+                    .heightIn(min = with(density) { tallest.toDp() })
+                    .onSizeChanged { if (it.height > tallest) tallest = it.height },
+            )
+        }
+        PageDots(count = plans.size, current = pager.currentPage) { scope.launch { pager.animateScrollToPage(it) } }
+    }
+}
+
+/** A row of small dots, the current one wider and darker; tapping one goes to it. */
+@Composable
+private fun PageDots(count: Int, current: Int, onSelect: (Int) -> Unit) {
+    val colors = AvailablissTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) { contentDescription = "Plan ${current + 1} of $count" },
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(count) { index ->
+            val selected = index == current
+            val width by animateDpAsState(if (selected) 18.dp else 7.dp, label = "dot")
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .clickable(onClickLabel = "Show plan ${index + 1}") { onSelect(index) }
+                    .padding(horizontal = 3.dp, vertical = 8.dp)
+                    .size(width = width, height = 7.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) colors.ink else colors.muted.copy(alpha = 0.35f)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpNextCard(upNext: UpNextUi, onOpen: () -> Unit, onAddToCalendar: () -> Unit, modifier: Modifier = Modifier) {
     val colors = AvailablissTheme.colors
     // The whole card opens the plan; Add to calendar and Change inside it keep their own taps.
+    // In the pager a shorter card stretches to match the tallest, keeping its button at the foot.
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .glass(Shapes.cardLarge)
             .clickable(role = Role.Button, onClickLabel = "Open plan", onClick = onOpen)
             .padding(18.dp)
             .semantics(mergeDescendants = false) { contentDescription = "Up next" },
-        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        upNext.image?.let { CoverPhoto(it) }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            StatusPill(
-                "Everyone's in",
-                PillTone.Mint,
-                icon = AvIcons.Check,
-                style = AvailablissTheme.type.captionStrong,
-                padding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
-            )
-            Text(upNext.groupName, style = AvailablissTheme.type.caption, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xl)) {
+            upNext.image?.let { CoverPhoto(it) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                StatusPill(
+                    "Everyone's in",
+                    PillTone.Mint,
+                    icon = AvIcons.Check,
+                    style = AvailablissTheme.type.captionStrong,
+                    padding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
+                )
+                Text(upNext.groupName, style = AvailablissTheme.type.caption, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(upNext.whenLabel, style = AvailablissTheme.type.titleLarge, color = colors.ink)
+                val detail = listOf(upNext.title, upNext.detail).filter { it.isNotBlank() }.joinToString(" · ")
+                if (detail.isNotBlank()) Text(detail, style = AvailablissTheme.type.body, color = colors.muted)
+            }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(upNext.whenLabel, style = AvailablissTheme.type.titleLarge, color = colors.ink)
-            val detail = listOf(upNext.title, upNext.detail).filter { it.isNotBlank() }.joinToString(" · ")
-            if (detail.isNotBlank()) Text(detail, style = AvailablissTheme.type.body, color = colors.muted)
-        }
-        AddToCalendarButton(upNext.calendar, onClick = onAddToCalendar, height = 48.dp)
+        AddToCalendarButton(upNext.calendar, onClick = onAddToCalendar, height = 48.dp, modifier = Modifier.padding(top = Spacing.xl))
     }
 }
 
@@ -310,7 +398,10 @@ private fun HomePreview() {
                 dateLabel = "Sunday 1 November",
                 greeting = "Hi, Sam",
                 profileInitial = "S",
-                upNext = UpNextUi("e1", "g1", "p1", "Book club", "Book club", "Wed 11 Nov · 18:30", "At Hana's · 8 going", calendar = CalendarStatus()),
+                upNext = listOf(
+                    UpNextUi("e1", "g1", "p1", "Book club", "Book club", "Wed 11 Nov · 18:30", "At Hana's · 8 going", calendar = CalendarStatus()),
+                    UpNextUi("e2", "g2", null, "Lake District crew", "Pub quiz", "Tue 24 Nov · 19:30", "At The Bell · 5 going", calendar = CalendarStatus()),
+                ),
                 groups = listOf(
                     GroupTileUi("1", "Lake District crew", "LD", TileColor.T1, "2 weekends work", PillTone.Indigo, "A weekend · Fri 6pm → Sun · Nov–Jan", people, 4 / 6f, "2 of 6 to sync", 3),
                     GroupTileUi("2", "Mum's 60th", "60", TileColor.T4, "Needs your reply", PillTone.Apricot, "One day · school holidays only", people, 1f, "All synced", 0),
