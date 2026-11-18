@@ -15,7 +15,7 @@ import { defaultRequirement } from './requirements';
 import { syncedUserIds } from './busy';
 import { refreshCoverage } from './calendars';
 import { displayName } from './names';
-import { notify } from './notifications';
+import { notify, removeInviteNotification } from './notifications';
 
 const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -361,6 +361,8 @@ export async function listInvites(groupId: string, userId: string) {
 			token: groupInvites.token,
 			email: groupInvites.email,
 			username: invitee.username,
+			inviteeName: invitee.name,
+			inviteeEmail: invitee.email,
 			expiresAt: groupInvites.expiresAt,
 			createdAt: groupInvites.createdAt,
 			inviterName: user.name,
@@ -405,6 +407,8 @@ export async function previewInvite(token: string) {
 		expiresAt: invite.expiresAt.toISOString(),
 		// Who an emailed invite is for (null for a link anyone can use): prefills sign-in.
 		email: invite.email,
+		// Sent to one person's Activity (by username or as one of a group's people): they can decline it.
+		personal: invite.invitedUserId !== null,
 		// Who it was sent to by username, or null.
 		username: invite.invitedUserId
 			? ((await db.query.user.findFirst({ where: eq(user.id, invite.invitedUserId), columns: { username: true } }))?.username ?? null)
@@ -454,6 +458,29 @@ export async function acceptInvite(token: string, userId: string): Promise<{ gro
 		await refreshCoverage([userId]);
 	}
 	return { groupId: invite.groupId, joined };
+}
+
+/**
+ * Turns down an invite sent to you in Activity: it's gone (the link stops working and the group's
+ * admins no longer see it waiting), and so is its Activity item. Nobody is told.
+ */
+export async function declineInvite(token: string, userId: string): Promise<void> {
+	const invite = await liveInvite(token);
+	if (invite.invitedUserId !== userId) throw forbidden('Only the person this invite was sent to can decline it');
+	await db.delete(groupInvites).where(eq(groupInvites.id, invite.id));
+	await removeInviteNotification(userId, token);
+}
+
+/** Of `ids`, the people who are in at least one group with `userId` (you can invite them by id). */
+export async function peopleInAGroupWith(userId: string, ids: string[]): Promise<Set<string>> {
+	if (!ids.length) return new Set();
+	const theirs = alias(groupMembers, 'theirs');
+	const rows = await db
+		.selectDistinct({ userId: theirs.userId })
+		.from(groupMembers)
+		.innerJoin(theirs, eq(theirs.groupId, groupMembers.groupId))
+		.where(and(eq(groupMembers.userId, userId), inArray(theirs.userId, ids)));
+	return new Set(rows.map((r) => r.userId));
 }
 
 export async function usersByIds(ids: string[]) {

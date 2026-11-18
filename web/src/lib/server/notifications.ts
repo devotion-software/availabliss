@@ -120,6 +120,19 @@ export async function markChatRead(userId: string, groupId: string): Promise<voi
 	}
 }
 
+/** Removes the Activity item for an invite sent to you (`invite.received` with that token). */
+export async function removeInviteNotification(userId: string, token: string): Promise<void> {
+	await db
+		.delete(notifications)
+		.where(
+			and(
+				eq(notifications.userId, userId),
+				eq(notifications.kind, 'invite.received'),
+				sql`json_unquote(json_extract(${notifications.data}, '$.token')) = ${token}`
+			)
+		);
+}
+
 export async function listNotifications(userId: string) {
 	const [rows, [{ unread }]] = await Promise.all([
 		db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(100),

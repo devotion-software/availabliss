@@ -137,9 +137,11 @@ export const inviteSchema = z
 	.object({
 		email: z.email().optional(),
 		emails: z.array(z.email()).max(20, 'Invite up to 20 people at a time').optional(),
-		usernames: z.array(username).max(20, 'Invite up to 20 people at a time').optional()
+		usernames: z.array(username).max(20, 'Invite up to 20 people at a time').optional(),
+		// People who already share a group with you (e.g. a new group with the same people).
+		userIds: z.array(z.string().min(1).max(64)).max(20, 'Invite up to 20 people at a time').optional()
 	})
-	.refine((i) => (i.emails?.length ?? 0) + (i.usernames?.length ?? 0) <= 20, { message: 'Invite up to 20 people at a time' });
+	.refine((i) => (i.emails?.length ?? 0) + (i.usernames?.length ?? 0) + (i.userIds?.length ?? 0) <= 20, { message: 'Invite up to 20 people at a time' });
 
 const blockShape = {
 	start: isoDateTime,

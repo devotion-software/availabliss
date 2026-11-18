@@ -17,6 +17,7 @@ describe('matchRule', () => {
 		expect(matchRule('GET', '/api/v1/calendars/abc/sync')).toBeUndefined();
 		expect(matchRule('GET', '/api/v1/invites/tok')?.name).toBe('invite');
 		expect(matchRule('POST', '/api/v1/invites/tok/accept')?.name).toBe('invite');
+		expect(matchRule('POST', '/api/v1/invites/tok/decline')?.name).toBe('invite');
 		expect(matchRule('GET', '/api/v1/groups/g1/availability/day')?.name).toBe('availability');
 		expect(matchRule('POST', '/api/v1/groups')?.name).toBe('group-create');
 		expect(matchRule('PATCH', '/api/v1/groups/g1')).toBeUndefined();

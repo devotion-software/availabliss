@@ -436,10 +436,11 @@ interface ManualBlock {
 | POST 🔒 | `/groups/:id/preferences` | `{ kind: 'dates', from, to }` or `{ kind: 'weekly', days?: Weekday[], window?: { from, to } \| null }` | `GroupPreference` |
 | DELETE 🔒 | `/groups/:id/preferences/:prefId` | | 204 (your own only) |
 | GET 👑 | `/groups/:id/invites` | | `{ invites: GroupInvite[] }` (live ones, newest first; every invite is single-use, and joining also removes any other invites to that group sent to you) |
-| POST 👑 | `/groups/:id/invites` | `{ emails?: string[], usernames?: string[], email?: string }` (≤ 20 people) | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |
+| POST 👑 | `/groups/:id/invites` | `{ emails?: string[], usernames?: string[], userIds?: string[], email?: string }` (≤ 20 people) | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |
 | DELETE 👑 | `/groups/:id/invites/:inviteId` | | 204 (the link stops working) |
-| GET | `/invites/:token` | | `{ groupName, inviterName, memberCount, expiresAt, email: string \| null, username: string \| null }` |
+| GET | `/invites/:token` | | `{ groupName, inviterName, memberCount, expiresAt, email: string \| null, username: string \| null, personal: boolean }` (`personal`: sent to one person's Activity, so they can decline it) |
 | POST 🔒 | `/invites/:token/accept` | | `Group & { joined: boolean }` (`joined`: false when you were already a member; the apps then skip asking what name to go by. 403 if the invite was for a different address or username) |
+| POST 🔒 | `/invites/:token/decline` | | 204 (an invite sent to you in Activity: it's removed, with its Activity item; nobody is told. 403 for anyone else's invite or a link) |
 
 **Names in a group.** Each member can choose the name they go by in one group (`PATCH /groups/:id/members/me`).
 Within that group it replaces their account name everywhere the server names them: `Member.name` (so the members
@@ -467,13 +468,18 @@ address gets its own emailed invite that only someone signed in with that addres
 used up once they join. With usernames, each person gets their own invite in Activity (an
 `invite.received` notification and a push, `data: { token }`) that only they can accept; it's used
 up once they join. A username nobody has is `404`, and someone already in the group is `409`,
-before any invite is sent.
+before any invite is sent. `userIds` works like `usernames` (an `invite.received` in their Activity, only
+for them, whether or not they have a username) but only for people who are already in a group with you:
+anyone else is `404`, before any invite is sent. The apps use it for "New group with these people": they
+create the group (`POST /groups`) and then invite the people they kept ticked. Someone invited this way can
+accept (`POST /invites/:token/accept`) or decline (`POST /invites/:token/decline`).
 
 ```ts
 // Preferred times are guidelines: they never block a date. Availability marks the slots and
 // `match` days they fit with `preferredBy: string[]` (user ids).
 interface GroupPreference { id: string; userId: string; kind: 'dates' | 'weekly'; from: string | null; to: string | null; days: Weekday[]; window: { from: string; to: string } | null; label: string }
-interface GroupInvite { id: string; email: string | null; username: string | null; url: string; expiresAt: string; createdAt: string; invitedBy: string }
+// name: the account name of the person it was sent to in Activity (by username or id), else null.
+interface GroupInvite { id: string; email: string | null; username: string | null; name?: string | null; url: string; expiresAt: string; createdAt: string; invitedBy: string }
 ```
 
 ### Availability

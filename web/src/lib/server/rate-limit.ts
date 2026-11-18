@@ -25,7 +25,7 @@ const HOUR = 60 * MINUTE;
 /** Specific limits for endpoints that are expensive, reach third parties or guess at tokens. */
 export const RULES: Rule[] = [
 	{ name: 'native-exchange', method: 'POST', path: /^\/api\/v1\/auth\/native\/exchange$/, max: 10, windowSeconds: MINUTE, perIp: true },
-	{ name: 'invite', path: /^\/api\/v1\/invites\/[^/]+(\/accept)?$/, max: 30, windowSeconds: 10 * MINUTE, perIp: true },
+	{ name: 'invite', path: /^\/api\/v1\/invites\/[^/]+(\/accept|\/decline)?$/, max: 30, windowSeconds: 10 * MINUTE, perIp: true },
 	{ name: 'live', method: 'GET', path: /^\/api\/v1\/live$/, max: 20, windowSeconds: MINUTE },
 	{ name: 'calendar-sync', method: 'POST', path: /^\/api\/v1\/calendars\/[^/]+\/sync$/, max: 6, windowSeconds: MINUTE },
 	{ name: 'calendar-connect', method: 'POST', path: /^\/api\/v1\/calendars\/(caldav|oauth\/[^/]+\/(url|complete))$/, max: 10, windowSeconds: 10 * MINUTE },

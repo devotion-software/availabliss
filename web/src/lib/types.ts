@@ -476,6 +476,8 @@ export interface GroupInvite {
 	email: string | null;
 	/** Who it was sent to by username (only they can join with it), or null. */
 	username: string | null;
+	/** The account name of the person it was sent to in Activity (by username or user id), or null. */
+	name?: string | null;
 	url: string;
 	expiresAt: string;
 	createdAt: string;
