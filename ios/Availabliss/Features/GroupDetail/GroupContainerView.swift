@@ -10,6 +10,9 @@ struct GroupContainerView: View {
     @State private var detail: GroupDetailModel
     /// "New group with these people", from the More menu or Group settings.
     @State private var showsNewGroup = false
+    /// From muting or unmuting in the More menu.
+    @State private var toast: String?
+    @State private var error: String?
 
     init(groupId: String, section: GroupSection?, app: AppModel) {
         self.section = section
@@ -20,7 +23,8 @@ struct GroupContainerView: View {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let group = detail.group {
-                    GroupTopBar(group: group, section: section, unreadCount: detail.unreadCount, onNewGroup: { showsNewGroup = true })
+                    GroupTopBar(detail: detail, group: group, section: section, unreadCount: detail.unreadCount,
+                                onNewGroup: { showsNewGroup = true }, toast: $toast, error: $error)
                 }
             }
             .sheet(isPresented: $showsNewGroup) {
@@ -31,6 +35,8 @@ struct GroupContainerView: View {
                     }
                 }
             }
+            .toast($toast)
+            .errorAlert($error)
             .foregroundStyle(theme.ink)
             .chromeless()
             .task { await detail.start() }
@@ -77,13 +83,16 @@ struct GroupContainerView: View {
 }
 
 /// Pinned at the top of a group's screens. On the calendar: back to groups, name, role, Chat and More
-/// (Plans, Timing, Members, New group with these people, Group settings). On a pushed section: back to the calendar, with the group's
+/// (Plans, Timing, Members, New group with these people, Mute notifications, Group settings). On a pushed section: back to the calendar, with the group's
 /// name (Settings is titled "Group settings", with the name under it).
 private struct GroupTopBar: View {
+    let detail: GroupDetailModel
     let group: Group
     let section: GroupSection?
     let unreadCount: Int
     let onNewGroup: () -> Void
+    @Binding var toast: String?
+    @Binding var error: String?
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
@@ -106,7 +115,7 @@ private struct GroupTopBar: View {
                 ScreenHeader(title: group.name, titleSize: 22, onBack: { app.router.back() }, onTitle: { app.router.pop(); app.open(.group(id: group.id)) },
                              leading: section == .chat ? tile : nil)
             } else {
-                GroupHeader(group: group, unreadCount: unreadCount, onNewGroup: onNewGroup)
+                GroupHeader(detail: detail, group: group, unreadCount: unreadCount, onNewGroup: onNewGroup, toast: $toast, error: $error)
             }
         }
         .padding(.horizontal, 20)
@@ -126,16 +135,20 @@ private struct GroupTopBar: View {
     }
 }
 
-/// The calendar's header: back, name + "6 members · you're an admin", Chat (with unread badge) and More.
+/// The calendar's header: back, name + "6 members · you're an admin" (and a crossed-out bell when muted),
+/// Chat (with unread badge) and More.
 private struct GroupHeader: View {
+    let detail: GroupDetailModel
     let group: Group
     let unreadCount: Int
     let onNewGroup: () -> Void
+    @Binding var toast: String?
+    @Binding var error: String?
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
     var body: some View {
-        ScreenHeader(title: group.name, subtitle: subtitle, titleSize: 22, backLabel: "Back to groups", onBack: { app.router.pop() }) {
+        ScreenHeader(title: group.name, subtitle: subtitle, subtitleSystemImage: detail.isMuted ? "bell.slash" : nil, titleSize: 22, backLabel: "Back to groups", onBack: { app.router.pop() }) {
             HStack(spacing: 8) {
                 chatButton
                 moreMenu
@@ -178,6 +191,7 @@ private struct GroupHeader: View {
                     Label("New group with these people", systemImage: "plus.square.on.square")
                 }
             }
+            muteMenu
             Button { app.router.push(.groupSection(id: group.id, section: .settings)) } label: {
                 Label("Group settings", systemImage: "gearshape")
             }
@@ -192,6 +206,39 @@ private struct GroupHeader: View {
         .accessibilityLabel("More")
     }
 
+    /// "Unmute" when muted, otherwise "Mute notifications" for 8 hours, a week, or until turned back on.
+    @ViewBuilder
+    private var muteMenu: some View {
+        if detail.isMuted {
+            Button { setMute(nil) } label: { Label("Unmute", systemImage: "bell") }
+        } else {
+            Menu {
+                ForEach(MuteChoice.allCases) { choice in
+                    Button(choice.label) { setMute(choice) }
+                }
+            } label: {
+                Label("Mute notifications", systemImage: "bell.slash")
+            }
+        }
+    }
+
+    /// Mutes for `choice`, or with nil unmutes.
+    private func setMute(_ choice: MuteChoice?) {
+        Task {
+            do {
+                if let choice {
+                    try await detail.setMute(until: choice.until())
+                    toast = choice.toast
+                } else {
+                    try await detail.unmute()
+                    toast = "Notifications on"
+                }
+            } catch where !error.isCancellation {
+                self.error = error.userMessage
+            } catch {}
+        }
+    }
+
     /// Only owners and admins can invite.
     private var canInvite: Bool { group.role != .member }
 
@@ -202,6 +249,38 @@ private struct GroupHeader: View {
         case .owner: return "\(members) · you're the owner"
         case .admin: return "\(members) · you're an admin"
         case .member: return members
+        }
+    }
+}
+
+/// How long "Mute notifications" lasts.
+private enum MuteChoice: CaseIterable, Identifiable {
+    case eightHours, week, untilUnmuted
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .eightHours: "For 8 hours"
+        case .week: "For a week"
+        case .untilUnmuted: "Until I turn it back on"
+        }
+    }
+
+    var toast: String {
+        switch self {
+        case .eightHours: "Muted for 8 hours"
+        case .week: "Muted for a week"
+        case .untilUnmuted: "Muted"
+        }
+    }
+
+    /// When the mute ends (nil: when it's unmuted).
+    func until(from now: Date = Date()) -> Date? {
+        switch self {
+        case .eightHours: now.addingTimeInterval(8 * 60 * 60)
+        case .week: Calendar.current.date(byAdding: .day, value: 7, to: now)
+        case .untilUnmuted: nil
         }
     }
 }

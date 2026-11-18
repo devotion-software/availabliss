@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// "You": account, appearance, calendars, region, plan, passkeys, timing templates, sign out.
+/// "You": account, appearance, calendars, region, reminders, notifications, plan, passkeys, timing templates, sign out.
 struct ProfileView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
@@ -20,6 +20,7 @@ struct ProfileView: View {
                 account
                 settingsList
                 PlanRemindersCard(error: $error)
+                NotificationsCard(error: $error)
                 PlanSection(toast: $toast)
                 SignInMethodsSection(toast: $toast, error: $error)
                 TemplatesSection(api: app.api, toast: $toast, error: $error)

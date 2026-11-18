@@ -21,6 +21,11 @@ final class GroupDetailModel {
     private(set) var events: [GroupEvent] = []
     private(set) var plansLoaded = false
 
+    /// Your mute on this group (nil: not muted), from your notification settings, for the More menu
+    /// and the bell beside the subtitle.
+    private(set) var mute: GroupMute?
+    @ObservationIgnored private var muteLoaded = false
+
     let api: APIClient
     @ObservationIgnored private let live: LiveEventsClient
     /// The signed-in user, so our own messages don't count as unread.
@@ -51,6 +56,28 @@ final class GroupDetailModel {
         if group == nil { await load() }
         if !unreadLoaded { await loadUnread() }
         if !plansLoaded { try? await loadPlans() }
+        if !muteLoaded { await loadMute() }
+    }
+
+    /// Whether pushes from the group are muted right now (a mute for a while can run out while it's open).
+    var isMuted: Bool { mute?.isActive() ?? false }
+
+    /// Reads your mute on this group from your notification settings.
+    func loadMute() async {
+        guard let settings = try? await api.send(API.Me.notificationSettings()) else { return }
+        muteLoaded = true
+        mute = settings.mute(for: groupId)
+    }
+
+    /// Mutes pushes from the group until `until` (nil: until it's unmuted).
+    func setMute(until: Date?) async throws {
+        let settings = try await api.send(API.Groups.mute(groupId: groupId, until: until))
+        mute = settings.mute(for: groupId)
+    }
+
+    func unmute() async throws {
+        let settings = try await api.send(API.Groups.unmute(groupId: groupId))
+        mute = settings.mute(for: groupId)
     }
 
     /// Seeds the Chat badge with the server's unread count (only the groups list carries it).
@@ -86,6 +113,7 @@ final class GroupDetailModel {
             await load()
             await loadUnread()
             try? await loadPlans()
+            await loadMute()
         case .groupUpdated:
             // The server builds the payload for whoever made the change, so its role is theirs: use ours.
             if var updated = event.payload(as: Group.self) {

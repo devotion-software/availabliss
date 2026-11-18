@@ -42,6 +42,12 @@ enum API {
         static func calendarFeed() -> Endpoint<CalendarFeed> { .init(.get, "/me/calendar-feed") }
         /// Swaps the feed link for a new one; calendars subscribed with the old one stop updating.
         static func resetCalendarFeed() -> Endpoint<CalendarFeed> { .init(.post, "/me/calendar-feed/reset") }
+        /// Which pushes you get: categories turned off, quiet hours and muted groups.
+        static func notificationSettings() -> Endpoint<NotificationSettings> { .init(.get, "/me/notification-settings") }
+        /// Changes only the fields set in `patch` (a `nil` quiet hours inside it turns them off).
+        static func updateNotificationSettings(_ patch: NotificationSettingsPatch) -> Endpoint<NotificationSettings> {
+            .init(.patch, "/me/notification-settings", body: patch)
+        }
     }
 
     // MARK: Usernames
@@ -131,6 +137,12 @@ enum API {
             .init(.get, "/groups/\(groupId.pathEncoded)/conflicts", query: ["start": iso(start), "end": iso(end)])
         }
         static func nudge(groupId: String) -> Endpoint<NudgeResponse> { .init(.post, "/groups/\(groupId.pathEncoded)/nudge") }
+        /// No pushes from the group until `until` (nil: until it's unmuted). Returns your whole notification settings.
+        static func mute(groupId: String, until: Date?) -> Endpoint<NotificationSettings> {
+            .init(.put, "/groups/\(groupId.pathEncoded)/mute", body: MuteGroupBody(until: until))
+        }
+        /// Pushes from the group again. Returns your whole notification settings.
+        static func unmute(groupId: String) -> Endpoint<NotificationSettings> { .init(.delete, "/groups/\(groupId.pathEncoded)/mute") }
         /// No one: a link anyone can use, by `maxUses` people (left out: one). Emails / usernames: one invite each, only for that person
         /// (emailed, or sent to their Activity). 404 for a username nobody has, 409 if they're in already.
         /// User ids: likewise sent to their Activity, for people you're already in a group with.

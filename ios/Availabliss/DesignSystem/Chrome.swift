@@ -4,6 +4,8 @@ import SwiftUI
 struct ScreenHeader<Trailing: View>: View {
     let title: String
     var subtitle: String?
+    /// A small symbol after the subtitle, e.g. "bell.slash" for a muted group.
+    var subtitleSystemImage: String?
     var titleSize: CGFloat = 24
     var backLabel = "Back"
     var onBack: (() -> Void)?
@@ -41,7 +43,7 @@ struct ScreenHeader<Trailing: View>: View {
                         .accessibilityAddTraits(.isHeader)
                 }
                 if let subtitle {
-                    SubtitleText(subtitle)
+                    SubtitleText(subtitle, systemImage: subtitleSystemImage)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -51,17 +53,28 @@ struct ScreenHeader<Trailing: View>: View {
 }
 
 extension ScreenHeader where Trailing == EmptyView {
-    init(title: String, subtitle: String? = nil, titleSize: CGFloat = 24, backLabel: String = "Back", onBack: (() -> Void)? = nil, onTitle: (() -> Void)? = nil, leading: AnyView? = nil) {
-        self.init(title: title, subtitle: subtitle, titleSize: titleSize, backLabel: backLabel, onBack: onBack, onTitle: onTitle, leading: leading) { EmptyView() }
+    init(title: String, subtitle: String? = nil, subtitleSystemImage: String? = nil, titleSize: CGFloat = 24, backLabel: String = "Back", onBack: (() -> Void)? = nil, onTitle: (() -> Void)? = nil, leading: AnyView? = nil) {
+        self.init(title: title, subtitle: subtitle, subtitleSystemImage: subtitleSystemImage, titleSize: titleSize, backLabel: backLabel, onBack: onBack, onTitle: onTitle, leading: leading) { EmptyView() }
     }
 }
 
 private struct SubtitleText: View {
     let text: String
+    var systemImage: String?
     @Environment(\.theme) private var theme
-    init(_ text: String) { self.text = text }
+    init(_ text: String, systemImage: String? = nil) {
+        self.text = text
+        self.systemImage = systemImage
+    }
     var body: some View {
-        Text(text).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted).lineLimit(1)
+        HStack(spacing: 4) {
+            Text(text).lineLimit(1)
+            if let systemImage {
+                Image(systemName: systemImage).font(.system(size: 10, weight: .semibold))
+            }
+        }
+        .bodyFont(12, relativeTo: .caption)
+        .foregroundStyle(theme.muted)
     }
 }
 
