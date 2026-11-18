@@ -33,6 +33,7 @@ export const RULES: Rule[] = [
 	{ name: 'group-create', method: 'POST', path: /^\/api\/v1\/groups$/, max: 20, windowSeconds: HOUR },
 	{ name: 'invite-create', method: 'POST', path: /^\/api\/v1\/groups\/[^/]+\/invites$/, max: 30, windowSeconds: HOUR },
 	{ name: 'message', method: 'POST', path: /^\/api\/v1\/groups\/[^/]+\/messages$/, max: 30, windowSeconds: MINUTE },
+	{ name: 'attachment', method: 'POST', path: /^\/api\/v1\/groups\/[^/]+\/attachments$/, max: 60, windowSeconds: 10 * MINUTE },
 	{ name: 'availability', method: 'GET', path: /^\/api\/v1\/groups\/[^/]+\/availability(\/day)?$/, max: 120, windowSeconds: MINUTE },
 	{ name: 'preview', method: 'POST', path: /^\/api\/v1\/requirements\/preview$/, max: 120, windowSeconds: MINUTE },
 	{ name: 'ai-planner', method: 'POST', path: /^\/api\/v1\/groups\/[^/]+\/planner$/, max: 20, windowSeconds: HOUR },

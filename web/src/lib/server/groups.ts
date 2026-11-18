@@ -6,7 +6,8 @@ import { monogram } from '#lib/monogram';
 import { db } from './db';
 import { requireCanCreateGroup } from './billing';
 import { events, groupInvites, groupMembers, groups, user } from './db/schema';
-import { deleteStored, IMAGE_SIZES, processImage, putImage } from './media';
+import { deleteKeys, deleteStored, IMAGE_SIZES, processImage, putImage } from './media';
+import { groupAttachmentKeys } from './attachments';
 import { ApiError, forbidden, notFound } from './http';
 import { newId, newToken } from './ids';
 import { requirementSummary } from './availability/labels';
@@ -209,8 +210,10 @@ export async function deleteGroup(groupId: string, userId: string): Promise<stri
 	const members = await memberIds(groupId);
 	const row = await getGroupRow(groupId);
 	const covers = await db.select({ image: events.image }).from(events).where(eq(events.groupId, groupId));
+	const chatFiles = await groupAttachmentKeys(groupId);
 	await db.delete(groups).where(eq(groups.id, groupId));
 	for (const url of [row.image, ...covers.map((c) => c.image)]) await deleteStored(url);
+	await deleteKeys(chatFiles);
 	return members;
 }
 

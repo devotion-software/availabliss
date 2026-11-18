@@ -1,5 +1,5 @@
 /**
- * Profile pictures, group photos and event covers: resized on the server (sharp), stored in Cloudflare R2 (S3-compatible,
+ * Profile pictures, group photos and event covers (and, privately, chat attachments): resized on the server (sharp), stored in Cloudflare R2 (S3-compatible,
  * signed with aws4fetch). Without R2 configured (local development), files go to `.uploads/`
  * on disk and are served by /media/[...key].
  */
@@ -63,11 +63,17 @@ const FOLDERS = { avatar: 'avatars', group: 'groups', cover: 'events' } as const
 /** Stores a picture under a fresh key and returns its public URL. */
 export async function putImage(kind: keyof typeof FOLDERS, ownerId: string, bytes: Uint8Array): Promise<string> {
 	const key = `${FOLDERS[kind]}/${ownerId}/${newToken()}.jpg`;
+	await putObject(key, bytes, 'image/jpeg', 'public, max-age=31536000, immutable');
+	return publicUrlOf(key);
+}
+
+/** Writes bytes under `key` (R2, or `.uploads/` without it). */
+export async function putObject(key: string, bytes: Uint8Array, contentType: string, cacheControl = 'private, max-age=31536000, immutable'): Promise<void> {
 	if (r2) {
 		const res = await r2.client.fetch(r2.objectUrl(key), {
 			method: 'PUT',
-			body: new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "image/jpeg" }),
-			headers: { 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=31536000, immutable' }
+			body: new Blob([bytes as Uint8Array<ArrayBuffer>], { type: contentType }),
+			headers: { 'content-type': contentType, 'cache-control': cacheControl }
 		});
 		if (!res.ok) throw new Error(`R2 upload failed: ${res.status} ${await res.text()}`);
 	} else {
@@ -75,7 +81,43 @@ export async function putImage(kind: keyof typeof FOLDERS, ownerId: string, byte
 		await mkdir(dirname(path), { recursive: true });
 		await writeFile(path, bytes);
 	}
-	return publicUrlOf(key);
+}
+
+/**
+ * Reads a stored object for serving it ourselves (private files such as chat attachments).
+ * `range` is passed on to R2 (a 206 comes back); the local fallback always returns the whole file.
+ */
+export async function getObject(key: string, range: string | null = null): Promise<{ body: ReadableStream | Uint8Array; status: number; headers: Headers } | null> {
+	if (r2) {
+		const res = await r2.client.fetch(r2.objectUrl(key), { headers: range ? { range } : {} });
+		if (res.status !== 200 && res.status !== 206) {
+			await res.body?.cancel();
+			return null;
+		}
+		const headers = new Headers();
+		for (const name of ['content-length', 'content-range', 'accept-ranges', 'etag']) {
+			const value = res.headers.get(name);
+			if (value) headers.set(name, value);
+		}
+		return { body: res.body!, status: res.status, headers };
+	}
+	const bytes = await readFile(join(LOCAL_DIR, key)).catch(() => null);
+	if (!bytes) return null;
+	return { body: new Uint8Array(bytes), status: 200, headers: new Headers({ 'content-length': String(bytes.byteLength) }) };
+}
+
+/** Deletes stored objects by key (best effort). */
+export async function deleteKeys(keys: string[]): Promise<void> {
+	await Promise.all(
+		keys.map(async (key) => {
+			try {
+				if (r2) await r2.client.fetch(r2.objectUrl(key), { method: 'DELETE' });
+				else await rm(join(LOCAL_DIR, key), { force: true });
+			} catch (err) {
+				console.warn('[media] delete failed', key, err);
+			}
+		})
+	);
 }
 
 /** Stores a user's picture under a fresh key and returns its public URL. */
@@ -84,13 +126,7 @@ export const putAvatar = (userId: string, bytes: Uint8Array) => putImage('avatar
 /** Deletes one of our stored files (best effort; other URLs are left alone). */
 export async function deleteStored(url: string | null): Promise<void> {
 	const key = keyOf(url);
-	if (!key) return;
-	try {
-		if (r2) await r2.client.fetch(r2.objectUrl(key), { method: 'DELETE' });
-		else await rm(join(LOCAL_DIR, key), { force: true });
-	} catch (err) {
-		console.warn('[media] delete failed', key, err);
-	}
+	if (key) await deleteKeys([key]);
 }
 
 /** A locally stored file's bytes (dev without R2), or null. */

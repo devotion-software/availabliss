@@ -82,6 +82,7 @@ out. Some endpoints have tighter limits of their own:
 | `POST /groups/:id/invites` | 30 / hour |
 | `GET /usernames/:username` | 60 / minute |
 | `POST /groups/:id/messages` | 30 / minute |
+| `POST /groups/:id/attachments` | 60 / 10 minutes |
 | `GET /groups/:id/availability[/day]` | 120 / minute |
 | `POST /requirements/preview` | 120 / minute |
 | `POST /groups/:id/planner` | 20 / hour |
@@ -576,12 +577,28 @@ interface Message {
   deleted: boolean;                     // deleted by its author: show "This message was deleted" (body is null)
   receipt: { delivered: number; seen: number; recipients: number; seenBy: string[] } | null; // only on your own messages; seenBy in the order they read it
   replyTo: MessageReply | null;         // the message this one replies to (text messages only)
+  attachments: Attachment[];            // photos, GIFs and files sent with it, in order ([] for most messages and once deleted)
+  caption: string | null;               // with attachments: the caption, or null. Null for messages without attachments
+}
+// A text message can carry attachments with or without a caption. Its `body` is then the caption, or
+// (with none) a one-line summary for older apps: "📷 Photo", "GIF", "📷 3 photos", "📎 Plan.pdf",
+// "📎 2 files", "📎 2 attachments". Apps that know `attachments` show those and `caption` instead.
+interface Attachment {
+  id: string;
+  kind: 'image' | 'gif' | 'file';       // gif = animated (show `url` so it moves)
+  name: string;                         // file name, e.g. "Plan.pdf" or "IMG_0001.jpg"
+  mime: string;
+  size: number;                         // bytes stored
+  width: number | null; height: number | null; // pixels, images and GIFs only
+  url: string;                          // signed link to the file (no auth header needed); see below
+  thumbnailUrl: string | null;          // smaller preview (at most 720 px) for photos; null for GIFs and files
 }
 interface MessageReply {                // the quoted message, as it is now
   id: string;
   authorId: string | null; authorName: string | null;
   kind: 'text' | 'poll' | 'proposal' | 'event' | 'system';
-  text: string | null;                  // one line, at most 140 characters (…): the text, or a poll's question; null once deleted
+  text: string | null;                  // one line, at most 140 characters (…): the text, or a poll's question, or the
+                                        // attachment summary ("📷 Photo", "GIF", "📎 Plan.pdf") when sent without a caption; null once deleted
   deleted: boolean;                     // deleted since: show "Deleted message"
 }
 interface Poll {
@@ -599,10 +616,12 @@ interface MessageInfo {
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/groups/:id/messages?before=<messageId>&limit=50` | | `{ messages: Message[]; hasMore: boolean }` (newest last) |
-| POST 🔒 | `/groups/:id/messages` | `{ body, replyToId? }` or `{ poll: { question, options: string[], multi? } }` | `Message`. `replyToId` must be a message in the same chat (else `400`), not a group update (`400`) and not deleted (`409`) |
+| POST 🔒 | `/groups/:id/attachments` | `multipart/form-data` with one file in the field `file` | `201` `Attachment`, not yet in any message: send its id in `attachmentIds`. Photos (JPEG, PNG, WebP, GIF, HEIC where the server can read it; up to 15 MB) are turned upright, stripped of metadata (location included), shrunk to at most 2560 px and stored as JPEG (PNG if transparent), so `name`, `mime` and `size` can differ from what was sent; an animated GIF is kept as it is. Files (up to 25 MB) must be one of: pdf, txt, md, csv, rtf, ics, vcf, doc(x), xls(x), ppt(x), odt, ods, odp, pages, numbers, key, epub, zip, mp3, m4a, wav, mp4, mov (by extension); anything else is `400`. Uploads not sent within a day are deleted |
+| POST 🔒 | `/groups/:id/messages` | `{ body, replyToId? }`, or `{ attachmentIds: string[] (1–10), body?: caption, replyToId? }`, or `{ poll: { question, options: string[], multi? } }` | `Message`. `replyToId` must be a message in the same chat (else `400`), not a group update (`400`) and not deleted (`409`). `attachmentIds` must be your own unsent uploads to this group (else `400`) |
 | POST 🔒 | `/groups/:id/messages/receipts` | `{ upTo: messageId, state: 'delivered' \| 'seen' }` | `204` |
-| PATCH 🔒 | `/messages/:id` | `{ body }` | `Message` (the sender's own text messages only) |
-| DELETE 🔒 | `/messages/:id` | | `204` (the sender's own text messages only; it stays in the chat as deleted) |
+| PATCH 🔒 | `/messages/:id` | `{ body }` | `Message` (the sender's own text messages only). With attachments `body` is the caption and may be `""` to remove it |
+| DELETE 🔒 | `/messages/:id` | | `204` (the sender's own text messages only; it stays in the chat as deleted, and its attachments are deleted for good) |
+| GET | `/attachments/:id?e=…&s=…`, `/attachments/:id/thumb?e=…&s=…` | | The file (or a photo's preview). These are the signed `url` / `thumbnailUrl` links from `Attachment`: no session needed, valid for 7–8 days and unchanged within a day (cacheable); refetch the message for fresh ones. Without a valid signature, only a signed-in member of the group gets it (else `404`). Photos and GIFs are served `inline`; files as a download (`Content-Disposition: attachment` with the name); add `&download=1` to download a photo. Not rate limited. Deleting the group deletes every attachment sent in it |
 | GET 🔒 | `/messages/:id/info` | | `MessageInfo` (any member of the group) |
 | GET 🔒 | `/messages/:id/thread` | | `{ rootId: string; messages: Message[]; truncated: boolean }`: the thread the message is in. `rootId` is the first message of its chain of replies (following `replyTo` up); `messages` is that message and every reply to it, and replies to those, oldest first (deleted ones included), at most 200 (the earliest; `truncated` when there were more). Any member of the group |
 | POST 🔒 | `/polls/:id/vote` | `{ optionIds: string[] }` (empty = remove vote) | `Poll` |
@@ -662,7 +681,7 @@ interface Notification {
 | DELETE 🔒 | `/devices/:token` | | `204` |
 
 Chats (`kind: 'message'`) get **one Activity item per group**: each new message brings it to
-the top with `title` = the group's name, `body` = `"Sam: See you there"` and `data.count` = messages
+the top with `title` = the group's name, `body` = `"Sam: See you there"` (or `"Sam: 📷 Photo"` for a photo without a caption) and `data.count` = messages
 since it was last read. It stays unread until the chat itself is read (a `seen` receipt), not
 when Activity is opened. Updates to an existing item (a new message, or it being read) arrive
 as `notification.created` with the **same id**: replace the item you have, and move it to the

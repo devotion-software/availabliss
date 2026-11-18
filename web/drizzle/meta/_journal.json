@@ -162,6 +162,13 @@
       "when": 1794990980169,
       "tag": "0022_dapper_karnak",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1794992282845,
+      "tag": "0023_ordinary_quicksilver",
+      "breakpoints": true
     }
   ]
 }

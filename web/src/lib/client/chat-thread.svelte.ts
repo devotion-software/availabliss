@@ -108,7 +108,9 @@ export class ChatThread {
 			editedAt: null,
 			deleted: false,
 			receipt: { delivered: 0, seen: 0, recipients: this.#recipients, seenBy: [] },
-			replyTo: replying ? replyPreview(replying) : null
+			replyTo: replying ? replyPreview(replying) : null,
+			attachments: [],
+			caption: null
 		};
 		this.messages = [...this.messages, temp];
 		try {

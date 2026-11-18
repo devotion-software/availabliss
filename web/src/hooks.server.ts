@@ -5,6 +5,7 @@ import { COLOR_THEMES, THEME_MODES, type ColorTheme, type ThemeMode } from '#lib
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
 import type { RequestEvent } from '@sveltejs/kit';
 import { autoArchiveGroups } from '#lib/server/auto-archive';
+import { deleteAbandonedUploads } from '#lib/server/attachments';
 import { checkCaldavConnections, syncStaleConnections } from '#lib/server/calendars';
 import { isForbiddenCrossSite, selfOrigins } from '#lib/server/csrf';
 import { env } from '#lib/server/env';
@@ -18,10 +19,12 @@ const CALENDAR_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const CALDAV_CHECK_INTERVAL_MS = 2 * 60 * 1000;
 /** How often groups that archive themselves are checked for a passed event. */
 const AUTO_ARCHIVE_INTERVAL_MS = 15 * 60 * 1000;
+/** How often chat uploads that were never sent are cleared away (they're kept a day). */
+const ABANDONED_UPLOADS_INTERVAL_MS = 60 * 60 * 1000;
 
 /**
  * Keeps Google / Microsoft / CalDAV busy time fresh in the background, checks
- * CalDAV change tags in between, and archives groups whose event has passed. Every instance runs the timers, but locks in the
+ * CalDAV change tags in between, archives groups whose event has passed and deletes unsent chat uploads. Every instance runs the timers, but locks in the
  * shared store let only one of them run each per interval.
  */
 export const init: ServerInit = () => {
@@ -49,6 +52,14 @@ export const init: ServerInit = () => {
 	}, CALDAV_CHECK_INTERVAL_MS).unref();
 	setInterval(async () => {
 		try {
+			if (!(await kv.setIfAbsent('lock:abandoned-uploads', String(process.pid), ABANDONED_UPLOADS_INTERVAL_MS / 1000 - 10))) return;
+			await deleteAbandonedUploads();
+		} catch (err) {
+			console.warn('[chat] deleting abandoned uploads failed', err);
+		}
+	}, ABANDONED_UPLOADS_INTERVAL_MS).unref();
+	setInterval(async () => {
+		try {
 			if (!(await kv.setIfAbsent('lock:auto-archive', String(process.pid), AUTO_ARCHIVE_INTERVAL_MS / 1000 - 10))) return;
 			await autoArchiveGroups();
 		} catch (err) {
@@ -65,7 +76,9 @@ async function rateLimit(event: RequestEvent): Promise<Response | null> {
 	const { pathname } = event.url;
 	try {
 		// Webhooks authenticate with a shared secret (or a per-channel token) and can arrive in bursts.
-		if (pathname.startsWith('/api/v1/') && !pathname.startsWith('/api/v1/billing/') && !pathname.startsWith('/api/v1/calendars/push/')) {
+		// Chat attachments load by signed link, without a session, a screenful of photos at a time.
+		const exempt = ['/api/v1/billing/', '/api/v1/calendars/push/', '/api/v1/attachments/'].some((p) => pathname.startsWith(p));
+		if (pathname.startsWith('/api/v1/') && !exempt) {
 			const decision = await checkRateLimit(kv, event.request.method, pathname, {
 				userId: event.locals.user?.id ?? null,
 				ip: event.getClientAddress()

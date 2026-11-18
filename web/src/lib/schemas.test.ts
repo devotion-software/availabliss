@@ -171,6 +171,13 @@ describe('other schemas', () => {
 		expect(ok(createMessageSchema, { body: '' })).toBe(false);
 	});
 
+	test('attachments are sent by id, with or without a caption', () => {
+		expect(createMessageSchema.parse({ attachmentIds: ['a1'] })).toEqual({ attachmentIds: ['a1'], body: null });
+		expect(createMessageSchema.parse({ body: ' look ', attachmentIds: ['a1', 'a2'] })).toEqual({ body: 'look', attachmentIds: ['a1', 'a2'] });
+		expect(ok(createMessageSchema, { attachmentIds: [] })).toBe(false);
+		expect(ok(createMessageSchema, { attachmentIds: Array(11).fill('a') })).toBe(false);
+	});
+
 	test('templates need a name and a valid requirement', () => {
 		expect(ok(createTemplateSchema, { name: 'Weekend', requirement: requirement() })).toBe(true);
 		expect(ok(createTemplateSchema, { name: 'x'.repeat(61), requirement: requirement() })).toBe(false);

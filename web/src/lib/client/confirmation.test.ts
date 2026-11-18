@@ -18,6 +18,8 @@ const msg = (over: Partial<Message> = {}): Message => ({
 	editedAt: null,
 	deleted: false,
 	receipt: null,
+	attachments: [],
+	caption: null,
 	replyTo: null,
 	...over
 });

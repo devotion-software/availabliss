@@ -304,6 +304,32 @@ export interface Message {
 	receipt: { delivered: number; seen: number; recipients: number; seenBy: string[] } | null;
 	/** A compact preview of the message this one replies to, or null. */
 	replyTo: MessageReply | null;
+	/** Photos, GIFs and files sent with it, in order (empty for most messages, and once deleted). */
+	attachments: Attachment[];
+	/**
+	 * With attachments, `body` is the caption or (with none) a short summary such as "📷 Photo"
+	 * for older apps; `caption` is just the caption, or null. Null for messages without attachments.
+	 */
+	caption: string | null;
+}
+
+export const ATTACHMENT_KINDS = ['image', 'gif', 'file'] as const;
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+
+/** A photo, GIF or file in a chat message. URLs are signed and expire after about a week: refetch the message for fresh ones. */
+export interface Attachment {
+	id: string;
+	kind: AttachmentKind;
+	name: string;
+	mime: string;
+	/** Bytes of the stored file. */
+	size: number;
+	/** Pixels, for images and GIFs (null for files). */
+	width: number | null;
+	height: number | null;
+	url: string;
+	/** A smaller JPEG/PNG preview for photos; null for GIFs (show `url`, animated) and files. */
+	thumbnailUrl: string | null;
 }
 
 /** A message's thread: the first message of its chain of replies, then every reply under it, oldest first. */

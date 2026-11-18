@@ -1,6 +1,6 @@
 /** Group chat: messages, polls and per-recipient delivery / read receipts. */
 import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
-import type { Message, MessageInfo, MessageKind, MessageReply, MessageThread, Poll } from '#lib/types';
+import type { Attachment, Message, MessageInfo, MessageKind, MessageReply, MessageThread, Poll } from '#lib/types';
 import { db } from './db';
 import { groups, messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
 import { badRequest, conflict, forbidden, notFound } from './http';
@@ -10,6 +10,7 @@ import { memberIds, requireMember } from './groups';
 import { publishToGroup } from './realtime';
 import { markChatRead, notify } from './notifications';
 import { displayName } from './names';
+import { attachmentsFor, attachmentSummary, claimUploads, deleteMessageAttachments, pendingUploads } from './attachments';
 
 type MessageRow = typeof messages.$inferSelect;
 
@@ -218,9 +219,11 @@ async function loadReplies(ids: string[]): Promise<Map<string, MessageReply>> {
 		.leftJoin(polls, eq(polls.id, messages.pollId))
 		.leftJoin(user, eq(user.id, messages.authorId))
 		.where(inArray(messages.id, [...new Set(ids)]));
+	// Photos and files sent without a caption are quoted as "📷 Photo", "📎 Plan.pdf" and so on.
+	const attachments = await attachmentsFor(rows.filter((r) => !r.deletedAt && r.kind === 'text' && !r.body).map((r) => r.id));
 	for (const r of rows) {
 		const deleted = r.deletedAt !== null;
-		const text = deleted ? null : r.kind === 'poll' ? r.question : r.body;
+		const text = deleted ? null : r.kind === 'poll' ? r.question : r.body || attachmentSummary(attachments.get(r.id) ?? []);
 		result.set(r.id, {
 			id: r.id,
 			authorId: r.authorId,
@@ -236,20 +239,23 @@ async function loadReplies(ids: string[]): Promise<Map<string, MessageReply>> {
 // ─── Messages ─────────────────────────────────────────────────────────────
 
 async function toMessages(rows: MessageRow[], viewerId: string, groupSize: number): Promise<Message[]> {
-	const [pollMap, replies] = await Promise.all([
+	const [pollMap, replies, attachments] = await Promise.all([
 		loadPolls(rows.flatMap((r) => (r.pollId ? [r.pollId] : []))),
-		loadReplies(rows.flatMap((r) => (r.replyToId ? [r.replyToId] : [])))
+		loadReplies(rows.flatMap((r) => (r.replyToId ? [r.replyToId] : []))),
+		attachmentsFor(rows.filter((r) => !r.deletedAt && r.kind === 'text').map((r) => r.id))
 	]);
 	const own = rows.filter((r) => r.authorId === viewerId);
 	const receipts = await receiptSummaries(own, groupSize);
 	return rows.map((r) => {
 		const receipt = receipts.get(r.id);
+		const files = attachments.get(r.id) ?? [];
 		return {
 			id: r.id,
 			groupId: r.groupId,
 			authorId: r.authorId,
 			kind: r.kind,
-			body: r.deletedAt ? null : r.body,
+			// Older apps only know `body`: without a caption they get a summary of the attachments.
+			body: r.deletedAt ? null : files.length ? r.body || attachmentSummary(files) : r.body,
 			poll: r.pollId ? (pollMap.get(r.pollId) ?? null) : null,
 			proposalId: r.proposalId,
 			eventId: r.eventId,
@@ -257,7 +263,9 @@ async function toMessages(rows: MessageRow[], viewerId: string, groupSize: numbe
 			editedAt: r.editedAt?.toISOString() ?? null,
 			deleted: r.deletedAt !== null,
 			receipt: receipt ? { delivered: receipt.delivered, seen: receipt.seen, recipients: receipt.recipients, seenBy: receipt.seenBy } : null,
-			replyTo: r.replyToId ? (replies.get(r.replyToId) ?? null) : null
+			replyTo: r.replyToId ? (replies.get(r.replyToId) ?? null) : null,
+			attachments: files,
+			caption: files.length ? r.body || null : null
 		};
 	});
 }
@@ -340,6 +348,8 @@ interface PostInput {
 	proposalId?: string | null;
 	eventId?: string | null;
 	replyToId?: string | null;
+	/** Checked unsent uploads (see pendingUploads), attached in this order. */
+	attachments?: { id: string; kind: Attachment['kind']; name: string }[];
 }
 
 /** Messages can be 4000 characters, but APNs and FCM reject payloads over 4 KB. */
@@ -350,7 +360,9 @@ export const pushPreview = (text: string) =>
 /** Inserts a message, publishes it live and pushes it to everyone else. */
 export async function postMessage(groupId: string, authorId: string | null, input: PostInput): Promise<Message> {
 	const id = newId();
-	await db.insert(messages).values({ id, groupId, authorId, ...input });
+	const { attachments: uploads = [], ...values } = input;
+	await db.insert(messages).values({ id, groupId, authorId, ...values });
+	if (uploads.length) await claimUploads(id, uploads.map((a) => a.id));
 	const row = (await db.query.messages.findFirst({ where: eq(messages.id, id) }))!;
 	const members = await memberIds(groupId);
 	const [message] = await toMessages([row], authorId ?? '', members.length);
@@ -369,7 +381,7 @@ export async function postMessage(groupId: string, authorId: string | null, inpu
 				kind: 'message',
 				groupId,
 				title: group?.name ?? 'New message',
-				body: pushPreview(`${displayName(author, 'Someone')}: ${poll ?? input.body ?? ''}`),
+				body: pushPreview(`${displayName(author, 'Someone')}: ${poll ?? (input.body || attachmentSummary(uploads))}`),
 				data: { messageId: id },
 				record: 'per-group'
 			}
@@ -378,8 +390,17 @@ export async function postMessage(groupId: string, authorId: string | null, inpu
 	return message;
 }
 
-export async function sendText(groupId: string, userId: string, body: string, replyToId: string | null = null): Promise<Message> {
+/** A text message: `body`, or attachments (uploaded first) with an optional caption, or both. */
+export async function sendText(
+	groupId: string,
+	userId: string,
+	body: string | null,
+	replyToId: string | null = null,
+	attachmentIds: string[] = []
+): Promise<Message> {
 	await requireMember(groupId, userId);
+	if (!body && !attachmentIds.length) throw badRequest('Write a message or attach something');
+	const attachments = await pendingUploads(groupId, userId, attachmentIds);
 	if (replyToId) {
 		const original = await db.query.messages.findFirst({
 			where: and(eq(messages.id, replyToId), eq(messages.groupId, groupId)),
@@ -389,7 +410,7 @@ export async function sendText(groupId: string, userId: string, body: string, re
 		if (original.kind === 'system') throw badRequest("Group updates can't be replied to");
 		if (original.deletedAt) throw conflict('That message was deleted');
 	}
-	return postMessage(groupId, userId, { kind: 'text', body, replyToId });
+	return postMessage(groupId, userId, { kind: 'text', body: body || null, replyToId, attachments });
 }
 
 /** The author's own text message, for editing or deleting. */
@@ -414,13 +435,18 @@ async function publishUpdated(messageId: string, userId: string): Promise<Messag
 
 export async function editMessage(messageId: string, userId: string, body: string): Promise<Message> {
 	const row = await ownText(messageId, userId);
-	if (row.body !== body) await db.update(messages).set({ body, editedAt: new Date() }).where(eq(messages.id, messageId));
+	const files = (await attachmentsFor([messageId])).get(messageId) ?? [];
+	if (!body && !files.length) throw badRequest('Write a message');
+	// An older app editing a photo shows its summary as the text; sent back unchanged, it isn't a caption.
+	const caption = files.length && !row.body && body === attachmentSummary(files) ? null : body || null;
+	if (row.body !== caption) await db.update(messages).set({ body: caption, editedAt: new Date() }).where(eq(messages.id, messageId));
 	return publishUpdated(messageId, userId);
 }
 
 export async function deleteMessage(messageId: string, userId: string): Promise<void> {
 	await ownText(messageId, userId);
 	await db.update(messages).set({ body: null, deletedAt: new Date() }).where(eq(messages.id, messageId));
+	await deleteMessageAttachments(messageId);
 	await publishUpdated(messageId, userId);
 }
 

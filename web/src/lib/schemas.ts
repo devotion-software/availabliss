@@ -231,6 +231,12 @@ export const createEventSchema = z.object(eventShape).refine(endsAfterStart, { m
 export const updateEventSchema = z.object(eventShape).partial().refine(endsAfterStart, { message: 'Ends before it starts' });
 
 export const createMessageSchema = z.union([
+	// Photos / files uploaded first (POST /groups/:id/attachments), with an optional caption.
+	z.object({
+		body: optionalText(4000),
+		attachmentIds: z.array(z.string().min(1).max(36)).min(1).max(10),
+		replyToId: z.string().min(1).max(36).nullish()
+	}),
 	z.object({ body: trimmed(4000), replyToId: z.string().min(1).max(36).nullish() }),
 	z.object({
 		poll: z.object({
@@ -241,7 +247,8 @@ export const createMessageSchema = z.union([
 	})
 ]);
 
-export const editMessageSchema = z.object({ body: trimmed(4000) });
+// Empty only for a message with attachments (removes its caption).
+export const editMessageSchema = z.object({ body: z.string().trim().max(4000) });
 
 export const receiptsSchema = z.object({ upTo: z.string().min(1), state: z.enum(['delivered', 'seen']) });
 export const voteSchema = z.object({ optionIds: z.array(z.string().min(1)).max(10) });

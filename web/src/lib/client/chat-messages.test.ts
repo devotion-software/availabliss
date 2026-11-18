@@ -17,6 +17,8 @@ const msg = (over: Partial<Message> = {}): Message => ({
 	deleted: false,
 	receipt: { delivered: 2, seen: 1, recipients: 3, seenBy: ['u2'] },
 	replyTo: null,
+	attachments: [],
+	caption: null,
 	...over
 });
 

@@ -33,6 +33,7 @@ describe('matchRule', () => {
 			'group-create': ['POST', '/api/v1/groups'],
 			'invite-create': ['POST', '/api/v1/groups/g/invites'],
 			message: ['POST', '/api/v1/groups/g/messages'],
+			attachment: ['POST', '/api/v1/groups/g/attachments'],
 			availability: ['GET', '/api/v1/groups/g/availability'],
 			preview: ['POST', '/api/v1/requirements/preview'],
 			'ai-planner': ['POST', '/api/v1/groups/g/planner'],

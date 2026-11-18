@@ -16,6 +16,7 @@ import {
 } from 'drizzle-orm/mysql-core';
 import { user } from './auth.schema';
 import {
+	ATTACHMENT_KINDS,
 	CALENDAR_PROVIDERS,
 	NOTIFICATION_KINDS,
 	REPEATS,
@@ -380,6 +381,41 @@ export const messages = mysqlTable(
 		deletedAt: instant('deleted_at')
 	},
 	(t) => [index('messages_group_seq_idx').on(t.groupId, t.seq), index('messages_reply_to_idx').on(t.replyToId)]
+);
+
+/**
+ * Photos, GIFs and files sent in a group's chat. Uploaded first (messageId null, kept
+ * for a day), then claimed by the message that sends them. The bytes live in object
+ * storage under `storageKey` (and `thumbKey` for a photo's preview) and are only served
+ * through signed links (see attachments.ts), never from the public bucket URL.
+ */
+export const messageAttachments = mysqlTable(
+	'message_attachments',
+	{
+		id: id(),
+		groupId: varchar('group_id', { length: 36 })
+			.notNull()
+			.references(() => groups.id, { onDelete: 'cascade' }),
+		messageId: varchar('message_id', { length: 36 }).references(() => messages.id, { onDelete: 'cascade' }),
+		// Kept (set null) if the uploader deletes their account, like their messages.
+		uploaderId: varchar('uploader_id', { length: 36 }).references(() => user.id, { onDelete: 'set null' }),
+		kind: mysqlEnum('kind', ATTACHMENT_KINDS).notNull(),
+		name: varchar('name', { length: 255 }).notNull(),
+		mime: varchar('mime', { length: 127 }).notNull(),
+		size: int('size').notNull(),
+		width: int('width'),
+		height: int('height'),
+		storageKey: varchar('storage_key', { length: 255 }).notNull(),
+		thumbKey: varchar('thumb_key', { length: 255 }),
+		// Order within its message.
+		position: int('position').default(0).notNull(),
+		createdAt: createdAt()
+	},
+	(t) => [
+		index('message_attachments_message_idx').on(t.messageId),
+		index('message_attachments_group_idx').on(t.groupId),
+		index('message_attachments_pending_idx').on(t.uploaderId, t.createdAt)
+	]
 );
 
 /** Per-recipient delivery and read state for each message. */

@@ -31,7 +31,8 @@ ENV PORT=3000
 ENV PROTOCOL_HEADER=x-forwarded-proto
 ENV HOST_HEADER=x-forwarded-host
 ENV ADDRESS_HEADER=x-forwarded-for
-ENV BODY_SIZE_LIMIT=10M
+# Chat files can be 25 MB (plus multipart overhead).
+ENV BODY_SIZE_LIMIT=26M
 
 # Run as the image's unprivileged node user, not root.
 COPY --chown=node:node --from=deps  /app/node_modules ./node_modules
