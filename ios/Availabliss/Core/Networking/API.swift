@@ -183,7 +183,10 @@ enum API {
         static func override(id: String, userId: String, response: ResponseKind) -> Endpoint<Proposal> {
             .init(.post, "/proposals/\(id.pathEncoded)/override", body: OverrideBody(userId: userId, response: response))
         }
+        /// Withdraws an open proposal, or cancels a confirmed plan (deleting its event).
         static func cancel(id: String) -> Endpoint<EmptyResponse> { .init(.delete, "/proposals/\(id.pathEncoded)") }
+        /// "Keep the plan" after someone can't make it any more: clears `needsReview`.
+        static func keep(id: String) -> Endpoint<Proposal> { .init(.post, "/proposals/\(id.pathEncoded)/keep") }
     }
 
     // MARK: Events

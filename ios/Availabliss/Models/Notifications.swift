@@ -5,6 +5,8 @@ struct AppNotification: Decodable, Sendable, Identifiable, Equatable {
     enum Kind: String, Decodable, Sendable {
         case proposalCreated = "proposal.created"
         case proposalConfirmed = "proposal.confirmed"
+        /// A confirmed plan changed: someone can't make it any more, or it was cancelled.
+        case proposalChanged = "proposal.changed"
         case nudge
         case inviteAccepted = "invite.accepted"
         /// Someone invited you by username: `data.token` opens the invite.

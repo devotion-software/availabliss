@@ -12,6 +12,8 @@ struct Proposal: Codable, Sendable, Identifiable, Equatable {
         let response: ResponseKind
         let setBy: String?
         let updatedAt: Date
+        /// Confirmed: said they can't make it after it was confirmed, not yet reviewed. Nil on older servers.
+        var droppedOut: Bool?
     }
 
     let id: String
@@ -29,6 +31,9 @@ struct Proposal: Codable, Sendable, Identifiable, Equatable {
     /// Confirmed before everyone accepted ("Confirm anyway"): who did it. Nil otherwise, and on older servers.
     var confirmedBy: String?
     var responses: [Response]
+    /// Confirmed: someone who was coming can't make it any more, and the proposer or an admin
+    /// hasn't yet kept the plan or cancelled it.
+    var needsReview: Bool = false
     /// Open proposals: members whose calendars or blocked time clash with it (ids only).
     var busyMemberIds: [String] = []
 
@@ -62,6 +67,7 @@ extension Proposal {
         eventId = try c.decodeIfPresent(String.self, forKey: .eventId)
         confirmedBy = try c.decodeIfPresent(String.self, forKey: .confirmedBy)
         responses = try c.decode([Response].self, forKey: .responses)
+        needsReview = try c.decodeIfPresent(Bool.self, forKey: .needsReview) ?? false
         busyMemberIds = try c.decodeIfPresent([String].self, forKey: .busyMemberIds) ?? []
     }
 }

@@ -148,6 +148,7 @@ private struct NotificationRow: View {
         switch notification.kind {
         case .proposalCreated: "checkmark.circle"
         case .proposalConfirmed: "party.popper"
+        case .proposalChanged: "exclamationmark.circle"
         case .nudge: "hand.wave"
         case .inviteAccepted, .inviteReceived: "person.badge.plus"
         case .message: "bubble.left"
@@ -159,7 +160,7 @@ private struct NotificationRow: View {
     private var tint: (background: Color, foreground: Color) {
         switch notification.kind {
         case .proposalConfirmed: (theme.okBg, theme.okInk)
-        case .nudge: (theme.warnBg, theme.warnInk)
+        case .nudge, .proposalChanged: (theme.warnBg, theme.warnInk)
         default: (theme.accentSoft, theme.accentInk)
         }
     }

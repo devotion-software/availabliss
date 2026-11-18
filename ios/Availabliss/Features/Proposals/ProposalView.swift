@@ -250,6 +250,10 @@ private struct ConfirmedView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var bloom = false
+    @State private var changingReply = false
+    @State private var reviewing = false
+    /// The review sheet opens by itself once per visit; after that, the panel's button opens it.
+    @State private var promptedReview = false
 
     private var me: String? { app.session.user?.id }
 
@@ -261,6 +265,11 @@ private struct ConfirmedView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 6)
+                if model.needsReview(me: me) {
+                    reviewPanel
+                        .padding(.horizontal, 6)
+                        .padding(.top, 8)
+                }
                 VStack(spacing: 18) {
                     VennLogo(size: 132)
                         .scaleEffect(bloom ? 1 : 0.6)
@@ -285,6 +294,96 @@ private struct ConfirmedView: View {
             withAnimation(.spring(response: 0.7, dampingFraction: 0.6).delay(0.1)) { bloom = true }
         }
         .sensoryFeedback(.success, trigger: bloom)
+        .task(id: model.needsReview(me: me)) {
+            guard model.needsReview(me: me), !promptedReview else { return }
+            promptedReview = true
+            try? await Task.sleep(for: .milliseconds(600))
+            reviewing = true
+        }
+        .confirmSheet(model.droppedOutHeadline(me: me), isPresented: $reviewing, message: "The plan\u{2019}s still on. Keep it with who can make it, or cancel it and find another date.", cancelTitle: "Decide later") {
+            [
+                ConfirmOption("Keep the plan", systemImage: "checkmark") {
+                    Task { await model.keepPlan() }
+                },
+                ConfirmOption("Cancel and find another date", systemImage: "calendar", kind: .destructive) {
+                    Task { await cancelAndFindAnotherDate() }
+                },
+            ]
+        }
+        .confirmSheet(changeReplyTitle, isPresented: $changingReply, message: changeReplyMessage) {
+            changeReplyOptions
+        }
+    }
+
+    // MARK: Changing your reply
+
+    private var myReply: ResponseKind? { model.myResponse(me) }
+
+    /// Only people asked at the time can reply (members who joined since can't).
+    private var changeReplyLabel: String? {
+        switch myReply {
+        case .accepted: "Can\u{2019}t make it any more?"
+        case .declined: "Can make it after all?"
+        case .pending: "Can you make it?"
+        case nil: nil
+        }
+    }
+
+    private var changeReplyTitle: String {
+        myReply == .accepted ? "Can\u{2019}t make it any more?" : "Can you make it?"
+    }
+
+    private var changeReplyMessage: String {
+        if myReply == .accepted {
+            let reviewer = model.proposal?.createdBy == me ? "Admins" : "Whoever proposed it and the admins"
+            return "The plan stays on. \(reviewer) will be told, so they can keep it or find another date."
+        }
+        return "Let everyone know whether you\u{2019}re coming."
+    }
+
+    private var changeReplyOptions: [ConfirmOption] {
+        switch myReply {
+        case .accepted:
+            [ConfirmOption("I can\u{2019}t make it", systemImage: "xmark", kind: .destructive) {
+                Task { await model.respond(.declined) }
+            }]
+        case .declined:
+            [ConfirmOption("I can make it", systemImage: "checkmark") {
+                Task { await model.respond(.accepted) }
+            }]
+        default:
+            [
+                ConfirmOption("I can make it", systemImage: "checkmark") {
+                    Task { await model.respond(.accepted) }
+                },
+                ConfirmOption("I can\u{2019}t make it", systemImage: "xmark", kind: .secondary) {
+                    Task { await model.respond(.declined) }
+                },
+            ]
+        }
+    }
+
+    // MARK: Review
+
+    /// For the proposer or an admin after someone dropped out: stays until they keep or cancel.
+    private var reviewPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ClashPanel(headline: model.droppedOutHeadline(me: me), detail: "Keep the plan with who can make it, or cancel it and find another date.", cornerRadius: 18)
+            Button { reviewing = true } label: {
+                Label("Keep or cancel\u{2026}", systemImage: "arrow.triangle.branch")
+            }
+            .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 15))
+            .disabled(model.isResponding)
+        }
+    }
+
+    /// Cancels the plan (its event goes too), then opens the group's calendar to pick another date.
+    private func cancelAndFindAnotherDate() async {
+        guard await model.cancel() else { return }
+        app.router.pop()
+        if app.router.currentPath.last != .group(id: group.id) {
+            app.router.push(.group(id: group.id))
+        }
     }
 
     private var comingCount: Int {
@@ -336,7 +435,7 @@ private struct ConfirmedView: View {
             }
             if !model.cantMakeIt.isEmpty {
                 GlassList(data: model.cantMakeIt, id: \.userId, header: "Can\u{2019}t make it", trailingHeader: "\(model.cantMakeIt.count)", rowMinHeight: 48) { member in
-                    personRow(member, note: nil, size: 28)
+                    personRow(member, note: model.droppedOut(member) ? "Can\u{2019}t make it any more" : nil, size: 28)
                         .opacity(0.65)
                 }
             }
@@ -383,6 +482,13 @@ private struct ConfirmedView: View {
                 Label("Go to chat", systemImage: "bubble.left")
             }
             .buttonStyle(.secondary)
+            if let changeReplyLabel {
+                Button(changeReplyLabel) { changingReply = true }
+                    .bodyFont(14, .semibold, relativeTo: .subheadline)
+                    .foregroundStyle(theme.muted)
+                    .frame(minHeight: 36)
+                    .disabled(model.isResponding)
+            }
         }
         .padding(14)
         .glass(cornerRadius: 28)

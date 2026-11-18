@@ -112,6 +112,31 @@ final class ProposalViewModel {
         return rows.filter { proposal.response(for: $0.userId)?.response == response }
     }
 
+    /// The proposer or an admin: who keeps or cancels a confirmed plan someone dropped out of.
+    func canReview(me: String?) -> Bool {
+        guard let proposal, let group, let me else { return false }
+        return proposal.createdBy == me || group.role.isAdmin
+    }
+
+    /// Confirmed and waiting on the proposer or an admin to keep it or cancel it.
+    func needsReview(me: String?) -> Bool {
+        (proposal?.needsReview ?? false) && proposal?.status == .confirmed && canReview(me: me)
+    }
+
+    /// "Priya can't make it any more" / "Priya and Tom can't make it any more".
+    func droppedOutHeadline(me: String?) -> String {
+        guard let proposal else { return "" }
+        let names = rows.filter { proposal.response(for: $0.userId)?.droppedOut == true }
+            .map { $0.userId == me ? "You" : $0.firstName }
+        guard !names.isEmpty else { return "Someone can\u{2019}t make it any more" }
+        return "\(Clash.listNames(names, max: 4)) can\u{2019}t make it any more"
+    }
+
+    /// Whether this member said they can't make it after it was confirmed (still to be reviewed).
+    func droppedOut(_ member: Member) -> Bool {
+        proposal?.response(for: member.userId)?.droppedOut == true
+    }
+
     /// The proposer or an admin can confirm an open proposal before everyone has accepted, once
     /// someone besides them can make it (the server checks the same).
     func canConfirmAnyway(me: String?) -> Bool {
@@ -166,6 +191,11 @@ final class ProposalViewModel {
 
     func confirmAnyway() async {
         await run { try await self.api.send(API.Proposals.confirm(id: self.proposalId)) }
+    }
+
+    /// "Keep the plan": clears the review; whoever dropped out stays as can't make it.
+    func keepPlan() async {
+        await run { try await self.api.send(API.Proposals.keep(id: self.proposalId)) }
     }
 
     func cancel() async -> Bool {
