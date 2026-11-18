@@ -282,17 +282,17 @@ private struct QuoteBlock: View {
         Button { open(quote.preview.id) } label: {
             HStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 1.5)
-                    .fill(isMine ? theme.onSolid.opacity(0.55) : theme.accentInk)
+                    .fill(isMine ? theme.onAccent.opacity(0.6) : theme.accentInk)
                     .frame(width: 3)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(quote.name)
                         .bodyFont(12, .semibold, relativeTo: .caption)
-                        .foregroundStyle(isMine ? theme.onSolid : theme.accentInk)
+                        .foregroundStyle(isMine ? theme.onAccent : theme.accentInk)
                         .lineLimit(1)
                     Text(quote.preview.snippet)
                         .bodyFont(12, relativeTo: .caption)
                         .italic(quote.preview.deleted)
-                        .foregroundStyle(isMine ? theme.onSolid.opacity(0.75) : theme.muted)
+                        .foregroundStyle(isMine ? theme.onAccent.opacity(0.82) : theme.muted)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
@@ -301,7 +301,7 @@ private struct QuoteBlock: View {
             .padding(.leading, 6)
             .padding(.trailing, 10)
             .fixedSize(horizontal: false, vertical: true)
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(isMine ? theme.onSolid.opacity(0.12) : theme.accentSoft))
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(isMine ? theme.onAccent.opacity(0.16) : theme.accentSoft))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -310,7 +310,7 @@ private struct QuoteBlock: View {
     }
 }
 
-/// Glass bubble for others (tail bottom-left), `solid` for you (tail bottom-right).
+/// Glass bubble for others (tail bottom-left), the theme `accent` for you (tail bottom-right).
 struct MessageBubble: View {
     let text: String
     let isMine: Bool
@@ -336,13 +336,13 @@ struct MessageBubble: View {
             Text(text)
                 .bodyFont(14)
                 .lineSpacing(2)
-                .foregroundStyle(isMine ? theme.onSolid : theme.ink)
+                .foregroundStyle(isMine ? theme.onAccent : theme.ink)
                 .textSelection(.enabled)
         }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .background {
-                if isMine { shape.fill(theme.solid) } else { Color.clear.modifier(GlassBackground(shape: shape, shadow: false)) }
+                if isMine { shape.fill(theme.accent) } else { Color.clear.modifier(GlassBackground(shape: shape, shadow: false)) }
             }
             .frame(maxWidth: 290, alignment: isMine ? .trailing : .leading)
     }
