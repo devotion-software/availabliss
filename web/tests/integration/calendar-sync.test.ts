@@ -125,6 +125,33 @@ describe('horizonFor', () => {
 });
 
 describe('syncConnection', () => {
+	test('two syncs of one connection at once never overlap or duplicate busy time; the second goes round again', async () => {
+		const me = await fx.user();
+		const id = await connection(me);
+		fake.calendars = [{ externalId: 'home', name: 'Home', color: null, changes: 'version', version: 'v1' }];
+		fake.events = [busy('home', yearsAhead(0.1)), busy('home', yearsAhead(0.2))];
+		// Slow listings, so the second request lands while the first sync is still running.
+		let running = 0, overlapped = false, listings = 0;
+		const list = adapter.listCalendars;
+		adapter.listCalendars = async (creds) => {
+			running++;
+			listings++;
+			if (running > 1) overlapped = true;
+			await new Promise((r) => setTimeout(r, 150));
+			running--;
+			return list(creds);
+		};
+		try {
+			await Promise.all([syncConnection(id), syncConnection(id)]);
+		} finally {
+			adapter.listCalendars = list;
+		}
+		expect(overlapped).toBe(false);
+		// The second request ran as another round of the first, not alongside it.
+		expect(listings).toBe(2);
+		expect(await rows(me)).toHaveLength(2);
+	});
+
 	test('first sync stores busy time years ahead, including past 2038', async () => {
 		const me = await fx.user();
 		const id = await connection(me);

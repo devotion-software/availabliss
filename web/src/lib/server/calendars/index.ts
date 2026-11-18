@@ -424,8 +424,52 @@ export interface SyncOptions {
 	pushedEvents?: (string | null)[];
 }
 
-/** Pulls calendars and busy time for one server-side connection, and keeps its change notifications alive. */
+const syncLockKey = (connectionId: string) => `calendar-sync:running:${connectionId}`;
+const syncAgainKey = (connectionId: string) => `calendar-sync:again:${connectionId}`;
+/** Longer than any one sync takes; the lock is released as soon as it finishes. */
+const SYNC_LOCK_SECONDS = 5 * 60;
+/** At most this many syncs back to back when requests keep arriving during one. */
+const MAX_SYNC_ROUNDS = 3;
+
+/**
+ * Pulls calendars and busy time for one server-side connection, and keeps its change notifications
+ * alive. Only one sync of a connection runs at a time (across instances): two at once would diff
+ * against the same stored state and could both insert the same busy block, or write cursors out of
+ * order. A request that arrives while one is running isn't dropped: it makes that sync go round
+ * again once it's done, with the changed events it named (if any).
+ */
 export async function syncConnection(connectionId: string, options: SyncOptions = {}): Promise<void> {
+	if (!(await kv.setIfAbsent(syncLockKey(connectionId), '1', SYNC_LOCK_SECONDS))) {
+		await queueAnotherRound(connectionId, options);
+		return;
+	}
+	try {
+		let next: SyncOptions | null = options;
+		for (let round = 0; next && round < MAX_SYNC_ROUNDS; round++) {
+			await syncConnectionOnce(connectionId, next);
+			next = await takeQueuedRound(connectionId);
+		}
+	} finally {
+		await kv.delete(syncLockKey(connectionId));
+	}
+}
+
+/** Remembers that another round is wanted. Changed event ids accumulate; a plain sync (no ids) wins. */
+async function queueAnotherRound(connectionId: string, options: SyncOptions) {
+	const before = await kv.get(syncAgainKey(connectionId));
+	const known: (string | null)[] | 'full' | null = before ? JSON.parse(before) : null;
+	const merged = !options.pushedEvents?.length || known === 'full' ? 'full' : [...(known ?? []), ...options.pushedEvents];
+	await kv.set(syncAgainKey(connectionId), JSON.stringify(merged), SYNC_LOCK_SECONDS);
+}
+
+async function takeQueuedRound(connectionId: string): Promise<SyncOptions | null> {
+	const queued = await kv.take(syncAgainKey(connectionId));
+	if (queued === null) return null;
+	const parsed = JSON.parse(queued) as (string | null)[] | 'full';
+	return parsed === 'full' ? {} : { pushedEvents: parsed };
+}
+
+async function syncConnectionOnce(connectionId: string, options: SyncOptions): Promise<void> {
 	const row = await db.query.calendarConnections.findFirst({ where: eq(calendarConnections.id, connectionId) });
 	if (!row || row.provider === 'device' || !row.credentials) return;
 	const adapter = adapters[row.provider];
