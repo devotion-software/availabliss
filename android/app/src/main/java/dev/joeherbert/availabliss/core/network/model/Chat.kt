@@ -47,6 +47,8 @@ enum class AttachmentKind(override val wire: String) : WireEnum {
     Image("image"),
     Gif("gif"),
     File("file"),
+    /** An Apple Wallet pass (.pkpass / .pkpasses), with [Attachment.pass] for its card. */
+    Pass("pass"),
 }
 
 object AttachmentKindSerializer :
@@ -65,23 +67,78 @@ data class Attachment(
     val width: Int? = null,
     val height: Int? = null,
     val url: String,
-    /** A smaller preview for photos; null for GIFs (show [url], animated) and files. */
+    /** A smaller preview for photos, or a pass's logo; null for GIFs (show [url], animated) and files. */
     val thumbnailUrl: String? = null,
+    /** For [AttachmentKind.Pass]: what its card shows. */
+    val pass: WalletPass? = null,
 ) {
     /** Shown in the chat as a picture (photos and GIFs). */
     val isVisual: Boolean get() = kind == AttachmentKind.Image || kind == AttachmentKind.Gif
 }
 
-/** What the attachments are, in words: "Photo", "3 photos", "GIF", "Plan.pdf", "2 files", "2 attachments". Empty for none. */
+/** An Apple Wallet pass's details, read by the server from its pass.json. */
+@Serializable
+data class WalletPass(
+    /** boardingPass, eventTicket, coupon, storeCard or generic. */
+    val style: String = "generic",
+    val organizationName: String = "",
+    val description: String = "",
+    val logoText: String? = null,
+    val passTypeIdentifier: String = "",
+    val serialNumber: String = "",
+    /** ISO 8601 UTC. */
+    val relevantDate: String? = null,
+    val expirationDate: String? = null,
+    val voided: Boolean = false,
+    val eventName: String? = null,
+    val venue: String? = null,
+    val fields: List<Field> = emptyList(),
+    /** "#rrggbb". */
+    val backgroundColor: String? = null,
+    val foregroundColor: String? = null,
+    val labelColor: String? = null,
+    /** Passes in the file (more than 1 for a .pkpasses bundle). */
+    val count: Int = 1,
+) {
+    @Serializable
+    data class Field(
+        val label: String? = null,
+        /** The text, or with [date] an ISO 8601 date-time. */
+        val value: String = "",
+        val date: Boolean = false,
+    )
+
+    /** "Concert ticket", "Boarding pass", "2 tickets". */
+    val title: String
+        get() = when {
+            count > 1 -> "$count " + when (style) {
+                "boardingPass" -> "boarding passes"
+                "eventTicket" -> "tickets"
+                else -> "passes"
+            }
+            description.isNotBlank() -> description
+            else -> when (style) {
+                "boardingPass" -> "Boarding pass"
+                "coupon" -> "Coupon"
+                "storeCard" -> "Card"
+                "generic" -> "Pass"
+                else -> "Ticket"
+            }
+        }
+}
+
+/** What the attachments are, in words: "Photo", "3 photos", "GIF", "Plan.pdf", "Concert ticket", "2 files", "2 passes", "2 attachments". Empty for none. */
 fun attachmentsSummary(attachments: List<Attachment>): String {
     if (attachments.isEmpty()) return ""
     val n = attachments.size
     val kinds = attachments.map { it.kind }.toSet()
     return when {
+        kinds == setOf(AttachmentKind.Pass) -> if (n == 1) attachments[0].pass?.title ?: "Ticket" else "$n passes"
         kinds == setOf(AttachmentKind.Image) -> if (n == 1) "Photo" else "$n photos"
         kinds == setOf(AttachmentKind.Gif) -> if (n == 1) "GIF" else "$n GIFs"
         kinds.all { it == AttachmentKind.Image || it == AttachmentKind.Gif } -> "$n photos"
         kinds == setOf(AttachmentKind.File) -> if (n == 1) attachments[0].name.ifBlank { "File" } else "$n files"
+        kinds.all { it == AttachmentKind.File || it == AttachmentKind.Pass } -> "$n files"
         else -> "$n attachments"
     }
 }

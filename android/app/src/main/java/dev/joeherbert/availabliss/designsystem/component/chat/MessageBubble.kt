@@ -116,7 +116,8 @@ fun MessageBubble(
                     val (images, files) = attachments.partition { it.visual }
                     AttachmentGallery(images, onOpenAttachment, onLongClick = longPress)
                     files.forEach { f ->
-                        FileAttachmentCard(f, own, onOpenAttachment, progress = downloads[f.id], onLongClick = longPress)
+                        if (f.pass != null) WalletPassCard(f, f.pass, onOpenAttachment, progress = downloads[f.id], onLongClick = longPress)
+                        else FileAttachmentCard(f, own, onOpenAttachment, progress = downloads[f.id], onLongClick = longPress)
                     }
                     if (text.isNotBlank()) {
                         BubbleText(text = text, modifier = Modifier.widthIn(max = 240.dp).padding(start = 8.dp, end = 8.dp, top = 2.dp, bottom = 5.dp), own = own)

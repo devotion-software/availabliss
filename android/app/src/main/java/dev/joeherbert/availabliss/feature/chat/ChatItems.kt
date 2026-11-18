@@ -8,6 +8,9 @@ import dev.joeherbert.availabliss.core.network.model.attachmentsSummary
 import dev.joeherbert.availabliss.core.network.model.displayText
 import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUi
 import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUiKind
+import dev.joeherbert.availabliss.designsystem.component.chat.PassUi
+import dev.joeherbert.availabliss.designsystem.component.chat.passColor
+import dev.joeherbert.availabliss.core.network.model.WalletPass
 import dev.joeherbert.availabliss.designsystem.component.chat.fileIconFor
 import dev.joeherbert.availabliss.designsystem.component.chat.formatFileSize
 import dev.joeherbert.availabliss.core.network.model.Message
@@ -225,23 +228,48 @@ fun Attachment.toUi(): AttachmentUi = AttachmentUi(
     kind = when (kind) {
         AttachmentKind.Image -> AttachmentUiKind.Image
         AttachmentKind.Gif -> AttachmentUiKind.Gif
-        AttachmentKind.File -> AttachmentUiKind.File
+        AttachmentKind.File, AttachmentKind.Pass -> AttachmentUiKind.File
     },
     name = name,
     sizeLabel = formatFileSize(size),
     preview = when (kind) {
         AttachmentKind.Image -> thumbnailUrl ?: url
         AttachmentKind.Gif -> url
-        AttachmentKind.File -> null
+        AttachmentKind.File, AttachmentKind.Pass -> null
     },
     width = width,
     height = height,
     icon = fileIconFor(name, mime),
+    pass = pass?.takeIf { kind == AttachmentKind.Pass }?.toUi(thumbnailUrl),
 )
+
+/** A pass's card: the event (or what it is), when, where and up to three other details. */
+fun WalletPass.toUi(logo: String?): PassUi {
+    val headline = if (count > 1) title else eventName ?: title
+    val dated = relevantDate?.let { DateTimes.dayAndTime(it).ifBlank { null } }
+    val fields = fields
+        .filter { it.value != headline && it.value != organizationName && !(it.date && dated != null) }
+        .take(3)
+        .map { f -> f.label to (if (f.date) DateTimes.dayAndTime(f.value).ifBlank { f.value } else f.value) }
+    return PassUi(
+        organization = logoText ?: organizationName,
+        headline = headline,
+        dateLabel = dated,
+        venue = venue,
+        fields = fields,
+        background = passColor(backgroundColor),
+        foreground = passColor(foregroundColor),
+        label = passColor(labelColor),
+        logo = logo,
+        boarding = style == "boardingPass",
+        voided = voided,
+        count = count,
+    )
+}
 
 /** The attachments for a screen reader: "Photo", "3 photos", "File: Plan.pdf, 1.2 MB". */
 fun attachmentsSpoken(attachments: List<Attachment>): String =
-    if (attachments.size == 1 && attachments[0].kind == AttachmentKind.File) attachments[0].toUi().accessibilityLabel
+    if (attachments.size == 1 && (attachments[0].kind == AttachmentKind.File || attachments[0].kind == AttachmentKind.Pass)) attachments[0].toUi().accessibilityLabel
     else attachmentsSummary(attachments)
 
 private fun confirmedItem(m: Message, e: GroupEvent, now: Instant): ChatItem.Confirmed {

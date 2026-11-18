@@ -26,6 +26,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.Assert.assertNotNull
 import java.time.LocalDate
 
 /** Photos, GIFs and files in chat: the wire format, list rows, summaries and the bubble / composer layout rules. */
@@ -208,5 +209,33 @@ class ChatAttachmentsTest {
         assertEquals("Files can be up to 25 MB", uploadLimitError("application/pdf", 26L * 1024 * 1024))
         assertNull(uploadLimitError("application/pdf", 1_000))
         assertNull(uploadLimitError("application/pdf", null))
+    }
+
+    @Test
+    fun walletPassDecodesAndDrawsAsACard() {
+        val a = json.decodeFromString(
+            Attachment.serializer(),
+            """{"id":"w","kind":"pass","name":"Gig.pkpass","mime":"application/vnd.apple.pkpass","size":1882,"url":"u","thumbnailUrl":"logo",
+              "pass":{"style":"eventTicket","organizationName":"Roundhouse","description":"Concert ticket","logoText":null,"passTypeIdentifier":"p","serialNumber":"s",
+              "relevantDate":"2026-12-02T00:30:00.000Z","expirationDate":null,"voided":false,"eventName":"Winter Gig","venue":"Roundhouse, London",
+              "fields":[{"label":"Event","value":"Winter Gig","date":false},{"label":"Seat","value":"12A","date":false}],
+              "backgroundColor":"#201840","foregroundColor":"#ffffff","labelColor":null,"count":1,"future":true}}""",
+        )
+        assertEquals(AttachmentKind.Pass, a.kind)
+        assertFalse(a.isVisual)
+        assertEquals("Concert ticket", attachmentsSummary(listOf(a)))
+        assertEquals("2 passes", attachmentsSummary(listOf(a, a.copy(id = "x"))))
+        val ui = a.toUi()
+        assertEquals(AttachmentUiKind.File, ui.kind)
+        assertEquals(FileIcon.Ticket, ui.icon)
+        assertNotNull(ui.pass)
+        val pass = ui.pass!!
+        assertEquals("Winter Gig", pass.headline)
+        assertEquals(listOf("Seat" to "12A"), pass.fields)
+        assertEquals("logo", pass.logo)
+        assertNotNull(pass.background)
+        assertNull(pass.label)
+        // A plain file, or an old server's: no card.
+        assertNull(a.copy(kind = AttachmentKind.File).toUi().pass)
     }
 }

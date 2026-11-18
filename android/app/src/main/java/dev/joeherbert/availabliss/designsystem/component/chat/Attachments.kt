@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -37,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
@@ -46,7 +49,34 @@ import kotlin.math.roundToInt
 enum class AttachmentUiKind { Image, Gif, File }
 
 /** What a file card's icon shows. */
-enum class FileIcon { Document, Archive, Audio, Video, Generic }
+enum class FileIcon { Document, Archive, Audio, Video, Ticket, Generic }
+
+/** An Apple Wallet pass's card: drawn in the pass's own colours. */
+@Immutable
+data class PassUi(
+    val organization: String,
+    /** The event's name, or what the pass is ("Concert ticket", "2 tickets"). */
+    val headline: String,
+    /** "Wed 2 Dec · 19:30", in the phone's time zone. */
+    val dateLabel: String? = null,
+    val venue: String? = null,
+    /** Up to three (label, value) details such as seat and gate. */
+    val fields: List<Pair<String?, String>> = emptyList(),
+    val background: Color? = null,
+    val foreground: Color? = null,
+    val label: Color? = null,
+    /** The pass's logo (a signed link), or null. */
+    val logo: String? = null,
+    val boarding: Boolean = false,
+    val voided: Boolean = false,
+    val count: Int = 1,
+)
+
+/** "#rrggbb" → a colour, or null. */
+fun passColor(hex: String?): Color? {
+    val digits = hex?.removePrefix("#")?.takeIf { it.length == 6 } ?: return null
+    return digits.toLongOrNull(16)?.let { Color(0xFF000000 or it) }
+}
 
 /** A sent photo, GIF or file, as a bubble draws it. */
 @Immutable
@@ -61,15 +91,17 @@ data class AttachmentUi(
     val width: Int? = null,
     val height: Int? = null,
     val icon: FileIcon = FileIcon.Generic,
+    /** A Wallet pass (kind File): drawn as a pass card rather than a file card. */
+    val pass: PassUi? = null,
 ) {
     val visual: Boolean get() = kind != AttachmentUiKind.File
 
-    /** "Photo", "GIF", or "File: Plan.pdf, 1.2 MB". */
+    /** "Photo", "GIF", "Wallet pass: Winter Gig, Roundhouse", or "File: Plan.pdf, 1.2 MB". */
     val accessibilityLabel: String
         get() = when (kind) {
             AttachmentUiKind.Image -> "Photo"
             AttachmentUiKind.Gif -> "GIF"
-            AttachmentUiKind.File -> "File: $name, $sizeLabel"
+            AttachmentUiKind.File -> if (pass != null) "Wallet pass: ${pass.headline}, ${pass.organization}" else "File: $name, $sizeLabel"
         }
 }
 
@@ -124,6 +156,7 @@ fun fileIconFor(name: String, mime: String): FileIcon {
     return when {
         mime.startsWith("audio/") || ext in setOf("mp3", "m4a", "wav", "aac", "ogg", "flac") -> FileIcon.Audio
         mime.startsWith("video/") || ext in setOf("mp4", "mov", "m4v", "webm") -> FileIcon.Video
+        ext in setOf("pkpass", "pkpasses") || mime.startsWith("application/vnd.apple.pkpass") -> FileIcon.Ticket
         ext in setOf("zip", "rar", "7z", "gz", "tar") || mime.contains("zip") -> FileIcon.Archive
         ext in setOf("pdf", "txt", "md", "csv", "rtf", "ics", "vcf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "pages", "numbers", "key", "epub") ||
             mime.startsWith("text/") || mime == "application/pdf" -> FileIcon.Document
@@ -253,7 +286,103 @@ private fun FileIcon.vector(): ImageVector = when (this) {
     FileIcon.Archive -> AvIcons.Archive
     FileIcon.Audio -> AvIcons.Music
     FileIcon.Video -> AvIcons.Video
+    FileIcon.Ticket -> AvIcons.Ticket
     FileIcon.Generic -> AvIcons.File
+}
+
+/**
+ * A Wallet pass in a message, drawn like the pass: its colours and logo, what and when, a few
+ * details, and Open pass (Android has no Apple Wallet: the .pkpass opens in whichever app handles
+ * it). [progress] is non-null while it downloads.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun WalletPassCard(
+    file: AttachmentUi,
+    pass: PassUi,
+    onOpen: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    progress: Float? = null,
+    onLongClick: (() -> Unit)? = null,
+) {
+    val colors = AvailablissTheme.colors
+    val background = pass.background ?: colors.surface
+    val ink = pass.foreground ?: colors.ink
+    val label = pass.label ?: ink.copy(alpha = 0.72f)
+    Column(
+        modifier
+            .width(GalleryWidth)
+            .clip(RoundedCornerShape(14.dp))
+            .background(background)
+            .combinedClickable(
+                role = Role.Button,
+                onClickLabel = "Open pass",
+                onLongClick = onLongClick,
+                onClick = { onOpen(file.id) },
+            )
+            .semantics(mergeDescendants = true) {
+                contentDescription = file.accessibilityLabel + listOfNotNull(pass.dateLabel, pass.venue).joinToString { ", $it" } +
+                    if (progress != null) ", downloading" else ""
+            }
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(Modifier.clearAndSetSemantics {}, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (pass.logo != null) {
+                AsyncImage(
+                    model = pass.logo,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                    modifier = Modifier.height(24.dp).widthIn(max = 100.dp),
+                )
+            }
+            Text(pass.organization, style = AvailablissTheme.type.bodySmallStrong, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (pass.voided) {
+                Text(
+                    "Voided",
+                    style = AvailablissTheme.type.caption,
+                    color = ink,
+                    modifier = Modifier.clip(CircleShape).background(ink.copy(alpha = 0.16f)).padding(horizontal = 6.dp, vertical = 1.dp),
+                )
+            } else {
+                Icon(if (pass.boarding) AvIcons.Plane else AvIcons.Ticket, null, tint = label, modifier = Modifier.size(16.dp))
+            }
+        }
+        Column(Modifier.clearAndSetSemantics {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(pass.headline, style = AvailablissTheme.type.bodyStrong, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            pass.dateLabel?.let { Text(it, style = AvailablissTheme.type.bodySmallStrong, color = label, maxLines = 1) }
+            pass.venue?.let { Text(it, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = ink.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        }
+        if (pass.fields.isNotEmpty()) {
+            Row(Modifier.clearAndSetSemantics {}, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                pass.fields.forEach { (name, value) ->
+                    Column(Modifier.widthIn(max = 110.dp)) {
+                        if (name != null) Text(name.uppercase(Locale.getDefault()), style = AvailablissTheme.type.caption.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold), color = label, maxLines = 1)
+                        Text(value, style = AvailablissTheme.type.bodySmallStrong, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(ink.copy(alpha = 0.14f))
+                .clearAndSetSemantics {},
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (progress != null) {
+                if (progress < 0f) CircularProgressIndicator(color = ink, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                else CircularProgressIndicator(progress = { progress }, color = ink, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+            } else {
+                Icon(AvIcons.Download, null, tint = ink, modifier = Modifier.size(16.dp))
+            }
+            Text(if (pass.count > 1) "Open ${pass.count} passes" else "Open pass", style = AvailablissTheme.type.bodySmallStrong, color = ink)
+        }
+    }
 }
 
 /**

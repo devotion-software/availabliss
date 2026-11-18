@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.network.model.AttachmentKind
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.common.firstName
 import dev.joeherbert.availabliss.core.common.joinNamesSummary
@@ -593,7 +594,14 @@ class ChatViewModel @Inject constructor(
             data.update { it.copy(viewer = ViewerUi(visuals, visuals.indexOf(a).coerceAtLeast(0)), menuOpen = false) }
         } else {
             withDownload(a) { file ->
-                if (!files.open(file, a.mime)) data.update { it.copy(message = UserMessage("No app on this phone can open ${a.name}")) }
+                if (!files.open(file, a.mime)) {
+                    val why = if (a.kind == AttachmentKind.Pass) {
+                        "No app on this phone opens Wallet passes. Google Wallet can't add Apple Wallet passes directly: try an app that supports .pkpass files"
+                    } else {
+                        "No app on this phone can open ${a.name}"
+                    }
+                    data.update { it.copy(message = UserMessage(why)) }
+                }
             }
         }
     }
