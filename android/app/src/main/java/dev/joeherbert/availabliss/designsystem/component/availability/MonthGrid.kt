@@ -18,7 +18,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -76,6 +75,17 @@ private const val HIDDEN_FADE = 0.35f
 private fun Modifier.todayOutline(today: Boolean, shape: Shape, fallback: Color): Modifier =
     if (today) border(1.5.dp, AvailablissTheme.colors.accent, shape) else border(1.dp, fallback, shape)
 
+/** A [width] ring [inset] inside the edge of [shape], drawn over the background. */
+private fun Modifier.insetRing(shape: Shape, color: Color, width: Dp = 2.dp, inset: Dp = 2.dp): Modifier = drawBehind {
+    val grow = inset.toPx() + width.toPx() / 2
+    val outline = shape.createOutline(Size(size.width - grow * 2, size.height - grow * 2), layoutDirection, this)
+    val path = Path().apply {
+        addOutline(outline)
+        translate(Offset(grow, grow))
+    }
+    drawPath(path, color, style = Stroke(width.toPx()))
+}
+
 /**
  * Picks out today's date with a pill behind it in [pill]. Drawn outside the layout, so cells keep
  * their size.
@@ -126,16 +136,14 @@ fun MonthGrid(
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             rows.forEach { week ->
-                // The selected cell (and its row) draw above their neighbours, which would otherwise cover the ring.
-                val hasSelected = week.any { it?.selected == true }
-                Row(Modifier.fillMaxWidth().zIndex(if (hasSelected) 1f else 0f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     week.forEach { cell ->
                         if (cell == null) {
                             Spacer(Modifier.weight(1f).height(54.dp))
                         } else if (cell.state == CellState.Hidden) {
                             HiddenCell(cell, Modifier.weight(1f))
                         } else {
-                            MonthCell(cell, onClick = { onSelect(cell.date) }, modifier = Modifier.weight(1f).zIndex(if (cell.selected) 1f else 0f))
+                            MonthCell(cell, onClick = { onSelect(cell.date) }, modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -161,12 +169,20 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
         Modifier
             .fillMaxWidth()
             .height(54.dp)
-            .then(if (cell.selected) Modifier.outlineOutside(shape, colors.ink) else Modifier)
             .then(if (cell.state == CellState.Match) Modifier.softShadow(shape, colors.accent, offsetY = 12.dp, blur = 24.dp, spread = (-14).dp) else Modifier)
             .alpha(if (plainToday) 1f else fade)
             .clip(shape)
             .background(if (plainToday) bg.copy(alpha = bg.alpha * fade) else bg)
-            .then(if (plainToday) Modifier.todayOutline(true, shape, border) else Modifier.border(1.dp, border, shape))
+            // The selected day: a ring inside the cell, so it never reaches the neighbouring days. It takes over
+            // from today's outline (only ever one ring); on a day that works, a light inner ring reads on the fill.
+            .then(
+                when {
+                    cell.selected && cell.state == CellState.Match -> Modifier.insetRing(shape, colors.onAccent, inset = 2.dp)
+                    cell.selected -> Modifier.border(2.dp, colors.ink, shape)
+                    plainToday -> Modifier.todayOutline(true, shape, border)
+                    else -> Modifier.border(1.dp, border, shape)
+                },
+            )
             .clickable(role = Role.Button, onClick = onClick)
             .semantics {
                 contentDescription = cell.accessibilityLabel

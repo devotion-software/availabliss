@@ -600,7 +600,8 @@ private struct DayCell: View {
             .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
             .background(background(status).opacity(fade))
             .overlay {
-                if plainToday { shape.strokeBorder(theme.accent, lineWidth: 1.5) }
+                // The selected day's ring takes over from today's outline, so there's only ever one.
+                if plainToday && !isSelected { shape.strokeBorder(theme.accent, lineWidth: 1.5) }
             }
             .overlay(alignment: .topTrailing) {
                 if status == .match, let count = info?.preferredBy?.count, count > 0 {
@@ -615,8 +616,14 @@ private struct DayCell: View {
                 }
             }
             .overlay {
+                // The selected day: a ring inside the cell, so it never reaches the neighbouring days.
+                // On a day that works (filled with the accent), a light inner ring reads on the fill.
                 if isSelected {
-                    shape.stroke(theme.ink, lineWidth: 2).padding(-4)
+                    if status == .match {
+                        shape.inset(by: 2).strokeBorder(theme.onAccent, lineWidth: 2)
+                    } else {
+                        shape.strokeBorder(theme.ink, lineWidth: 2)
+                    }
                 }
             }
             .contentShape(Rectangle())

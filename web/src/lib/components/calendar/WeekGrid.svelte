@@ -253,8 +253,9 @@
 		color: var(--bg);
 	}
 	.col.on {
+		/* Inside the column, so the ring never reaches the neighbouring days. */
 		outline: 2px solid var(--ink);
-		outline-offset: 1px;
+		outline-offset: -2px;
 	}
 	.col {
 		cursor: pointer;

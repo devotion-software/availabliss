@@ -50,7 +50,7 @@ struct WeekGrid: View {
                         // Days that don't work for everyone step back, like the month's plain cells.
                         .opacity(model.works(day) ? 1 : WeekFade.opacity)
                         .overlay {
-                            if selected { RoundedRectangle(cornerRadius: 14).stroke(theme.ink, lineWidth: 2).padding(-3) }
+                            if selected { RoundedRectangle(cornerRadius: 12).strokeBorder(theme.ink, lineWidth: 2) }
                         }
                         .contentShape(Rectangle())
                         .onTapGesture { withAnimation(.spring(response: 0.3)) { model.pick(day) } }
