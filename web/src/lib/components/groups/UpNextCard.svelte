@@ -61,7 +61,9 @@
 		outline-offset: 2px;
 	}
 	/* Only the buttons and links take taps; the space around them opens the plan. */
+	/* In the pager a shorter card stretches to match the tallest, keeping its buttons at the foot. */
 	.actions {
+		margin-top: auto;
 		position: relative;
 		z-index: 2;
 		pointer-events: none;

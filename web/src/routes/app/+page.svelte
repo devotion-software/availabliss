@@ -5,12 +5,13 @@
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
 	import ProfileMenu from '#lib/components/app/ProfileMenu.svelte';
 	import GroupCard from '#lib/components/groups/GroupCard.svelte';
-	import UpNextCard from '#lib/components/groups/UpNextCard.svelte';
+	import UpNextPager from '#lib/components/groups/UpNextPager.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
 
 	let { data } = $props();
 	const fmt = useFormat();
-	const next = $derived(data.upcoming[0]);
+	// The next few confirmed plans, soonest first, for the Up next pager.
+	const next = $derived([...data.upcoming].sort((a, b) => a.start.localeCompare(b.start)).slice(0, 5));
 	const greeting = $derived(data.user.name?.trim() ? `Hi, ${firstName(data.user.name)}` : 'Hi');
 	const active = $derived(data.groups.filter((g) => !g.archived));
 	const archived = $derived(data.groups.filter((g) => g.archived));
@@ -30,8 +31,8 @@
 	</header>
 
 	<div class="layout">
-		{#if next}
-			<div class="side"><UpNextCard event={next} /></div>
+		{#if next.length}
+			<div class="side"><UpNextPager events={next} /></div>
 		{/if}
 
 		<section class="groups" aria-labelledby="groups-heading">
