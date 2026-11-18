@@ -11,7 +11,16 @@ struct RequirementTemplate: Codable, Sendable, Identifiable, Equatable {
     /// today (keeping its length), specific dates already over are dropped, and times are read
     /// in your time zone. Mirrors `requirementFromTemplate` in web/src/lib/client/templates.ts.
     func requirementForNewGroup(today: CalendarDay = .today(), timezone: String, calendar: Calendar = .current) -> Requirement {
-        var r = requirement
+        requirement.forNewGroup(today: today, timezone: timezone, calendar: calendar)
+    }
+}
+
+extension Requirement {
+    /// This timing, ready for a new group (from a template, or another group's "New group with these
+    /// people"): same rules, but the search range starts today (keeping its length), specific dates
+    /// already over are dropped, and times are read in your time zone.
+    func forNewGroup(today: CalendarDay = .today(), timezone: String, calendar: Calendar = .current) -> Requirement {
+        var r = self
         let from = r.range.from.startDate(calendar: calendar)
         let to = r.range.to.startDate(calendar: calendar)
         let length = max(0, calendar.dateComponents([.day], from: from, to: to).day ?? 0)
@@ -21,9 +30,7 @@ struct RequirementTemplate: Codable, Sendable, Identifiable, Equatable {
         r.timezone = timezone
         return r
     }
-}
 
-extension Requirement {
     /// True when this is the same timing as `other`, ignoring when the search range starts (its
     /// length still counts) and the time zone: a template's range moves to "today" when it's used.
     /// Mirrors `sameTiming` in web/src/lib/client/templates.ts.

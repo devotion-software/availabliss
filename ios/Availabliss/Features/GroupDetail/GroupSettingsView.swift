@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// Group settings, from the group's More menu: its photo, name and colour, the name you go by in it, Archive / Unarchive, Leave
+/// Group settings, from the group's More menu: its photo, name and colour, the name you go by in it, a new group with the same people, Archive / Unarchive, Leave
 /// group and Delete group. Everyone can open it and leave; only the owner and admins can change things
 /// (the server's rules), and only the owner can delete the group. Each part is its own section. Admins
 /// can also have the group archive itself once its event has passed.
 struct GroupSettingsView: View {
     let detail: GroupDetailModel
     let group: Group
+    /// Opens "New group with these people".
+    var onNewGroup: () -> Void = {}
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var name: String
@@ -26,9 +28,10 @@ struct GroupSettingsView: View {
     @State private var error: String?
     @State private var toast: String?
 
-    init(detail: GroupDetailModel, group: Group) {
+    init(detail: GroupDetailModel, group: Group, onNewGroup: @escaping () -> Void = {}) {
         self.detail = detail
         self.group = group
+        self.onNewGroup = onNewGroup
         _name = State(initialValue: group.name)
         _myName = State(initialValue: "")
     }
@@ -44,6 +47,7 @@ struct GroupSettingsView: View {
                 photoCard
                 detailsCard
                 myNameCard
+                if group.members.count > 1 { newGroupCard }
                 if canEdit { archiveCard }
                 leaveCard
                 if isOwner { deleteCard }
@@ -258,6 +262,24 @@ struct GroupSettingsView: View {
             } catch {
                 self.error = error.userMessage
             }
+        }
+    }
+
+    // MARK: New group with these people
+
+    private var newGroupCard: some View {
+        GlassPanel(cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Same people, new plan").bodyFont(15, .semibold)
+                Text("Start another group with everyone here. You choose who to invite, and each of them gets an invite to accept.")
+                    .bodyFont(13, relativeTo: .subheadline)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button(action: onNewGroup) {
+                LoadingLabel(title: "New group with these people", systemImage: "plus.square.on.square")
+            }
+            .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
         }
     }
 

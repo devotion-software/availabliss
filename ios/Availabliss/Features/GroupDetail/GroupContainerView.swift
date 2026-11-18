@@ -8,6 +8,8 @@ struct GroupContainerView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var detail: GroupDetailModel
+    /// "New group with these people", from the More menu or Group settings.
+    @State private var showsNewGroup = false
 
     init(groupId: String, section: GroupSection?, app: AppModel) {
         self.section = section
@@ -18,7 +20,15 @@ struct GroupContainerView: View {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let group = detail.group {
-                    GroupTopBar(group: group, section: section, unreadCount: detail.unreadCount)
+                    GroupTopBar(group: group, section: section, unreadCount: detail.unreadCount, onNewGroup: { showsNewGroup = true })
+                }
+            }
+            .sheet(isPresented: $showsNewGroup) {
+                if let group = detail.group {
+                    NewGroupSheet(api: app.api, timezone: app.session.user?.timezone ?? TimeZone.current.identifier,
+                                  basedOn: group, me: app.session.user?.id) { created in
+                        app.router.push(.group(id: created.id))
+                    }
                 }
             }
             .foregroundStyle(theme.ink)
@@ -47,7 +57,7 @@ struct GroupContainerView: View {
             case .timing:
                 TimingEditorView(detail: detail, group: group, onDone: { app.router.pop() })
             case .settings:
-                GroupSettingsView(detail: detail, group: group)
+                GroupSettingsView(detail: detail, group: group, onNewGroup: { showsNewGroup = true })
             }
         } else if let error = detail.loadError {
             VStack {
@@ -67,12 +77,13 @@ struct GroupContainerView: View {
 }
 
 /// Pinned at the top of a group's screens. On the calendar: back to groups, name, role, Chat and More
-/// (Plans, Timing, Members, Group settings). On a pushed section: back to the calendar, with the group's
+/// (Plans, Timing, Members, New group with these people, Group settings). On a pushed section: back to the calendar, with the group's
 /// name (Settings is titled "Group settings", with the name under it).
 private struct GroupTopBar: View {
     let group: Group
     let section: GroupSection?
     let unreadCount: Int
+    let onNewGroup: () -> Void
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
@@ -95,7 +106,7 @@ private struct GroupTopBar: View {
                 ScreenHeader(title: group.name, titleSize: 22, onBack: { app.router.back() }, onTitle: { app.router.pop(); app.open(.group(id: group.id)) },
                              leading: section == .chat ? tile : nil)
             } else {
-                GroupHeader(group: group, unreadCount: unreadCount)
+                GroupHeader(group: group, unreadCount: unreadCount, onNewGroup: onNewGroup)
             }
         }
         .padding(.horizontal, 20)
@@ -117,6 +128,7 @@ private struct GroupTopBar: View {
 private struct GroupHeader: View {
     let group: Group
     let unreadCount: Int
+    let onNewGroup: () -> Void
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
@@ -158,6 +170,11 @@ private struct GroupHeader: View {
             }
             Button { app.router.push(.members(groupId: group.id)) } label: {
                 Label(canInvite ? "Members and invites" : "Members", systemImage: canInvite ? "person.badge.plus" : "person.2")
+            }
+            if group.members.count > 1 {
+                Button(action: onNewGroup) {
+                    Label("New group with these people", systemImage: "plus.square.on.square")
+                }
             }
             Button { app.router.push(.groupSection(id: group.id, section: .settings)) } label: {
                 Label("Group settings", systemImage: "gearshape")

@@ -70,6 +70,10 @@ struct ActivityView: View {
             await app.markNotificationsRead()
         }
         .refreshable { await model.load() }
+        // An invite opened from here was joined or declined (a declined one's item goes): catch up.
+        .onChange(of: app.router.pendingInvite == nil) { _, closed in
+            if closed { Task { await model.load() } }
+        }
         .task {
             for await event in app.live.events() where event.kind == .notificationCreated || event.kind == .reconnected {
                 if event.kind == .reconnected {

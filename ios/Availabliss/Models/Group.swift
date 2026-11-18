@@ -181,13 +181,15 @@ struct GroupInvite: Decodable, Sendable, Identifiable, Hashable {
     let id: String
     let email: String?
     var username: String?
+    /// The account name of the person it was sent to in Activity (older servers omit it).
+    var name: String?
     let url: URL
     let expiresAt: Date
 
     /// A link anyone can use (not for a particular person).
-    var isLink: Bool { email == nil && username == nil }
-    /// Who it's for: "@sam" or "sam@example.com"; nil for a link.
-    var recipient: String? { username.map { "@\($0)" } ?? email }
+    var isLink: Bool { email == nil && username == nil && name == nil }
+    /// Who it's for: "@sam", "sam@example.com" or (sent to someone without a username) their name; nil for a link.
+    var recipient: String? { username.map { "@\($0)" } ?? email ?? name }
 }
 
 struct GroupInvitesResponse: Decodable, Sendable { let invites: [GroupInvite] }
@@ -195,6 +197,7 @@ struct GroupInvitesResponse: Decodable, Sendable { let invites: [GroupInvite] }
 struct CreateInviteBody: Encodable, Sendable {
     var emails: [String]?
     var usernames: [String]?
+    var userIds: [String]?
 }
 
 struct InvitePreview: Decodable, Sendable {
@@ -206,4 +209,6 @@ struct InvitePreview: Decodable, Sendable {
     var email: String?
     /// Who an invite sent by username is for.
     var username: String?
+    /// Sent to one person's Activity, so they can decline it (older servers omit it).
+    var personal: Bool?
 }

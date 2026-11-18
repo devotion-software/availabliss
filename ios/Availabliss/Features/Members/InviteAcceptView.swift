@@ -10,6 +10,7 @@ struct InviteAcceptView: View {
     @State private var preview: InvitePreview?
     @State private var loadError: String?
     @State private var isJoining = false
+    @State private var isDeclining = false
     @State private var isSwitching = false
     @State private var error: String?
     /// Joined: the sheet then asks what name to go by in the group, and opens it once it goes.
@@ -88,7 +89,17 @@ struct InviteAcceptView: View {
                         LoadingLabel(title: "Join \(preview.groupName)", isLoading: isJoining)
                     }
                     .buttonStyle(.primary)
-                    .disabled(isJoining)
+                    .disabled(isJoining || isDeclining)
+                    // Sent to you in Activity (by username, or as one of a group's people): you can turn it down.
+                    if preview.personal == true {
+                        Button {
+                            Task { await decline() }
+                        } label: {
+                            LoadingLabel(title: "Decline", isLoading: isDeclining)
+                        }
+                        .buttonStyle(.secondary)
+                        .disabled(isJoining || isDeclining)
+                    }
                 }
                 Button("Not now") { dismiss() }.buttonStyle(.textAction).frame(maxWidth: .infinity)
             } else if let loadError {
@@ -162,6 +173,18 @@ struct InviteAcceptView: View {
         isSwitching = true
         await app.signOut()
         app.router.pendingInvite = Router.InviteToken(token: token)
+    }
+
+    /// Turns the invite down: it goes, with its Activity item, and nobody is told.
+    private func decline() async {
+        isDeclining = true
+        defer { isDeclining = false }
+        do {
+            _ = try await api.send(API.Invites.decline(token: token))
+            dismiss()
+        } catch {
+            self.error = error.userMessage
+        }
     }
 
     private func join() async {

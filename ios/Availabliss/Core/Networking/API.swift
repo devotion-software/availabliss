@@ -129,10 +129,12 @@ enum API {
         static func nudge(groupId: String) -> Endpoint<NudgeResponse> { .init(.post, "/groups/\(groupId.pathEncoded)/nudge") }
         /// No one: a link anyone can use. Emails / usernames: one invite each, only for that person
         /// (emailed, or sent to their Activity). 404 for a username nobody has, 409 if they're in already.
-        static func createInvite(groupId: String, emails: [String] = [], usernames: [String] = []) -> Endpoint<InviteLink> {
+        /// User ids: likewise sent to their Activity, for people you're already in a group with.
+        static func createInvite(groupId: String, emails: [String] = [], usernames: [String] = [], userIds: [String] = []) -> Endpoint<InviteLink> {
             .init(.post, "/groups/\(groupId.pathEncoded)/invites", body: CreateInviteBody(
                 emails: emails.isEmpty ? nil : emails,
-                usernames: usernames.isEmpty ? nil : usernames
+                usernames: usernames.isEmpty ? nil : usernames,
+                userIds: userIds.isEmpty ? nil : userIds
             ))
         }
         static func preferences(groupId: String) -> Endpoint<GroupPreferencesResponse> { .init(.get, "/groups/\(groupId.pathEncoded)/preferences") }
@@ -152,6 +154,8 @@ enum API {
     enum Invites {
         static func preview(token: String) -> Endpoint<InvitePreview> { .init(.get, "/invites/\(token.pathEncoded)") }
         static func accept(token: String) -> Endpoint<JoinedGroup> { .init(.post, "/invites/\(token.pathEncoded)/accept") }
+        /// Turns down an invite sent to you (one with `personal`): it and its Activity item go.
+        static func decline(token: String) -> Endpoint<EmptyResponse> { .init(.post, "/invites/\(token.pathEncoded)/decline") }
     }
 
     // MARK: Availability
