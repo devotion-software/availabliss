@@ -751,6 +751,11 @@ when Activity is opened. Updates to an existing item (a new message, or it being
 as `notification.created` with the **same id**: replace the item you have, and move it to the
 top when its `createdAt` is newer.
 
+`proposal.created` tells each other member "Priya Shah proposed Sat 12 Dec · 18:00–21:00. Can
+you make it?" (`title` = the group's name, `data.proposalId`). The proposer gets their own item
+too, "You proposed Sat 12 Dec · 18:00–21:00.", with `data.own = 'true'`: it is created already
+read and sends no push.
+
 `role.changed` tells someone their role in a group changed, with `data.role` the new one:
 `admin` ("Sam Taylor made you an admin."), `member` ("You're no longer an admin. Sam Taylor
 changed your role.") or `owner` ("You're now the owner. Sam Taylor left and handed the group to

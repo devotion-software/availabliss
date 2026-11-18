@@ -1,9 +1,11 @@
 import './setup';
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db';
 import { events, messages, notifications } from '#lib/server/db/schema';
 import { createGroup, removeMember } from '#lib/server/groups';
+import { listNotifications } from '#lib/server/notifications';
+import * as pushModule from '#lib/server/push';
 import {
 	awaitingReply,
 	cancelProposal,
@@ -59,14 +61,42 @@ describe('createProposal', () => {
 		expect(p.busyMemberIds).toEqual([]);
 
 		const notified = await db.select().from(notifications).where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.created')));
-		expect(notified.map((n) => n.userId).sort()).toEqual([g.owner, g.admin].sort());
-		expect(notified[0].data).toMatchObject({ proposalId: p.id, kind: 'proposal.created', groupId: g.groupId });
+		const others = notified.filter((n) => n.userId !== g.member);
+		expect(others.map((n) => n.userId).sort()).toEqual([g.owner, g.admin].sort());
+		expect(others[0].data).toMatchObject({ proposalId: p.id, kind: 'proposal.created', groupId: g.groupId });
+		expect(others[0].data.own).toBeUndefined();
+		expect(others[0].body).toEndWith('Can you make it?');
+		expect(others[0].readAt).toBeNull();
 
 		const chat = await db.select().from(messages).where(eq(messages.groupId, g.groupId));
 		expect(chat.some((m) => m.kind === 'proposal' && m.proposalId === p.id)).toBe(true);
 
 		expect(await awaitingReply(g.groupId, g.owner)).toBe(p.id);
 		expect(await awaitingReply(g.groupId, g.member)).toBeNull();
+	});
+
+	test('the proposer gets their own Activity item, already read and without a push', async () => {
+		const push = spyOn(pushModule, 'sendPush');
+		try {
+			const p = await createProposal(g.groupId, g.admin, slot(6));
+			const own = (
+				await db
+					.select()
+					.from(notifications)
+					.where(and(eq(notifications.userId, g.admin), eq(notifications.kind, 'proposal.created')))
+			).filter((n) => n.data.proposalId === p.id);
+			expect(own.length).toBe(1);
+			expect(own[0]).toMatchObject({ groupId: g.groupId, title: 'Dinner club', body: 'You proposed Thu 6 Mar · 18:00–21:00.' });
+			expect(own[0].data).toMatchObject({ proposalId: p.id, kind: 'proposal.created', groupId: g.groupId, own: 'true' });
+			expect(own[0].readAt).not.toBeNull();
+			// Only the earlier proposal (from the member) is unread.
+			expect((await listNotifications(g.admin)).unread).toBe(1);
+
+			const pushedTo = push.mock.calls.flatMap(([userIds]) => userIds);
+			expect(pushedTo.sort()).toEqual([g.owner, g.member].sort());
+		} finally {
+			push.mockRestore();
+		}
 	});
 
 	test('non-members cannot propose or read proposals', async () => {

@@ -19,6 +19,10 @@ interface NotifyInput {
 	 * (`markChatRead`), with `data.count` messages since. false: push only.
 	 */
 	record?: boolean | 'per-group';
+	/** false: Activity item only, no push (e.g. a note of something you did yourself). Default true. */
+	push?: boolean;
+	/** true: the Activity item is recorded already read, so it doesn't count as unread. */
+	read?: boolean;
 }
 
 type Row = typeof notifications.$inferSelect;
@@ -42,6 +46,7 @@ export async function notify(userIds: string[], input: NotifyInput): Promise<voi
 	if (input.record === 'per-group' && input.groupId) {
 		await upsertPerGroup(userIds, input.groupId, input, data);
 	} else if (input.record !== false) {
+		const now = new Date();
 		const rows = userIds.map((userId) => ({
 			id: newId(),
 			userId,
@@ -50,20 +55,21 @@ export async function notify(userIds: string[], input: NotifyInput): Promise<voi
 			title: input.title,
 			body: input.body,
 			data,
-			createdAt: new Date()
+			readAt: input.read ? now : null,
+			createdAt: now
 		}));
 		await db.insert(notifications).values(rows);
 		for (const row of rows) {
 			publishToUsers([row.userId], {
 				type: 'notification.created',
 				groupId: row.groupId,
-				payload: toNotification({ ...row, readAt: null })
+				payload: toNotification(row)
 			});
 		}
 	}
 
 	// Push is best effort and shouldn't hold up the request.
-	void sendPush(userIds, { title: input.title, body: input.body, data });
+	if (input.push !== false) void sendPush(userIds, { title: input.title, body: input.body, data });
 }
 
 /** The group's one Activity item for each user, created or brought up to date (see `record`). */

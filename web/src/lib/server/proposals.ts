@@ -180,6 +180,16 @@ export async function createProposal(groupId: string, userId: string, input: Pro
 			data: { proposalId: id }
 		}
 	);
+	// The proposer's own note of it in Activity: already read, and no push.
+	await notify([userId], {
+		kind: 'proposal.created',
+		groupId,
+		title: group.name,
+		body: `You proposed ${when}.`,
+		data: { proposalId: id, own: 'true' },
+		push: false,
+		read: true
+	});
 	return (await confirmIfEveryoneAccepted(proposal)) ?? proposal;
 }
 
