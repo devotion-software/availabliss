@@ -26,6 +26,7 @@ import {
 import { FREE_GROUP_LIMIT, getPlan, saveEntitlement } from '#lib/server/billing';
 import { createBlock } from '#lib/server/blocks';
 import { nudgeUnsynced } from '#lib/server/nudge';
+import { listNotifications } from '#lib/server/notifications';
 import { apiError, everyDay, fixture } from './fixtures';
 
 const fx = fixture('groups');
@@ -156,6 +157,32 @@ describe('membership and roles', () => {
 		expect(await roleIn(groupId, member)).toBe('member');
 	});
 
+	test('setMemberRole tells the person in Activity (role.changed), not for no-op changes', async () => {
+		const [owner, person] = await fx.users(2);
+		const g = await createGroup(owner, { name: 'Roles club' }, 'UTC');
+		await fx.join(g.id, person);
+		const roleItems = async () =>
+			(await listNotifications(person)).notifications.filter((n) => n.kind === 'role.changed' && n.groupId === g.id);
+
+		await setMemberRole(g.id, owner, person, 'admin');
+		let items = await roleItems();
+		expect(items).toHaveLength(1);
+		expect(items[0]).toMatchObject({ title: 'Roles club', data: expect.objectContaining({ role: 'admin', groupId: g.id }) });
+		expect(items[0].body).toContain('made you an admin');
+
+		await setMemberRole(g.id, owner, person, 'admin'); // already an admin: nothing new
+		expect(await roleItems()).toHaveLength(1);
+
+		await setMemberRole(g.id, owner, person, 'member');
+		items = await roleItems();
+		expect(items).toHaveLength(2);
+		expect(items.find((n) => n.data.role === 'member')?.body).toContain("You're no longer an admin");
+		// Changing your own role doesn't tell you.
+		await setMemberRole(g.id, owner, person, 'admin');
+		await setMemberRole(g.id, person, person, 'member');
+		expect(await roleItems()).toHaveLength(3);
+	});
+
 	test('removeMember: members can leave, only admins remove others, nobody removes the owner', async () => {
 		const [leaver, kicked] = await fx.users(2);
 		await fx.join(groupId, leaver);
@@ -223,6 +250,9 @@ describe('membership and roles', () => {
 
 		const heir = await leaveGroup(g.id, owner, admin);
 		expect(heir).toMatchObject({ userId: admin, role: 'owner' });
+		const told = (await listNotifications(admin)).notifications.find((n) => n.kind === 'role.changed' && n.groupId === g.id);
+		expect(told).toMatchObject({ title: 'Handover', data: expect.objectContaining({ role: 'owner' }) });
+		expect(told?.body).toContain("You're now the owner");
 		expect(await roleIn(g.id, owner)).toBeNull();
 		expect(await roleIn(g.id, admin)).toBe('owner');
 		expect((await getGroup(g.id, admin)).role).toBe('owner');

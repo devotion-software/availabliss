@@ -22,7 +22,8 @@
 		'invite.accepted': 'user-plus',
 		'invite.received': 'user-plus',
 		message: 'chat',
-		'event.created': 'calendar-plus'
+		'event.created': 'calendar-plus',
+		'role.changed': 'shield'
 	};
 
 	// Opening Activity marks everything read, and so does anything new arriving while

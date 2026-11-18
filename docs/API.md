@@ -426,7 +426,7 @@ interface ManualBlock {
 | PUT 👑 | `/groups/:id/image` | the image bytes (as `/me/avatar`) | `Group` (`image` shrunk to fit 512 px; publishes `group.updated`) |
 | DELETE 👑 | `/groups/:id/image` | | `Group` (no photo: the monogram tile) |
 | DELETE ⭐ | `/groups/:id` | | `204` |
-| PATCH 👑 | `/groups/:id/members/:userId` | `{ role: 'admin' \| 'member' }` | `Member` |
+| PATCH 👑 | `/groups/:id/members/:userId` | `{ role: 'admin' \| 'member' }` | `Member` (they get a `role.changed` notification) |
 | DELETE 👑/self | `/groups/:id/members/:userId` | | `204` (an admin removes someone; never the owner. Yourself = leave, as `POST /groups/:id/leave` with no new owner) |
 | POST 🔒 | `/groups/:id/leave` | `{ newOwnerId?: string }` (the owner only: the admin who becomes owner) | `204` (see Leaving a group) |
 | POST 👑 | `/groups/:id/nudge` | | `{ nudged: number }` (push/email to unsynced members, rate limited to once per 12h) |
@@ -449,7 +449,8 @@ interface ManualBlock {
   promote someone with `PATCH /groups/:id/members/:userId` `{ role: 'admin' }` first.
 - The only member can't leave (`409 conflict`): they delete the group instead.
 
-Everyone left in the group gets `member.changed` with the new owner's `Member` (when ownership moved), then
+The new owner gets a `role.changed` notification (see Notifications & devices). Everyone left in the group gets
+`member.changed` with the new owner's `Member` (when ownership moved), then
 `{ userId, removed: true }` for the leaver; the leaver's own apps get that too, so they close the group.
 
 With no emails, an invite is a link anyone can use until it expires (14 days). With emails, each
@@ -719,7 +720,8 @@ Native apps keep this open while foregrounded and rely on push otherwise.
 ```ts
 interface Notification {
   id: string; groupId: string | null;
-  kind: 'proposal.created' | 'proposal.confirmed' | 'proposal.changed' | 'nudge' | 'invite.accepted' | 'invite.received' | 'message' | 'event.created';
+  kind: 'proposal.created' | 'proposal.confirmed' | 'proposal.changed' | 'nudge' | 'invite.accepted' | 'invite.received' | 'message' | 'event.created'
+      | 'role.changed';                // clients show kinds they don't know with a generic icon and open the group (or proposal) from `data`
   title: string; body: string;
   data: Record<string, string>;        // e.g. { proposalId }
   readAt: string | null; createdAt: string;
@@ -739,6 +741,12 @@ since it was last read. It stays unread until the chat itself is read (a `seen` 
 when Activity is opened. Updates to an existing item (a new message, or it being read) arrive
 as `notification.created` with the **same id**: replace the item you have, and move it to the
 top when its `createdAt` is newer.
+
+`role.changed` tells someone their role in a group changed, with `data.role` the new one:
+`admin` ("Sam Taylor made you an admin."), `member` ("You're no longer an admin. Sam Taylor
+changed your role.") or `owner` ("You're now the owner. Sam Taylor left and handed the group to
+you.", when the owner leaves). `title` is the group's name; it opens the group. Nobody is told
+about a change to their own role, or a "change" to the role they already have.
 
 Push payloads carry `{ kind, groupId, proposalId?, eventId?, messageId?, token? }` (`token`: an
 `invite.received` invite, opened like `/invite/:token`) so the app

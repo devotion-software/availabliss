@@ -1,0 +1,1 @@
+ALTER TABLE `notifications` MODIFY COLUMN `kind` enum('proposal.created','proposal.confirmed','proposal.changed','nudge','invite.accepted','invite.received','message','event.created','role.changed') NOT NULL;

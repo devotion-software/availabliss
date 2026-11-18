@@ -15,6 +15,7 @@ import { defaultRequirement } from './requirements';
 import { syncedUserIds } from './busy';
 import { refreshCoverage } from './calendars';
 import { displayName } from './names';
+import { notify } from './notifications';
 
 const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -228,7 +229,27 @@ export async function setMemberRole(groupId: string, actorId: string, targetId: 
 		.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, targetId)));
 	const member = (await listMembers(groupId)).find((m) => m.userId === targetId);
 	if (!member) throw notFound('Member not found');
+	if (current !== role && actorId !== targetId) await notifyRoleChanged(groupId, actorId, targetId, role);
 	return member;
+}
+
+/**
+ * Tells someone their role in the group changed (a `role.changed` Activity item and push):
+ * made an admin, no longer an admin, or (`owner`) handed the group by its owner as they left.
+ */
+async function notifyRoleChanged(groupId: string, actorId: string, targetId: string, role: Role) {
+	const [group, actor] = await Promise.all([
+		getGroupRow(groupId),
+		db.query.user.findFirst({ where: eq(user.id, actorId), columns: { name: true, email: true } })
+	]);
+	const name = displayName(actor);
+	const body =
+		role === 'owner'
+			? `You're now the owner. ${name} left and handed the group to you.`
+			: role === 'admin'
+				? `${name} made you an admin.`
+				: `You're no longer an admin. ${name} changed your role.`;
+	await notify([targetId], { kind: 'role.changed', groupId, title: group.name, body, data: { role } });
 }
 
 /**
@@ -288,6 +309,7 @@ export async function leaveGroup(groupId: string, userId: string, newOwnerId: st
 		return heir;
 	});
 	if (!moved) return null;
+	await notifyRoleChanged(groupId, userId, moved, 'owner');
 	return (await listMembers(groupId)).find((m) => m.userId === moved) ?? null;
 }
 

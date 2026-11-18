@@ -197,6 +197,13 @@
       "when": 1794999334234,
       "tag": "0027_curvy_swordsman",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "5",
+      "when": 1795001114510,
+      "tag": "0028_busy_robbie_robertson",
+      "breakpoints": true
     }
   ]
 }

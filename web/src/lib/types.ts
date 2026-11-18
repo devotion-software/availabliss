@@ -429,7 +429,9 @@ export const NOTIFICATION_KINDS = [
 	'invite.accepted',
 	'invite.received',
 	'message',
-	'event.created'
+	'event.created',
+	/** Your role in a group changed: made an admin, no longer an admin, or handed ownership. `data.role` is the new one. */
+	'role.changed'
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
