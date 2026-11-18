@@ -73,10 +73,10 @@ struct Message: Codable, Sendable, Identifiable, Equatable {
     }
 }
 
-/// A photo, GIF or file in a chat message. `url` / `thumbnailUrl` are signed links: no auth header needed.
+/// A photo, GIF, file or Wallet pass in a chat message. `url` / `thumbnailUrl` are signed links: no auth header needed.
 struct Attachment: Codable, Sendable, Identifiable, Equatable, Hashable {
     enum Kind: String, Codable, Sendable {
-        case image, gif, file
+        case image, gif, file, pass
         /// A kind this version doesn't know is shown as a file.
         init(from decoder: Decoder) throws {
             self = Kind(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .file
@@ -91,22 +91,74 @@ struct Attachment: Codable, Sendable, Identifiable, Equatable, Hashable {
     let width: Int?
     let height: Int?
     let url: String
+    /// A photo's preview, or a pass's logo.
     let thumbnailUrl: String?
+    /// For a Wallet pass: what its card shows.
+    var pass: WalletPass?
 
-    var isVisual: Bool { kind != .file }
+    var isVisual: Bool { kind == .image || kind == .gif }
     /// Width over height, when known.
     var aspectRatio: CGFloat? {
         guard let width, let height, width > 0, height > 0 else { return nil }
         return CGFloat(width) / CGFloat(height)
     }
 
-    /// "Photo", "GIF", "3 photos", "Plan.pdf", "2 files", "2 attachments".
+    /// "Photo", "GIF", "3 photos", "Plan.pdf", "Concert ticket", "2 files", "2 passes", "2 attachments".
     static func summary(_ list: [Attachment]) -> String {
         guard let first = list.first else { return "" }
-        if list.count == 1 { return first.kind == .gif ? "GIF" : first.kind == .image ? "Photo" : first.name }
-        let files = list.filter { $0.kind == .file }.count
+        if list.count == 1 {
+            switch first.kind {
+            case .gif: return "GIF"
+            case .image: return "Photo"
+            case .pass: return first.pass?.title ?? "Ticket"
+            case .file: return first.name
+            }
+        }
+        let files = list.filter { !$0.isVisual }.count
         if files == 0 { return "\(list.count) photos" }
+        if list.allSatisfy({ $0.kind == .pass }) { return "\(list.count) passes" }
         return files == list.count ? "\(list.count) files" : "\(list.count) attachments"
+    }
+}
+
+/// An Apple Wallet pass's details, read by the server from its pass.json.
+struct WalletPass: Codable, Sendable, Equatable, Hashable {
+    struct Field: Codable, Sendable, Equatable, Hashable {
+        let label: String?
+        /// The text, or with `date` an ISO 8601 date-time.
+        let value: String
+        let date: Bool
+    }
+
+    /// boardingPass, eventTicket, coupon, storeCard or generic.
+    let style: String
+    let organizationName: String
+    let description: String
+    let logoText: String?
+    let passTypeIdentifier: String
+    let serialNumber: String
+    let relevantDate: Date?
+    let expirationDate: Date?
+    let voided: Bool
+    let eventName: String?
+    let venue: String?
+    let fields: [Field]
+    let backgroundColor: String?
+    let foregroundColor: String?
+    let labelColor: String?
+    let count: Int
+
+    /// "Concert ticket", "Boarding pass", "2 tickets".
+    var title: String {
+        if count > 1 { return "\(count) \(style == "boardingPass" ? "boarding passes" : style == "eventTicket" ? "tickets" : "passes")" }
+        if !description.isEmpty { return description }
+        switch style {
+        case "boardingPass": return "Boarding pass"
+        case "coupon": return "Coupon"
+        case "storeCard": return "Card"
+        case "generic": return "Pass"
+        default: return "Ticket"
+        }
     }
 }
 

@@ -43,6 +43,7 @@ enum AttachmentFormat {
         if mime.hasPrefix("audio/") { return "waveform" }
         if mime.hasPrefix("video/") { return "film" }
         if ext == "zip" { return "doc.zipper" }
+        if ["pkpass", "pkpasses"].contains(ext) || mime.hasPrefix("application/vnd.apple.pkpass") { return "wallet.pass" }
         if ["xls", "xlsx", "ods", "numbers", "csv"].contains(ext) { return "tablecells" }
         if ["ppt", "pptx", "odp", "key"].contains(ext) { return "rectangle.on.rectangle" }
         if ["ics"].contains(ext) { return "calendar" }
@@ -185,7 +186,7 @@ struct AttachmentImage: View {
 
 // MARK: - In a message
 
-/// A message's photos (one sized by its shape, several in a grid) and file cards.
+/// A message's photos (one sized by its shape, several in a grid), Wallet passes and file cards.
 struct AttachmentGallery: View {
     let attachments: [Attachment]
     let isMine: Bool
@@ -208,7 +209,11 @@ struct AttachmentGallery: View {
                 grid
             }
             ForEach(files) { file in
-                FileCard(attachment: file, isMine: isMine, isLoading: loadingFileId == file.id) { openFile(file) }
+                if file.kind == .pass, let pass = file.pass {
+                    WalletPassCard(attachment: file, pass: pass, isLoading: loadingFileId == file.id) { openFile(file) }
+                } else {
+                    FileCard(attachment: file, isMine: isMine, isLoading: loadingFileId == file.id) { openFile(file) }
+                }
             }
         }
         .frame(width: Self.width, alignment: .leading)
