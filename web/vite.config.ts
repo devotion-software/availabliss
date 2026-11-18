@@ -3,6 +3,28 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import pkg from './package.json' with { type: 'json' };
 
+/**
+ * Script sources besides our own: RevenueCat Web Billing loads its checkout (Stripe or Paddle)
+ * from these hosts, and Svelte's server rendering puts `onload` / `onerror="this.__e=event"` on
+ * images (to replay those events after hydration), allowed by that exact handler's hash only.
+ */
+const SCRIPT_HOSTS = [
+	'https://js.stripe.com',
+	'https://cdn.paddle.com',
+	'https://sdk.revenuecat-static.com',
+	'unsafe-hashes',
+	'sha256-7dQwUgLau1NFCCGjfn9FsYptB6ZtWxJin6VohGIu20I='
+] as const;
+const BILLING_HOSTS = [
+	'https://api.revenuecat.com',
+	'https://e.revenue.cat',
+	'https://*.revenuecat.com',
+	'https://*.stripe.com',
+	'https://*.paddle.com'
+] as const;
+/** Social sign-in redirects through these after a form post. */
+const SIGN_IN_HOSTS = ['https://accounts.google.com', 'https://appleid.apple.com', 'https://login.microsoftonline.com'] as const;
+
 export default defineConfig({
 	define: {
 		__APP_VERSION__: JSON.stringify(pkg.version)
@@ -17,7 +39,37 @@ export default defineConfig({
 			adapter: adapter(),
 			// SvelteKit's origin check also rejects body-less POST/DELETE from the native
 			// apps (no Origin header). hooks.server.ts applies a bearer-aware check instead.
-			csrf: { trustedOrigins: ['*'] }
+			csrf: { trustedOrigins: ['*'] },
+			// Content-Security-Policy. SvelteKit adds a nonce (or a hash, on prerendered pages) to its
+			// own scripts and to app.html's inline script. Enforced: where scripts may come from, no
+			// plugins, no <base> hijacking and no framing. The fuller policy (images, connections,
+			// frames) is report-only until real traffic shows it doesn't break billing or sign-in;
+			// reports go to /api/v1/csp-report and are logged.
+			csp: {
+				mode: 'auto',
+				directives: {
+					'script-src': ['self', ...SCRIPT_HOSTS],
+					'object-src': ['none'],
+					'base-uri': ['self'],
+					'frame-ancestors': ['none']
+				},
+				reportOnly: {
+					'default-src': ['self'],
+					'script-src': ['self', ...SCRIPT_HOSTS],
+					'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com'],
+					'font-src': ['self', 'https://fonts.gstatic.com'],
+					// Profile and group photos (R2 or Google), chat photos, OpenStreetMap tiles.
+					'img-src': ['self', 'data:', 'blob:', 'https:'],
+					'media-src': ['self', 'blob:', 'https:'],
+					'connect-src': ['self', 'https://nominatim.openstreetmap.org', ...BILLING_HOSTS],
+					'frame-src': ['self', ...BILLING_HOSTS],
+					'form-action': ['self', ...SIGN_IN_HOSTS],
+					'object-src': ['none'],
+					'base-uri': ['self'],
+					'frame-ancestors': ['none'],
+					'report-uri': ['/api/v1/csp-report']
+				}
+			}
 		})
 	],
 	server: {

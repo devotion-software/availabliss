@@ -220,6 +220,12 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | ------ | ---- | ---- | -------- |
 | GET | `/health` | | `{ ok: boolean; version: string; db: 'ok' \| 'down'; redis: 'ok' \| 'down' \| 'off' }` (`503` when the database doesn't answer; Redis being down still returns `200`) |
 
+### Security reports
+
+| Method | Path | Body | Response |
+| ------ | ---- | ---- | -------- |
+| POST | `/csp-report` | a browser's Content-Security-Policy violation report (`application/csp-report` or Reporting API JSON) | `204`. Logged as `[csp] violation`; the web app's report-only policy sends these (see `csp` in `web/vite.config.ts`) |
+
 ### Me
 
 | Method | Path | Body | Response |

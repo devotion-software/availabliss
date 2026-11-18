@@ -125,8 +125,31 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// validated so an unexpected stored value can't be injected into markup.
 	const mode: ThemeMode = THEME_MODES.find((m) => m === event.locals.user?.themeMode) ?? 'system';
 	const theme: ColorTheme = COLOR_THEMES.find((t) => t === event.locals.user?.colorTheme) ?? 'dawn';
-	return resolve(event, {
+	const response = await resolve(event, {
 		transformPageChunk: ({ html }) =>
 			html.replace('data-mode="system" data-theme="dawn"', `data-mode="${mode}" data-theme="${theme}"`)
 	});
+	setSecurityHeaders(response.headers);
+	return response;
 };
+
+/**
+ * Headers every response gets (the Content-Security-Policy itself is set by SvelteKit, see
+ * vite.config.ts). HSTS only in production, so plain-HTTP dev on localhost isn't pinned to HTTPS.
+ */
+function setSecurityHeaders(headers: Headers) {
+	const set = (name: string, value: string) => {
+		// Some responses (redirects, fetched files) have immutable headers; skip those quietly.
+		try {
+			if (!headers.has(name)) headers.set(name, value);
+		} catch {
+			// Immutable.
+		}
+	};
+	if (process.env.NODE_ENV === 'production') set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+	set('X-Content-Type-Options', 'nosniff');
+	set('X-Frame-Options', 'DENY');
+	set('Referrer-Policy', 'strict-origin-when-cross-origin');
+	// Location is for sharing a place in chat; nothing uses the camera, microphone or payment APIs directly.
+	set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), interest-cohort=()');
+}
