@@ -115,8 +115,36 @@ struct GroupEvent: Codable, Sendable, Identifiable, Equatable {
     var image: String?
     let createdBy: String
     let createdAt: Date
-    /// Only present on `GET /me/upcoming`.
+    /// Only present on `GET /me/upcoming` and `GET /me/plans`.
     var groupName: String?
+}
+
+/// A plan on `GET /me/plans`: the event, its group's name, and your reply to its proposal.
+struct MyPlan: Decodable, Sendable, Identifiable, Equatable {
+    let event: GroupEvent
+    let groupName: String
+    /// Nil when it was added straight to the calendar (no proposal to reply to).
+    let myResponse: ResponseKind?
+
+    var id: String { event.id }
+
+    private enum CodingKeys: String, CodingKey { case groupName, myResponse }
+
+    /// The event's fields sit alongside `groupName` and `myResponse` in the same object.
+    init(from decoder: Decoder) throws {
+        event = try GroupEvent(from: decoder)
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        groupName = try c.decode(String.self, forKey: .groupName)
+        myResponse = try c.decodeIfPresent(ResponseKind.self, forKey: .myResponse)
+    }
+}
+
+/// `GET /me/plans`: upcoming plans you're going to (or haven't replied to), ones you can't make,
+/// and the last year's, newest first.
+struct MyPlansResponse: Decodable, Sendable {
+    let going: [MyPlan]
+    let notGoing: [MyPlan]
+    let past: [MyPlan]
 }
 
 struct EventsResponse: Decodable, Sendable { let events: [GroupEvent] }

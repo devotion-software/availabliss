@@ -111,6 +111,8 @@ struct RouteDestination: View {
             CalendarsView(api: app.api, mode: .settings)
         case .region:
             RegionView(api: app.api, mode: .settings)
+        case .myPlans:
+            MyPlansView(api: app.api)
         }
     }
 }

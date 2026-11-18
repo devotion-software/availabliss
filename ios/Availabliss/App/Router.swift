@@ -19,6 +19,8 @@ enum AppRoute: Hashable {
     case appearance
     case calendars
     case region
+    /// My plans: every plan across your groups (from Activity).
+    case myPlans
 }
 
 /// Set by a screen with unsaved changes while it's on screen (the group's Timing). Back — the
@@ -151,7 +153,7 @@ extension AppRoute {
         switch self {
         case .group(let id), .groupSection(let id, _): id
         case .members(let groupId): groupId
-        case .proposal, .appearance, .calendars, .region: nil
+        case .proposal, .appearance, .calendars, .region, .myPlans: nil
         }
     }
 }

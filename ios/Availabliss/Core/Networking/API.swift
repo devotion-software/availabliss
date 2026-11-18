@@ -23,6 +23,8 @@ enum API {
         static func unignoreBusy(id: String) -> Endpoint<EmptyResponse> { .init(.delete, "/me/busy/ignores/\(id.pathEncoded)") }
         static func delete() -> Endpoint<EmptyResponse> { .init(.delete, "/me") }
         static func upcoming() -> Endpoint<EventsResponse> { .init(.get, "/me/upcoming") }
+        /// Every plan across your groups: coming up, can't make it, and past.
+        static func plans() -> Endpoint<MyPlansResponse> { .init(.get, "/me/plans") }
         static func plan() -> Endpoint<Plan> { .init(.get, "/me/plan") }
         /// Apple / Google sign-ins on the account, and which ones the server can link.
         static func accounts() -> Endpoint<LinkedAccounts> { .init(.get, "/me/accounts") }

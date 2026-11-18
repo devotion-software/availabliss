@@ -54,7 +54,9 @@ struct ActivityView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeader(title: "Activity", subtitle: "Chats, proposals, plans and nudges")
+                ScreenHeader(title: "Activity", subtitle: "Chats, proposals, plans and nudges") {
+                    IconButton(systemImage: "calendar", label: "My plans") { app.router.push(.myPlans) }
+                }
                 content
             }
             .padding(.horizontal, 20)
