@@ -26,3 +26,8 @@ export function groupSubtitle(group: Group): string {
 	if (group.role === 'admin') return `${count} · you're an admin`;
 	return count;
 }
+
+/** The name other people see for you (outside a group that has its own name for you): your name, or your email. */
+export function accountName(user: { name: string | null; email: string }): string {
+	return user.name?.trim() || user.email;
+}

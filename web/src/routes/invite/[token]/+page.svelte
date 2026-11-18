@@ -11,6 +11,8 @@
 	import Button from '#lib/components/ui/Button.svelte';
 	import GroupTile from '#lib/components/ui/GroupTile.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
+	import GroupNameSheet from '#lib/components/groups/GroupNameSheet.svelte';
+	import { accountName } from '#lib/client/members';
 
 	let { data } = $props();
 	const fmt = useFormat();
@@ -41,16 +43,27 @@
 		return days <= 0 ? 'Expires today' : days === 1 ? 'Expires tomorrow' : `Expires ${fmt.current.day(data.invite.expiresAt)}`;
 	});
 
+	// Just joined: ask how the group should see you, then open it.
+	let joined = $state<{ id: string; name: string } | null>(null);
+	let askingName = $state(false);
+
 	async function join() {
 		joining = true;
 		try {
 			const group = await acceptInvite(data.token);
-			await goto(`/app/groups/${group.id}`, { invalidateAll: true });
+			if (group.joined === false || !data.user) {
+				await openGroup(group.id);
+			} else {
+				joined = { id: group.id, name: group.name };
+				askingName = true;
+			}
 		} catch (err) {
 			toasts.error(err);
 			joining = false;
 		}
 	}
+
+	const openGroup = (id: string) => goto(`/app/groups/${id}`, { invalidateAll: true });
 </script>
 
 <svelte:head><title>{data.invite ? `Join ${data.invite.groupName}` : 'Invite'} · Availabliss</title></svelte:head>
@@ -101,6 +114,16 @@
 		{/if}
 	</section>
 </main>
+
+{#if joined && data.user}
+	<GroupNameSheet
+		bind:open={askingName}
+		groupId={joined.id}
+		groupName={joined.name}
+		accountName={accountName(data.user)}
+		ondone={() => joined && openGroup(joined.id)}
+	/>
+{/if}
 
 <style>
 	.invite {

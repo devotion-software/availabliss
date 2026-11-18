@@ -54,6 +54,9 @@ export const removeGroupImage = (id: string) => api.del<Group>(`/groups/${id}/im
 
 export const setMemberRole = (groupId: string, userId: string, role: 'admin' | 'member') =>
 	api.patch<Member>(`/groups/${groupId}/members/${userId}`, { role });
+/** Sets (or with null, clears) the name you go by in the group. */
+export const setMyName = (groupId: string, displayName: string | null) =>
+	api.patch<Member>(`/groups/${groupId}/members/me`, { displayName });
 /** Removes someone (an admin removing another member). */
 export const removeMember = (groupId: string, userId: string) => api.del(`/groups/${groupId}/members/${userId}`);
 /** Leaves the group. The owner names the admin who becomes the owner. */
@@ -80,7 +83,8 @@ export const listInvites = (groupId: string, fetch?: Fetch) =>
 	api.get<{ invites: GroupInvite[] }>(`/groups/${groupId}/invites`, { fetch }).then((r) => r.invites);
 export const revokeInvite = (groupId: string, inviteId: string) => api.del(`/groups/${groupId}/invites/${inviteId}`);
 export const getInvite = (token: string, fetch?: Fetch) => api.get<InvitePreview>(`/invites/${token}`, { fetch });
-export const acceptInvite = (token: string) => api.post<Group>(`/invites/${token}/accept`);
+/** `joined`: false when you were already in the group. */
+export const acceptInvite = (token: string) => api.post<Group & { joined?: boolean }>(`/invites/${token}/accept`);
 
 /** Every member's preferred times for the group. */
 export const listPreferences = (groupId: string, fetch?: Fetch) =>

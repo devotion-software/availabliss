@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
 	import type { TileColor } from '#lib/types';
-	import { deleteGroup, updateGroup } from '#lib/client/groups';
-	import { groupSubtitle, isAdminRole } from '#lib/client/members';
+	import { deleteGroup, setMyName, updateGroup } from '#lib/client/groups';
+	import { accountName, groupSubtitle, isAdminRole } from '#lib/client/members';
 	import { toasts } from '#lib/client/toast.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
@@ -15,8 +15,8 @@
 	import LeaveGroupSheet from '#lib/components/groups/LeaveGroupSheet.svelte';
 
 	/**
-	 * Group settings, from the group's More menu (and the sidebar): its photo, name and colour,
-	 * Archive / Unarchive, Leave group and Delete group. Everyone can open it and leave; only the
+	 * Group settings, from the group's More menu (and the sidebar): its photo, name and colour, the
+	 * name you go by in it, Archive / Unarchive, Leave group and Delete group. Everyone can open it and leave; only the
 	 * owner and admins can change things (the server's rules), and only the owner can delete the
 	 * group. Each part is its own card. Admins can also have the group archive itself once its
 	 * event has passed.
@@ -37,6 +37,36 @@
 	const nameChanged = $derived(name.trim() !== '' && name.trim() !== group.name);
 
 	let savingName = $state(false);
+
+	// The name you go by in this group (blank: your account name). Follows the saved one until you type.
+	const myAccountName = $derived(accountName(data.user));
+	const myNameInGroup = $derived(group.members.find((m) => m.userId === data.user.id)?.nameInGroup ?? null);
+	let myName = $state('');
+	let savedMyName = $state<string | null>(null);
+	$effect.pre(() => {
+		if (myName === (savedMyName ?? '')) myName = myNameInGroup ?? '';
+		savedMyName = myNameInGroup;
+	});
+	// Blank, or the account name itself, means going by the account name.
+	const myNameToSave = $derived(myName.trim() && myName.trim() !== myAccountName ? myName.trim() : null);
+	const myNameChanged = $derived(myNameToSave !== myNameInGroup);
+	let savingMyName = $state(false);
+
+	async function saveMyName(value: string | null, e?: Event) {
+		e?.preventDefault();
+		if (value === myNameInGroup || savingMyName) return;
+		savingMyName = true;
+		try {
+			const member = await setMyName(group.id, value);
+			myName = member.nameInGroup ?? '';
+			await invalidate('app:group');
+			toasts.success(value === null ? `Back to ${myAccountName}` : 'Name updated');
+		} catch (err) {
+			toasts.error(err);
+		} finally {
+			savingMyName = false;
+		}
+	}
 	let archiving = $state(false);
 	// The switch moves straight away; it follows the saved setting (and goes back if saving fails).
 	let autoArchive = $state(false);
@@ -145,6 +175,26 @@
 					}}
 				/>
 			</div>
+		</section>
+
+		<section class="glass card" aria-labelledby="my-name-title">
+			<div class="text">
+				<h2 id="my-name-title">Your name in this group</h2>
+				<p class="small">
+					{myNameInGroup === null
+						? `${group.name} sees you as ${myAccountName}, your account name. Choose another name just for this group.`
+						: `Only ${group.name} sees this. Everywhere else you're ${myAccountName}.`}
+				</p>
+			</div>
+			<form class="name" onsubmit={(e) => saveMyName(myNameToSave, e)}>
+				<TextField label="Your name in this group" hideLabel bind:value={myName} placeholder={myAccountName} maxlength={80} autocomplete="nickname" />
+				{#if myNameChanged}
+					<Button type="submit" variant="accent" loading={savingMyName}>Save</Button>
+				{/if}
+			</form>
+			{#if myNameInGroup !== null && !myNameChanged}
+				<Button variant="ghost" size="sm" disabled={savingMyName} onclick={() => saveMyName(null)}>Use {myAccountName} instead</Button>
+			{/if}
 		</section>
 
 		{#if canEdit}
