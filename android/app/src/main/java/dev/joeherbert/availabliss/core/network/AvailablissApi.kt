@@ -16,6 +16,7 @@ import dev.joeherbert.availabliss.core.network.model.BusyResponse
 import dev.joeherbert.availabliss.core.network.model.CalDavRequest
 import dev.joeherbert.availabliss.core.network.model.CalendarBusyRequest
 import dev.joeherbert.availabliss.core.network.model.CalendarConnection
+import dev.joeherbert.availabliss.core.network.model.CalendarFeed
 import dev.joeherbert.availabliss.core.network.model.ConnectionsResponse
 import dev.joeherbert.availabliss.core.network.model.CountriesResponse
 import dev.joeherbert.availabliss.core.network.model.CreateBlockRequest
@@ -177,6 +178,14 @@ interface AvailablissApi {
 
     @DELETE("api/v1/calendars/{connectionId}")
     suspend fun deleteConnection(@Path("connectionId") connectionId: String)
+
+    /** Your secret webcal feed of plans, made the first time it's asked for. */
+    @GET("api/v1/me/calendar-feed")
+    suspend fun getCalendarFeed(): CalendarFeed
+
+    /** Replaces the feed link; calendars subscribed with the old one stop updating. */
+    @POST("api/v1/me/calendar-feed/reset")
+    suspend fun resetCalendarFeed(): CalendarFeed
     // endregion
 
     // region Manual blocks

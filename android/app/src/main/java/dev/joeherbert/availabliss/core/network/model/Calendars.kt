@@ -100,3 +100,10 @@ data class DeviceBusy(
     /** The event's name: stored encrypted and only ever shown to you. */
     val title: String? = null,
 )
+
+/**
+ * Your secret calendar feed (`/me/calendar-feed`): [url] to copy, [webcalUrl] for calendar apps
+ * that subscribe (Google Calendar takes it as `?cid=`). Anyone with the link can read your plans.
+ */
+@Serializable
+data class CalendarFeed(val url: String, val webcalUrl: String)

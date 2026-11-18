@@ -6,6 +6,7 @@ import dev.joeherbert.availabliss.core.network.map
 import dev.joeherbert.availabliss.core.network.model.CalDavRequest
 import dev.joeherbert.availabliss.core.network.model.CalendarBusyRequest
 import dev.joeherbert.availabliss.core.network.model.CalendarConnection
+import dev.joeherbert.availabliss.core.network.model.CalendarFeed
 import dev.joeherbert.availabliss.core.network.model.DeviceSync
 import dev.joeherbert.availabliss.core.network.model.OAuthCompleteRequest
 import dev.joeherbert.availabliss.core.network.model.OAuthUrlRequest
@@ -59,6 +60,12 @@ class CalendarsRepository @Inject constructor(
     /** Links the calendar. Sent with our bearer token, so only the user who started the flow can finish it. */
     suspend fun completeOAuth(provider: String, code: String): ApiResult<CalendarConnection> =
         call { api.completeCalendarOAuth(provider, OAuthCompleteRequest(code)) }.onSuccess(::upsert)
+
+    /** Your secret feed link of plans from every group (made on the server the first time). */
+    suspend fun calendarFeed(): ApiResult<CalendarFeed> = call { api.getCalendarFeed() }
+
+    /** A new feed link; the old one stops working. */
+    suspend fun resetCalendarFeed(): ApiResult<CalendarFeed> = call { api.resetCalendarFeed() }
 
     fun clear() {
         _connections.value = emptyList()
