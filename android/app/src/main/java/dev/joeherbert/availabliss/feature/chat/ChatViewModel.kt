@@ -1,283 +1,72 @@
 package dev.joeherbert.availabliss.feature.chat
 
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.Dispatchers
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.joeherbert.availabliss.core.common.DateTimes
-import dev.joeherbert.availabliss.core.network.model.AttachmentKind
+import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
 import dev.joeherbert.availabliss.core.common.UserMessage
-import dev.joeherbert.availabliss.core.common.firstName
-import dev.joeherbert.availabliss.core.common.joinNamesSummary
+import dev.joeherbert.availabliss.core.data.AttachmentFiles
 import dev.joeherbert.availabliss.core.data.ChatRepository
-import dev.joeherbert.availabliss.core.data.FoundPlace
-import dev.joeherbert.availabliss.core.data.PlaceSearch
 import dev.joeherbert.availabliss.core.data.EventsRepository
+import dev.joeherbert.availabliss.core.data.FoundPlace
 import dev.joeherbert.availabliss.core.data.GroupsRepository
+import dev.joeherbert.availabliss.core.data.PlaceSearch
 import dev.joeherbert.availabliss.core.data.ProposalsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.live.LiveEvents
-import dev.joeherbert.availabliss.core.live.LivePayload
 import dev.joeherbert.availabliss.core.network.ApiResult
-import dev.joeherbert.availabliss.core.network.model.Group
-import dev.joeherbert.availabliss.core.network.model.GroupEvent
-import dev.joeherbert.availabliss.core.network.model.Message
-import dev.joeherbert.availabliss.core.network.model.MessageInfo
-import dev.joeherbert.availabliss.core.network.model.MessageKind
-import dev.joeherbert.availabliss.core.network.model.MessageLocation
-import dev.joeherbert.availabliss.core.network.model.Poll
-import dev.joeherbert.availabliss.core.network.model.Proposal
-import dev.joeherbert.availabliss.core.network.model.ReceiptState
-import dev.joeherbert.availabliss.core.network.model.TileColor
-import dev.joeherbert.availabliss.core.network.model.asReply
-import dev.joeherbert.availabliss.core.network.model.canReply
-import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
-import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
-import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
-import dev.joeherbert.availabliss.feature.common.AddToCalendarState
-import dev.joeherbert.availabliss.feature.common.MemberDirectory
-import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
-import android.net.Uri
-import dev.joeherbert.availabliss.core.data.AttachmentFiles
-import dev.joeherbert.availabliss.core.data.PickedFile
 import dev.joeherbert.availabliss.core.network.model.Attachment
-import dev.joeherbert.availabliss.core.network.model.attachmentsSummary
-import dev.joeherbert.availabliss.core.network.model.displayText
-import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUiKind
-import dev.joeherbert.availabliss.designsystem.component.chat.ComposerAttachment
-import dev.joeherbert.availabliss.designsystem.component.chat.MAX_ATTACHMENTS
-import java.util.UUID
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import dev.joeherbert.availabliss.core.network.model.MessageLocation
+import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
+import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
+import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-/** A person row in the Message info sheet. */
-data class InfoPerson(val person: AvatarPerson, val name: String, val time: String)
-
-data class MessageInfoUi(
-    val text: String,
-    val sentLabel: String,
-    /** Your own message (bubble on the right) or someone else's (on the left). */
-    val own: Boolean = true,
-    val loading: Boolean,
-    val seen: List<InfoPerson> = emptyList(),
-    val delivered: List<InfoPerson> = emptyList(),
-    val pending: List<InfoPerson> = emptyList(),
-    val error: String? = null,
-)
-
-/** "Replying to Priya" above the composer, with one line of what they said. */
-data class ReplyingUi(val messageId: String, val name: String, val snippet: String)
-
-/** The thread sheet: a message's chain of replies, with a composer that replies within it. */
-data class ThreadUi(
-    /** The message it was opened from, shown and flashed once loaded. */
-    val focusId: String,
-    /** Oldest first. */
-    val items: List<ChatItem> = emptyList(),
-    val count: Int = 0,
-    val loading: Boolean = true,
-    val truncated: Boolean = false,
-    /** Who your reply goes to; [picked] when you chose it rather than it being the latest. */
-    val replying: ReplyingUi? = null,
-    val picked: Boolean = false,
-    val sending: Boolean = false,
-    /** Non-null while a tapped message's Reply / Show in chat options are showing. */
-    val actions: ThreadActionsUi? = null,
-)
-
-data class ThreadActionsUi(val messageId: String, val title: String, val snippet: String, val canReply: Boolean)
-
-/** Scroll the chat to [messageId] and flash it ("Show in chat" from a thread). */
-data class ShowInChatRequest(val messageId: String, val nonce: Long = System.nanoTime())
-
-/** The full-screen photo viewer: a message's photos and GIFs, opened at [startIndex]. */
-data class ViewerUi(val attachments: List<Attachment>, val startIndex: Int)
-
-/** A photo or file picked in the composer: uploading, uploaded (ready to send) or failed. */
-private data class PendingUpload(
-    val localId: String,
-    val uri: Uri,
-    val file: PickedFile? = null,
-    val kind: AttachmentUiKind = AttachmentUiKind.File,
-    val name: String = "",
-    val progress: Float = 0f,
-    val uploaded: Attachment? = null,
-    val error: String? = null,
-) {
-    fun toUi() = ComposerAttachment(
-        id = localId,
-        kind = kind,
-        name = name,
-        preview = uri.takeIf { kind != AttachmentUiKind.File },
-        progress = progress,
-        uploaded = uploaded != null,
-        error = error,
-    )
-}
-
-/** Poll creation form. */
-data class PollDraft(
-    val question: String = "",
-    val options: List<String> = listOf("", ""),
-    val multi: Boolean = false,
-    val sending: Boolean = false,
-) {
-    val canAddOption: Boolean get() = options.size < MAX_OPTIONS
-    val canSubmit: Boolean get() = question.isNotBlank() && options.count { it.isNotBlank() } >= 2 && !sending
-
-    companion object {
-        const val MAX_OPTIONS = 10
-    }
-}
-
-data class ChatUiState(
-    val groupName: String = "",
-    val monogram: String = "",
-    val tileColor: TileColor = TileColor.T1,
-    /** The group's photo, instead of the monogram. */
-    val groupImage: String? = null,
-    val membersSummary: String = "",
-    /** Newest first (the list is reverse-laid-out). */
-    val items: List<ChatItem> = emptyList(),
-    val loading: Boolean = true,
-    val loadingOlder: Boolean = false,
-    val hasMore: Boolean = false,
-    val error: String? = null,
-    val menuOpen: Boolean = false,
-    val sending: Boolean = false,
-    /** Non-null while the poll sheet is open. */
-    val pollDraft: PollDraft? = null,
-    /** Non-null while the Message info sheet is open. */
-    val info: MessageInfoUi? = null,
-    /** The composer is editing one of your messages (the draft holds its text). */
-    val editing: Boolean = false,
-    /** The message your next one replies to, shown above the composer. */
-    val replying: ReplyingUi? = null,
-    /** Non-null while "Delete this message?" is showing. */
-    val confirmDeleteId: String? = null,
-    /** Add to calendar on "Everyone's in" banners (`added` holds event ids added this session). */
-    val calendar: AddToCalendarState = AddToCalendarState(),
-    /** Non-null while the thread sheet is open. */
-    val thread: ThreadUi? = null,
-    val showInChat: ShowInChatRequest? = null,
-    val message: UserMessage? = null,
-    /** Photos and files picked for the next message. */
-    val attachments: List<ComposerAttachment> = emptyList(),
-    /** Editing a message with attachments: its caption can be emptied. */
-    val editingCaption: Boolean = false,
-    /** Attachments downloading (to open, share or save): progress 0–1 by id, below 0 when unknown. */
-    val downloads: Map<String, Float> = emptyMap(),
-    /** Non-null while the photo viewer is open. */
-    val viewer: ViewerUi? = null,
-    /** Non-null while the Share a location sheet is open. */
-    val locationSheet: LocationSheetUi? = null,
-)
-
-/** The Share a location sheet: a place search and what it found, or the place picked from it. */
-data class LocationSheetUi(
-    val query: String = "",
-    val results: List<FoundPlace> = emptyList(),
-    val searching: Boolean = false,
-    /** A search finished with nothing found. */
-    val noResults: Boolean = false,
-    val picked: FoundPlace? = null,
-    val sending: Boolean = false,
-)
-
-/** Editing [messageId]; [original] is its text, [stashedDraft] the composer draft to restore afterwards. */
-private data class EditSession(val messageId: String, val original: String, val stashedDraft: String, val hasAttachments: Boolean = false)
-
-private data class ThreadSession(
-    val focusId: String,
-    val messages: List<Message> = emptyList(),
-    val truncated: Boolean = false,
-    val loading: Boolean = true,
-    val pickedId: String? = null,
-    val sending: Boolean = false,
-    val actionsForId: String? = null,
-)
-
-private data class InfoSheet(val messageId: String, val info: MessageInfo? = null, val error: String? = null)
-
-private data class ChatData(
-    val group: Group? = null,
-    val messages: List<Message> = emptyList(),
-    val proposals: Map<String, Proposal> = emptyMap(),
-    val events: Map<String, GroupEvent> = emptyMap(),
-    /** Who's busy for each date poll option's time, by [pollSlotKey]. */
-    val conflicts: Map<String, List<String>> = emptyMap(),
-    val hasMore: Boolean = false,
-    val loading: Boolean = true,
-    val loadingOlder: Boolean = false,
-    val error: String? = null,
-    val menuOpen: Boolean = false,
-    val sending: Boolean = false,
-    val pollDraft: PollDraft? = null,
-    val infoSheet: InfoSheet? = null,
-    val editing: EditSession? = null,
-    val replyingToId: String? = null,
-    val confirmDeleteId: String? = null,
-    val thread: ThreadSession? = null,
-    val showInChat: ShowInChatRequest? = null,
-    val message: UserMessage? = null,
-    val pending: List<PendingUpload> = emptyList(),
-    val downloads: Map<String, Float> = emptyMap(),
-    val viewer: ViewerUi? = null,
-    val locationSheet: LocationSheetUi? = null,
-)
-
-/** What the message list is built from; everything else in [ChatData] changes without rebuilding it. */
-private data class ItemInputs(
-    val group: Group?,
-    val messages: List<Message>,
-    val proposals: Map<String, Proposal>,
-    val events: Map<String, GroupEvent>,
-    val conflicts: Map<String, List<String>>,
-)
-
+/**
+ * A group's chat. Loading pages and the screen's state live here; the rest is split by job into
+ * collaborators sharing one [ChatSession]: [ChatComposer] (sending, replying, editing),
+ * [ChatAttachments], [ChatPolls], [ChatThreads], [ChatLocation], [ChatReceipts],
+ * [ChatLiveUpdates] and [ChatReferences]. The UI-state types are in ChatUiModels.kt, the
+ * internal state in ChatData.kt and the mapping between them in ChatUiMapping.kt.
+ */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val chat: ChatRepository,
     private val groups: GroupsRepository,
-    private val proposals: ProposalsRepository,
-    private val events: EventsRepository,
-    private val users: UserRepository,
+    proposals: ProposalsRepository,
+    events: EventsRepository,
+    users: UserRepository,
     private val addToCalendar: AddToCalendarDelegate,
-    private val files: AttachmentFiles,
-    private val places: PlaceSearch,
+    files: AttachmentFiles,
+    places: PlaceSearch,
     liveEvents: LiveEvents,
 ) : ViewModel() {
 
     private val groupId = savedStateHandle.get<String>("groupId").orEmpty()
     private val data = MutableStateFlow(ChatData(group = groups.cachedGroup(groupId)))
-    private val meId: String? get() = users.user.value?.id
 
-    private val requestedProposals = mutableSetOf<String>()
-    private val requestedEvents = mutableSetOf<String>()
-    /** Date poll times whose conflicts have been asked for, by [pollSlotKey]. */
-    private val requestedConflicts = mutableSetOf<String>()
-    private var conflictsJob: Job? = null
-    private var visible = false
-    private var lastSeenSent: String? = null
-    private var receiptJob: Job? = null
-    private val uploadJobs = mutableMapOf<String, Job>()
+    private val references = ChatReferences(groupId, data, viewModelScope, proposals, events)
+    private val session = ChatSession(groupId, data, viewModelScope, chat, groups, users, references)
+    private val receipts = ChatReceipts(session)
+    private val composer = ChatComposer(session)
+    private val attachments = ChatAttachments(session, files)
+    private val polls = ChatPolls(session)
+    private val threads = ChatThreads(session)
+    private val location = ChatLocation(session, places)
+    private val live = ChatLiveUpdates(session, groups, receipts, composer)
 
     private val meIds = users.user.map { it?.id }.distinctUntilChanged()
 
@@ -299,18 +88,16 @@ class ChatViewModel @Inject constructor(
      * [state]: a keystroke neither goes through an async flow (which drops characters and
      * moves the caret) nor rebuilds the message list.
      */
-    var draft by mutableStateOf("")
-        private set
+    val draft: String get() = composer.draft
 
     /** The thread sheet's composer text, kept apart from the chat's. */
-    var threadDraft by mutableStateOf("")
-        private set
+    val threadDraft: String get() = threads.threadDraft
 
     init {
         load()
         viewModelScope.launch { addToCalendar.loadCalendars() }
         viewModelScope.launch {
-            liveEvents.payloadsFor(groupId).collect { onLive(it) }
+            liveEvents.payloadsFor(groupId).collect { live.onLive(it) }
         }
         viewModelScope.launch { liveEvents.reconnected.collect { catchUp() } }
     }
@@ -319,12 +106,12 @@ class ChatViewModel @Inject constructor(
     fun load() {
         viewModelScope.launch {
             data.update { it.copy(loading = true, error = null) }
-            if (data.value.group == null) refreshGroup()
+            if (data.value.group == null) session.refreshGroup()
             when (val result = chat.page(groupId)) {
                 is ApiResult.Success -> {
                     data.update { it.copy(messages = result.value.messages, hasMore = result.value.hasMore, loading = false) }
-                    resolveReferences()
-                    scheduleReceipts()
+                    references.resolve()
+                    receipts.schedule()
                 }
                 is ApiResult.Failure -> data.update { it.copy(loading = false, error = result.error.message) }
             }
@@ -347,7 +134,7 @@ class ChatViewModel @Inject constructor(
                             loadingOlder = false,
                         )
                     }
-                    resolveReferences()
+                    references.resolve()
                 }
                 is ApiResult.Failure -> data.update { it.copy(loadingOlder = false, message = UserMessage(result.error.message)) }
             }
@@ -373,552 +160,96 @@ class ChatViewModel @Inject constructor(
                     cur.copy(messages = page.messages, hasMore = page.hasMore)
                 }
             }
-            page.messages.forEach { m ->
-                m.proposalId?.let(requestedProposals::remove)
-                m.eventId?.let(requestedEvents::remove)
-            }
-            // Busy times may have changed while disconnected.
-            requestedConflicts.clear()
-            resolveReferences()
-            scheduleReceipts()
-            refreshGroup()
+            references.forget(page.messages)
+            references.resolve()
+            receipts.schedule()
+            session.refreshGroup()
         }
-    }
-
-    private suspend fun refreshGroup() {
-        (groups.refreshGroup(groupId) as? ApiResult.Success)?.value?.let { g -> data.update { it.copy(group = g) } }
-    }
-
-    /** Lazily fetches proposals and events referenced by messages. */
-    private fun resolveReferences() {
-        val messages = data.value.messages
-        messages.mapNotNull { it.proposalId }.filter { requestedProposals.add(it) }.forEach { id ->
-            viewModelScope.launch {
-                (proposals.get(id) as? ApiResult.Success)?.value?.let(::putProposal)
-            }
-        }
-        messages.mapNotNull { it.eventId }.filter { requestedEvents.add(it) }.forEach { id ->
-            viewModelScope.launch {
-                (events.get(id) as? ApiResult.Success)?.value?.let(::putEvent)
-            }
-        }
-        resolveConflicts(messages)
-    }
-
-    /** Who's busy for each open date poll's times (the conflicts endpoint), fetched once each. */
-    private fun resolveConflicts(messages: List<Message>) {
-        val now = java.time.Instant.now()
-        messages.asSequence()
-            .mapNotNull { it.poll?.takeIf { poll -> !poll.closed } }
-            .flatMap { it.options.asSequence().mapNotNull { o -> o.slot } }
-            .filter { slot -> DateTimes.parseInstant(slot.end)?.isAfter(now) ?: false }
-            .filter { requestedConflicts.add(pollSlotKey(it)) }
-            .toList()
-            .forEach { slot ->
-                viewModelScope.launch {
-                    when (val result = proposals.conflicts(groupId, slot.start, slot.end)) {
-                        is ApiResult.Success -> data.update { it.copy(conflicts = it.conflicts + (pollSlotKey(slot) to result.value)) }
-                        // Asked again next time the chat catches up.
-                        is ApiResult.Failure -> requestedConflicts.remove(pollSlotKey(slot))
-                    }
-                }
-            }
-    }
-
-    /**
-     * Busy times changed (someone synced): re-checks date poll options. Syncs come in bursts, so
-     * they're coalesced, and nothing is fetched without an open date poll.
-     */
-    private fun refreshConflicts() {
-        if (data.value.messages.none { m -> m.poll?.let { !it.closed && it.options.any { o -> o.slot != null } } == true }) return
-        conflictsJob?.cancel()
-        conflictsJob = viewModelScope.launch {
-            delay(CONFLICTS_DEBOUNCE_MS)
-            requestedConflicts.clear()
-            resolveConflicts(data.value.messages)
-        }
-    }
-
-    private fun putProposal(p: Proposal) = data.update { it.copy(proposals = it.proposals + (p.id to p)) }
-    private fun putEvent(e: GroupEvent) = data.update { it.copy(events = it.events + (e.id to e)) }
-    // endregion
-
-    // region Live updates
-    private suspend fun onLive(payload: LivePayload) {
-        when (payload) {
-            is LivePayload.MessageCreated -> {
-                appendMessage(payload.message)
-                if (visible) scheduleReceipts()
-                else if (payload.message.authorId != meId) chat.markReceipts(groupId, payload.message.id, ReceiptState.Delivered)
-            }
-            is LivePayload.MessageUpdated -> {
-                val m = payload.message
-                data.update { it.copy(messages = it.messages.withUpdated(m), thread = it.thread?.let { t -> t.copy(messages = t.messages.withUpdated(m)) }) }
-                // Deleted elsewhere (e.g. on another device) while you were editing it.
-                if (m.deleted && data.value.editing?.messageId == m.id) cancelEdit()
-                if (m.deleted && data.value.replyingToId == m.id) cancelReply()
-            }
-            is LivePayload.MessageReceipts -> {
-                val updates = payload.payload.receipts.associateBy { it.messageId }
-                data.update { d ->
-                    d.copy(messages = d.messages.map { m -> updates[m.id]?.let { m.copy(receipt = it.toReceipt()) } ?: m })
-                }
-            }
-            is LivePayload.PollUpdated -> {
-                replacePoll(payload.poll)
-                resolveConflicts(data.value.messages)
-            }
-            is LivePayload.AvailabilityChanged -> refreshConflicts()
-            is LivePayload.ProposalChanged -> putProposal(payload.proposal)
-            is LivePayload.ProposalConfirmed -> {
-                putProposal(payload.proposal)
-                putEvent(payload.event)
-            }
-            is LivePayload.EventChanged -> putEvent(payload.event)
-            is LivePayload.EventDeleted -> data.update { it.copy(events = it.events - payload.id) }
-            is LivePayload.GroupUpdated -> {
-                val group = groups.applyLiveUpdate(payload.group, meId)
-                data.update { it.copy(group = group) }
-            }
-            is LivePayload.MemberChanged, is LivePayload.MemberRemoved -> refreshGroup()
-            else -> Unit
-        }
-    }
-
-    private fun appendMessage(message: Message) {
-        data.update { d ->
-            val messages = if (d.messages.any { it.id == message.id }) {
-                d.messages.map { if (it.id == message.id) message else it }
-            } else {
-                d.messages + message
-            }
-            // A reply to something in the open thread joins it.
-            d.copy(messages = messages, thread = d.thread?.let { t -> t.copy(messages = t.messages.withThreadMessage(message)) })
-        }
-        resolveReferences()
-    }
-
-    private fun replacePoll(poll: Poll) = data.update { d ->
-        fun List<Message>.withPoll() = map { m -> if (m.poll?.id == poll.id) m.copy(poll = poll) else m }
-        d.copy(messages = d.messages.withPoll(), thread = d.thread?.let { it.copy(messages = it.messages.withPoll()) })
     }
     // endregion
 
     // region Receipts
     /** Called by the screen on resume / pause so "seen" is only sent while the chat is on screen. */
-    fun onVisibilityChanged(isVisible: Boolean) {
-        visible = isVisible
-        if (isVisible) scheduleReceipts()
-    }
-
-    /** Marks everything up to the newest message from someone else as delivered, then seen. */
-    private fun scheduleReceipts() {
-        if (!visible) return
-        val me = meId
-        val newest = data.value.messages.lastOrNull { it.authorId != null && it.authorId != me } ?: return
-        if (newest.id == lastSeenSent) return
-        receiptJob?.cancel()
-        receiptJob = viewModelScope.launch {
-            delay(RECEIPT_DEBOUNCE_MS)
-            chat.markReceipts(groupId, newest.id, ReceiptState.Delivered)
-            if (chat.markReceipts(groupId, newest.id, ReceiptState.Seen) is ApiResult.Success) lastSeenSent = newest.id
-        }
-    }
+    fun onVisibilityChanged(isVisible: Boolean) = receipts.onVisibilityChanged(isVisible)
     // endregion
 
     // region Composer
-    fun onDraftChange(value: String) {
-        draft = value.take(4000)
-    }
+    fun onDraftChange(value: String) = composer.onDraftChange(value)
 
     fun onToggleMenu() = data.update { it.copy(menuOpen = !it.menuOpen) }
 
     fun closeMenu() = data.update { it.copy(menuOpen = false) }
 
-    fun send() {
-        if (data.value.editing != null) return saveEdit()
-        if (data.value.pending.isNotEmpty()) return sendAttachments()
-        val text = draft.trim()
-        if (text.isEmpty() || data.value.sending) return
-        draft = ""
-        val replyTo = data.value.replyingToId
-        data.update { it.copy(sending = true, menuOpen = false, replyingToId = null) }
-        viewModelScope.launch {
-            when (val result = chat.sendText(groupId, text, replyTo)) {
-                is ApiResult.Success -> {
-                    appendMessage(result.value)
-                    data.update { it.copy(sending = false) }
-                }
-                is ApiResult.Failure -> {
-                    if (draft.isEmpty()) draft = text
-                    data.update { it.copy(sending = false, replyingToId = it.replyingToId ?: replyTo, message = UserMessage(result.error.message)) }
-                }
-            }
-        }
-    }
+    fun send() = composer.send()
 
-    private fun sendAttachments() {
-        val d = data.value
-        if (d.sending || d.pending.any { it.uploaded == null }) return
-        val ids = d.pending.mapNotNull { it.uploaded?.id }
-        val text = draft.trim()
-        draft = ""
-        val replyTo = d.replyingToId
-        data.update { it.copy(sending = true, menuOpen = false, replyingToId = null) }
-        viewModelScope.launch {
-            when (val result = chat.sendAttachments(groupId, ids, text, replyTo)) {
-                is ApiResult.Success -> {
-                    appendMessage(result.value)
-                    data.update { cur -> cur.copy(sending = false, pending = cur.pending.filterNot { it.uploaded?.id in ids }) }
-                }
-                is ApiResult.Failure -> {
-                    if (draft.isEmpty()) draft = text
-                    data.update { it.copy(sending = false, replyingToId = it.replyingToId ?: replyTo, message = UserMessage(result.error.message)) }
-                }
-            }
-        }
-    }
+    /** Replies to [messageId] with the next message (swipe right, or Reply in its menu). */
+    fun startReply(messageId: String) = composer.startReply(messageId)
+
+    fun cancelReply() = composer.cancelReply()
+
+    /** Puts the composer into edit mode with the message's text; the current draft comes back afterwards. */
+    fun startEdit(messageId: String) = composer.startEdit(messageId)
+
+    /** Leaves edit mode, restoring whatever draft was there before. */
+    fun cancelEdit() = composer.cancelEdit()
+
+    fun requestDelete(messageId: String) = composer.requestDelete(messageId)
+
+    fun dismissDelete() = composer.dismissDelete()
+
+    fun confirmDelete() = composer.confirmDelete()
     // endregion
 
     // region Attachments
-    /** Photos or files picked to send: each starts uploading straight away (up to [MAX_ATTACHMENTS] per message). */
-    fun onPicked(uris: List<Uri>) {
-        if (uris.isEmpty()) return
-        val room = MAX_ATTACHMENTS - data.value.pending.size
-        val taken = uris.distinct().take(room.coerceAtLeast(0))
-        val entries = taken.map { PendingUpload(localId = UUID.randomUUID().toString(), uri = it) }
-        data.update {
-            it.copy(
-                pending = it.pending + entries,
-                menuOpen = false,
-                message = if (taken.size < uris.distinct().size) UserMessage("You can send up to $MAX_ATTACHMENTS photos and files at a time") else it.message,
-            )
-        }
-        entries.forEach { upload(it.localId) }
-    }
+    /** Photos or files picked to send: each starts uploading straight away. */
+    fun onPicked(uris: List<Uri>) = attachments.onPicked(uris)
 
-    fun removeAttachment(localId: String) {
-        uploadJobs.remove(localId)?.cancel()
-        data.update { d -> d.copy(pending = d.pending.filterNot { it.localId == localId }) }
-    }
+    fun removeAttachment(localId: String) = attachments.removeAttachment(localId)
 
-    fun retryAttachment(localId: String) {
-        updatePending(localId) { it.copy(error = null, progress = 0f) }
-        upload(localId)
-    }
-
-    private fun updatePending(localId: String, transform: (PendingUpload) -> PendingUpload) = data.update { d ->
-        d.copy(pending = d.pending.map { if (it.localId == localId) transform(it) else it })
-    }
-
-    private fun upload(localId: String) {
-        uploadJobs.remove(localId)?.cancel()
-        uploadJobs[localId] = viewModelScope.launch {
-            val entry = data.value.pending.firstOrNull { it.localId == localId } ?: return@launch
-            val file = entry.file ?: runCatching { files.describe(entry.uri) }.getOrNull()
-            if (file == null) {
-                updatePending(localId) { it.copy(error = "Couldn't read this file") }
-                return@launch
-            }
-            val kind = when {
-                file.isGif -> AttachmentUiKind.Gif
-                file.isImage -> AttachmentUiKind.Image
-                else -> AttachmentUiKind.File
-            }
-            updatePending(localId) { it.copy(file = file, kind = kind, name = file.name) }
-            uploadLimitError(file.mime, file.size)?.let { error ->
-                updatePending(localId) { it.copy(error = error) }
-                return@launch
-            }
-            var reported = -1
-            val source = files.prepare(file) { written, total ->
-                if (total > 0) {
-                    val percent = (written * 100 / total).toInt().coerceIn(0, 100)
-                    if (percent != reported) {
-                        reported = percent
-                        updatePending(localId) { if (it.uploaded == null && it.error == null) it.copy(progress = percent / 100f) else it }
-                    }
-                }
-            }
-            if (source == null) {
-                updatePending(localId) { it.copy(error = "Couldn't read this photo") }
-                return@launch
-            }
-            when (val result = chat.upload(groupId, source.name, source.body)) {
-                is ApiResult.Success -> updatePending(localId) { it.copy(uploaded = result.value, progress = 1f) }
-                is ApiResult.Failure -> updatePending(localId) { it.copy(error = result.error.message) }
-            }
-            uploadJobs.remove(localId)
-        }
-    }
+    fun retryAttachment(localId: String) = attachments.retryAttachment(localId)
 
     /** Taps on a photo (opens the viewer over the message's photos) or a file (downloads and opens it). */
-    fun openAttachment(messageId: String, attachmentId: String) {
-        val m = (data.value.messages + data.value.thread?.messages.orEmpty()).firstOrNull { it.id == messageId } ?: return
-        val a = m.attachments.firstOrNull { it.id == attachmentId } ?: return
-        if (a.isVisual) {
-            val visuals = m.attachments.filter { it.isVisual }
-            data.update { it.copy(viewer = ViewerUi(visuals, visuals.indexOf(a).coerceAtLeast(0)), menuOpen = false) }
-        } else {
-            withDownload(a) { file ->
-                if (!files.open(file, a.mime)) {
-                    val why = if (a.kind == AttachmentKind.Pass) {
-                        "No app on this phone opens Wallet passes. Google Wallet can't add Apple Wallet passes directly: try an app that supports .pkpass files"
-                    } else {
-                        "No app on this phone can open ${a.name}"
-                    }
-                    data.update { it.copy(message = UserMessage(why)) }
-                }
-            }
-        }
-    }
+    fun openAttachment(messageId: String, attachmentId: String) = attachments.openAttachment(messageId, attachmentId)
 
-    fun closeViewer() = data.update { it.copy(viewer = null) }
+    fun closeViewer() = attachments.closeViewer()
 
-    fun shareAttachment(attachment: Attachment) = withDownload(attachment) { file -> files.share(file, attachment.mime) }
+    fun shareAttachment(attachment: Attachment) = attachments.shareAttachment(attachment)
 
-    fun saveAttachment(attachment: Attachment) = withDownload(attachment) { file ->
-        val saved = files.saveToPictures(file, attachment.mime)
-        data.update { it.copy(message = UserMessage(if (saved) "Saved to Pictures" else "Couldn't save the photo")) }
-    }
-
-    /** Downloads [attachment] to the cache (once at a time per attachment), then runs [then]. */
-    private fun withDownload(attachment: Attachment, then: suspend (java.io.File) -> Unit) {
-        if (attachment.id in data.value.downloads) return
-        data.update { it.copy(downloads = it.downloads + (attachment.id to -1f)) }
-        viewModelScope.launch {
-            var reported = -1
-            val result = runCatching {
-                files.download(attachment) { p ->
-                    val percent = (p * 100).toInt()
-                    if (percent != reported) {
-                        reported = percent
-                        data.update { d -> if (attachment.id in d.downloads) d.copy(downloads = d.downloads + (attachment.id to p)) else d }
-                    }
-                }
-            }
-            data.update { it.copy(downloads = it.downloads - attachment.id) }
-            result.fold(
-                onSuccess = { then(it) },
-                onFailure = { e ->
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    data.update { it.copy(message = UserMessage("Couldn't download ${attachment.name}")) }
-                },
-            )
-        }
-    }
-    // endregion
-
-    // region Reply
-    /** Replies to [messageId] with the next message (swipe right, or Reply in its menu). */
-    fun startReply(messageId: String) {
-        val m = data.value.messages.firstOrNull { it.id == messageId }?.takeIf { it.canReply } ?: return
-        cancelEdit()
-        data.update { it.copy(replyingToId = m.id, menuOpen = false) }
-    }
-
-    fun cancelReply() = data.update { it.copy(replyingToId = null) }
-    // endregion
-
-    // region Edit & delete
-    /** Your own, non-deleted text message, or null. */
-    private fun editable(messageId: String): Message? = data.value.messages.firstOrNull {
-        it.id == messageId && it.kind == MessageKind.Text && !it.deleted && it.authorId != null && it.authorId == meId
-    }
-
-    /** Your own text message that can be edited: not a shared place (those can only be deleted). */
-    private fun canEdit(messageId: String): Message? = editable(messageId)?.takeIf { it.location == null }
-
-    /** Puts the composer into edit mode with the message's text; the current draft comes back afterwards. */
-    fun startEdit(messageId: String) {
-        val m = canEdit(messageId) ?: return
-        val stash = data.value.editing?.stashedDraft ?: draft
-        val text = m.displayText.orEmpty()
-        data.update { it.copy(editing = EditSession(m.id, text, stash, hasAttachments = m.attachments.isNotEmpty()), menuOpen = false, replyingToId = null) }
-        draft = text
-    }
-
-    /** Leaves edit mode, restoring whatever draft was there before. */
-    fun cancelEdit() {
-        val session = data.value.editing ?: return
-        draft = session.stashedDraft
-        data.update { it.copy(editing = null) }
-    }
-
-    private fun saveEdit() {
-        val session = data.value.editing ?: return
-        val text = draft.trim()
-        if ((text.isEmpty() && !session.hasAttachments) || data.value.sending) return
-        if (text == session.original.trim()) return cancelEdit()
-        data.update { it.copy(sending = true) }
-        viewModelScope.launch {
-            val result = chat.edit(session.messageId, text)
-            when (result) {
-                is ApiResult.Success -> {
-                    data.update { it.copy(messages = it.messages.withUpdated(result.value), sending = false) }
-                    if (data.value.editing?.messageId == session.messageId) cancelEdit()
-                }
-                is ApiResult.Failure -> data.update { it.copy(sending = false, message = UserMessage(result.error.message)) }
-            }
-        }
-    }
-
-    fun requestDelete(messageId: String) {
-        if (editable(messageId) == null) return
-        data.update { it.copy(confirmDeleteId = messageId, menuOpen = false) }
-    }
-
-    fun dismissDelete() = data.update { it.copy(confirmDeleteId = null) }
-
-    fun confirmDelete() {
-        val id = data.value.confirmDeleteId ?: return
-        data.update { it.copy(confirmDeleteId = null) }
-        viewModelScope.launch {
-            when (val result = chat.delete(id)) {
-                is ApiResult.Success -> {
-                    data.update { it.copy(messages = it.messages.withDeleted(id), thread = it.thread?.let { t -> t.copy(messages = t.messages.withDeleted(id)) }) }
-                    if (data.value.editing?.messageId == id) cancelEdit()
-                    if (data.value.replyingToId == id) cancelReply()
-                }
-                is ApiResult.Failure -> data.update { it.copy(message = UserMessage(result.error.message)) }
-            }
-        }
-    }
+    fun saveAttachment(attachment: Attachment) = attachments.saveAttachment(attachment)
     // endregion
 
     // region Location
-    fun openLocationSheet() = data.update { it.copy(locationSheet = LocationSheetUi(), menuOpen = false) }
-    fun closeLocationSheet() = data.update { it.copy(locationSheet = null) }
-
-    fun onPlaceQuery(value: String) = updateLocation { it.copy(query = value.take(200), noResults = false) }
-
-    fun clearPlaceSearch() = updateLocation { LocationSheetUi() }
+    fun openLocationSheet() = location.openLocationSheet()
+    fun closeLocationSheet() = location.closeLocationSheet()
+    fun onPlaceQuery(value: String) = location.onPlaceQuery(value)
+    fun clearPlaceSearch() = location.clearPlaceSearch()
 
     /** Searches for [LocationSheetUi.query], nearer [near] (lat, lng) first. */
-    fun searchPlaces(near: Pair<Double, Double>?) {
-        val query = data.value.locationSheet?.query?.trim().orEmpty()
-        if (query.isEmpty() || data.value.locationSheet?.searching == true) return
-        updateLocation { it.copy(searching = true, picked = null, noResults = false) }
-        viewModelScope.launch {
-            val found = try {
-                places.search(query, near)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                updateLocation { it.copy(searching = false) }
-                data.update { it.copy(message = UserMessage("Couldn't search for places. Check your connection and try again.")) }
-                return@launch
-            }
-            updateLocation { it.copy(searching = false, results = found, noResults = found.isEmpty(), picked = found.singleOrNull()) }
-        }
-    }
+    fun searchPlaces(near: Pair<Double, Double>?) = location.searchPlaces(near)
 
-    fun pickPlace(place: FoundPlace) = updateLocation { it.copy(picked = place) }
+    fun pickPlace(place: FoundPlace) = location.pickPlace(place)
 
     /** Shares [location] (as a reply, if one is being written), then closes the sheet. */
-    fun sendLocation(location: MessageLocation) {
-        if (data.value.locationSheet?.sending == true) return
-        val replyTo = data.value.replyingToId
-        updateLocation { it.copy(sending = true) }
-        viewModelScope.launch {
-            when (val result = chat.sendLocation(groupId, location, replyTo)) {
-                is ApiResult.Success -> {
-                    appendMessage(result.value)
-                    data.update { it.copy(locationSheet = null, replyingToId = if (it.replyingToId == replyTo) null else it.replyingToId) }
-                }
-                is ApiResult.Failure -> {
-                    updateLocation { it.copy(sending = false) }
-                    data.update { it.copy(message = UserMessage(result.error.message)) }
-                }
-            }
-        }
-    }
-
-    private fun updateLocation(transform: (LocationSheetUi) -> LocationSheetUi) =
-        data.update { d -> d.copy(locationSheet = d.locationSheet?.let(transform)) }
+    fun sendLocation(location: MessageLocation) = this.location.sendLocation(location)
     // endregion
 
     // region Polls
-    fun openPollSheet() = data.update { it.copy(pollDraft = PollDraft(), menuOpen = false) }
-    fun closePollSheet() = data.update { it.copy(pollDraft = null) }
-    fun onPollQuestion(value: String) = updatePoll { it.copy(question = value.take(200)) }
-    fun onPollOption(index: Int, value: String) = updatePoll { p ->
-        p.copy(options = p.options.mapIndexed { i, o -> if (i == index) value.take(100) else o })
-    }
-    fun onAddPollOption() = updatePoll { if (it.canAddOption) it.copy(options = it.options + "") else it }
-    fun onRemovePollOption(index: Int) = updatePoll { p ->
-        if (p.options.size <= 2) p else p.copy(options = p.options.filterIndexed { i, _ -> i != index })
-    }
-    fun onPollMulti(value: Boolean) = updatePoll { it.copy(multi = value) }
-
-    fun submitPoll() {
-        val draft = data.value.pollDraft ?: return
-        if (!draft.canSubmit) return
-        updatePoll { it.copy(sending = true) }
-        viewModelScope.launch {
-            val options = draft.options.map { it.trim() }.filter { it.isNotEmpty() }
-            when (val result = chat.sendPoll(groupId, draft.question, options, draft.multi)) {
-                is ApiResult.Success -> {
-                    appendMessage(result.value)
-                    data.update { it.copy(pollDraft = null) }
-                }
-                is ApiResult.Failure -> {
-                    updatePoll { it.copy(sending = false) }
-                    data.update { it.copy(message = UserMessage(result.error.message)) }
-                }
-            }
-        }
-    }
-
-    private fun updatePoll(transform: (PollDraft) -> PollDraft) = data.update { d -> d.copy(pollDraft = d.pollDraft?.let(transform)) }
+    fun openPollSheet() = polls.openPollSheet()
+    fun closePollSheet() = polls.closePollSheet()
+    fun onPollQuestion(value: String) = polls.onPollQuestion(value)
+    fun onPollOption(index: Int, value: String) = polls.onPollOption(index, value)
+    fun onAddPollOption() = polls.onAddPollOption()
+    fun onRemovePollOption(index: Int) = polls.onRemovePollOption(index)
+    fun onPollMulti(value: Boolean) = polls.onPollMulti(value)
+    fun submitPoll() = polls.submitPoll()
 
     /** Tap an option: toggles your vote (single-choice polls move it). Optimistic, then reconciled. */
-    fun onVote(messageId: String, optionId: String) {
-        val me = meId ?: return
-        val poll = (data.value.messages + data.value.thread?.messages.orEmpty()).firstOrNull { it.id == messageId }?.poll ?: return
-        if (poll.closed) return
-        val mine = poll.options.filter { me in it.voterIds }.map { it.id }.toSet()
-        val selection = when {
-            optionId in mine -> mine - optionId
-            poll.multi -> mine + optionId
-            else -> setOf(optionId)
-        }
-        val optimistic = poll.copy(
-            options = poll.options.map { o ->
-                o.copy(voterIds = o.voterIds.filterNot { it == me } + if (o.id in selection) listOf(me) else emptyList())
-            },
-        )
-        replacePoll(optimistic)
-        viewModelScope.launch {
-            when (val result = chat.vote(poll.id, selection.toList())) {
-                is ApiResult.Success -> replacePoll(result.value)
-                is ApiResult.Failure -> {
-                    replacePoll(poll)
-                    data.update { it.copy(message = UserMessage(result.error.message)) }
-                }
-            }
-        }
-    }
+    fun onVote(messageId: String, optionId: String) = polls.onVote(messageId, optionId)
 
-    /**
-     * "Propose this" on a date poll's option: its time for the propose form, or null if it's
-     * gone or has no time.
-     */
-    fun proposalFor(messageId: String, optionId: String): ProposalPrefill? {
-        val poll = data.value.messages.firstOrNull { it.id == messageId }?.poll ?: return null
-        val slot = poll.options.firstOrNull { it.id == optionId }?.slot ?: return null
-        return ProposalPrefill(slot.start, slot.end, slot.allDay)
-    }
+    /** "Propose this" on a date poll's option: its time for the propose form, or null if it's gone or has no time. */
+    fun proposalFor(messageId: String, optionId: String): ProposalPrefill? = polls.proposalFor(messageId, optionId)
 
-    fun onClosePoll(messageId: String) {
-        val poll = (data.value.messages + data.value.thread?.messages.orEmpty()).firstOrNull { it.id == messageId }?.poll ?: return
-        viewModelScope.launch {
-            when (val result = chat.closePoll(poll.id)) {
-                is ApiResult.Success -> replacePoll(result.value)
-                is ApiResult.Failure -> data.update { it.copy(message = UserMessage(result.error.message)) }
-            }
-        }
-    }
+    fun onClosePoll(messageId: String) = polls.onClosePoll(messageId)
     // endregion
 
     // region Message info
@@ -941,80 +272,25 @@ class ChatViewModel @Inject constructor(
 
     // region Thread
     /** Opens the thread [messageId] is part of (fetched, since it may reach past what's loaded). */
-    fun openThread(messageId: String) {
-        threadDraft = ""
-        data.update { it.copy(thread = ThreadSession(messageId), menuOpen = false) }
-        viewModelScope.launch {
-            val result = chat.thread(messageId)
-            data.update { d ->
-                val t = d.thread?.takeIf { it.focusId == messageId } ?: return@update d
-                when (result) {
-                    is ApiResult.Success -> d.copy(thread = t.copy(messages = result.value.messages, truncated = result.value.truncated, loading = false))
-                    is ApiResult.Failure -> d.copy(thread = null, message = UserMessage(result.error.message))
-                }
-            }
-        }
-    }
+    fun openThread(messageId: String) = threads.openThread(messageId)
 
-    fun closeThread() {
-        threadDraft = ""
-        data.update { it.copy(thread = null) }
-    }
+    fun closeThread() = threads.closeThread()
 
-    fun onThreadDraftChange(value: String) {
-        threadDraft = value.take(4000)
-    }
+    fun onThreadDraftChange(value: String) = threads.onThreadDraftChange(value)
 
     /** Your next reply in the thread goes to [messageId]; null goes back to the latest. */
-    fun replyInThread(messageId: String?) = data.update { d ->
-        d.copy(thread = d.thread?.copy(pickedId = messageId, actionsForId = null))
-    }
+    fun replyInThread(messageId: String?) = threads.replyInThread(messageId)
 
-    fun openThreadActions(messageId: String) = data.update { d -> d.copy(thread = d.thread?.copy(actionsForId = messageId)) }
+    fun openThreadActions(messageId: String) = threads.openThreadActions(messageId)
 
-    fun closeThreadActions() = data.update { d -> d.copy(thread = d.thread?.copy(actionsForId = null)) }
+    fun closeThreadActions() = threads.closeThreadActions()
 
-    fun sendInThread() {
-        val t = data.value.thread ?: return
-        val text = threadDraft.trim()
-        if (text.isEmpty() || t.sending) return
-        val target = threadReplyTarget(t.messages, t.pickedId, meId) ?: return
-        threadDraft = ""
-        data.update { d -> d.copy(thread = d.thread?.copy(sending = true)) }
-        viewModelScope.launch {
-            when (val result = chat.sendText(groupId, text, target.id)) {
-                is ApiResult.Success -> {
-                    appendMessage(result.value)
-                    data.update { d -> d.copy(thread = d.thread?.copy(sending = false, pickedId = null)) }
-                }
-                is ApiResult.Failure -> {
-                    if (threadDraft.isEmpty()) threadDraft = text
-                    data.update { d -> d.copy(thread = d.thread?.copy(sending = false), message = UserMessage(result.error.message)) }
-                }
-            }
-        }
-    }
+    fun sendInThread() = threads.sendInThread()
 
     /** Closes the thread and goes to [messageId] in the chat, paging back to it if needed. */
-    fun showInChat(messageId: String) {
-        closeThread()
-        viewModelScope.launch {
-            var pages = 0
-            while (data.value.messages.none { it.id == messageId } && data.value.hasMore && pages < MAX_PAGES_TO_FIND) {
-                val oldest = data.value.messages.firstOrNull()?.id ?: break
-                val page = (chat.page(groupId, before = oldest) as? ApiResult.Success)?.value ?: break
-                data.update { cur ->
-                    val known = cur.messages.mapTo(HashSet()) { it.id }
-                    cur.copy(messages = page.messages.filterNot { it.id in known } + cur.messages, hasMore = page.hasMore)
-                }
-                pages++
-            }
-            resolveReferences()
-            if (data.value.messages.any { it.id == messageId }) data.update { it.copy(showInChat = ShowInChatRequest(messageId)) }
-        }
-    }
+    fun showInChat(messageId: String) = threads.showInChat(messageId)
 
-    fun onShowInChatHandled() = data.update { it.copy(showInChat = null) }
+    fun onShowInChatHandled() = threads.onShowInChatHandled()
     // endregion
 
     // region Add to calendar
@@ -1034,124 +310,4 @@ class ChatViewModel @Inject constructor(
     // endregion
 
     fun onMessageShown(message: UserMessage) = data.update { if (it.message?.id == message.id) it.copy(message = null) else it }
-
-    private fun ItemInputs.toItems(me: String?): List<ChatItem> = buildChatItems(
-        messages = messages,
-        directory = MemberDirectory(group?.members.orEmpty(), me),
-        memberCount = group?.memberCount ?: 0,
-        proposals = proposals,
-        events = events,
-        conflicts = conflicts,
-        isAdmin = group?.role?.isAdmin == true,
-    ).asReversed()
-
-    private fun ChatData.toUi(items: List<ChatItem>, me: String?, cal: AddToCalendarState): ChatUiState {
-        val g = group
-        val others = g?.members.orEmpty().filter { it.userId != me }.map { it.name.firstName() }
-        return ChatUiState(
-            groupName = g?.name.orEmpty(),
-            monogram = g?.monogram.orEmpty(),
-            tileColor = g?.color ?: TileColor.T1,
-            groupImage = g?.image,
-            membersSummary = others.joinNamesSummary(),
-            items = items,
-            loading = loading,
-            loadingOlder = loadingOlder,
-            hasMore = hasMore,
-            error = error,
-            menuOpen = menuOpen,
-            sending = sending,
-            pollDraft = pollDraft,
-            editing = editing != null,
-            replying = replyingToId?.let { id -> messages.firstOrNull { it.id == id } }?.let { m ->
-                val directory = MemberDirectory(g?.members.orEmpty(), me)
-                ReplyingUi(m.id, replyAuthorName(m.authorId, null, directory), m.asReply().snippet)
-            },
-            confirmDeleteId = confirmDeleteId,
-            calendar = cal,
-            thread = thread?.toUi(MemberDirectory(g?.members.orEmpty(), me), g?.memberCount ?: 0, me),
-            showInChat = showInChat,
-            info = infoSheet?.let { sheet ->
-                sheet.toUi(messages.firstOrNull { it.id == sheet.messageId }, MemberDirectory(g?.members.orEmpty(), me))
-            },
-            message = message,
-            attachments = pending.map { it.toUi() },
-            editingCaption = editing?.hasAttachments == true,
-            downloads = downloads,
-            viewer = viewer,
-            locationSheet = locationSheet,
-        )
-    }
-
-    private fun ThreadSession.toUi(directory: MemberDirectory, memberCount: Int, me: String?): ThreadUi {
-        val target = threadReplyTarget(messages, pickedId, me)
-        val items = buildChatItems(messages, directory, memberCount, proposals = emptyMap(), events = emptyMap())
-            // A thread is for replying: proposing a date poll's winner happens in the chat.
-            .map { if (it is ChatItem.PollItem) it.copy(poll = it.poll.copy(canPropose = false)) else it }
-            // No receipt rows, and no Edit / Delete / View thread from inside a thread.
-            .filterNot { it is ChatItem.Receipt }
-            .map { if (it is ChatItem.Text) it.copy(canEdit = false, inThread = false) else it }
-        return ThreadUi(
-            focusId = focusId,
-            items = items,
-            count = messages.size,
-            loading = loading,
-            truncated = truncated,
-            replying = target?.let { ReplyingUi(it.id, replyAuthorName(it.authorId, null, directory), it.asReply().snippet) },
-            picked = pickedId != null && target?.id == pickedId,
-            sending = sending,
-            actions = actionsForId?.let { id -> messages.firstOrNull { it.id == id } }?.let { m ->
-                val name = replyAuthorName(m.authorId, null, directory)
-                ThreadActionsUi(
-                    messageId = m.id,
-                    title = if (name == "You") "Your message" else "$name\u2019s message",
-                    snippet = m.asReply().snippet,
-                    canReply = m.canReply,
-                )
-            },
-        )
-    }
-
-    private fun InfoSheet.toUi(message: Message?, directory: MemberDirectory): MessageInfoUi {
-        fun person(userId: String, time: String) = InfoPerson(directory.avatar(userId), directory.displayName(userId), time)
-        fun clock(iso: String) = DateTimes.localDateTime(iso)?.let(DateTimes::time).orEmpty()
-        val text = message?.takeIf { it.attachments.isNotEmpty() }?.let { it.displayText ?: attachmentsSummary(it.attachments) }
-            ?: message?.body ?: message?.poll?.question.orEmpty()
-        val own = message == null || directory.isMe(message.authorId)
-        val sent = sentAtLabel(info?.sentAt ?: message?.createdAt.orEmpty())
-        return MessageInfoUi(
-            text = text,
-            // "Sent today at 18:20", or "Ana sent this today at 18:20".
-            sentLabel = if (own) "Sent $sent" else "${directory[message?.authorId.orEmpty()]?.name?.substringBefore(' ') ?: "Someone"} sent this $sent",
-            own = own,
-            loading = info == null && error == null,
-            seen = info?.seen.orEmpty().map { person(it.userId, clock(it.at)) },
-            delivered = info?.delivered.orEmpty().map { person(it.userId, "Delivered ${clock(it.at)}") },
-            pending = info?.pending.orEmpty().map { person(it, "Not delivered yet") },
-            error = error,
-        )
-    }
-
-    private companion object {
-        const val RECEIPT_DEBOUNCE_MS = 600L
-        const val CONFLICTS_DEBOUNCE_MS = 1_000L
-        /** How many older pages "Show in chat" loads looking for a message. */
-        const val MAX_PAGES_TO_FIND = 20
-    }
-}
-
-private const val MAX_PHOTO_BYTES = 15L * 1024 * 1024
-private const val MAX_FILE_BYTES = 25L * 1024 * 1024
-
-/**
- * Why a picked file of [mime] and [size] bytes is too big to send, or null. GIFs are sent as they are;
- * other photos are shrunk on the device when they're over the limit, so only GIFs and files are checked.
- */
-fun uploadLimitError(mime: String, size: Long?): String? {
-    if (size == null) return null
-    return when {
-        mime == "image/gif" && size > MAX_PHOTO_BYTES -> "GIFs can be up to 15 MB"
-        !mime.startsWith("image/") && size > MAX_FILE_BYTES -> "Files can be up to 25 MB"
-        else -> null
-    }
 }

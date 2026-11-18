@@ -1,19 +1,13 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { fly } from 'svelte/transition';
-	import { prefersReducedMotion } from 'svelte/motion';
-	import type { Availability, DayAvailability, Slot } from '#lib/types';
-	import { getAvailability, getDayAvailability } from '#lib/client/availability';
+	import type { DayAvailability, Slot } from '#lib/types';
 	import { addDays, addMonths, endOfMonth, startOfMonth, startOfWeek } from '#lib/client/dates';
-	import { formatDayKey, formatDayRange, monthTitle, useFormat } from '#lib/client/format';
+	import { formatDayRange, monthTitle, useFormat } from '#lib/client/format';
 	import { live } from '#lib/client/live.svelte';
-	import { groupSubtitle, isAdminRole, memberMap } from '#lib/client/members';
+	import { isAdminRole, memberMap } from '#lib/client/members';
 	import { detailLabel, lengthLabel, PRESETS, presetOf } from '#lib/client/requirements';
 	import { toasts } from '#lib/client/toast.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
-	import IconButton from '#lib/components/ui/IconButton.svelte';
-	import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
-	import Spinner from '#lib/components/ui/Spinner.svelte';
 	import MonthGrid from '#lib/components/calendar/MonthGrid.svelte';
 	import WeekGrid from '#lib/components/calendar/WeekGrid.svelte';
 	import DayDetailCard from '#lib/components/calendar/DayDetailCard.svelte';
@@ -21,26 +15,21 @@
 	import SyncBanner from '#lib/components/group/SyncBanner.svelte';
 	import CoverageNote from '#lib/components/group/CoverageNote.svelte';
 	import BestOptions from '#lib/components/group/BestOptions.svelte';
-	import PlannerSheet from '#lib/components/group/PlannerSheet.svelte';
-	import { getPlan } from '#lib/client/plan';
-	import { upgradeSheet } from '#lib/client/ui-state.svelte';
+	import NextCard from '#lib/components/group/NextCard.svelte';
+	import GroupHeader from '#lib/components/group/GroupHeader.svelte';
+	import CalendarHeading from '#lib/components/group/CalendarHeading.svelte';
+	import CalendarPager from '#lib/components/group/CalendarPager.svelte';
+	import ShortlistBar from '#lib/components/group/ShortlistBar.svelte';
+	import GroupSheets from '#lib/components/group/GroupSheets.svelte';
+	import { AvailabilityCache } from '#lib/components/group/availability-cache';
+	import { Shortlist } from '#lib/components/group/shortlist.svelte';
+	import { GroupSheetState } from '#lib/components/group/sheets.svelte';
+	import type { CalendarView } from '#lib/components/group/views';
 	import { DESKTOP, layoutQuery } from '#lib/client/media.svelte';
-	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
-	import Breadcrumbs from '#lib/components/ui/Breadcrumbs.svelte';
 	import ChatPanel from '#lib/components/chat/ChatPanel.svelte';
 	import PlansCard from '#lib/components/proposals/PlansCard.svelte';
-	import NextCard from '#lib/components/group/NextCard.svelte';
-	import DatePollSheet from '#lib/components/group/DatePollSheet.svelte';
-	import Button from '#lib/components/ui/Button.svelte';
 
 	let { data } = $props();
-
-	// The selected day's detail (who's free when, and Propose) shows under either view.
-	type View = 'month' | 'week';
-	const VIEWS = [
-		{ value: 'month', label: 'Month' },
-		{ value: 'week', label: 'Week' }
-	] as const;
 
 	const fmt = useFormat();
 	const group = $derived(data.group);
@@ -49,7 +38,21 @@
 	const noun = $derived(PRESETS.find((p) => p.id === presetOf(group.requirement))?.noun ?? 'time');
 	const base = $derived(`/app/groups/${group.id}`);
 
-	let view = $state<View>('month');
+	// The Propose and AI planner sheets, and the times shortlisted for a date poll.
+	const sheets = new GroupSheetState();
+	const propose = sheets.propose;
+	const shortlist = new Shortlist();
+	// A new group starts with an empty shortlist.
+	$effect(() => {
+		void group.id;
+		untrack(() => shortlist.clear());
+	});
+
+	// Months and days already fetched or on their way; cleared when something changes (busy time, the timing).
+	const cache = new AvailabilityCache(() => group.id);
+
+	// The selected day's detail (who's free when, and Propose) shows under either view.
+	let view = $state<CalendarView>('month');
 	// Seeded from this page's load; navigation overrides them client-side. Not
 	// $derived from `data`: that object changes whenever a parent layout reloads
 	// (live events in any group refetch the groups list), which would snap the
@@ -63,11 +66,11 @@
 		if (next === seededFrom) return;
 		seededFrom = next;
 		untrack(() => {
-			forgetCached();
+			cache.forget();
 			month = data.month;
 			availability = next;
 			selected = defaultSelection(next, data.month);
-			seedCache(data.month, next);
+			cache.seed(data.month, next);
 			findFreeNeighbours();
 		});
 	});
@@ -98,63 +101,13 @@
 		return today.slice(0, 7) === m.slice(0, 7) ? today : m;
 	}
 
-	// Months and days already fetched, and ones on their way (a page change or a prefetch), so paging
-	// to a neighbouring month or week shows it straight away instead of waiting on the network.
-	// Cleared when something changes (busy time, the timing).
-	let months = new Map<string, Promise<Availability>>();
-	let dayCache = new Map<string, Promise<DayAvailability>>();
-	const monthsReady = new Map<string, Availability>();
-	const daysReady = new Map<string, DayAvailability>();
-
-	function fetchMonth(m: string): Promise<Availability> {
-		let request = months.get(m);
-		if (!request) {
-			const cache = months;
-			request = getAvailability(group.id, m, endOfMonth(m));
-			cache.set(m, request);
-			request.then(
-				(a) => cache === months && monthsReady.set(m, a),
-				() => cache.delete(m)
-			);
-		}
-		return request;
-	}
-
-	function fetchDay(date: string): Promise<DayAvailability> {
-		let request = dayCache.get(date);
-		if (!request) {
-			const cache = dayCache;
-			request = getDayAvailability(group.id, date);
-			cache.set(date, request);
-			request.then(
-				(d) => cache === dayCache && daysReady.set(date, d),
-				() => cache.delete(date)
-			);
-		}
-		return request;
-	}
-
-	function forgetCached() {
-		months = new Map();
-		dayCache = new Map();
-		monthsReady.clear();
-		daysReady.clear();
-	}
-
-	/** Caches the month the page loaded with, and fetches the months either side for the first swipe. */
-	function seedCache(m: string, a: Availability) {
-		monthsReady.set(m, a);
-		months.set(m, Promise.resolve(a));
-		fetchMonth(addMonths(m, 1)).catch(() => {});
-		fetchMonth(addMonths(m, -1)).catch(() => {});
-	}
-	$effect(() => untrack(() => seedCache(month, availability)));
+	$effect(() => untrack(() => cache.seed(month, availability)));
 
 	let monthRequest = 0;
 	async function loadMonth(m: string) {
 		const id = ++monthRequest;
 		// Already fetched (usually: neighbours are prefetched): show it as the page slides in.
-		const ready = monthsReady.get(m);
+		const ready = cache.monthsReady.get(m);
 		if (ready) {
 			availability = ready;
 			month = m;
@@ -163,7 +116,7 @@
 			month = m;
 			loadingMonth = true;
 			try {
-				const next = await fetchMonth(m);
+				const next = await cache.month(m);
 				if (id !== monthRequest) return;
 				availability = next;
 			} catch (err) {
@@ -173,8 +126,7 @@
 				if (id === monthRequest) loadingMonth = false;
 			}
 		}
-		fetchMonth(addMonths(m, 1)).catch(() => {});
-		fetchMonth(addMonths(m, -1)).catch(() => {});
+		cache.prefetchAround(m);
 	}
 
 	let weekRequest = 0;
@@ -187,26 +139,26 @@
 		const id = ++weekRequest;
 		const wanted = (d: string) => days.get(d)?.status !== 'hidden';
 		// Cached (usually: the next week is prefetched): show it at once.
-		weekDays = dates.every((d) => !wanted(d) || daysReady.has(d))
-			? new Map(dates.map((d) => [d, daysReady.get(d) ?? null]))
+		weekDays = dates.every((d) => !wanted(d) || cache.daysReady.has(d))
+			? new Map(dates.map((d) => [d, cache.daysReady.get(d) ?? null]))
 			: new Map();
-		const results = await Promise.all(dates.map((d) => (wanted(d) ? fetchDay(d).catch(() => null) : null)));
+		const results = await Promise.all(dates.map((d) => (wanted(d) ? cache.day(d).catch(() => null) : null)));
 		// A week running into the next (or previous) month needs that month's days too, to fade the ones that don't work.
 		await Promise.all(
-			[...new Set(dates.map(startOfMonth))].filter((m) => m !== month).map((m) => fetchMonth(m).catch(() => null))
+			[...new Set(dates.map(startOfMonth))].filter((m) => m !== month).map((m) => cache.month(m).catch(() => null))
 		);
 		if (id === weekRequest) weekDays = new Map(dates.map((d, i) => [d, results[i]]));
 		// The next week the user is likely to swipe to.
-		for (const d of dates) fetchDay(addDays(d, 7 * lastStep)).catch(() => {});
+		for (const d of dates) cache.day(addDays(d, 7 * lastStep)).catch(() => {});
 	}
 
 	let dayRequest = 0;
 	async function loadDay() {
 		const id = ++dayRequest;
 		const date = selected;
-		if (dayDetail?.date !== date) dayDetail = daysReady.get(date) ?? null;
+		if (dayDetail?.date !== date) dayDetail = cache.daysReady.get(date) ?? null;
 		try {
-			const detail = await fetchDay(date);
+			const detail = await cache.day(date);
 			if (id === dayRequest) dayDetail = detail;
 		} catch (err) {
 			toasts.error(err);
@@ -233,7 +185,7 @@
 		const id = group.id;
 		const refresh = () =>
 			untrack(() => {
-				forgetCached();
+				cache.forget();
 				loadMonth(month);
 				loadDetails(true);
 				findFreeNeighbours();
@@ -252,7 +204,7 @@
 	/** Whether a day works for everyone (and isn't over); unknown days count as working, so nothing fades while it loads. */
 	function works(date: string): boolean {
 		if (date < todayKey) return false;
-		const status = (days.get(date) ?? monthsReady.get(startOfMonth(date))?.days.find((d) => d.date === date))?.status;
+		const status = (days.get(date) ?? cache.monthsReady.get(startOfMonth(date))?.days.find((d) => d.date === date))?.status;
 		return status === undefined || status === 'match';
 	}
 
@@ -289,8 +241,8 @@
 		const today = todayKey;
 		const after = addDays(end, 1);
 		const [next, previous] = await Promise.all([
-			findFreeDay(fetchMonth, after > today ? after : today, to, true),
-			findFreeDay(fetchMonth, from > today ? from : today, addDays(start, -1), false)
+			findFreeDay(cache.month, after > today ? after : today, to, true),
+			findFreeDay(cache.month, from > today ? from : today, addDays(start, -1), false)
 		]);
 		if (id !== freeRequest) return;
 		nextFree = next;
@@ -322,74 +274,8 @@
 		}
 	}
 
-	// One page per month / week: it slides in from the side it's coming from.
+	// One page per month / week.
 	const pageKey = $derived(`${view}:${view === 'month' ? month : (week[0] ?? selected)}`);
-	let pageDir = $state<1 | -1>(1);
-	let lastPageKey = untrack(() => pageKey);
-	$effect.pre(() => {
-		const key = pageKey;
-		untrack(() => {
-			if (key.split(':')[0] === lastPageKey.split(':')[0] && key !== lastPageKey) pageDir = key > lastPageKey ? 1 : -1;
-			lastPageKey = key;
-		});
-	});
-	const pageIn = (node: Element) =>
-		fly(node, { x: prefersReducedMotion.current ? 0 : pageDir * 48, duration: prefersReducedMotion.current ? 0 : 220 });
-
-	// Swipe sideways on a touch screen for the previous / next month or week; the page follows the finger.
-	let touch: { x: number; y: number } | null = null;
-	// The last two moves, for the flick speed.
-	let moves: { x: number; t: number }[] = [];
-	let dragX = $state(0);
-	function touchStart(e: TouchEvent) {
-		touch = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
-		moves = [];
-	}
-	function touchMove(e: TouchEvent) {
-		if (!touch) return;
-		const dx = e.touches[0].clientX - touch.x;
-		const dy = e.touches[0].clientY - touch.y;
-		dragX = Math.abs(dx) > Math.abs(dy) * 1.5 ? dx : 0;
-		moves = [...moves.slice(-1), { x: e.touches[0].clientX, t: e.timeStamp }];
-	}
-	function touchEnd(e: TouchEvent) {
-		if (!touch) return;
-		const dx = e.changedTouches[0].clientX - touch.x;
-		const dy = e.changedTouches[0].clientY - touch.y;
-		touch = null;
-		dragX = 0;
-		const [a, b] = moves;
-		const speed = a && b && b.t > a.t ? (b.x - a.x) / (b.t - a.t) : 0; // px per ms
-		const sideways = Math.abs(dx) > Math.abs(dy) * 1.5;
-		// A long enough drag, or a quick flick.
-		if (sideways && (Math.abs(dx) > 60 || (Math.abs(speed) > 0.6 && Math.abs(dx) > 20))) step(dx < 0 ? 1 : -1);
-	}
-
-	let proposeOpen = $state(false);
-	let proposeInitial = $state<(Slot & { title?: string; note?: string; allDay?: boolean }) | { day: string } | null>(null);
-	function propose(slot: (Slot & { title?: string; note?: string; allDay?: boolean }) | { day: string } | null) {
-		proposeInitial = slot;
-		proposeOpen = true;
-	}
-
-	// The optional AI planner: only offered when the server has it set up; Pro to use.
-	let aiPlanner = $state<{ available: boolean; included: boolean } | null>(null);
-	// Reload whenever the upgrade sheet closes, so buying Pro unlocks it straight away.
-	$effect(() => {
-		if (upgradeSheet.open) return;
-		let stale = false;
-		getPlan()
-			.then((p) => !stale && (aiPlanner = p.aiPlanner))
-			.catch(() => {});
-		return () => {
-			stale = true;
-		};
-	});
-	let plannerOpen = $state(false);
-	function openPlanner() {
-		if (aiPlanner?.included) plannerOpen = true;
-		else upgradeSheet.showFor('AI planning is part of Pro: it picks the best time, suggests things to do and drafts the plan.');
-	}
 
 	// Mount one layout's pieces, not both. Until hydrated, both render and CSS picks.
 	const isDesktop = layoutQuery(DESKTOP);
@@ -399,23 +285,6 @@
 	const phoneWidth = $derived(narrow.matches === true);
 	const phone = $derived(isDesktop.matches !== true);
 
-	// Times shortlisted for a date poll ("Ask the group"): 2–5 of them.
-	const POLL_MAX = 5;
-	let shortlist = $state<Slot[]>([]);
-	let askOpen = $state(false);
-	const sameSlot = (a: Slot, b: Slot) => a.start === b.start && a.end === b.end;
-	const isPicked = (slot: Slot) => shortlist.some((s) => sameSlot(s, slot));
-	function togglePick(slot: Slot) {
-		if (isPicked(slot)) shortlist = shortlist.filter((s) => !sameSlot(s, slot));
-		else if (shortlist.length >= POLL_MAX) toasts.info(`A poll can have up to ${POLL_MAX} times.`);
-		else shortlist = [...shortlist, slot];
-	}
-	// A new group starts with an empty shortlist.
-	$effect(() => {
-		void group.id;
-		untrack(() => (shortlist = []));
-	});
-
 	function selectSlot(slot: Slot) {
 		select(fmt.current.dayKey(slot.start));
 		view = 'month';
@@ -424,23 +293,11 @@
 
 <svelte:head><title>{group.name} · Availabliss</title></svelte:head>
 
-<div class="page" class:with-bar={shortlist.length > 0}>
+<div class="page" class:with-bar={shortlist.slots.length > 0}>
 	<div class="main">
 
 		{#if desk}
-		<!-- Desktop header (Web.dc) -->
-		<header class="desk-head">
-			<div class="titles">
-				<Breadcrumbs items={[{ label: 'Groups', href: '/app' }, { label: group.name }]} />
-				<h1>{group.name}</h1>
-				<span class="sub">
-					{lengthLabel(group.requirement)} · {detailLabel(group.requirement)} ·
-					<a href="{base}/timing">{isAdmin ? 'Edit timing' : 'See timing'}</a> ·
-					<a href="{base}/members">{group.members.length} members</a>
-				</span>
-			</div>
-			<SegmentedControl options={VIEWS} bind:value={view} label="Calendar view" />
-		</header>
+		<GroupHeader {group} {isAdmin} bind:view />
 		{/if}
 
 		{#if phone}
@@ -457,84 +314,42 @@
 		{/if}
 
 		<section class="cal" aria-labelledby="cal-heading">
-			<div class="cal-head">
-				<h2 id="cal-heading"><span class="desk-inline">{heading}</span><span class="phone-inline">{shortHeading}</span></h2>
-				{#if loadingMonth}<Spinner size={16} label="Loading month" />{/if}
-				{#if desk}<span class="desk-only"><SyncBanner groupId={group.id} members={group.members} canNudge={isAdmin} variant="pill" /></span>{/if}
-				<span class="nav desk-flex">
-					<IconButton icon="chevron-left" label="Previous {view}" variant="surface" shape="rounded" size={40} onclick={() => step(-1)} />
-					<IconButton icon="chevron-right" label="Next {view}" variant="surface" shape="rounded" size={40} onclick={() => step(1)} />
-					{#if awayFromToday}<button type="button" class="today-btn" onclick={jumpToToday}>Today</button>{/if}
-				</span>
-				<span class="nav phone-flex">
-					<IconButton icon="chevron-left" label="Previous {view}" variant="plain" shape="rounded" size={36} onclick={() => step(-1)} />
-					<IconButton icon="chevron-right" label="Next {view}" variant="plain" shape="rounded" size={36} onclick={() => step(1)} />
-					{#if awayFromToday}<button type="button" class="today-btn" onclick={jumpToToday}>Today</button>{/if}
-				</span>
-				<span class="phone-only">
-					<SegmentedControl options={VIEWS} bind:value={view} label="Calendar view" size="sm" />
-				</span>
-			</div>
-
-			<!-- "‹ Fri 25 Dec · Free dates · Fri 5 Feb ›": skips months or weeks where nothing works. -->
-			<div class="free-jumps">
-				<button
-					type="button"
-					class="free-jump"
-					disabled={!previousFree}
-					onclick={() => previousFree && jumpTo(previousFree)}
-					aria-label={previousFree ? `Previous free date, ${formatDayKey(previousFree)}` : findingFree ? 'Previous free date, looking' : 'No earlier free dates'}
-				>
-					<Icon name="chevron-left" size={13} />
-					{previousFree ? formatDayKey(previousFree) : findingFree ? 'Earlier' : 'None earlier'}
-				</button>
-				<span class="free-label" aria-hidden="true">Free dates</span>
-				<button
-					type="button"
-					class="free-jump"
-					disabled={!nextFree}
-					onclick={() => nextFree && jumpTo(nextFree)}
-					aria-label={nextFree ? `Next free date, ${formatDayKey(nextFree)}` : findingFree ? 'Next free date, looking' : 'No later free dates'}
-				>
-					{nextFree ? formatDayKey(nextFree) : findingFree ? 'Later' : 'None later'}
-					<Icon name="chevron-right" size={13} />
-				</button>
-			</div>
+			<CalendarHeading
+				bind:view
+				{heading}
+				{shortHeading}
+				{loadingMonth}
+				{desk}
+				{group}
+				{isAdmin}
+				{awayFromToday}
+				{previousFree}
+				{nextFree}
+				{findingFree}
+				onstep={step}
+				ontoday={jumpToToday}
+				onjump={jumpTo}
+			/>
 
 			<CoverageNote gaps={availability.checkedUntil ?? []} {members} meId={data.user.id} />
 
-			<div
-				class="cal-body"
-				role="group"
-				aria-label="Calendar"
-				class:boxed={view === 'week' && !(!desk && phoneWidth)}
-				class:dragging={dragX !== 0}
-				style:transform={dragX ? `translateX(${dragX}px)` : undefined}
-				ontouchstart={touchStart}
-				ontouchmove={touchMove}
-				ontouchend={touchEnd}
-				ontouchcancel={() => ((touch = null), (dragX = 0))}
-			>
-			{#key pageKey}
-			<div class="page" in:pageIn>
-			{#if view === 'month'}
-				{#if phone}
-					<span class="phone-only">
-						<MonthGrid {availability} {month} {members} {selected} onselect={select} compact />
-					</span>
+			<CalendarPager {pageKey} boxed={view === 'week' && !(!desk && phoneWidth)} onstep={step}>
+				{#if view === 'month'}
+					{#if phone}
+						<span class="phone-only">
+							<MonthGrid {availability} {month} {members} {selected} onselect={select} compact />
+						</span>
+					{/if}
+					{#if desk}
+						<span class="desk-only">
+							<MonthGrid {availability} {month} {members} {selected} onselect={select} />
+						</span>
+					{/if}
+				{:else}
+					<!-- Phones get a card per day; the time grid needs a wider screen. -->
+					<WeekGrid dates={week} days={weekDays} {members} {selected} onselect={select} cards={!desk && phoneWidth} {works} />
 				{/if}
-				{#if desk}
-					<span class="desk-only">
-						<MonthGrid {availability} {month} {members} {selected} onselect={select} />
-					</span>
-				{/if}
-			{:else}
-				<!-- Phones get a card per day; the time grid needs a wider screen. -->
-				<WeekGrid dates={week} days={weekDays} {members} {selected} onselect={select} cards={!desk && phoneWidth} {works} />
-			{/if}
-			</div>
-			{/key}
-			</div>
+			</CalendarPager>
 		</section>
 
 		<DayDetailCard
@@ -547,8 +362,8 @@
 			{noun}
 			onpropose={propose}
 			onproposeday={(day) => propose({ day })}
-			shortlisted={selectedSlot ? isPicked(selectedSlot) : false}
-			onshortlist={togglePick}
+			shortlisted={selectedSlot ? shortlist.has(selectedSlot) : false}
+			onshortlist={shortlist.toggle}
 		/>
 	</div>
 
@@ -562,9 +377,9 @@
 			pendingCount={availability.pendingMemberIds.length}
 			onpropose={propose}
 			onselect={selectSlot}
-			onplan={aiPlanner?.available ? openPlanner : undefined}
-			picked={isPicked}
-			onpick={togglePick}
+			onplan={sheets.aiPlanner?.available ? sheets.openPlanner : undefined}
+			picked={shortlist.has}
+			onpick={shortlist.toggle}
 		/>
 		<!-- Only mounted on desktop: it loads and subscribes to the chat. Phones open the chat from the header. -->
 		{#if isDesktop.matches}
@@ -575,26 +390,8 @@
 	</aside>
 </div>
 
-{#if shortlist.length}
-	<div class="shortlist glass" role="region" aria-label="Shortlist" transition:fly={{ y: prefersReducedMotion.current ? 0 : 24, duration: 200 }}>
-		<span class="picked" aria-live="polite">
-			<strong>{shortlist.length} picked</strong>
-			<span>{shortlist.length < 2 ? 'Pick another time' : 'Let the group vote'}</span>
-		</span>
-		<button type="button" class="clear" onclick={() => (shortlist = [])}>Clear</button>
-		<Button variant="accent" size="sm" icon="poll" disabled={shortlist.length < 2} onclick={() => (askOpen = true)}>Ask the group</Button>
-	</div>
-{/if}
-
-<ProposeSheet bind:open={proposeOpen} {group} meId={data.user.id} initial={proposeInitial} />
-<DatePollSheet
-	bind:open={askOpen}
-	groupId={group.id}
-	slots={shortlist}
-	onremove={(slot) => (shortlist = shortlist.filter((s) => !sameSlot(s, slot)))}
-	onposted={() => (shortlist = [])}
-/>
-<PlannerSheet bind:open={plannerOpen} groupId={group.id} onpropose={({ slot, title, note }) => propose({ ...slot, title, note })} />
+<ShortlistBar {shortlist} groupId={group.id} />
+<GroupSheets {sheets} {group} meId={data.user.id} />
 
 <style>
 	.page {
@@ -621,35 +418,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-	}
-
-	.desk-head {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
-	.desk-head {
-		display: none;
-		align-items: flex-end;
-		gap: 14px;
-		flex-wrap: wrap;
-	}
-	.titles {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-	}
-	h1 {
-		font-size: 22px;
-		font-weight: 700;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.sub {
-		font-size: 12px;
-		color: var(--muted);
 	}
 
 	.timing {
@@ -682,66 +450,11 @@
 		flex-direction: column;
 		gap: 10px;
 	}
-	.cal-body {
-		transition: transform 0.25s ease;
-		touch-action: pan-y;
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-	}
+	/* Also matched the calendar's inner page before it moved into CalendarPager; kept as it was. */
 	.page {
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
-	}
-	.cal-body.dragging {
-		transition: none;
-	}
-	.cal-body.boxed {
-		background: var(--glass);
-		-webkit-backdrop-filter: var(--blur);
-		backdrop-filter: var(--blur);
-		border: 1px solid var(--glass-border);
-		box-shadow: var(--glass-shadow);
-		border-radius: 22px;
-		padding: 12px;
-	}
-	.cal-head {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		flex-wrap: wrap;
-	}
-	h2 {
-		flex: 1;
-		font-size: 19px;
-		font-weight: 650;
-		white-space: nowrap;
-	}
-	.cal-head {
-		flex-wrap: nowrap;
-	}
-	.cal-head h2 {
-		flex: 0 1 auto;
-	}
-	.cal-head > .phone-only:last-child {
-		margin-left: auto;
-	}
-	.desk-inline,
-	.nav.desk-flex {
-		display: none;
-	}
-	.cal-head > .phone-only:last-child {
-		flex: none;
-	}
-	.nav.phone-flex {
-		display: flex;
-		gap: 0;
-		margin-left: -4px;
-	}
-	.nav {
-		display: flex;
-		gap: 6px;
 	}
 	.desk-only {
 		display: none;
@@ -765,40 +478,8 @@
 		.desk-only {
 			display: block;
 		}
-		.desk-inline {
-			display: inline;
-		}
-		.phone-inline,
-		.nav.phone-flex {
-			display: none;
-		}
-		.nav.desk-flex {
-			display: flex;
-		}
-		.desk-head {
-			display: flex;
-		}
-		h1 {
-			font-size: 34px;
-			font-weight: 750;
-			line-height: 1.05;
-			white-space: normal;
-		}
-		.desk-head .sub {
-			font-size: 14px;
-			margin-top: 4px;
-		}
 		.main {
 			gap: 14px;
-		}
-		.cal-body.boxed {
-			background: none;
-			-webkit-backdrop-filter: none;
-			backdrop-filter: none;
-			border: 0;
-			box-shadow: none;
-			border-radius: 0;
-			padding: 0;
 		}
 		.cal {
 			background: var(--glass);
@@ -810,116 +491,13 @@
 			padding: 18px;
 			gap: 12px;
 		}
-		.cal-head h2 {
-			flex: 1;
-			font-size: 20px;
-		}
 		.aside {
 			max-width: 380px;
 			position: sticky;
 			top: 20px;
 		}
 	}
-	/* "Today": back to today's month or week. */
-	.today-btn {
-		align-self: center;
-		padding: 5px 11px;
-		border: 0;
-		border-radius: 999px;
-		background: var(--accent-soft);
-		color: var(--accent-ink);
-		font: inherit;
-		font-size: 13px;
-		font-weight: 650;
-		cursor: pointer;
-	}
-	.today-btn:hover {
-		filter: brightness(0.97);
-	}
-	/* "‹ Fri 25 Dec · Free dates · Fri 5 Feb ›": greyed out when there's none that way. */
-	.free-jumps {
-		display: grid;
-		grid-template-columns: 1fr auto 1fr;
-		align-items: center;
-		gap: 8px;
-	}
-	.free-jump {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		min-height: 30px;
-		padding: 4px 10px;
-		border: 0;
-		border-radius: 999px;
-		background: var(--accent-soft);
-		color: var(--accent-ink);
-		font: inherit;
-		font-size: 13px;
-		font-weight: 650;
-		white-space: nowrap;
-		cursor: pointer;
-	}
-	.free-jump:first-child {
-		justify-self: start;
-	}
-	.free-jump:last-child {
-		justify-self: end;
-	}
-	.free-jump:hover:not(:disabled) {
-		filter: brightness(0.97);
-	}
-	.free-jump:disabled {
-		background: var(--line);
-		color: var(--muted);
-		opacity: 0.7;
-		cursor: default;
-	}
 	.with-bar {
 		padding-bottom: 76px;
-	}
-	/* "3 picked · Ask the group": floats above the tab bar while times are shortlisted. */
-	.shortlist {
-		position: fixed;
-		left: 50%;
-		transform: translateX(-50%);
-		bottom: calc(var(--tabbar-space) + env(safe-area-inset-bottom));
-		z-index: 40;
-		width: min(calc(100vw - 32px), 440px);
-		border-radius: 22px;
-		padding: 8px 8px 8px 16px;
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
-	.picked {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-	}
-	.picked strong {
-		font-size: 15px;
-		font-weight: 650;
-	}
-	.picked span {
-		font-size: 12px;
-		color: var(--muted);
-	}
-	.clear {
-		min-height: 44px;
-		padding: 0 6px;
-		font-size: 13px;
-		font-weight: 600;
-		color: var(--accent-ink);
-	}
-	@media (min-width: 900px) {
-		.shortlist {
-			bottom: 24px;
-		}
-	}
-	.free-label {
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--muted);
 	}
 </style>
