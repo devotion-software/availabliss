@@ -15,3 +15,8 @@ android
 docs
 *.log
 .DS_Store
+# Signing keys (Sign in with Apple, APNs) and local-only files
+**/*.p8
+web/.uploads
+web/.tmp-*
+web/.demo.json
