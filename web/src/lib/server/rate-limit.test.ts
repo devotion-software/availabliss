@@ -38,6 +38,7 @@ describe('matchRule', () => {
 			availability: ['GET', '/api/v1/groups/g/availability'],
 			preview: ['POST', '/api/v1/requirements/preview'],
 			'ai-planner': ['POST', '/api/v1/groups/g/planner'],
+			'ai-draft': ['POST', '/api/v1/groups/g/planner/draft'],
 			'username-check': ['GET', '/api/v1/usernames/sam'],
 			'region-detect': ['GET', '/api/v1/regions/detect']
 		};
