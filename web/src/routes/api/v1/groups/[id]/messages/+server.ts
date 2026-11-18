@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { authed, body, json, query } from '#lib/server/http';
-import { listMessages, sendPoll, sendText } from '#lib/server/chat';
+import { listMessages, sendLocation, sendPoll, sendText } from '#lib/server/chat';
 import { createMessageSchema } from '#lib/schemas';
 
 const pageQuery = z.object({
@@ -18,6 +18,8 @@ export const POST = authed<{ id: string }>(async ({ event, params, userId }) => 
 	const message =
 		'poll' in input
 			? await sendPoll(params.id, userId, input.poll)
-			: await sendText(params.id, userId, input.body, input.replyToId ?? null, 'attachmentIds' in input ? input.attachmentIds : []);
+			: 'location' in input
+				? await sendLocation(params.id, userId, input.location, input.replyToId ?? null)
+				: await sendText(params.id, userId, input.body, input.replyToId ?? null, 'attachmentIds' in input ? input.attachmentIds : []);
 	return json(message, { status: 201 });
 });

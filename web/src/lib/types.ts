@@ -311,6 +311,19 @@ export interface Message {
 	 * for older apps; `caption` is just the caption, or null. Null for messages without attachments.
 	 */
 	caption: string | null;
+	/** A place shared in the chat (a one-off pin). `body` is then a fallback for older apps; null once deleted. */
+	location: MessageLocation | null;
+}
+
+/** A place shared in a chat message: where it is and, if it's a named place, what it's called. */
+export interface MessageLocation {
+	lat: number;
+	lng: number;
+	/** A place's name ("Dishoom Shoreditch"), or null for "my location". */
+	name: string | null;
+	address: string | null;
+	/** How precise a device's position was, in metres; null for a searched place. */
+	accuracy: number | null;
 }
 
 export const ATTACHMENT_KINDS = ['image', 'gif', 'file', 'pass'] as const;

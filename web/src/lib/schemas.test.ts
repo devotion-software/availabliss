@@ -178,6 +178,20 @@ describe('other schemas', () => {
 		expect(ok(createMessageSchema, { attachmentIds: Array(11).fill('a') })).toBe(false);
 	});
 
+	test('locations need coordinates in range; name, address and accuracy are optional', () => {
+		expect(createMessageSchema.parse({ location: { lat: 51.5, lng: -0.12 } })).toEqual({
+			location: { lat: 51.5, lng: -0.12, name: null, address: null, accuracy: null }
+		});
+		expect(createMessageSchema.parse({ location: { lat: 0, lng: 0, name: ' Pub ', address: '', accuracy: 12 }, replyToId: 'm1' })).toEqual({
+			location: { lat: 0, lng: 0, name: 'Pub', address: null, accuracy: 12 },
+			replyToId: 'm1'
+		});
+		expect(ok(createMessageSchema, { location: { lat: 91, lng: 0 } })).toBe(false);
+		expect(ok(createMessageSchema, { location: { lat: 0, lng: -180.5 } })).toBe(false);
+		expect(ok(createMessageSchema, { location: { lat: '51', lng: 0 } })).toBe(false);
+		expect(ok(createMessageSchema, { location: { lat: 0, lng: 0, accuracy: -1 } })).toBe(false);
+	});
+
 	test('templates need a name and a valid requirement', () => {
 		expect(ok(createTemplateSchema, { name: 'Weekend', requirement: requirement() })).toBe(true);
 		expect(ok(createTemplateSchema, { name: 'x'.repeat(61), requirement: requirement() })).toBe(false);

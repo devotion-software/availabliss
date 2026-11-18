@@ -238,6 +238,17 @@ export const createMessageSchema = z.union([
 		replyToId: z.string().min(1).max(36).nullish()
 	}),
 	z.object({ body: trimmed(4000), replyToId: z.string().min(1).max(36).nullish() }),
+	// A place: the sender's current location or one they searched for.
+	z.object({
+		location: z.object({
+			lat: z.number().finite().min(-90).max(90),
+			lng: z.number().finite().min(-180).max(180),
+			name: optionalText(200),
+			address: optionalText(300),
+			accuracy: z.number().finite().min(0).max(100_000).nullish().transform((v) => v ?? null)
+		}),
+		replyToId: z.string().min(1).max(36).nullish()
+	}),
 	z.object({
 		poll: z.object({
 			question: trimmed(200),

@@ -115,7 +115,8 @@ export class ChatThread {
 			receipt: { delivered: 0, seen: 0, recipients: this.#recipients, seenBy: [] },
 			replyTo: replying ? replyPreview(replying) : null,
 			attachments: [],
-			caption: null
+			caption: null,
+			location: null
 		};
 		this.messages = [...this.messages, temp];
 		try {

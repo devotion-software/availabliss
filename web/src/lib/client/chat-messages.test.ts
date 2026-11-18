@@ -19,6 +19,7 @@ const msg = (over: Partial<Message> = {}): Message => ({
 	replyTo: null,
 	attachments: [],
 	caption: null,
+	location: null,
 	...over
 });
 

@@ -1,6 +1,6 @@
 /** Group chat: messages, polls and per-recipient delivery / read receipts. */
 import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
-import type { Attachment, Message, MessageInfo, MessageKind, MessageReply, MessageThread, Poll } from '#lib/types';
+import type { Attachment, Message, MessageInfo, MessageKind, MessageLocation, MessageReply, MessageThread, Poll } from '#lib/types';
 import { db } from './db';
 import { groups, messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
 import { badRequest, conflict, forbidden, notFound } from './http';
@@ -191,6 +191,22 @@ export async function messageInfo(messageId: string, userId: string): Promise<Me
 	};
 }
 
+// ─── Locations ────────────────────────────────────────────────────────────
+
+/** Coordinates as sent in links: 6 decimal places is about 10 cm. */
+const coord = (n: number) => String(Number(n.toFixed(6)));
+
+/** One line for reply quotes and notifications: "📍 Dishoom Shoreditch" or "📍 Location". */
+export const locationSummary = (location: Pick<MessageLocation, 'name'>) => `📍 ${location.name || 'Location'}`;
+
+/** What apps that don't know `location` show as the text: the summary, the address and a maps link. */
+export function locationFallback(location: MessageLocation): string {
+	const query = `${coord(location.lat)},${coord(location.lng)}`;
+	return [locationSummary(location), location.address, `https://www.google.com/maps/search/?api=1&query=${query}`]
+		.filter(Boolean)
+		.join('\n');
+}
+
 // ─── Replies ──────────────────────────────────────────────────────────────
 
 /** Quoted text is one line in the clients; a little more than fits is plenty. */
@@ -211,6 +227,7 @@ async function loadReplies(ids: string[]): Promise<Map<string, MessageReply>> {
 			kind: messages.kind,
 			body: messages.body,
 			deletedAt: messages.deletedAt,
+			location: messages.location,
 			question: polls.question,
 			name: user.name,
 			email: user.email
@@ -223,7 +240,13 @@ async function loadReplies(ids: string[]): Promise<Map<string, MessageReply>> {
 	const attachments = await attachmentsFor(rows.filter((r) => !r.deletedAt && r.kind === 'text' && !r.body).map((r) => r.id));
 	for (const r of rows) {
 		const deleted = r.deletedAt !== null;
-		const text = deleted ? null : r.kind === 'poll' ? r.question : r.body || attachmentSummary(attachments.get(r.id) ?? []);
+		const text = deleted
+			? null
+			: r.kind === 'poll'
+				? r.question
+				: r.location
+					? locationSummary(r.location)
+					: r.body || attachmentSummary(attachments.get(r.id) ?? []);
 		result.set(r.id, {
 			id: r.id,
 			authorId: r.authorId,
@@ -249,13 +272,15 @@ async function toMessages(rows: MessageRow[], viewerId: string, groupSize: numbe
 	return rows.map((r) => {
 		const receipt = receipts.get(r.id);
 		const files = attachments.get(r.id) ?? [];
+		const location = r.deletedAt ? null : r.location;
 		return {
 			id: r.id,
 			groupId: r.groupId,
 			authorId: r.authorId,
 			kind: r.kind,
 			// Older apps only know `body`: without a caption they get a summary of the attachments.
-			body: r.deletedAt ? null : files.length ? r.body || attachmentSummary(files) : r.body,
+			// …and for a location, a summary with a maps link.
+			body: r.deletedAt ? null : location ? locationFallback(location) : files.length ? r.body || attachmentSummary(files) : r.body,
 			poll: r.pollId ? (pollMap.get(r.pollId) ?? null) : null,
 			proposalId: r.proposalId,
 			eventId: r.eventId,
@@ -265,7 +290,8 @@ async function toMessages(rows: MessageRow[], viewerId: string, groupSize: numbe
 			receipt: receipt ? { delivered: receipt.delivered, seen: receipt.seen, recipients: receipt.recipients, seenBy: receipt.seenBy } : null,
 			replyTo: r.replyToId ? (replies.get(r.replyToId) ?? null) : null,
 			attachments: files,
-			caption: files.length ? r.body || null : null
+			caption: files.length ? r.body || null : null,
+			location
 		};
 	});
 }
@@ -348,6 +374,7 @@ interface PostInput {
 	proposalId?: string | null;
 	eventId?: string | null;
 	replyToId?: string | null;
+	location?: MessageLocation | null;
 	/** Checked unsent uploads (see pendingUploads), attached in this order. */
 	attachments?: { id: string; kind: Attachment['kind']; name: string; pass?: Attachment['pass'] }[];
 }
@@ -381,7 +408,7 @@ export async function postMessage(groupId: string, authorId: string | null, inpu
 				kind: 'message',
 				groupId,
 				title: group?.name ?? 'New message',
-				body: pushPreview(`${displayName(author, 'Someone')}: ${poll ?? (input.body || attachmentSummary(uploads))}`),
+				body: pushPreview(`${displayName(author, 'Someone')}: ${poll ?? (input.location ? locationSummary(input.location) : input.body || attachmentSummary(uploads))}`),
 				data: { messageId: id },
 				record: 'per-group'
 			}
@@ -401,16 +428,31 @@ export async function sendText(
 	await requireMember(groupId, userId);
 	if (!body && !attachmentIds.length) throw badRequest('Write a message or attach something');
 	const attachments = await pendingUploads(groupId, userId, attachmentIds);
-	if (replyToId) {
-		const original = await db.query.messages.findFirst({
-			where: and(eq(messages.id, replyToId), eq(messages.groupId, groupId)),
-			columns: { kind: true, deletedAt: true }
-		});
-		if (!original) throw badRequest('The message being replied to is not in this chat');
-		if (original.kind === 'system') throw badRequest("Group updates can't be replied to");
-		if (original.deletedAt) throw conflict('That message was deleted');
-	}
+	await checkReplyTo(groupId, replyToId);
 	return postMessage(groupId, userId, { kind: 'text', body: body || null, replyToId, attachments });
+}
+
+/** A place: the sender's current location or one they searched for (a text message with `location`). */
+export async function sendLocation(
+	groupId: string,
+	userId: string,
+	location: MessageLocation,
+	replyToId: string | null = null
+): Promise<Message> {
+	await requireMember(groupId, userId);
+	await checkReplyTo(groupId, replyToId);
+	return postMessage(groupId, userId, { kind: 'text', location, replyToId });
+}
+
+async function checkReplyTo(groupId: string, replyToId: string | null) {
+	if (!replyToId) return;
+	const original = await db.query.messages.findFirst({
+		where: and(eq(messages.id, replyToId), eq(messages.groupId, groupId)),
+		columns: { kind: true, deletedAt: true }
+	});
+	if (!original) throw badRequest('The message being replied to is not in this chat');
+	if (original.kind === 'system') throw badRequest("Group updates can't be replied to");
+	if (original.deletedAt) throw conflict('That message was deleted');
 }
 
 /** The author's own text message, for editing or deleting. */
@@ -435,6 +477,7 @@ async function publishUpdated(messageId: string, userId: string): Promise<Messag
 
 export async function editMessage(messageId: string, userId: string, body: string): Promise<Message> {
 	const row = await ownText(messageId, userId);
+	if (row.location) throw badRequest("A location can't be edited");
 	const files = (await attachmentsFor([messageId])).get(messageId) ?? [];
 	if (!body && !files.length) throw badRequest('Write a message');
 	// An older app editing a photo shows its summary as the text; sent back unchanged, it isn't a caption.

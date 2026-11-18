@@ -23,6 +23,7 @@ import {
 	RESPONSE_KINDS,
 	ROLES,
 	type Requirement,
+	type MessageLocation,
 	type WalletPass,
 	type Weekday
 } from '../../types';
@@ -373,6 +374,8 @@ export const messages = mysqlTable(
 		eventId: varchar('event_id', { length: 36 }),
 		// The message this one replies to (same group). No foreign key: messages are only soft-deleted.
 		replyToId: varchar('reply_to_id', { length: 36 }),
+		// A shared place (a one-off pin, not live): kind 'text' with no body.
+		location: json('location').$type<MessageLocation>(),
 		// Monotonic per insert so pagination and "read up to" never tie.
 		seq: int('seq').autoincrement().notNull().unique(),
 		createdAt: createdAt(),

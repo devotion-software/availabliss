@@ -579,6 +579,16 @@ interface Message {
   replyTo: MessageReply | null;         // the message this one replies to (text messages only)
   attachments: Attachment[];            // photos, GIFs and files sent with it, in order ([] for most messages and once deleted)
   caption: string | null;               // with attachments: the caption, or null. Null for messages without attachments
+  location: MessageLocation | null;     // a place shared in the chat (kind 'text'); null otherwise and once deleted
+}
+// A shared place is a one-off pin (not live tracking). Its `body` is a fallback for older apps:
+// "📍 Dishoom Shoreditch" (or "📍 Location" without a name), the address if any, and a Google Maps link,
+// one per line. Apps that know `location` show a card instead. It can't be edited, only deleted.
+interface MessageLocation {
+  lat: number; lng: number;             // WGS 84 degrees
+  name: string | null;                  // a place's name; null for the sender's own position
+  address: string | null;
+  accuracy: number | null;              // metres, for a device's position; null for a searched place
 }
 // A text message can carry attachments with or without a caption. Its `body` is then the caption, or
 // (with none) a one-line summary for older apps: "📷 Photo", "GIF", "📷 3 photos", "📎 Plan.pdf",
@@ -617,7 +627,8 @@ interface MessageReply {                // the quoted message, as it is now
   authorId: string | null; authorName: string | null;
   kind: 'text' | 'poll' | 'proposal' | 'event' | 'system';
   text: string | null;                  // one line, at most 140 characters (…): the text, or a poll's question, or the
-                                        // attachment summary ("📷 Photo", "GIF", "📎 Plan.pdf") when sent without a caption; null once deleted
+                                        // attachment summary ("📷 Photo", "GIF", "📎 Plan.pdf") when sent without a caption, or
+                                        // "📍 Dishoom Shoreditch" / "📍 Location" for a place; null once deleted
   deleted: boolean;                     // deleted since: show "Deleted message"
 }
 interface Poll {
@@ -636,9 +647,9 @@ interface MessageInfo {
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/groups/:id/messages?before=<messageId>&limit=50` | | `{ messages: Message[]; hasMore: boolean }` (newest last) |
 | POST 🔒 | `/groups/:id/attachments` | `multipart/form-data` with one file in the field `file` | `201` `Attachment`, not yet in any message: send its id in `attachmentIds`. Photos (JPEG, PNG, WebP, GIF, HEIC where the server can read it; up to 15 MB) are turned upright, stripped of metadata (location included), shrunk to at most 2560 px and stored as JPEG (PNG if transparent), so `name`, `mime` and `size` can differ from what was sent; an animated GIF is kept as it is. Files (up to 25 MB) must be one of: pdf, txt, md, csv, rtf, ics, vcf, doc(x), xls(x), ppt(x), odt, ods, odp, pages, numbers, key, epub, zip, mp3, m4a, wav, mp4, mov, pkpass, pkpasses (by extension; a file sent as `application/vnd.apple.pkpass` without one gets `.pkpass`); anything else is `400`. A Wallet pass whose pass.json can be read comes back as `kind: 'pass'` with `pass` details (else as a plain `file`). Uploads not sent within a day are deleted |
-| POST 🔒 | `/groups/:id/messages` | `{ body, replyToId? }`, or `{ attachmentIds: string[] (1–10), body?: caption, replyToId? }`, or `{ poll: { question, options: string[], multi? } }` | `Message`. `replyToId` must be a message in the same chat (else `400`), not a group update (`400`) and not deleted (`409`). `attachmentIds` must be your own unsent uploads to this group (else `400`) |
+| POST 🔒 | `/groups/:id/messages` | `{ body, replyToId? }`, or `{ attachmentIds: string[] (1–10), body?: caption, replyToId? }`, or `{ location: { lat (−90…90), lng (−180…180), name?, address?, accuracy? (metres, ≥ 0) }, replyToId? }`, or `{ poll: { question, options: string[], multi? } }` | `Message`. `replyToId` must be a message in the same chat (else `400`), not a group update (`400`) and not deleted (`409`). `attachmentIds` must be your own unsent uploads to this group (else `400`) |
 | POST 🔒 | `/groups/:id/messages/receipts` | `{ upTo: messageId, state: 'delivered' \| 'seen' }` | `204` |
-| PATCH 🔒 | `/messages/:id` | `{ body }` | `Message` (the sender's own text messages only). With attachments `body` is the caption and may be `""` to remove it |
+| PATCH 🔒 | `/messages/:id` | `{ body }` | `Message` (the sender's own text messages only; a location can't be edited: `400`). With attachments `body` is the caption and may be `""` to remove it |
 | DELETE 🔒 | `/messages/:id` | | `204` (the sender's own text messages only; it stays in the chat as deleted, and its attachments are deleted for good) |
 | GET | `/attachments/:id?e=…&s=…`, `/attachments/:id/thumb?e=…&s=…` | | The file (or a photo's preview). These are the signed `url` / `thumbnailUrl` links from `Attachment`: no session needed, valid for 7–8 days and unchanged within a day (cacheable); refetch the message for fresh ones. Without a valid signature, only a signed-in member of the group gets it (else `404`). Photos, GIFs and Wallet passes are served `inline` (a pass as `application/vnd.apple.pkpass`, so Safari offers to add it to Wallet); files as a download (`Content-Disposition: attachment` with the name); add `&download=1` to download a photo. Not rate limited. Deleting the group deletes every attachment sent in it |
 | GET 🔒 | `/messages/:id/info` | | `MessageInfo` (any member of the group) |
@@ -700,7 +711,7 @@ interface Notification {
 | DELETE 🔒 | `/devices/:token` | | `204` |
 
 Chats (`kind: 'message'`) get **one Activity item per group**: each new message brings it to
-the top with `title` = the group's name, `body` = `"Sam: See you there"` (or `"Sam: 📷 Photo"` for a photo without a caption) and `data.count` = messages
+the top with `title` = the group's name, `body` = `"Sam: See you there"` (or `"Sam: 📷 Photo"` for a photo without a caption, `"Sam: 📍 Dishoom Shoreditch"` for a place) and `data.count` = messages
 since it was last read. It stays unread until the chat itself is read (a `seen` receipt), not
 when Activity is opened. Updates to an existing item (a new message, or it being read) arrive
 as `notification.created` with the **same id**: replace the item you have, and move it to the
