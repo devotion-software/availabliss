@@ -20,6 +20,16 @@ final class ChatViewModel {
     /// The message your next one replies to, shown above the composer.
     private(set) var replyingTo: Message?
 
+    /// The thread open in its sheet: the first message of a chain of replies and every reply under it, oldest first.
+    private(set) var thread: [Message] = []
+    private(set) var threadTruncated = false
+    private(set) var isLoadingThread = false
+    private(set) var isSendingInThread = false
+    var threadDraft = ""
+    var threadError: String?
+    /// The message picked to reply to in the thread; otherwise replies go to the latest one.
+    private var threadReplyTargetId: String?
+
     let groupId: String
     private let api: APIClient
     private var me: String?
@@ -112,6 +122,73 @@ final class ChatViewModel {
         replyingTo = nil
     }
 
+    // MARK: Threads
+
+    /// Loads the thread `messageId` is part of (it may reach back past what's loaded in the chat).
+    func openThread(for messageId: String) async {
+        thread = []
+        threadTruncated = false
+        threadReplyTargetId = nil
+        threadDraft = ""
+        isLoadingThread = true
+        defer { isLoadingThread = false }
+        do {
+            let result = try await api.send(API.Chat.thread(messageId: messageId))
+            thread = result.messages
+            threadTruncated = result.truncated
+        } catch where !error.isCancellation {
+            threadError = error.userMessage
+        } catch {}
+    }
+
+    func closeThread() {
+        thread = []
+        threadReplyTargetId = nil
+        threadDraft = ""
+    }
+
+    /// Who your reply in the thread goes to: the one you picked, else the latest from someone else
+    /// (so it isn't to yourself straight after you send), else the latest.
+    var threadReplyingTo: Message? {
+        if let id = threadReplyTargetId, let picked = thread.first(where: { $0.id == id }), picked.canReply { return picked }
+        return thread.last { $0.canReply && $0.authorId != me } ?? thread.last(where: \.canReply)
+    }
+
+    /// True once you've picked a message to reply to, rather than the latest.
+    var hasPickedThreadReply: Bool { threadReplyTargetId != nil && threadReplyingTo?.id == threadReplyTargetId }
+
+    func replyInThread(to message: Message?) {
+        threadReplyTargetId = message?.id
+    }
+
+    func sendInThread() async {
+        let text = threadDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !isSendingInThread, let target = threadReplyingTo else { return }
+        isSendingInThread = true
+        defer { isSendingInThread = false }
+        threadDraft = ""
+        do {
+            let message = try await api.send(API.Chat.send(groupId: groupId, SendMessageBody(body: text, replyToId: target.id)))
+            insert(message)
+            threadReplyTargetId = nil
+        } catch {
+            threadDraft = text
+            threadError = error.userMessage
+        }
+    }
+
+    /// Loads older pages until `id` is in the chat (or there's nothing older), so it can be shown there.
+    func loadUntil(_ id: String) async -> Bool {
+        var pages = 0
+        while !messages.contains(where: { $0.id == id }), hasMore, pages < 20 {
+            let before = messages.count
+            await loadOlder()
+            if messages.count == before { break }
+            pages += 1
+        }
+        return messages.contains { $0.id == id }
+    }
+
     func createPoll(question: String, options: [String], multi: Bool) async -> Bool {
         do {
             let message = try await api.send(API.Chat.send(groupId: groupId, SendMessageBody(poll: .init(question: question, options: options, multi: multi))))
@@ -186,11 +263,10 @@ final class ChatViewModel {
     func delete(_ message: Message) async {
         do {
             _ = try await api.send(API.Chat.delete(messageId: message.id))
-            if let index = messages.firstIndex(where: { $0.id == message.id }) {
-                messages[index].deleted = true
-                messages[index].body = nil
-                refreshQuotes(of: messages[index])
-            }
+            var deleted = message
+            deleted.deleted = true
+            deleted.body = nil
+            replaceKeepingReceipt(deleted)
             if editing?.id == message.id { cancelEditing() }
             if replyingTo?.id == message.id { cancelReplying() }
         } catch {
@@ -200,19 +276,24 @@ final class ChatViewModel {
 
     /// An edited or deleted message: everything but the receipt, which is per viewer.
     private func replaceKeepingReceipt(_ message: Message) {
-        refreshQuotes(of: message)
-        guard let index = messages.firstIndex(where: { $0.id == message.id }) else { return }
+        Self.replaceKeepingReceipt(message, in: &messages)
+        Self.replaceKeepingReceipt(message, in: &thread)
+    }
+
+    private static func replaceKeepingReceipt(_ message: Message, in list: inout [Message]) {
+        refreshQuotes(of: message, in: &list)
+        guard let index = list.firstIndex(where: { $0.id == message.id }) else { return }
         var updated = message
-        updated.receipt = messages[index].receipt
-        messages[index] = updated
+        updated.receipt = list[index].receipt
+        list[index] = updated
     }
 
     /// Quotes of a message aren't republished when it's edited or deleted, so update loaded replies here.
-    private func refreshQuotes(of message: Message) {
-        for index in messages.indices where messages[index].replyTo?.id == message.id {
-            let fresh = message.asReplyPreview(authorName: messages[index].replyTo?.authorName)
-            messages[index].replyTo?.text = fresh.text
-            messages[index].replyTo?.deleted = fresh.deleted
+    private static func refreshQuotes(of message: Message, in list: inout [Message]) {
+        for index in list.indices where list[index].replyTo?.id == message.id {
+            let fresh = message.asReplyPreview(authorName: list[index].replyTo?.authorName)
+            list[index].replyTo?.text = fresh.text
+            list[index].replyTo?.deleted = fresh.deleted
         }
     }
 
@@ -275,11 +356,17 @@ final class ChatViewModel {
         } else {
             messages.append(message)
         }
+        // A reply to something in the open thread joins it.
+        if let index = thread.firstIndex(where: { $0.id == message.id }) {
+            thread[index] = message
+        } else if let parent = message.replyTo?.id, thread.contains(where: { $0.id == parent }) {
+            thread.append(message)
+        }
     }
 
     private func update(poll: Poll) {
-        guard let index = messages.firstIndex(where: { $0.poll?.id == poll.id }) else { return }
-        messages[index].poll = poll
+        if let index = messages.firstIndex(where: { $0.poll?.id == poll.id }) { messages[index].poll = poll }
+        if let index = thread.firstIndex(where: { $0.poll?.id == poll.id }) { thread[index].poll = poll }
     }
 
     /// Loads the proposals and events that cards in `batch` refer to (`refreshing` refetches ones already loaded).

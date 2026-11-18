@@ -19,6 +19,8 @@ struct ChatView: View {
     @State private var viewportHeight: CGFloat = 0
     /// Messages from others that arrived while you were scrolled back, shown on the jump button.
     @State private var unseenCount = 0
+    /// A message to scroll to and flash ("Show in chat" from a thread).
+    @State private var showRequest: String?
 
     /// Scrolled back further than this, the jump-to-latest button shows.
     private static let jumpThreshold: CGFloat = 200
@@ -27,8 +29,11 @@ struct ChatView: View {
 
     enum ChatSheet: Identifiable {
         case poll, propose, event, info(Message)
+        /// The thread a message is part of (by the message's id).
+        case thread(String)
         var id: String {
             switch self {
+            case .thread(let id): "thread-\(id)"
             case .poll: "poll"
             case .propose: "propose"
             case .event: "event"
@@ -102,6 +107,7 @@ struct ChatView: View {
                             .onAppear { Task { await model.loadOlder() } }
                     }
                     if model.isLoading { StatusView(kind: .loading) }
+                    let repliedTo = Set(model.messages.compactMap(\.replyTo?.id))
                     ForEach(Array(model.messages.enumerated()), id: \.element.id) { index, message in
                         if index == 0 || !Calendar.current.isDate(model.messages[index - 1].createdAt, inSameDayAs: message.createdAt) {
                             Text(Formatting.chatDay(message.createdAt))
@@ -124,7 +130,8 @@ struct ChatView: View {
                             },
                             onDelete: { pendingDelete = message },
                             onReply: { reply(to: message) },
-                            openQuote: { id in showOriginal(id, proxy: proxy) }
+                            openQuote: { _ in openThread(message.id) },
+                            onOpenThread: message.replyTo != nil || repliedTo.contains(message.id) ? { openThread(message.id) } : nil
                         )
                         .modifier(SwipeToReply(isEnabled: message.canReply) { reply(to: message) })
                         .background {
@@ -159,6 +166,15 @@ struct ChatView: View {
                 newestChanged(from: oldId, to: newId, proxy: proxy)
             }
             .onChange(of: isScrolledBack) { _, back in if !back { unseenCount = 0 } }
+            .onChange(of: showRequest) { _, id in
+                guard let id else { return }
+                showRequest = nil
+                Task {
+                    // Lets the thread sheet get out of the way first.
+                    try? await Task.sleep(for: .seconds(0.35))
+                    if await model.loadUntil(id) { showOriginal(id, proxy: proxy) }
+                }
+            }
         }
     }
 
@@ -181,12 +197,17 @@ struct ChatView: View {
         }
     }
 
+    private func openThread(_ messageId: String) {
+        showsMenu = false
+        sheet = .thread(messageId)
+    }
+
     private func reply(to message: Message) {
         showsMenu = false
         model.startReplying(to: message)
     }
 
-    /// Scrolls to a quoted message (when it's loaded) and flashes it.
+    /// Scrolls to a message (when it's loaded) and flashes it.
     private func showOriginal(_ id: String, proxy: ScrollViewProxy) {
         guard model.messages.contains(where: { $0.id == id }) else { return }
         withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(id, anchor: .center) }
@@ -217,6 +238,11 @@ struct ChatView: View {
             EventEditorSheet(groupId: group.id, target: .new, api: detail.api) { _ in }
         case .info(let message):
             MessageInfoSheet(message: message, group: group, me: app.session.user?.id, model: model)
+        case .thread(let id):
+            ThreadSheet(focusId: id, group: group, me: me, model: model) { target in
+                self.sheet = nil
+                showRequest = target
+            }
         }
     }
 }
@@ -280,10 +306,12 @@ private struct EditingStrip: View {
 }
 
 /// Above the composer while you reply: "Replying to Ana", one line of what they said, and ✕ to cancel.
-private struct ReplyingStrip: View {
+struct ReplyingStrip: View {
     let name: String
     let snippet: String
-    let cancel: () -> Void
+    var cancelLabel = "Cancel reply"
+    /// Nil hides ✕.
+    let cancel: (() -> Void)?
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -304,15 +332,19 @@ private struct ReplyingStrip: View {
             }
             .accessibilityElement(children: .combine)
             Spacer(minLength: 0)
-            Button(action: cancel) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(theme.muted)
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
+            if let cancel {
+                Button(action: cancel) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(theme.muted)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(cancelLabel)
+            } else {
+                Color.clear.frame(width: 10, height: 36)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Cancel reply")
         }
         .padding(.vertical, 6)
         .padding(.leading, 14)
@@ -354,7 +386,7 @@ private struct ComposerMenu: View {
 }
 
 /// Glass composer: + menu toggle, text field, send.
-private struct Composer: View {
+struct Composer: View {
     @Binding var text: String
     @Binding var isMenuOpen: Bool
     let isSending: Bool
@@ -362,31 +394,37 @@ private struct Composer: View {
     let editingId: String?
     /// The message being replied to: the field takes focus.
     var replyingId: String?
+    /// Off in a thread, where there's only text.
+    var showsMenu = true
+    var placeholder = "Message the group"
     let send: () -> Void
     @Environment(\.theme) private var theme
     @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
-            Button {
-                isMenuOpen.toggle()
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .bold))
-                    .rotationEffect(.degrees(isMenuOpen ? 45 : 0))
-                    .foregroundStyle(isMenuOpen ? theme.onSolid : theme.ink)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(isMenuOpen ? theme.solid : theme.surface))
+            if showsMenu {
+                Button {
+                    isMenuOpen.toggle()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .bold))
+                        .rotationEffect(.degrees(isMenuOpen ? 45 : 0))
+                        .foregroundStyle(isMenuOpen ? theme.onSolid : theme.ink)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(isMenuOpen ? theme.solid : theme.surface))
+                }
+                .buttonStyle(.pressable)
+                .accessibilityLabel("Add poll, proposal or event")
+                .accessibilityValue(isMenuOpen ? "Expanded" : "Collapsed")
             }
-            .buttonStyle(.pressable)
-            .accessibilityLabel("Add poll, proposal or event")
-            .accessibilityValue(isMenuOpen ? "Expanded" : "Collapsed")
 
-            TextField("", text: $text, prompt: Text("Message the group").foregroundStyle(theme.muted), axis: .vertical)
+            TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(theme.muted), axis: .vertical)
                 .lineLimit(1...5)
                 .bodyFont(15)
                 .foregroundStyle(theme.ink)
                 .frame(minHeight: 44)
+                .padding(.leading, showsMenu ? 0 : 12)
                 .submitLabel(editingId == nil ? .send : .done)
                 .onSubmit(send)
                 .focused($isFocused)

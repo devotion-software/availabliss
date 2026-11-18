@@ -11,13 +11,21 @@ struct MessageRow: View {
     var startsRun = true
     let openInfo: () -> Void
     let openProposal: (String) -> Void
-    /// Your own text messages: edit it in the composer / ask to delete it.
-    var onEdit: () -> Void = {}
-    var onDelete: () -> Void = {}
+    /// Your own text messages: edit it in the composer / ask to delete it (nil hides them).
+    var onEdit: (() -> Void)?
+    var onDelete: (() -> Void)?
     /// Start a reply to this message in the composer.
     var onReply: () -> Void = {}
-    /// Tapped the quote above a reply: go to the original (by id).
+    /// Tapped the quote above a reply (by the original's id).
     var openQuote: (String) -> Void = { _ in }
+    /// Open the thread this message is part of (nil hides "View thread").
+    var onOpenThread: (() -> Void)?
+    /// In a thread: go to this message in the chat.
+    var onShowInChat: (() -> Void)?
+    /// Whether the menu has "Info" (tapping the bubble runs `openInfo` either way).
+    var showsInfo = true
+    var tapHint = "Shows message info"
+    var quoteHint = "Shows the thread"
     @Environment(\.theme) private var theme
 
     private var isMine: Bool { message.authorId != nil && message.authorId == me }
@@ -25,6 +33,18 @@ struct MessageRow: View {
 
     private var quote: MessageQuote? {
         message.replyTo.map { MessageQuote(preview: $0, name: ReplyNames.name(of: $0.authorId, fallback: $0.authorName, group: group, me: me)) }
+    }
+
+    /// The long-press menu on texts and polls.
+    @ViewBuilder private var menu: some View {
+        Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
+        if let onOpenThread { Button(action: onOpenThread) { Label("View thread", systemImage: "bubble.left.and.bubble.right") } }
+        if let onShowInChat { Button(action: onShowInChat) { Label("Show in chat", systemImage: "text.bubble") } }
+        if showsInfo, message.kind == .text { Button(action: openInfo) { Label("Info", systemImage: "info.circle") } }
+        if isMine, message.kind == .text {
+            if let onEdit { Button(action: onEdit) { Label("Edit", systemImage: "pencil") } }
+            if let onDelete { Button(role: .destructive, action: onDelete) { Label("Delete", systemImage: "trash") } }
+        }
     }
 
     var body: some View {
@@ -51,19 +71,13 @@ struct MessageRow: View {
                 }
             } else if isMine {
                 VStack(alignment: .trailing, spacing: 4) {
-                    MessageBubble(text: message.body ?? "", isMine: true, quote: quote, openQuote: openQuote)
+                    MessageBubble(text: message.body ?? "", isMine: true, quote: quote, quoteHint: quoteHint, openQuote: openQuote)
                         .onTapGesture(perform: openInfo)
-                        .contextMenu {
-                            Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
-                            Button(action: openInfo) { Label("Info", systemImage: "info.circle") }
-                            Button(action: onEdit) { Label("Edit", systemImage: "pencil") }
-                            Button(role: .destructive, action: onDelete) { Label("Delete", systemImage: "trash") }
-                        }
+                        .contextMenu { menu }
                         .accessibilityAddTraits(.isButton)
-                        .accessibilityHint("Shows message info")
+                        .accessibilityHint(tapHint)
                         .accessibilityAction(named: "Reply", onReply)
-                        .accessibilityAction(named: "Edit", onEdit)
-                        .accessibilityAction(named: "Delete", onDelete)
+                        .accessibilityActions { extraActions }
                     if message.isEdited { EditedLabel() }
                     if isLatestOwn, let receipt = message.receipt {
                         ReadReceipt(receipt: receipt, group: group, action: openInfo)
@@ -73,27 +87,24 @@ struct MessageRow: View {
             } else {
                 IncomingRow(author: author, showsName: startsRun) {
                     VStack(alignment: .leading, spacing: 4) {
-                        MessageBubble(text: message.body ?? "", isMine: false, quote: quote, openQuote: openQuote)
+                        MessageBubble(text: message.body ?? "", isMine: false, quote: quote, quoteHint: quoteHint, openQuote: openQuote)
                             .onTapGesture(perform: openInfo)
-                            .contextMenu {
-                                Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
-                                Button(action: openInfo) { Label("Info", systemImage: "info.circle") }
-                            }
+                            .contextMenu { menu }
                         if message.isEdited { EditedLabel() }
                     }
                 }
                 .accessibilityAddTraits(.isButton)
-                .accessibilityHint("Shows message info")
+                .accessibilityHint(tapHint)
                 .accessibilityAction(named: "Reply", onReply)
+                .accessibilityActions { extraActions }
             }
         case .poll:
             if let poll = message.poll {
                 VStack(alignment: .trailing, spacing: 4) {
                     PollCard(poll: poll, me: me, title: isMine ? "Your poll" : "Poll by \(author?.firstName ?? "Someone")", canClose: isMine, model: model)
-                        .contextMenu {
-                            Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
-                        }
+                        .contextMenu { menu }
                         .accessibilityAction(named: "Reply", onReply)
+                        .accessibilityActions { extraActions }
                     if isMine, isLatestOwn, let receipt = message.receipt {
                         ReadReceipt(receipt: receipt, group: group, action: openInfo)
                     }
@@ -117,6 +128,18 @@ struct MessageRow: View {
             } else if let body = message.body {
                 Text(body).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
             }
+        }
+    }
+}
+
+extension MessageRow {
+    /// VoiceOver actions beyond Reply, matching the menu.
+    @ViewBuilder fileprivate var extraActions: some View {
+        if let onOpenThread { Button("View thread", action: onOpenThread) }
+        if let onShowInChat { Button("Show in chat", action: onShowInChat) }
+        if isMine, message.kind == .text {
+            if let onEdit { Button("Edit", action: onEdit) }
+            if let onDelete { Button("Delete", action: onDelete) }
         }
     }
 }
@@ -271,10 +294,11 @@ private struct QuoteStack: Layout {
     }
 }
 
-/// "Ana" over one line of what they said, with a bar down the side. Tapping it goes to the original.
+/// "Ana" over one line of what they said, with a bar down the side. Tapping it opens the thread.
 private struct QuoteBlock: View {
     let quote: MessageQuote
     let isMine: Bool
+    var hint = "Shows the thread"
     let open: (String) -> Void
     @Environment(\.theme) private var theme
 
@@ -306,7 +330,7 @@ private struct QuoteBlock: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Replying to \(quote.name): \(quote.preview.snippet)")
-        .accessibilityHint("Shows the original message")
+        .accessibilityHint(hint)
     }
 }
 
@@ -316,6 +340,7 @@ struct MessageBubble: View {
     let isMine: Bool
     /// The message this one replies to, quoted above the text.
     var quote: MessageQuote?
+    var quoteHint = "Shows the thread"
     var openQuote: (String) -> Void = { _ in }
     @Environment(\.theme) private var theme
 
@@ -329,7 +354,7 @@ struct MessageBubble: View {
         )
         QuoteStack(spacing: 6) {
             if let quote {
-                QuoteBlock(quote: quote, isMine: isMine, open: openQuote)
+                QuoteBlock(quote: quote, isMine: isMine, hint: quoteHint, open: openQuote)
                     .padding(.horizontal, -4)
                     .padding(.top, -2)
             }

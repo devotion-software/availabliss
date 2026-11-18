@@ -216,6 +216,7 @@ enum API {
             .init(.post, "/groups/\(groupId.pathEncoded)/messages/receipts", body: ReceiptBody(upTo: upTo, state: state))
         }
         static func info(messageId: String) -> Endpoint<MessageInfo> { .init(.get, "/messages/\(messageId.pathEncoded)/info") }
+        static func thread(messageId: String) -> Endpoint<MessageThread> { .init(.get, "/messages/\(messageId.pathEncoded)/thread") }
         static func edit(messageId: String, body: String) -> Endpoint<Message> {
             .init(.patch, "/messages/\(messageId.pathEncoded)", body: EditMessageBody(body: body))
         }

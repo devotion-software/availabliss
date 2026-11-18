@@ -101,6 +101,14 @@ struct MessagesPage: Decodable, Sendable {
     let hasMore: Bool
 }
 
+/// A message's thread: the first message of its chain of replies, then every reply under it, oldest first.
+struct MessageThread: Decodable, Sendable {
+    let rootId: String
+    let messages: [Message]
+    /// More replies than the server returns (the earliest are kept).
+    let truncated: Bool
+}
+
 struct SendMessageBody: Encodable, Sendable {
     struct NewPoll: Encodable, Sendable {
         let question: String
