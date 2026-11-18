@@ -87,6 +87,11 @@
 	});
 
 	const today = $derived(todayIn(timeZone));
+	/** Past days are read-only: new blocks start today or later; one being edited may keep its own (earlier) start. */
+	const earliest = $derived.by(() => {
+		const own = block ? dayKeyIn(block.start, timeZone) : today;
+		return own < today ? own : today;
+	});
 	// A repeat this app doesn't know yet (from a newer server) still shows, as "Repeats".
 	const choices = $derived.by(() => {
 		const list = repeatChoices(startDate || today);
@@ -107,6 +112,7 @@
 
 	function range(): { start: string; end: string; allDay: boolean } | string {
 		if (!startDate || !endDate) return 'Choose a date';
+		if (startDate < earliest) return 'That day has passed. Block time from today onwards.';
 		if (allDay) {
 			if (endDate < startDate) return 'The last day is before the first';
 			return { start: zonedToIso(startDate, '00:00', timeZone), end: zonedToIso(addDays(endDate, 1), '00:00', timeZone), allDay: true };
@@ -152,7 +158,7 @@
 
 <Sheet bind:open title={block ? 'Edit block' : 'Block a time'}>
 	<form class="form" onsubmit={submit} novalidate>
-		<DateRangeInput bind:startDate bind:startTime bind:endDate bind:endTime bind:allDay {today} />
+		<DateRangeInput bind:startDate bind:startTime bind:endDate bind:endTime bind:allDay {today} minDate={earliest} />
 
 		<div class="glass options">
 			<button type="button" class="row" aria-expanded={panel === 'repeat'} aria-controls="repeat-{uid}" onclick={() => togglePanel('repeat')}>
