@@ -20,9 +20,18 @@ function client(): ClientHttp2Session {
 	return session;
 }
 
+/** Kinds that change what the widgets show (your next plan, proposals waiting for you). */
+export const wakesApp = (kind: string | undefined) => !!kind && (kind.startsWith('proposal.') || kind.startsWith('event.') || kind === 'reminder');
+
 export async function sendApns(token: string, message: PushMessage): Promise<PushResult> {
 	const payload = JSON.stringify({
-		aps: { alert: { title: message.title, body: message.body }, sound: 'default', 'thread-id': message.data.groupId ?? undefined },
+		aps: {
+			alert: { title: message.title, body: message.body },
+			sound: 'default',
+			'thread-id': message.data.groupId ?? undefined,
+			// Plans changed: let the app wake briefly in the background to refresh its widgets.
+			...(wakesApp(message.data.kind) && { 'content-available': 1 })
+		},
 		...message.data
 	});
 	const authorization = `bearer ${await providerToken()}`;
