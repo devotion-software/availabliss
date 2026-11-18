@@ -2,6 +2,11 @@ package dev.joeherbert.availabliss.feature.common
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +19,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,6 +50,7 @@ import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -294,19 +304,26 @@ fun CalendarChoiceSheet(
 }
 
 /**
- * The "Add to calendar" button, which says "Added to your calendar" just after you add it. Once a
- * plan is in a calendar it says which one, with Change to move it (both call [onClick]; the
- * delegate decides). A plan deleted from the calendar since is offered again.
+ * The "Add to calendar" button, which says "Added to your calendar" for a few seconds after you
+ * add it. After that (and on later visits) the button goes: a quiet line says which calendar the
+ * plan is in, with Change to move it (both call [onClick]; the delegate decides). A plan deleted
+ * from the calendar since is offered again.
  */
 @Composable
 fun AddToCalendarButton(status: CalendarStatus, onClick: () -> Unit, modifier: Modifier = Modifier, height: Dp = 54.dp) {
+    var confirmed by remember(status.justAdded) { mutableStateOf(false) }
+    LaunchedEffect(status.justAdded) {
+        if (!status.justAdded) return@LaunchedEffect
+        delay(CONFIRMATION_MILLIS)
+        confirmed = true
+    }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (!status.inCalendar || status.justAdded) {
+        AnimatedVisibility(visible = !status.inCalendar || (status.justAdded && !confirmed), enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             PrimaryButton(
-                text = if (status.justAdded) "Added to your calendar" else "Add to calendar",
+                text = if (status.inCalendar) "Added to your calendar" else "Add to calendar",
                 onClick = { if (!status.inCalendar) onClick() },
-                icon = if (status.justAdded) AvIcons.Check else AvIcons.CalendarAdd,
-                style = if (status.justAdded) ButtonStyle.Success else ButtonStyle.Solid,
+                icon = if (status.inCalendar) AvIcons.Check else AvIcons.CalendarAdd,
+                style = if (status.inCalendar) ButtonStyle.Success else ButtonStyle.Solid,
                 height = height,
                 shape = if (height >= 52.dp) Shapes.controlLarge else Shapes.control,
                 modifier = Modifier.fillMaxWidth(),
@@ -315,6 +332,9 @@ fun AddToCalendarButton(status: CalendarStatus, onClick: () -> Unit, modifier: M
         if (status.inCalendar) AddedToCalendarRow(status, onChange = onClick)
     }
 }
+
+/** How long "Added to your calendar" shows before the button goes. */
+private const val CONFIRMATION_MILLIS = 3_000L
 
 /** "● In Work · Change": the quiet line once a plan is in the user's calendar. */
 @Composable
