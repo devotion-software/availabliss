@@ -18,7 +18,7 @@ struct GroupsHomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 header
                 if let event = model.upNext {
-                    UpNextCard(event: event, goingCount: model.memberCount(forGroup: event.groupId))
+                    UpNextCard(event: event, goingCount: model.memberCount(forGroup: event.groupId)) { openPlan(event) }
                 }
                 groupsHeader
                 groupsList
@@ -145,6 +145,17 @@ struct GroupsHomeView: View {
         }
     }
 
+    /// Opens a confirmed plan: its proposal ("Everyone's in", with the details and Add to calendar),
+    /// or the group's Plans for an event added without one.
+    private func openPlan(_ event: GroupEvent) {
+        if let proposalId = event.proposalId {
+            app.router.push(.proposal(id: proposalId))
+        } else {
+            app.router.push(.group(id: event.groupId))
+            app.router.push(.groupSection(id: event.groupId, section: .plans))
+        }
+    }
+
     private func groupButton(_ group: GroupSummary) -> some View {
         Button {
             app.router.push(.group(id: group.id))
@@ -158,13 +169,26 @@ struct GroupsHomeView: View {
     }
 }
 
-/// The "Up next" card: confirmed plan with one-tap Add to calendar.
+/// The "Up next" card: confirmed plan with one-tap Add to calendar. Tapping anywhere else on the
+/// card opens the plan.
 private struct UpNextCard: View {
     let event: GroupEvent
     let goingCount: Int?
+    let open: () -> Void
     @Environment(\.theme) private var theme
 
     var body: some View {
+        Button(action: open) { card }
+            .buttonStyle(.pressable)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Up next")
+            .accessibilityHint("Opens the plan")
+            .accessibilityActions {
+                Button("Open plan", action: open)
+            }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let image = event.image { EventCover(imageURL: image, height: 150, cornerRadius: 16) }
             HStack {
@@ -181,10 +205,11 @@ private struct UpNextCard: View {
             }
             AddToCalendarButton(event: event, height: 48)
         }
+        .foregroundStyle(theme.ink)
         .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glass(cornerRadius: 28)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Up next")
+        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
     private var subtitle: String {
