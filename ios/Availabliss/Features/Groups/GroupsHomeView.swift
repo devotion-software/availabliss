@@ -17,8 +17,8 @@ struct GroupsHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
-                if let event = model.upNext {
-                    UpNextCard(event: event, goingCount: model.memberCount(forGroup: event.groupId)) { openPlan(event) }
+                if !model.upNext.isEmpty {
+                    UpNextPager(events: model.upNext, goingCount: model.memberCount(forGroup:), open: openPlan)
                 }
                 groupsHeader
                 groupsList
@@ -169,6 +169,81 @@ struct GroupsHomeView: View {
     }
 }
 
+/// The next confirmed plans, one card each, swiped left and right with page dots under them
+/// (no dots when there's only one). Cards are the same height so the dots don't jump.
+private struct UpNextPager: View {
+    let events: [GroupEvent]
+    let goingCount: (String) -> Int?
+    let open: (GroupEvent) -> Void
+    @State private var page: String?
+
+    var body: some View {
+        if events.count == 1, let event = events.first {
+            UpNextCard(event: event, goingCount: goingCount(event.groupId)) { open(event) }
+        } else {
+            VStack(spacing: 12) {
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: 20) {
+                        ForEach(events) { event in
+                            UpNextCard(event: event, goingCount: goingCount(event.groupId)) { open(event) }
+                                .frame(maxHeight: .infinity)
+                                .containerRelativeFrame(.horizontal)
+                                .id(event.id)
+                        }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
+                .scrollPosition(id: $page)
+                .scrollIndicators(.hidden)
+                // Lets the cards' shadows show, and the next card slide in from the screen's edge.
+                .scrollClipDisabled()
+                PageDots(count: events.count, current: currentIndex) { index in
+                    withAnimation(.snappy) { page = events[index].id }
+                }
+            }
+        }
+    }
+
+    private var currentIndex: Int {
+        page.flatMap { id in events.firstIndex { $0.id == id } } ?? 0
+    }
+}
+
+/// A row of small dots, the current one wider and darker; tapping one goes to it.
+private struct PageDots: View {
+    let count: Int
+    let current: Int
+    let select: (Int) -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<count, id: \.self) { index in
+                Capsule()
+                    .fill(index == current ? theme.ink : theme.muted.opacity(0.35))
+                    .frame(width: index == current ? 18 : 7, height: 7)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture { select(index) }
+            }
+        }
+        .animation(.snappy, value: current)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement()
+        .accessibilityLabel("Plan")
+        .accessibilityValue("\(current + 1) of \(count)")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: if current < count - 1 { select(current + 1) }
+            case .decrement: if current > 0 { select(current - 1) }
+            @unknown default: break
+            }
+        }
+    }
+}
+
 /// The "Up next" card: confirmed plan with one-tap Add to calendar. Tapping anywhere else on the
 /// card opens the plan.
 private struct UpNextCard: View {
@@ -203,11 +278,13 @@ private struct UpNextCard: View {
                     .displayFont(22, .semibold)
                 Text(subtitle).bodyFont(14).foregroundStyle(theme.muted)
             }
+            // In the pager a shorter card stretches to match the tallest, keeping its button at the foot.
+            Spacer(minLength: 0)
             AddToCalendarButton(event: event, height: 48)
         }
         .foregroundStyle(theme.ink)
         .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .glass(cornerRadius: 28)
         .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }

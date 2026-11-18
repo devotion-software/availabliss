@@ -5,12 +5,14 @@ import Observation
 @Observable
 final class GroupsHomeViewModel {
     private(set) var groups: [GroupSummary] = []
-    private(set) var upNext: GroupEvent?
+    /// The next confirmed plans across all groups, soonest first (a few at most), for the Up next pager.
+    private(set) var upNext: [GroupEvent] = []
     private(set) var isLoading = false
     private(set) var loadError: String?
     var error: String?
 
     let api: APIClient
+    static let upNextLimit = 5
 
     init(api: APIClient) {
         self.api = api
@@ -23,7 +25,8 @@ final class GroupsHomeViewModel {
             async let groupList = api.send(API.Groups.list())
             async let upcoming = try? api.send(API.Me.upcoming())
             groups = try await groupList.groups
-            upNext = await upcoming?.events.filter { $0.end > Date() }.min { $0.start < $1.start }
+            let now = Date()
+            upNext = await Array((upcoming?.events ?? []).filter { $0.end > now }.sorted { $0.start < $1.start }.prefix(Self.upNextLimit))
             loadError = nil
         } catch where !error.isCancellation {
             loadError = error.userMessage
