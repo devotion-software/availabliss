@@ -111,7 +111,37 @@ struct Group: Codable, Sendable, Identifiable, Equatable {
     var members: [Member]
     /// Archive it automatically once its event has passed and nothing else is planned (older servers omit it).
     var autoArchive: Bool?
+    /// How often the group meets, for the calendar's "Next one" card (nil: not set, or an older server).
+    var rhythm: Rhythm?
     var createdAt: Date
+
+    /// How often a group meets: weekly, fortnightly or monthly (the same weekday in the same week of the
+    /// month). With `prompt`, the server suggests the next one in the chat once a plan has ended.
+    struct Rhythm: Codable, Sendable, Hashable {
+        enum Every: String, Codable, Sendable, CaseIterable {
+            case week
+            case twoWeeks = "two-weeks"
+            case month
+
+            /// A value from a newer server reads as weekly rather than failing the whole group.
+            init(from decoder: Decoder) throws {
+                self = Every(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .week
+            }
+
+            /// "Every week", "Every two weeks", "Every month".
+            var label: String {
+                switch self {
+                case .week: "Every week"
+                case .twoWeeks: "Every two weeks"
+                case .month: "Every month"
+                }
+            }
+        }
+
+        var every: Every
+        /// Suggest the next one in the chat once a plan has ended.
+        var prompt: Bool
+    }
 
     var isArchived: Bool { archived ?? false }
     var archivesAutomatically: Bool { autoArchive ?? false }
@@ -139,6 +169,40 @@ struct UpdateGroupBody: Encodable, Sendable {
     var archived: Bool?
     /// Archive it automatically once its event has passed.
     var autoArchive: Bool?
+    /// How often it meets: `.set` saves one, `.clear` turns it off (sent as `null`); nil leaves it alone.
+    var rhythm: RhythmChange?
+
+    enum RhythmChange: Sendable {
+        case set(Group.Rhythm)
+        case clear
+    }
+
+    private enum CodingKeys: String, CodingKey { case name, color, requirement, archived, autoArchive, rhythm }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(name, forKey: .name)
+        try c.encodeIfPresent(color, forKey: .color)
+        try c.encodeIfPresent(requirement, forKey: .requirement)
+        try c.encodeIfPresent(archived, forKey: .archived)
+        try c.encodeIfPresent(autoArchive, forKey: .autoArchive)
+        switch rhythm {
+        case .set(let value): try c.encode(value, forKey: .rhythm)
+        case .clear: try c.encodeNil(forKey: .rhythm)
+        case nil: break
+        }
+    }
+}
+
+/// `GET /groups/:id/next`: the free time nearest the group's next meet-up (nil without a rhythm).
+struct NextMeetResponse: Decodable, Sendable {
+    struct Suggestion: Decodable, Sendable, Equatable {
+        /// The day the rhythm points at.
+        let target: CalendarDay
+        /// The free time nearest it (everyone-free first), or nil when nothing near it works yet.
+        let slot: Slot?
+    }
+    let suggestion: Suggestion?
 }
 
 struct RoleBody: Encodable, Sendable { let role: Role }

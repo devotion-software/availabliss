@@ -20,6 +20,11 @@ struct GroupAvailabilityView: View {
     @State private var showsUpgrade = false
     /// Picked in the planner; opened as a proposal once the planner sheet has gone.
     @State private var plannedDraft: ProposalDraft?
+    /// Times shortlisted from Best options, in the order picked, to ask the group about in a date poll.
+    @State private var shortlist: [Slot] = []
+    @State private var showsAskGroup = false
+    /// With a rhythm: the free time nearest the group's next meet-up.
+    @State private var next: NextMeetResponse.Suggestion?
 
     init(detail: GroupDetailModel, group: Group, onOpenTiming: @escaping () -> Void) {
         self.detail = detail
@@ -40,6 +45,11 @@ struct GroupAvailabilityView: View {
                 }
                 TimingChip(summary: group.requirementSummary, action: onOpenTiming)
                 GroupPlansCard(detail: detail, group: group)
+                if group.rhythm != nil, let next {
+                    NextMeetCard(suggestion: next, group: group, me: app.session.user?.id) { draft in
+                        proposalDraft = draft
+                    }
+                }
                 headingRow
                 freeJumps
                 if let gaps = model.availability?.checkedUntil, !gaps.isEmpty {
@@ -54,6 +64,7 @@ struct GroupAvailabilityView: View {
         .screenBackground(OrbLayout.groupCalendar)
         .task { await model.load() }
         .task { await loadPlan() }
+        .task(id: group.rhythm) { await loadNext() }
         .refreshable { await model.invalidate() }
         .onChange(of: model.mode) { _, _ in Task { await model.load() } }
         .onChange(of: model.selectedDay) { _, _ in Task { await model.loadSelectedDay() } }
@@ -64,7 +75,9 @@ struct GroupAvailabilityView: View {
         .task(id: group.id) {
             for await event in app.live.events(forGroup: group.id) {
                 switch event.kind {
-                case .availabilityChanged, .groupUpdated, .memberChanged, .reconnected: await model.invalidate()
+                case .availabilityChanged, .groupUpdated, .memberChanged, .reconnected:
+                    await model.invalidate()
+                    await loadNext()
                 default: break
                 }
             }
@@ -89,6 +102,11 @@ struct GroupAvailabilityView: View {
                 plannedDraft = draft
             }
         }
+        .sheet(isPresented: $showsAskGroup) {
+            AskGroupSheet(slots: shortlist, requirement: group.requirement) { question, slots, multi in
+                await askGroup(question: question, slots: slots, multi: multi)
+            }
+        }
         .sheet(isPresented: $showsUpgrade, onDismiss: { Task { await loadPlan() } }) {
             UpgradeSheet(reason: "AI planning is part of Pro: it picks the best time, suggests things to do and drafts the plan.") { _ in
                 model.toast = "Welcome to Pro"
@@ -96,6 +114,32 @@ struct GroupAvailabilityView: View {
         }
         .errorAlert($model.error)
         .toast($model.toast)
+    }
+
+    /// The "Next one" card's suggestion; cleared when the group has no rhythm.
+    private func loadNext() async {
+        guard group.rhythm != nil else {
+            next = nil
+            return
+        }
+        guard let response = try? await detail.api.send(API.Groups.next(groupId: group.id)) else { return }
+        next = response.suggestion
+    }
+
+    /// Posts the shortlist as a date poll in the chat, then opens the chat.
+    private func askGroup(question: String, slots: [PollSlot], multi: Bool) async -> Bool {
+        do {
+            let poll = SendMessageBody.NewPoll(question: question, slots: slots, multi: multi)
+            _ = try await detail.api.send(API.Chat.send(groupId: group.id, SendMessageBody(poll: poll)))
+            shortlist = []
+            app.router.push(.groupSection(id: group.id, section: .chat))
+            return true
+        } catch where !error.isCancellation {
+            model.error = error.userMessage
+            return false
+        } catch {
+            return false
+        }
     }
 
     private func loadPlan() async {
@@ -261,7 +305,8 @@ struct GroupAvailabilityView: View {
                 proposalDraft = draft
             }
             if model.mode == .month {
-                BestOptionsCard(model: model, group: group, me: app.session.user?.id, isPro: isPro) { draft in
+                BestOptionsCard(model: model, group: group, me: app.session.user?.id, isPro: isPro, shortlist: $shortlist,
+                                onAsk: { showsAskGroup = true }) { draft in
                     proposalDraft = draft
                 }
                 planWithAI
@@ -709,14 +754,21 @@ private struct DayCell: View {
 
 /// "Best options" under the month: the top three upcoming times, fewest missing first, then by the
 /// Pro best-date score, each with Propose. Shown to Pro viewers, and to anyone once the group's
-/// timing lets a time work without everyone (so who's missing is worth ranking).
+/// timing lets a time work without everyone (so who's missing is worth ranking). Shortlist two to five
+/// of them (across months too) to ask the group in a date poll.
 private struct BestOptionsCard: View {
     let model: GroupAvailabilityViewModel
     let group: Group
     let me: String?
     let isPro: Bool
+    @Binding var shortlist: [Slot]
+    /// "Ask the group": opens the date poll sheet with the shortlist.
+    let onAsk: () -> Void
     let propose: (ProposalDraft) -> Void
     @Environment(\.theme) private var theme
+
+    /// A date poll asks about 2–5 times.
+    static let pollRange = 2...5
 
     var body: some View {
         let options = model.bestOptions()
@@ -728,10 +780,69 @@ private struct BestOptionsCard: View {
                     if index > 0 { Rectangle().fill(theme.line).frame(height: 1) }
                     row(slot, isTop: index == 0)
                 }
+                if !shortlist.isEmpty { shortlistBar }
             }
             .padding(14)
             .glass(cornerRadius: 22)
+            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: shortlist.map(\.id))
         }
+    }
+
+    /// "3 picked · Ask the group" once two or more are shortlisted; "Pick one more to ask the group" before.
+    private var shortlistBar: some View {
+        let ready = Self.pollRange.contains(shortlist.count)
+        return HStack(spacing: 10) {
+            Text(ready ? "\(shortlist.count) picked" : "Pick one more to ask the group")
+                .bodyFont(13, .semibold, relativeTo: .subheadline)
+                .foregroundStyle(ready ? theme.ink : theme.muted)
+            Spacer(minLength: 4)
+            Button("Clear") { shortlist = [] }
+                .buttonStyle(.textAction)
+            if ready {
+                Button(action: onAsk) {
+                    LoadingLabel(title: "Ask the group", systemImage: "bubble.left")
+                }
+                .buttonStyle(.filled(.primary, height: 36, cornerRadius: 12, fontSize: 13, fullWidth: false))
+            }
+        }
+        .padding(.top, 4)
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func isShortlisted(_ slot: Slot) -> Bool { shortlist.contains { $0.id == slot.id } }
+
+    private func toggleShortlist(_ slot: Slot) {
+        if isShortlisted(slot) {
+            shortlist.removeAll { $0.id == slot.id }
+        } else if shortlist.count < Self.pollRange.upperBound {
+            shortlist.append(slot)
+        }
+    }
+
+    /// "Shortlist" / "Shortlisted": picks the time for a date poll.
+    private func shortlistToggle(_ slot: Slot) -> some View {
+        let isOn = isShortlisted(slot)
+        let isFull = !isOn && shortlist.count >= Self.pollRange.upperBound
+        return Button { toggleShortlist(slot) } label: {
+            HStack(spacing: 4) {
+                Image(systemName: isOn ? "checkmark.circle.fill" : "plus.circle").font(.system(size: 12, weight: .semibold))
+                Text(isOn ? "Shortlisted" : "Shortlist")
+            }
+            .bodyFont(12, .semibold, relativeTo: .caption)
+            .foregroundStyle(isOn ? theme.accentInk : theme.muted)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .background(Capsule().fill(isOn ? theme.accentSoft : theme.line))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isFull)
+        .opacity(isFull ? 0.5 : 1)
+        .accessibilityLabel("Shortlist \(slot.label)")
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+        .accessibilityHint(isFull ? "Five are shortlisted already" : "Adds it to a date poll for the group")
     }
 
     private func row(_ slot: Slot, isTop: Bool) -> some View {
@@ -747,6 +858,7 @@ private struct BestOptionsCard: View {
                         .foregroundStyle(theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                shortlistToggle(slot).padding(.vertical, -6)
             }
             Spacer(minLength: 4)
             Button("Propose") { propose(ProposalDraft(slot: slot, requirement: group.requirement)) }
@@ -857,5 +969,117 @@ private struct DayDetailCard: View {
         case .hidden: return info.holiday.map { "\($0) · outside the group's timing" } ?? "Outside the group's timing"
         default: return info.holiday ?? "Free, but no full slot fits here"
         }
+    }
+}
+
+/// "Ask the group": the shortlisted times as a date poll in the chat, with a question to go with them.
+private struct AskGroupSheet: View {
+    let slots: [Slot]
+    let requirement: Requirement
+    let post: (_ question: String, _ slots: [PollSlot], _ multi: Bool) async -> Bool
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
+    @State private var question = "Which of these works?"
+    /// Date polls let people pick every time they can make, unless it's turned off.
+    @State private var multi = true
+    @State private var isPosting = false
+
+    private var trimmedQuestion: String { question.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Each time as the poll asks about it: as it would be proposed (a duration's first stretch, all day or not).
+    private var pollSlots: [PollSlot] {
+        slots.sorted { $0.start < $1.start }.map { slot in
+            let draft = ProposalDraft(slot: slot, requirement: requirement)
+            return PollSlot(start: draft.start, end: draft.end, allDay: draft.allDay)
+        }
+    }
+
+    var body: some View {
+        BottomSheet(title: "Ask the group") {
+            InputField(placeholder: "Ask a question", text: $question)
+            Text("Times").sectionLabelStyle()
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(slots.sorted { $0.start < $1.start }) { slot in
+                    HStack(spacing: 10) {
+                        Image(systemName: "calendar").font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.accentInk)
+                        Text(slot.label).bodyFont(15, .semibold)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            Toggle("Allow more than one choice", isOn: $multi)
+                .toggleStyle(.glassSwitch)
+                .bodyFont(15, .medium)
+            Text("It goes in the chat as a poll. Everyone can see who\u{2019}s busy at each time.")
+                .bodyFont(13, relativeTo: .subheadline)
+                .foregroundStyle(theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                Task {
+                    isPosting = true
+                    defer { isPosting = false }
+                    if await post(trimmedQuestion, pollSlots, multi) { dismiss() }
+                }
+            } label: {
+                LoadingLabel(title: "Post poll", isLoading: isPosting)
+            }
+            .buttonStyle(.accent)
+            .disabled(trimmedQuestion.isEmpty || isPosting)
+        }
+    }
+}
+
+/// With a rhythm, the group's next meet-up: "Fri 4 Dec works for everyone" with Propose, or
+/// "Nothing near Fri 4 Dec works yet".
+private struct NextMeetCard: View {
+    let suggestion: NextMeetResponse.Suggestion
+    let group: Group
+    let me: String?
+    let propose: (ProposalDraft) -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(theme.accentInk)
+                .frame(width: 34, height: 34)
+                .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(theme.accentSoft))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(heading).bodyFont(12, .semibold, relativeTo: .caption).foregroundStyle(theme.muted)
+                Text(headline).bodyFont(15, .semibold).fixedSize(horizontal: false, vertical: true)
+                if let detail {
+                    Text(detail).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 4)
+            if let slot = suggestion.slot {
+                Button("Propose") { propose(ProposalDraft(slot: slot, requirement: group.requirement)) }
+                    .buttonStyle(.filled(slot.missingCount == 0 ? .accent : .secondary, height: 36, cornerRadius: 12, fontSize: 13, fullWidth: false))
+                    .accessibilityLabel("Propose \(slot.label)")
+            }
+        }
+        .padding(12)
+        .glass(cornerRadius: 22)
+        .accessibilityElement(children: .contain)
+    }
+
+    /// "Next one · every two weeks".
+    private var heading: String {
+        guard let every = group.rhythm?.every else { return "Next one" }
+        return "Next one \u{00B7} \(every.label.lowercased())"
+    }
+
+    /// "Fri 4 Dec works for everyone", "Fri 4 Dec works for most of us", "Nothing near Fri 4 Dec works yet".
+    private var headline: String {
+        guard let slot = suggestion.slot else { return "Nothing near \(Formatting.shortDay(suggestion.target)) works yet" }
+        return "\(slot.label) works for \(slot.missingCount == 0 ? "everyone" : "most of us")"
+    }
+
+    /// Who can't make it, when it works for most of the group.
+    private var detail: String? {
+        guard let missing = suggestion.slot?.missingMemberIds, !missing.isEmpty else { return nil }
+        return Clash.cantMake(missing, group: group, me: me)
     }
 }

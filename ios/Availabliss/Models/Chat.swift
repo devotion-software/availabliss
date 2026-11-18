@@ -189,6 +189,8 @@ struct Poll: Codable, Sendable, Identifiable, Equatable {
         let id: String
         let label: String
         var voterIds: [String]
+        /// A date poll's option: the time it stands for (nil for a text option, and from older servers).
+        var slot: PollSlot?
     }
 
     let id: String
@@ -198,6 +200,38 @@ struct Poll: Codable, Sendable, Identifiable, Equatable {
     var options: [Option]
 
     var totalVotes: Int { options.reduce(0) { $0 + $1.voterIds.count } }
+    /// A date poll: its options stand for times.
+    var isDatePoll: Bool { options.contains { $0.slot != nil } }
+    /// The option with the most votes (the earliest of a tie); nil before anyone has voted.
+    var leadingOption: Option? {
+        guard let top = options.map(\.voterIds.count).max(), top > 0 else { return nil }
+        return options.first { $0.voterIds.count == top }
+    }
+}
+
+/// The time a date poll's option stands for, and (sent when posting one) each time to ask about.
+struct PollSlot: Codable, Sendable, Hashable {
+    let start: Date
+    let end: Date
+    let allDay: Bool
+
+    init(start: Date, end: Date, allDay: Bool) {
+        self.start = start
+        self.end = end
+        self.allDay = allDay
+    }
+
+    private enum CodingKeys: String, CodingKey { case start, end, allDay }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        start = try container.decode(Date.self, forKey: .start)
+        end = try container.decode(Date.self, forKey: .end)
+        allDay = try container.decodeIfPresent(Bool.self, forKey: .allDay) ?? false
+    }
+
+    /// The same time as a proposal draft, for "Propose this".
+    var draft: ProposalDraft { ProposalDraft(start: start, end: end, allDay: allDay) }
 }
 
 struct MessageInfo: Decodable, Sendable {
@@ -226,9 +260,11 @@ struct MessageThread: Decodable, Sendable {
 }
 
 struct SendMessageBody: Encodable, Sendable {
+    /// A text poll (`options`) or a date poll (`slots`, 2–5 different times; `multi` defaults to true there).
     struct NewPoll: Encodable, Sendable {
         let question: String
-        let options: [String]
+        var options: [String]?
+        var slots: [PollSlot]?
         let multi: Bool?
     }
     var body: String?

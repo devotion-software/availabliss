@@ -142,6 +142,8 @@ enum API {
         static func conflicts(groupId: String, start: Date, end: Date) -> Endpoint<ConflictsResponse> {
             .init(.get, "/groups/\(groupId.pathEncoded)/conflicts", query: ["start": iso(start), "end": iso(end)])
         }
+        /// With a rhythm: the free time nearest the group's next meet-up.
+        static func next(groupId: String) -> Endpoint<NextMeetResponse> { .init(.get, "/groups/\(groupId.pathEncoded)/next") }
         static func nudge(groupId: String) -> Endpoint<NudgeResponse> { .init(.post, "/groups/\(groupId.pathEncoded)/nudge") }
         /// No pushes from the group until `until` (nil: until it's unmuted). Returns your whole notification settings.
         static func mute(groupId: String, until: Date?) -> Endpoint<NotificationSettings> {

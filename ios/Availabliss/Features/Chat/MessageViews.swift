@@ -115,7 +115,7 @@ struct MessageRow: View {
         case .poll:
             if let poll = message.poll {
                 VStack(alignment: .trailing, spacing: 4) {
-                    PollCard(poll: poll, me: me, title: isMine ? "Your poll" : "Poll by \(author?.firstName ?? "Someone")", canClose: isMine, model: model)
+                    PollCard(poll: poll, group: group, me: me, title: isMine ? "Your poll" : "Poll by \(author?.firstName ?? "Someone")", canClose: isMine, canPropose: isMine || group.role.isAdmin, model: model)
                         .contextMenu { menu }
                         .accessibilityAction(named: "Reply", onReply)
                         .accessibilityActions { extraActions }
@@ -442,20 +442,26 @@ struct ReadReceipt: View {
     }
 }
 
-/// Poll with live bars; tap an option to vote (again to remove).
+/// Poll with live bars; tap an option to vote (again to remove). A date poll's options show their
+/// times and who's busy then, and its creator (or an admin) can propose the leading one.
 struct PollCard: View {
     let poll: Poll
+    let group: Group
     let me: String?
     /// Who asked: "Your poll" or "Poll by Ana".
     let title: String
     let canClose: Bool
+    /// The poll's creator and admins: "Propose this" on a date poll's leading option.
+    let canPropose: Bool
     let model: ChatViewModel
     @Environment(\.theme) private var theme
+    @State private var proposalDraft: ProposalDraft?
 
     var body: some View {
+        let leading = poll.leadingOption
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: "chart.bar").font(.system(size: 14, weight: .semibold))
+                Image(systemName: poll.isDatePoll ? "calendar" : "chart.bar").font(.system(size: 14, weight: .semibold))
                 Text("\(title) · \(Formatting.plural(poll.totalVotes, "vote"))\(poll.closed ? " · closed" : "")")
                     .bodyFont(12, .semibold, relativeTo: .caption)
                 Spacer()
@@ -471,8 +477,16 @@ struct PollCard: View {
             .foregroundStyle(theme.accentInk)
             Text(poll.question).displayFont(17, .semibold, relativeTo: .headline)
             ForEach(poll.options) { option in
-                PollOptionRow(option: option, poll: poll, me: me) {
-                    Task { await model.vote(poll: poll, option: option) }
+                VStack(alignment: .leading, spacing: 6) {
+                    PollOptionRow(option: option, poll: poll, me: me, isLeading: isLeading(option, leading: leading),
+                                  busy: option.slot == nil ? nil : busyText(option)) {
+                        Task { await model.vote(poll: poll, option: option) }
+                    }
+                    if canPropose, option.id == leading?.id, let slot = option.slot {
+                        Button("Propose this") { proposalDraft = slot.draft }
+                            .buttonStyle(.filled(.accent, height: 36, cornerRadius: 12, fontSize: 13))
+                            .accessibilityLabel("Propose \(option.label)")
+                    }
                 }
             }
         }
@@ -481,6 +495,22 @@ struct PollCard: View {
         .glass(cornerRadius: 22)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Poll: \(poll.question)")
+        .task(id: poll.options.map(\.id)) { if poll.isDatePoll { await model.loadBusy(for: poll) } }
+        .sheet(item: $proposalDraft) { draft in
+            NewProposalSheet(group: group, me: me, draft: draft, api: model.api) { _ in }
+        }
+    }
+
+    /// A date poll has one leader (the earliest of a tie), to propose; a text poll highlights every tied option.
+    private func isLeading(_ option: Poll.Option, leading: Poll.Option?) -> Bool {
+        if poll.isDatePoll { return option.id == leading?.id }
+        return leading.map { option.voterIds.count == $0.voterIds.count } ?? false
+    }
+
+    /// "Everyone's free", "Priya is busy then", or nil while it's still being checked.
+    private func busyText(_ option: Poll.Option) -> String? {
+        guard let busy = model.pollBusy[option.id] else { return nil }
+        return Clash.text(busy, group: group, me: me) ?? "Everyone\u{2019}s free"
     }
 }
 
@@ -488,12 +518,22 @@ private struct PollOptionRow: View {
     let option: Poll.Option
     let poll: Poll
     let me: String?
+    /// The most votes so far: its bar is drawn in the accent.
+    let isLeading: Bool
+    /// A date poll's option: who's busy then (nil for a text option, or while it's checked).
+    var busy: String?
     let vote: () -> Void
     @Environment(\.theme) private var theme
 
     private var isMine: Bool { me.map(option.voterIds.contains) ?? false }
     private var share: Double { poll.totalVotes == 0 ? 0 : Double(option.voterIds.count) / Double(poll.totalVotes) }
-    private var isLeading: Bool { option.voterIds.count > 0 && option.voterIds.count == poll.options.map(\.voterIds.count).max() }
+
+    /// The option's time in your time zone ("Fri 4 Dec · 18:00 – 21:00"), when it differs from its label.
+    private var time: String? {
+        guard let slot = option.slot else { return nil }
+        let text = Formatting.span(start: slot.start, end: slot.end, allDay: slot.allDay)
+        return text == option.label ? nil : text
+    }
 
     var body: some View {
         Button(action: vote) {
@@ -507,11 +547,25 @@ private struct PollOptionRow: View {
                     }
                 }
                 .frame(width: 18, height: 18)
-                Text(option.label).bodyFont(14, .semibold).foregroundStyle(theme.ink)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.label).bodyFont(14, .semibold).foregroundStyle(theme.ink)
+                    if let time {
+                        Text(time).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
+                    }
+                    if let busy {
+                        Text(busy).bodyFont(12, .medium, relativeTo: .caption).foregroundStyle(theme.muted)
+                    }
+                }
+                .multilineTextAlignment(.leading)
                 Spacer()
+                if isLeading, option.slot != nil {
+                    Image(systemName: "star.fill").font(.system(size: 10, weight: .bold)).foregroundStyle(theme.accentInk)
+                        .accessibilityHidden(true)
+                }
                 Text("\(option.voterIds.count)").bodyFont(13, .semibold, relativeTo: .subheadline).foregroundStyle(theme.neutralInk)
             }
             .padding(.horizontal, 12)
+            .padding(.vertical, option.slot == nil ? 0 : 8)
             .frame(minHeight: 46)
             .background(alignment: .leading) {
                 GeometryReader { proxy in
@@ -523,12 +577,22 @@ private struct PollOptionRow: View {
             }
             .background(theme.surface)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(isMine ? theme.accent : theme.glassHi, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(isMine || (isLeading && option.slot != nil) ? theme.accent : theme.glassHi, lineWidth: isLeading && option.slot != nil ? 1.5 : 1))
         }
         .buttonStyle(.pressable)
         .disabled(poll.closed)
-        .accessibilityLabel("\(option.label), \(Formatting.plural(option.voterIds.count, "vote"))")
+        .accessibilityLabel(accessibilityText)
         .accessibilityAddTraits(isMine ? .isSelected : [])
+    }
+
+    private var accessibilityText: String {
+        var parts = [option.label]
+        if let time { parts.append(time) }
+        parts.append(Formatting.plural(option.voterIds.count, "vote"))
+        if isLeading { parts.append("leading") }
+        if let busy { parts.append(busy) }
+        return parts.joined(separator: ", ")
     }
 }
 

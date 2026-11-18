@@ -3,7 +3,7 @@ import SwiftUI
 /// Group settings, from the group's More menu: its photo, name and colour, the name you go by in it, a new group with the same people, Archive / Unarchive, Leave
 /// group and Delete group. Everyone can open it and leave; only the owner and admins can change things
 /// (the server's rules), and only the owner can delete the group. Each part is its own section. Admins
-/// can also have the group archive itself once its event has passed.
+/// can also have the group archive itself once its event has passed, and set how often it meets.
 struct GroupSettingsView: View {
     let detail: GroupDetailModel
     let group: Group
@@ -24,6 +24,7 @@ struct GroupSettingsView: View {
     @State private var isSavingName = false
     @State private var isArchiving = false
     @State private var isSavingAutoArchive = false
+    @State private var isSavingRhythm = false
     @State private var isDeleting = false
     @State private var error: String?
     @State private var toast: String?
@@ -48,6 +49,7 @@ struct GroupSettingsView: View {
                 detailsCard
                 myNameCard
                 if group.members.count > 1 { newGroupCard }
+                if canEdit { rhythmCard }
                 if canEdit { archiveCard }
                 leaveCard
                 if isOwner { deleteCard }
@@ -280,6 +282,70 @@ struct GroupSettingsView: View {
                 LoadingLabel(title: "New group with these people", systemImage: "plus.square.on.square")
             }
             .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
+        }
+    }
+
+    // MARK: How often you meet
+
+    /// "How often do you meet?": None / Every week / Every two weeks / Every month, and whether to suggest
+    /// the next one in the chat. Admins only; the calendar then shows a "Next one" card.
+    private var rhythmCard: some View {
+        GlassPanel(cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("How often do you meet?").bodyFont(15, .semibold)
+                Text("The calendar suggests the free time nearest the next one.")
+                    .bodyFont(13, relativeTo: .subheadline)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], alignment: .leading, spacing: 0) {
+                rhythmChip("None", isOn: group.rhythm == nil) { setRhythm(nil) }
+                ForEach(Group.Rhythm.Every.allCases, id: \.self) { every in
+                    rhythmChip(every.label, isOn: group.rhythm?.every == every) {
+                        setRhythm(Group.Rhythm(every: every, prompt: group.rhythm?.prompt ?? true))
+                    }
+                }
+            }
+            .disabled(isSavingRhythm)
+            if let rhythm = group.rhythm {
+                Divider().overlay(theme.line).padding(.vertical, 2)
+                Toggle(isOn: Binding(get: { rhythm.prompt }, set: { on in
+                    setRhythm(Group.Rhythm(every: rhythm.every, prompt: on))
+                })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Suggest the next one in the chat").bodyFont(15, .semibold)
+                        Text("Once a plan has ended and nothing newer is planned, it posts the best time for the next one.")
+                            .bodyFont(13, relativeTo: .subheadline)
+                            .foregroundStyle(theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .toggleStyle(.glassSwitch)
+                .disabled(isSavingRhythm)
+            }
+        }
+    }
+
+    private func rhythmChip(_ label: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+        Chip(label: label, isOn: isOn) { if !isOn { action() } }
+            .frame(maxWidth: .infinity)
+    }
+
+    /// Saves how often the group meets (nil: it doesn't have a rhythm).
+    private func setRhythm(_ rhythm: Group.Rhythm?) {
+        let old = group.rhythm
+        guard rhythm != old else { return }
+        // "Every two weeks", "Suggestions off" (only the toggle changed), or "No regular meet-up".
+        let message: String
+        if let rhythm {
+            message = rhythm.every == old?.every ? (rhythm.prompt ? "Suggestions on" : "Suggestions off") : rhythm.every.label
+        } else {
+            message = "No regular meet-up"
+        }
+        Task {
+            isSavingRhythm = true
+            defer { isSavingRhythm = false }
+            if await update(UpdateGroupBody(rhythm: rhythm.map { .set($0) } ?? .clear)) { toast = message }
         }
     }
 

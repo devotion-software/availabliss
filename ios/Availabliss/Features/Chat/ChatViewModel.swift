@@ -60,7 +60,9 @@ final class ChatViewModel {
     private var threadReplyTargetId: String?
 
     let groupId: String
-    private let api: APIClient
+    let api: APIClient
+    /// Who's busy at each date poll option's time (by option id), from the conflicts endpoint.
+    private(set) var pollBusy: [String: [String]] = [:]
     private var me: String?
     private var lastSeenSent: String?
 
@@ -361,6 +363,15 @@ final class ChatViewModel {
         } catch {
             update(poll: poll)
             self.error = error.userMessage
+        }
+    }
+
+    /// Looks up who's busy at each of a date poll's times (once per option).
+    func loadBusy(for poll: Poll) async {
+        for option in poll.options where pollBusy[option.id] == nil {
+            guard let slot = option.slot else { continue }
+            guard let busy = try? await api.send(API.Groups.conflicts(groupId: groupId, start: slot.start, end: slot.end)) else { continue }
+            pollBusy[option.id] = busy.busyMemberIds
         }
     }
 
