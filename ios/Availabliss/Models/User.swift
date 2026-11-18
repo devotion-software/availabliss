@@ -57,6 +57,9 @@ struct User: Codable, Sendable, Identifiable, Equatable {
     var schoolAuthority: String?
     var timezone: String
     var onboarded: Bool
+    /// Minutes counted as busy before and after each busy time when the server finds free slots
+    /// (0, 15, 30, 60 or 120). Optional so an older server's `User` still decodes.
+    var busyBufferMinutes: Int? = nil
 
     var firstName: String {
         name.split(separator: " ").first.map(String.init) ?? name
@@ -83,6 +86,7 @@ struct UserPatch: Encodable, Sendable {
     var schoolAuthority: String?
     var timezone: String?
     var onboarded: Bool?
+    var busyBufferMinutes: Int?
     /// Sends nil region fields as `null`. Omitting them would keep the old values, so moving from
     /// GB-ENG to Ireland would leave the subdivision (and its holidays) behind.
     private var replacesRegion = false
@@ -96,7 +100,8 @@ struct UserPatch: Encodable, Sendable {
         subdivision: String? = nil,
         schoolAuthority: String? = nil,
         timezone: String? = nil,
-        onboarded: Bool? = nil
+        onboarded: Bool? = nil,
+        busyBufferMinutes: Int? = nil
     ) {
         self.name = name
         self.username = username
@@ -107,6 +112,7 @@ struct UserPatch: Encodable, Sendable {
         self.schoolAuthority = schoolAuthority
         self.timezone = timezone
         self.onboarded = onboarded
+        self.busyBufferMinutes = busyBufferMinutes
     }
 
     /// Replaces the whole region: a nil subdivision or school authority clears it on the server.
@@ -133,10 +139,11 @@ struct UserPatch: Encodable, Sendable {
         }
         try container.encodeIfPresent(timezone, forKey: .timezone)
         try container.encodeIfPresent(onboarded, forKey: .onboarded)
+        try container.encodeIfPresent(busyBufferMinutes, forKey: .busyBufferMinutes)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case name, username, themeMode, colorTheme, country, subdivision, schoolAuthority, timezone, onboarded
+        case name, username, themeMode, colorTheme, country, subdivision, schoolAuthority, timezone, onboarded, busyBufferMinutes
     }
 }
 

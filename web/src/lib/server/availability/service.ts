@@ -40,7 +40,7 @@ async function engineInput(group: GroupRow, from: string, to: string): Promise<E
 	const holidayRange = { from: loadFrom, to: loadTo };
 
 	const [busy, synced, coverage, region, school] = await Promise.all([
-		loadBusy(ids, startOfDate(loadFrom, tz), startOfDate(loadTo, tz)),
+		loadBusy(ids, startOfDate(loadFrom, tz), startOfDate(loadTo, tz), false, false, true),
 		syncedUserIds(ids),
 		calendarCoverage(ids),
 		ownerRegion(group.id),

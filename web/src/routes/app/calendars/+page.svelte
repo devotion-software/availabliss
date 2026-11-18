@@ -8,6 +8,7 @@
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import ConnectionSection from '#lib/components/calendars/ConnectionSection.svelte';
 	import ConnectButton from '#lib/components/calendars/ConnectButton.svelte';
+	import BusyBufferSection from '#lib/components/calendars/BusyBufferSection.svelte';
 	import ConnectCalendarSheet from '#lib/components/calendars/ConnectCalendarSheet.svelte';
 	import { reportOAuthResult } from '#lib/components/calendars/oauth-result';
 
@@ -59,13 +60,16 @@
 			{/if}
 		</div>
 
-		<aside class="glass note">
-			<Icon name="shield" size={20} />
-			<div>
-				<h2>What your groups see</h2>
-				<p>Only that you're busy, never event titles, places or who you're with. Switch a calendar off and its events stop counting.</p>
-			</div>
-		</aside>
+		<div class="side">
+			<aside class="glass note">
+				<Icon name="shield" size={20} />
+				<div>
+					<h2>What your groups see</h2>
+					<p>Only that you're busy, never event titles, places or who you're with. Switch a calendar off and its events stop counting.</p>
+				</div>
+			</aside>
+			{#if page.data.user}<BusyBufferSection minutes={page.data.user.busyBufferMinutes} />{/if}
+		</div>
 	</div>
 </div>
 
@@ -90,6 +94,11 @@
 	}
 	.empty {
 		border-radius: 24px;
+	}
+	.side {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
 	}
 	.note {
 		border-radius: 20px;

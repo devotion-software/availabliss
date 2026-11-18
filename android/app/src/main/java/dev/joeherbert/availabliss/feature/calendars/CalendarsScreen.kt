@@ -30,8 +30,14 @@ import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostSta
 
 /** Settings: connected calendars and which ones mean busy. */
 @Composable
-fun CalendarsScreen(onBack: () -> Unit, viewModel: CalendarSourcesViewModel = hiltViewModel()) {
+fun CalendarsScreen(
+    onBack: () -> Unit,
+    viewModel: CalendarSourcesViewModel = hiltViewModel(),
+    bufferViewModel: BusyBufferViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val bufferMinutes by bufferViewModel.minutes.collectAsStateWithLifecycle()
+    val bufferMessage by bufferViewModel.message.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     val requestPermission = rememberCalendarPermissionRequest(
         blocked = state.permissionBlocked,
@@ -42,6 +48,7 @@ fun CalendarsScreen(onBack: () -> Unit, viewModel: CalendarSourcesViewModel = hi
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
     PendingUrlEffect(state.pendingUrl, viewModel::onUrlOpened)
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
+    UserMessageEffect(bufferMessage, snackbar) { bufferViewModel.onMessageShown() }
 
     val currentRequestPermission by rememberUpdatedState(requestPermission)
     // One instance for the screen's lifetime so unchanged rows skip recomposition.
@@ -77,6 +84,7 @@ fun CalendarsScreen(onBack: () -> Unit, viewModel: CalendarSourcesViewModel = hi
                     manage = true,
                     actions = actions,
                 )
+                BusyBufferCard(bufferMinutes, bufferViewModel::select)
             }
         }
         AvSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())

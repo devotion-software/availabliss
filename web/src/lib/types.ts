@@ -85,7 +85,13 @@ export interface User {
 	schoolAuthority: string | null;
 	timezone: string;
 	onboarded: boolean;
+	/** Minutes counted as busy before and after each busy time when finding free slots (0 = none). */
+	busyBufferMinutes: BusyBufferMinutes;
 }
+
+/** The buffers on offer around busy time ("None", 15 min, 30 min, 1 hour, 2 hours). */
+export const BUSY_BUFFER_MINUTES = [0, 15, 30, 60, 120] as const;
+export type BusyBufferMinutes = (typeof BUSY_BUFFER_MINUTES)[number];
 
 export interface Member {
 	userId: string;

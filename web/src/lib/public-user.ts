@@ -1,5 +1,6 @@
 import { COLOR_THEMES, THEME_MODES, type User } from './types';
 import type { User as AuthUser } from './auth';
+import { toBusyBuffer } from './busy-buffer';
 
 /** The Better Auth session user as the API's public `User` shape. */
 export function toPublicUser(u: AuthUser): User {
@@ -15,6 +16,7 @@ export function toPublicUser(u: AuthUser): User {
 		subdivision: u.subdivision ?? null,
 		schoolAuthority: u.schoolAuthority ?? null,
 		timezone: u.timezone || 'Europe/London',
-		onboarded: !!u.onboarded
+		onboarded: !!u.onboarded,
+		busyBufferMinutes: toBusyBuffer(Number(u.busyBufferMinutes ?? 0))
 	};
 }

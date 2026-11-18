@@ -1,0 +1,1 @@
+ALTER TABLE `user` ADD `busy_buffer_minutes` int DEFAULT 0 NOT NULL;

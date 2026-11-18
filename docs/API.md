@@ -114,6 +114,7 @@ interface User {
   schoolAuthority: string | null;// id from GET /regions/school-authorities
   timezone: string;              // IANA, e.g. "Europe/London"
   onboarded: boolean;            // false until the user finishes calendar setup
+  busyBufferMinutes: 0 | 15 | 30 | 60 | 120; // counted as busy before and after each busy time when finding free slots and clashes (not in /me/busy)
 }
 
 interface Member {
@@ -231,7 +232,7 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/me` | | `User` |
-| PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'username' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded'>>` | `User` (`409` if the username is taken) |
+| PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'username' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded' \| 'busyBufferMinutes'>>` | `User` (`409` if the username is taken; changing `busyBufferMinutes` publishes `availability.changed` to the user's groups) |
 | GET 🔒 | `/usernames/:username` | | `UsernameCheck`: whether it can be yours, and who has it (to invite them) |
 | GET 🔒 | `/me/busy?from&to` (ISO instants, `to` after `from`, at most 120 days apart) | | `{ intervals: BusyInterval[] }` (own merged busy time; `label` is only ever returned to the owner) |
 | PUT 🔒 | `/me/avatar` | the image bytes (JPEG / PNG / WebP / HEIC, ≤ 10 MB) with its `image/*` content type | `User` (`image` is the new picture, shrunk to fit 512 px) |

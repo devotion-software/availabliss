@@ -72,6 +72,8 @@ data class User(
     val schoolAuthority: String? = null,
     val timezone: String = "Europe/London",
     val onboarded: Boolean = false,
+    /** Minutes counted as busy before and after each busy time when finding free slots (0, 15, 30, 60, 120). */
+    val busyBufferMinutes: Int = 0,
 ) {
     /** The name other people see (outside a group that has its own name for them): their name, or their email. */
     val accountName: String get() = name.trim().ifEmpty { email }

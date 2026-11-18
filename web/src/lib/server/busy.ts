@@ -4,7 +4,7 @@
  * decrypted for their owner (`myBusy`); everyone else only ever gets times.
  */
 import { and, count, eq, gt, inArray, isNotNull, lt, min, ne, or } from 'drizzle-orm';
-import type { BusyInterval } from '#lib/types';
+import { BUSY_BUFFER_MINUTES, type BusyInterval } from '#lib/types';
 import { db } from './db';
 import { busyIgnores, busyIntervals, calendarConnections, calendars, manualBlocks, user } from './db/schema';
 import { expandBlock } from './blocks';
@@ -12,6 +12,7 @@ import type { Span } from './availability/intervals';
 import { badRequest, notFound } from './http';
 import { newId } from './ids';
 import { openTitle } from './calendars';
+import { toBusyBuffer } from '#lib/busy-buffer';
 
 export interface LabelledBusy extends Span {
 	manual: boolean;
@@ -65,19 +66,30 @@ export async function calendarCoverage(userIds: string[]): Promise<Map<string, n
 	return new Map(rows.flatMap((r) => (r.until ? [[r.userId, new Date(r.until).getTime()] as const] : [])));
 }
 
+/** The longest buffer a user can put around their busy time (see `User.busyBufferMinutes`). */
+const MAX_BUFFER_MS = Math.max(...BUSY_BUFFER_MINUTES) * 60_000;
+
 /**
  * Everyone's busy time in [from, to): calendar intervals (minus events they've marked not busy)
  * and manual blocks. `includeIgnored` keeps the not-busy events too, flagged with `ignoreId`.
+ * `buffered` widens each interval by its owner's buffer before and after (for finding free time,
+ * never for showing someone their own busy time), so a change to the setting applies at once.
  */
 export async function loadBusy(
 	userIds: string[],
 	from: number,
 	to: number,
 	includeIgnored = false,
-	withTitles = false
+	withTitles = false,
+	buffered = false
 ): Promise<Map<string, LabelledBusy[]>> {
 	const result = new Map<string, LabelledBusy[]>(userIds.map((id) => [id, []]));
 	if (!userIds.length) return result;
+	// A buffer can reach into [from, to) from busy time just outside it.
+	if (buffered) {
+		from -= MAX_BUFFER_MS;
+		to += MAX_BUFFER_MS;
+	}
 	const range = { from: new Date(from), to: new Date(to) };
 
 	const [calendarRows, blockRows, zones, ignoreRows] = await Promise.all([
@@ -111,7 +123,7 @@ export async function loadBusy(
 					or(ne(manualBlocks.repeat, 'none'), gt(manualBlocks.end, range.from))
 				)
 			),
-		db.select({ id: user.id, timezone: user.timezone }).from(user).where(inArray(user.id, userIds)),
+		db.select({ id: user.id, timezone: user.timezone, buffer: user.busyBufferMinutes }).from(user).where(inArray(user.id, userIds)),
 		db.select().from(busyIgnores).where(inArray(busyIgnores.userId, userIds))
 	]);
 
@@ -139,6 +151,16 @@ export async function loadBusy(
 		}
 	}
 
+	if (buffered) {
+		for (const z of zones) {
+			const pad = toBusyBuffer(z.buffer) * 60_000;
+			if (!pad) continue;
+			result.set(
+				z.id,
+				result.get(z.id)!.map((b) => ({ ...b, start: b.start - pad, end: b.end + pad }))
+			);
+		}
+	}
 	for (const list of result.values()) list.sort((a, b) => a.start - b.start);
 	return result;
 }
@@ -207,6 +229,6 @@ export async function unignoreBusy(userId: string, id: string): Promise<void> {
 
 /** Which of `userIds` have any busy time overlapping [start, end). Only ids, never labels. */
 export async function busyDuring(userIds: string[], start: number, end: number): Promise<string[]> {
-	const busy = await loadBusy(userIds, start, end);
+	const busy = await loadBusy(userIds, start, end, false, false, true);
 	return userIds.filter((id) => busy.get(id)?.some((b) => b.start < end && b.end > start));
 }

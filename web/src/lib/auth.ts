@@ -98,7 +98,8 @@ export const auth = betterAuth({
 			subdivision: { type: 'string', required: false, input: false },
 			schoolAuthority: { type: 'string', required: false, input: false },
 			timezone: { type: 'string', required: false, defaultValue: 'Europe/London', input: false },
-			onboarded: { type: 'boolean', required: false, defaultValue: false, input: false }
+			onboarded: { type: 'boolean', required: false, defaultValue: false, input: false },
+			busyBufferMinutes: { type: 'number', required: false, defaultValue: 0, input: false }
 		}
 	},
 	plugins: [

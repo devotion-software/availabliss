@@ -31,6 +31,10 @@ class JsonPatchBuilder internal constructor(private val builder: JsonObjectBuild
         builder.put(key, JsonPrimitive(value))
     }
 
+    fun set(key: String, value: Int) {
+        builder.put(key, JsonPrimitive(value))
+    }
+
     fun string(key: String, value: Patch<String?>) {
         if (value is Patch.Set) builder.put(key, value.value?.let(::JsonPrimitive) ?: JsonNull)
     }

@@ -3,7 +3,7 @@
  * Each schema mirrors a request body in docs/API.md.
  */
 import { z } from 'zod';
-import { COLOR_THEMES, REPEATS, RESPONSE_KINDS, THEME_MODES, TILE_COLORS, type Weekday } from './types';
+import { BUSY_BUFFER_MINUTES, COLOR_THEMES, REPEATS, RESPONSE_KINDS, THEME_MODES, TILE_COLORS, type Weekday } from './types';
 import { isValidZone } from './timezone';
 import { normalizeUsername, usernameProblem } from './usernames';
 
@@ -98,6 +98,7 @@ export const updateMeSchema = z
 		schoolAuthority: z.string().max(64).nullable(),
 		timezone,
 		onboarded: z.boolean(),
+		busyBufferMinutes: z.literal(BUSY_BUFFER_MINUTES),
 		username
 	})
 	.partial();

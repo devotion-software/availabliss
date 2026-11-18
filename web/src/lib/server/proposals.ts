@@ -70,7 +70,10 @@ async function load(rows: ProposalRow[]): Promise<Proposal[]> {
 		? await loadBusy(
 				[...new Set(open.flatMap((r) => byProposal.get(r.id)!.map((x) => x.userId)))],
 				Math.min(...open.map((r) => r.start.getTime())),
-				Math.max(...open.map((r) => r.end.getTime()))
+				Math.max(...open.map((r) => r.end.getTime())),
+				false,
+				false,
+				true
 			)
 		: new Map<string, LabelledBusy[]>();
 

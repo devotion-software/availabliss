@@ -1,10 +1,11 @@
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import type { ColorTheme, ThemeMode, User } from '#lib/types';
 import { COLOR_THEMES, THEME_MODES } from '#lib/types';
+import { toBusyBuffer } from '#lib/busy-buffer';
 import { db, isDuplicateKey } from './db';
 import { groupMembers, groups, user } from './db/schema';
 import { ApiError, notFound } from './http';
-import { publishToGroup } from './realtime';
+import { publishAvailabilityChanged, publishToGroup } from './realtime';
 import { assignUsername } from './usernames';
 import { onMemberLeft } from './proposals';
 
@@ -25,7 +26,8 @@ export const toUser = (row: UserRow): User => ({
 	subdivision: row.subdivision,
 	schoolAuthority: row.schoolAuthority,
 	timezone: row.timezone,
-	onboarded: row.onboarded
+	onboarded: row.onboarded,
+	busyBufferMinutes: toBusyBuffer(row.busyBufferMinutes)
 });
 
 export async function getMe(userId: string): Promise<User> {
@@ -36,7 +38,10 @@ export async function getMe(userId: string): Promise<User> {
 }
 
 export type UserPatch = Partial<
-	Pick<User, 'name' | 'themeMode' | 'colorTheme' | 'country' | 'subdivision' | 'schoolAuthority' | 'timezone' | 'onboarded'> & {
+	Pick<
+		User,
+		'name' | 'themeMode' | 'colorTheme' | 'country' | 'subdivision' | 'schoolAuthority' | 'timezone' | 'onboarded' | 'busyBufferMinutes'
+	> & {
 		username: string;
 	}
 >;
@@ -56,6 +61,8 @@ export async function updateMe(userId: string, patch: UserPatch): Promise<User> 
 			throw err;
 		}
 	}
+	// The buffer changes everyone's view of this user's free time.
+	if (patch.busyBufferMinutes !== undefined) await publishAvailabilityChanged(userId);
 	return getMe(userId);
 }
 

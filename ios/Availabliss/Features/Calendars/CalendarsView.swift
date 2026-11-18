@@ -37,6 +37,9 @@ struct CalendarsView: View {
                     }
                     connectButton
                     RegionCard(onChange: changeRegion)
+                    if case .settings = mode {
+                        BusyBufferCard(onError: { model.error = $0 })
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
@@ -406,6 +409,55 @@ private struct RegionCard: View {
 
     private var regionSubtitle: String {
         app.session.user?.schoolAuthority == nil ? "Used for bank and school holidays" : "School holidays included"
+    }
+}
+
+/// "Time around busy times": minutes counted as busy before and after each event when groups look
+/// for free time, so nobody plans something the minute you're free. Saves to the account at once.
+private struct BusyBufferCard: View {
+    let onError: (String) -> Void
+    @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
+    @State private var minutes = 0
+    @State private var loaded = false
+
+    private static let options: [SegmentOption<Int>] = [
+        SegmentOption(value: 0, label: "None"),
+        SegmentOption(value: 15, label: "15 min"),
+        SegmentOption(value: 30, label: "30 min"),
+        SegmentOption(value: 60, label: "1 hr"),
+        SegmentOption(value: 120, label: "2 hr"),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Time around busy times").bodyFont(14, .semibold).accessibilityAddTraits(.isHeader)
+                Text("Counts you as busy for a little longer before and after each event, so nobody plans something the minute you\u{2019}re free.")
+                    .bodyFont(12, relativeTo: .caption)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            SegmentedControl(selection: $minutes, options: Self.options, accessibilityLabel: "Time around busy times")
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(cornerRadius: 20)
+        .onAppear {
+            minutes = app.session.user?.busyBufferMinutes ?? 0
+            loaded = true
+        }
+        .onChange(of: minutes) { old, new in
+            guard loaded, new != (app.session.user?.busyBufferMinutes ?? 0) else { return }
+            Task {
+                do {
+                    _ = try await app.session.update(UserPatch(busyBufferMinutes: new))
+                } catch {
+                    minutes = old
+                    onError(error.userMessage)
+                }
+            }
+        }
     }
 }
 

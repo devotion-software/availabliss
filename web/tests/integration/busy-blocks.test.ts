@@ -5,6 +5,7 @@ import { busyIntervals, calendarConnections, calendars } from '#lib/server/db/sc
 import { createBlock, deleteBlock, getBlock, listBlocks, updateBlock } from '#lib/server/blocks';
 import { busyDuring, loadBusy, myBusy, syncedUserIds } from '#lib/server/busy';
 import { newId } from '#lib/server/ids';
+import { getMe, updateMe } from '#lib/server/users';
 import { apiError, fixture } from './fixtures';
 
 const fx = fixture('busy');
@@ -149,5 +150,30 @@ describe('loadBusy', () => {
 		const synced = await syncedUserIds([cal, manual, neither]);
 		expect([...synced].sort()).toEqual([cal, manual].sort());
 		expect((await syncedUserIds([])).size).toBe(0);
+	});
+});
+
+describe('busy buffer', () => {
+	test('widens busy time for finding free slots, never for the owner’s own view', async () => {
+		const me = await fx.user();
+		const other = await fx.user();
+		await createBlock(me, block('2031-01-08T12:00:00.000Z', '2031-01-08T13:00:00.000Z', { note: 'Lunch' }));
+		await updateMe(me, { busyBufferMinutes: 30 });
+
+		const plain = (await loadBusy([me], at('2031-01-08T00:00:00Z'), at('2031-01-09T00:00:00Z'))).get(me)!;
+		expect(plain.map((b) => [b.start, b.end])).toEqual([[at('2031-01-08T12:00:00Z'), at('2031-01-08T13:00:00Z')]]);
+		const buffered = (await loadBusy([me, other], at('2031-01-08T00:00:00Z'), at('2031-01-09T00:00:00Z'), false, false, true)).get(me)!;
+		expect(buffered.map((b) => [b.start, b.end])).toEqual([[at('2031-01-08T11:30:00Z'), at('2031-01-08T13:30:00Z')]]);
+		expect((await myBusy(me, at('2031-01-08T00:00:00Z'), at('2031-01-09T00:00:00Z'))).map((b) => b.start)).toEqual(['2031-01-08T12:00:00.000Z']);
+
+		// A slot right after lunch clashes because of the buffer; one 30 minutes later doesn't.
+		expect(await busyDuring([me, other], at('2031-01-08T13:00:00Z'), at('2031-01-08T14:00:00Z'))).toEqual([me]);
+		expect(await busyDuring([me, other], at('2031-01-08T13:30:00Z'), at('2031-01-08T14:30:00Z'))).toEqual([]);
+		// Busy time just outside the asked-for range still reaches into it.
+		expect(await busyDuring([me], at('2031-01-08T13:10:00Z'), at('2031-01-08T13:20:00Z'))).toEqual([me]);
+
+		await updateMe(me, { busyBufferMinutes: 0 });
+		expect(await busyDuring([me], at('2031-01-08T13:00:00Z'), at('2031-01-08T14:00:00Z'))).toEqual([]);
+		expect((await getMe(me)).busyBufferMinutes).toBe(0);
 	});
 });

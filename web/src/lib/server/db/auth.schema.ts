@@ -31,6 +31,8 @@ export const user = mysqlTable("user", {
   schoolAuthority: varchar("school_authority", { length: 64 }),
   timezone: varchar("timezone", { length: 64 }).default("Europe/London").notNull(),
   onboarded: boolean("onboarded").default(false).notNull(),
+  // Minutes counted as busy before and after each busy time when finding free slots (0 = none).
+  busyBufferMinutes: int("busy_buffer_minutes").default(0).notNull(),
 });
 
 export const session = mysqlTable(
