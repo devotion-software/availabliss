@@ -25,7 +25,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.material3.AlertDialog
+import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
+import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
@@ -40,7 +41,6 @@ import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
-import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.chat.DateTile
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
@@ -141,15 +141,12 @@ private fun EventsContent(
 /** Confirms deleting a group event (shared by the events list and the event screen). */
 @Composable
 fun DeleteEventDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    val colors = AvailablissTheme.colors
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = colors.bg,
-        shape = Shapes.cardLarge,
-        title = { Text("Delete $title?", style = AvailablissTheme.type.headlineSmall, color = colors.ink) },
-        text = { Text("It will be removed for everyone in the group.", style = AvailablissTheme.type.body, color = colors.muted) },
-        confirmButton = { TextAction("Delete", onConfirm, color = colors.warnInk) },
-        dismissButton = { TextAction("Keep", onDismiss, color = colors.muted) },
+    ConfirmSheet(
+        title = "Delete $title?",
+        message = "It will be removed for everyone in the group.",
+        options = listOf(ConfirmOption("Delete event", onConfirm, AvIcons.Trash, ConfirmOption.Kind.Destructive)),
+        onDismiss = onDismiss,
+        cancelText = "Keep",
     )
 }
 

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.SnackbarHostState
@@ -40,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.network.model.Role
+import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
+import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.Avatar
@@ -228,19 +229,14 @@ private fun MemberRow(member: MemberUi, actions: MembersActions) {
 
 @Composable
 private fun ConfirmDialog(action: ConfirmAction, groupName: String, working: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    val colors = AvailablissTheme.colors
     val (title, body, cta) = when (action) {
         is ConfirmAction.Remove -> Triple("Remove ${action.member.name}?", "They'll lose access to $groupName and its chat.", "Remove")
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = colors.bg,
-        shape = Shapes.cardLarge,
-        tonalElevation = 0.dp,
-        title = { Text(title, style = AvailablissTheme.type.headlineSmall, color = colors.ink) },
-        text = { Text(body, style = AvailablissTheme.type.body, color = colors.muted) },
-        confirmButton = { TextAction(cta, onConfirm, color = colors.warnInk, enabled = !working) },
-        dismissButton = { TextAction("Cancel", onDismiss, color = colors.muted) },
+    ConfirmSheet(
+        title = title,
+        message = body,
+        options = listOf(ConfirmOption(cta, onConfirm, kind = ConfirmOption.Kind.Destructive, loading = working)),
+        onDismiss = onDismiss,
     )
 }
 

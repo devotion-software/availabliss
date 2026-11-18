@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -52,6 +51,8 @@ import dev.joeherbert.availabliss.core.network.model.LinkProviders
 import dev.joeherbert.availabliss.core.network.model.LinkedAccount
 import dev.joeherbert.availabliss.core.network.model.LinkedAccounts
 import dev.joeherbert.availabliss.core.network.model.User
+import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
+import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
@@ -66,7 +67,6 @@ import dev.joeherbert.availabliss.designsystem.component.StatusPill
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.RowDivider
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
-import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
@@ -149,42 +149,22 @@ fun YouScreen(
     }
 
     state.pendingMerge?.let { pending ->
-        val colors = AvailablissTheme.colors
-        AlertDialog(
-            onDismissRequest = viewModel::cancelMerge,
-            containerColor = colors.bg,
-            shape = Shapes.cardLarge,
-            tonalElevation = 0.dp,
-            title = { Text("Merge accounts?", style = AvailablissTheme.type.headlineSmall, color = colors.ink) },
-            text = { Text(mergePrompt(pending.account), style = AvailablissTheme.type.body, color = colors.muted) },
-            confirmButton = { TextAction("Merge", viewModel::confirmMerge, color = colors.warnInk) },
-            dismissButton = { TextAction("Cancel", viewModel::cancelMerge, color = colors.muted) },
+        ConfirmSheet(
+            title = "Merge accounts?",
+            message = mergePrompt(pending.account),
+            options = listOf(ConfirmOption("Merge accounts", viewModel::confirmMerge, kind = ConfirmOption.Kind.Destructive)),
+            onDismiss = viewModel::cancelMerge,
         )
     }
 
     if (state.confirmingDelete) {
-        val colors = AvailablissTheme.colors
-        AlertDialog(
-            onDismissRequest = viewModel::cancelDelete,
-            containerColor = colors.bg,
-            shape = Shapes.cardLarge,
-            tonalElevation = 0.dp,
-            title = { Text("Delete your account?", style = AvailablissTheme.type.headlineSmall, color = colors.ink) },
-            text = {
-                Text(
-                    "This removes you from every group and deletes your busy times, blocks and messages. It can't be undone.",
-                    style = AvailablissTheme.type.body,
-                    color = colors.muted,
-                )
-            },
-            confirmButton = {
-                if (state.deleting) {
-                    CircularProgressIndicator(color = colors.warnInk, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-                } else {
-                    TextAction("Delete", viewModel::confirmDelete, color = colors.warnInk)
-                }
-            },
-            dismissButton = { TextAction("Cancel", viewModel::cancelDelete, color = colors.muted) },
+        ConfirmSheet(
+            title = "Delete your account?",
+            message = "This removes you from every group and deletes your busy times, blocks and messages. It can't be undone.",
+            options = listOf(
+                ConfirmOption("Delete account", viewModel::confirmDelete, AvIcons.Trash, ConfirmOption.Kind.Destructive, loading = state.deleting),
+            ),
+            onDismiss = viewModel::cancelDelete,
         )
     }
 }
