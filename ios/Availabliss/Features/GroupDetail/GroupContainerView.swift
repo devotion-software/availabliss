@@ -111,14 +111,16 @@ private struct GroupTopBar: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
-        .padding(.bottom, 10)
+        .padding(.bottom, 18)
         .background {
-            // The page colour fading out at the bottom (as on Android and web), so the calendar
-            // scrolls away under the name; a plain material read as a flat grey band.
-            LinearGradient(
-                stops: [.init(color: theme.bg.opacity(0.92), location: 0.8), .init(color: theme.bg.opacity(0), location: 1)],
-                startPoint: .top, endPoint: .bottom
-            )
+            // A light wash of the page colour over a strong blur, fading out at the bottom (as on
+            // Android and web) so the calendar scrolls away under the name without a hard edge.
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                theme.bg.opacity(0.45)
+            }
+            .mask(LinearGradient(stops: [.init(color: .black, location: 0.8), .init(color: .clear, location: 1)],
+                                 startPoint: .top, endPoint: .bottom))
             .ignoresSafeArea(edges: .top)
         }
     }

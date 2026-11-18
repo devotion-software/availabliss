@@ -47,7 +47,7 @@ import dev.joeherbert.availabliss.feature.proposal.PlansCard
 import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
 
 /** Height of the group's pinned header below the status bar; the calendar leaves this much room. */
-val GroupTopBarHeight = 64.dp
+val GroupTopBarHeight = 72.dp
 
 /**
  * A group: its calendar, under a pinned header (back, name, chat, "More"). Chat, Plans, Timing,
@@ -98,10 +98,10 @@ private fun GroupTopBar(state: GroupShellUiState, actions: GroupTopBarActions, m
     Row(
         modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(0.8f to colors.bg.copy(alpha = 0.92f), 1f to colors.bg.copy(alpha = 0f)))
+            .background(Brush.verticalGradient(0f to colors.bg.copy(alpha = 0.82f), 0.75f to colors.bg.copy(alpha = 0.7f), 1f to colors.bg.copy(alpha = 0f)))
             .statusBarsPadding()
             .height(GroupTopBarHeight)
-            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
