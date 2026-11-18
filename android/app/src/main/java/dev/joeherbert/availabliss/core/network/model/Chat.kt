@@ -30,6 +30,43 @@ data class Message(
     val deleted: Boolean = false,
     /** Only on your own messages. */
     val receipt: Receipt? = null,
+    /** The message this one replies to, as it is now. */
+    val replyTo: MessageReply? = null,
+)
+
+/** A quoted message above a reply: who sent it and one line of it. */
+@Serializable
+data class MessageReply(
+    val id: String,
+    val authorId: String? = null,
+    val authorName: String? = null,
+    val kind: MessageKind = MessageKind.Text,
+    /** The text, or a poll's question; null once deleted. */
+    val text: String? = null,
+    val deleted: Boolean = false,
+) {
+    /** One line for the quote: "Deleted message", "Poll: Which park?" or the text. */
+    val snippet: String
+        get() = when {
+            deleted -> "Deleted message"
+            kind == MessageKind.Poll -> "Poll: ${text.orEmpty()}"
+            kind == MessageKind.Proposal -> text ?: "Proposal"
+            kind == MessageKind.Event -> text ?: "Event"
+            else -> text.orEmpty()
+        }
+}
+
+/** Can be replied to: text and polls that are still there. */
+val Message.canReply: Boolean get() = (kind == MessageKind.Text || kind == MessageKind.Poll) && !deleted && authorId != null
+
+/** This message as a quote (for "Replying to …", and to refresh replies after it changes). */
+fun Message.asReply(authorName: String? = null): MessageReply = MessageReply(
+    id = id,
+    authorId = authorId,
+    authorName = authorName,
+    kind = kind,
+    text = if (deleted) null else (if (kind == MessageKind.Poll) poll?.question else body)?.split(Regex("\\s+"))?.joinToString(" ")?.trim(),
+    deleted = deleted,
 )
 
 @Serializable
@@ -71,7 +108,7 @@ data class UserAt(val userId: String, val at: String)
 data class MessagesResponse(val messages: List<Message>, val hasMore: Boolean)
 
 @Serializable
-data class SendTextRequest(val body: String)
+data class SendTextRequest(val body: String, val replyToId: String? = null)
 
 @Serializable
 data class SendPollRequest(val poll: NewPoll)

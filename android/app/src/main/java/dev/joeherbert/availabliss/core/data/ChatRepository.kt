@@ -25,8 +25,8 @@ class ChatRepository @Inject constructor(
     suspend fun page(groupId: String, before: String? = null, limit: Int = PAGE_SIZE): ApiResult<MessagesResponse> =
         call { api.getMessages(groupId, before, limit) }
 
-    suspend fun sendText(groupId: String, body: String): ApiResult<Message> =
-        call { api.sendText(groupId, SendTextRequest(body.trim())) }
+    suspend fun sendText(groupId: String, body: String, replyToId: String? = null): ApiResult<Message> =
+        call { api.sendText(groupId, SendTextRequest(body.trim(), replyToId)) }
 
     suspend fun sendPoll(groupId: String, question: String, options: List<String>, multi: Boolean): ApiResult<Message> =
         call { api.sendPoll(groupId, SendPollRequest(NewPoll(question.trim(), options.map { it.trim() }, multi))) }

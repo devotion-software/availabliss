@@ -56,6 +56,20 @@ import dev.joeherbert.availabliss.designsystem.component.chat.PollCard
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCard
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardUi
 import dev.joeherbert.availabliss.designsystem.component.chat.ReadReceipt
+import dev.joeherbert.availabliss.designsystem.component.chat.SwipeToReply
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
@@ -88,6 +102,8 @@ data class ChatActions(
     val onEditMessage: (messageId: String) -> Unit = {},
     val onDeleteMessage: (messageId: String) -> Unit = {},
     val onCancelEdit: () -> Unit = {},
+    val onReply: (messageId: String) -> Unit = {},
+    val onCancelReply: () -> Unit = {},
     val onAddToCalendar: (eventId: String) -> Unit = {},
     /** Set when the chat wasn't opened over its group's calendar: the header's group name opens it. */
     val onOpenGroup: (() -> Unit)? = null,
@@ -115,6 +131,7 @@ fun GroupChatTab(
     }
     BackHandler(enabled = state.menuOpen) { viewModel.closeMenu() }
     BackHandler(enabled = state.editing && !state.menuOpen) { viewModel.cancelEdit() }
+    BackHandler(enabled = state.replying != null && !state.editing && !state.menuOpen) { viewModel.cancelReply() }
 
     val currentOnBack by rememberUpdatedState(onBack)
     val currentOnOpenProposal by rememberUpdatedState(onOpenProposal)
@@ -147,6 +164,8 @@ fun GroupChatTab(
             onEditMessage = viewModel::startEdit,
             onDeleteMessage = viewModel::requestDelete,
             onCancelEdit = viewModel::cancelEdit,
+            onReply = viewModel::startReply,
+            onCancelReply = viewModel::cancelReply,
             onAddToCalendar = viewModel::onAddToCalendar,
             onOpenGroup = onOpenGroup,
         )
@@ -209,6 +228,9 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
                 sending = state.sending,
                 editing = state.editing,
                 onCancelEdit = actions.onCancelEdit,
+                replyingTo = state.replying?.name,
+                replyingSnippet = state.replying?.snippet.orEmpty(),
+                onCancelReply = actions.onCancelReply,
             )
         }
     }
@@ -268,6 +290,26 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
     LaunchedEffect(newestKey) {
         if (listState.firstVisibleItemIndex <= 2) listState.animateScrollToItem(0)
     }
+    // Tapping a quote scrolls to the original (when it's loaded) and flashes it.
+    var highlighted by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val items by rememberUpdatedState(state.items)
+    val showOriginal: (String) -> Unit = remember(listState) {
+        { id ->
+            val index = items.indexOfFirst { it.key == id }
+            if (index >= 0) scope.launch {
+                listState.animateScrollToItem(index)
+                // Lift it from the bottom edge to the middle.
+                listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.let { info ->
+                    val viewport = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
+                    listState.animateScrollBy(-(viewport / 2f - info.size / 2f).coerceAtLeast(0f))
+                }
+                highlighted = id
+                delay(1200)
+                if (highlighted == id) highlighted = null
+            }
+        }
+    }
 
     LazyColumn(
         state = listState,
@@ -277,18 +319,25 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
     ) {
         items(state.items, key = { it.key }, contentType = { it::class }) { item ->
-            ChatRow(item, actions, state.calendar.added)
+            val flash by animateColorAsState(
+                if (highlighted != null && highlighted == item.key) AvailablissTheme.colors.accentSoft else Color.Transparent,
+                animationSpec = tween(if (highlighted == item.key) 200 else 600),
+                label = "quote-highlight",
+            )
+            Box(Modifier.drawBehind { drawRoundRect(flash, topLeft = Offset(-6.dp.toPx(), -6.dp.toPx()), size = Size(size.width + 12.dp.toPx(), size.height + 12.dp.toPx()), cornerRadius = CornerRadius(18.dp.toPx())) }) {
+                ChatRow(item, actions, state.calendar.added, showOriginal)
+            }
         }
         if (state.loadingOlder) item(key = "loading-older") { LoadingIndicator() }
     }
 }
 
 @Composable
-private fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<String>) {
+private fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<String>, showOriginal: (String) -> Unit) {
     when (item) {
         is ChatItem.Day -> ChatMeta(item.label)
         is ChatItem.System -> ChatMeta(item.text)
-        is ChatItem.Text -> MessageBubble(
+        is ChatItem.Text -> SwipeToReply(enabled = item.canReply, onReply = { actions.onReply(item.id) }) { MessageBubble(
             text = item.text,
             own = item.own,
             author = item.author,
@@ -298,17 +347,16 @@ private fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<S
             accessibilityLabel = item.accessibilityLabel,
             edited = item.edited,
             deleted = item.deleted,
-            menuActions = if (item.canEdit) {
-                remember(item.id, actions) {
-                    listOf(
-                        BubbleAction("Edit") { actions.onEditMessage(item.id) },
-                        BubbleAction("Delete", destructive = true) { actions.onDeleteMessage(item.id) },
-                    )
-                }
-            } else {
-                emptyList()
+            menuActions = remember(item.id, item.canEdit, item.canReply, actions) {
+                listOfNotNull(
+                    BubbleAction("Reply") { actions.onReply(item.id) }.takeIf { item.canReply },
+                    BubbleAction("Edit") { actions.onEditMessage(item.id) }.takeIf { item.canEdit },
+                    BubbleAction("Delete", destructive = true) { actions.onDeleteMessage(item.id) }.takeIf { item.canEdit },
+                )
             },
-        )
+            quote = item.quote,
+            onQuoteClick = showOriginal,
+        ) }
         is ChatItem.ProposalCard -> ProposalCard(
             ui = item.card ?: ProposalCardUi("", "", "Proposed a time", "Loading…", ""),
             onClick = { actions.onOpenProposal(item.proposalId) },
@@ -333,13 +381,15 @@ private fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<S
                 height = 40.dp,
             )
         }
-        is ChatItem.PollItem -> Box(Modifier.fillMaxWidth(), contentAlignment = if (item.own) Alignment.CenterEnd else Alignment.CenterStart) {
-            PollCard(
-                poll = item.poll,
-                onToggle = { optionId -> actions.onVote(item.id, optionId) },
-                onClose = { actions.onClosePoll(item.id) },
-                modifier = Modifier.widthIn(max = 300.dp).fillMaxWidth(),
-            )
+        is ChatItem.PollItem -> SwipeToReply(enabled = item.canReply, onReply = { actions.onReply(item.id) }) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = if (item.own) Alignment.CenterEnd else Alignment.CenterStart) {
+                PollCard(
+                    poll = item.poll,
+                    onToggle = { optionId -> actions.onVote(item.id, optionId) },
+                    onClose = { actions.onClosePoll(item.id) },
+                    modifier = Modifier.widthIn(max = 300.dp).fillMaxWidth(),
+                )
+            }
         }
         is ChatItem.Receipt -> ReadReceipt(
             label = item.label,

@@ -32,6 +32,8 @@ import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ReceiptState
 import dev.joeherbert.availabliss.core.network.model.TileColor
+import dev.joeherbert.availabliss.core.network.model.asReply
+import dev.joeherbert.availabliss.core.network.model.canReply
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
 import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
@@ -62,6 +64,9 @@ data class MessageInfoUi(
     val pending: List<InfoPerson> = emptyList(),
     val error: String? = null,
 )
+
+/** "Replying to Priya" above the composer, with one line of what they said. */
+data class ReplyingUi(val messageId: String, val name: String, val snippet: String)
 
 /** Poll creation form. */
 data class PollDraft(
@@ -99,6 +104,8 @@ data class ChatUiState(
     val info: MessageInfoUi? = null,
     /** The composer is editing one of your messages (the draft holds its text). */
     val editing: Boolean = false,
+    /** The message your next one replies to, shown above the composer. */
+    val replying: ReplyingUi? = null,
     /** Non-null while "Delete this message?" is showing. */
     val confirmDeleteId: String? = null,
     /** Add to calendar on "Everyone's in" banners (`added` holds event ids added this session). */
@@ -125,6 +132,7 @@ private data class ChatData(
     val pollDraft: PollDraft? = null,
     val infoSheet: InfoSheet? = null,
     val editing: EditSession? = null,
+    val replyingToId: String? = null,
     val confirmDeleteId: String? = null,
     val message: UserMessage? = null,
 )
@@ -295,6 +303,7 @@ class ChatViewModel @Inject constructor(
                 data.update { it.copy(messages = it.messages.withUpdated(m)) }
                 // Deleted elsewhere (e.g. on another device) while you were editing it.
                 if (m.deleted && data.value.editing?.messageId == m.id) cancelEdit()
+                if (m.deleted && data.value.replyingToId == m.id) cancelReply()
             }
             is LivePayload.MessageReceipts -> {
                 val updates = payload.payload.receipts.associateBy { it.messageId }
@@ -371,20 +380,32 @@ class ChatViewModel @Inject constructor(
         val text = draft.trim()
         if (text.isEmpty() || data.value.sending) return
         draft = ""
-        data.update { it.copy(sending = true, menuOpen = false) }
+        val replyTo = data.value.replyingToId
+        data.update { it.copy(sending = true, menuOpen = false, replyingToId = null) }
         viewModelScope.launch {
-            when (val result = chat.sendText(groupId, text)) {
+            when (val result = chat.sendText(groupId, text, replyTo)) {
                 is ApiResult.Success -> {
                     appendMessage(result.value)
                     data.update { it.copy(sending = false) }
                 }
                 is ApiResult.Failure -> {
                     if (draft.isEmpty()) draft = text
-                    data.update { it.copy(sending = false, message = UserMessage(result.error.message)) }
+                    data.update { it.copy(sending = false, replyingToId = it.replyingToId ?: replyTo, message = UserMessage(result.error.message)) }
                 }
             }
         }
     }
+    // endregion
+
+    // region Reply
+    /** Replies to [messageId] with the next message (swipe right, or Reply in its menu). */
+    fun startReply(messageId: String) {
+        val m = data.value.messages.firstOrNull { it.id == messageId }?.takeIf { it.canReply } ?: return
+        cancelEdit()
+        data.update { it.copy(replyingToId = m.id, menuOpen = false) }
+    }
+
+    fun cancelReply() = data.update { it.copy(replyingToId = null) }
     // endregion
 
     // region Edit & delete
@@ -397,7 +418,7 @@ class ChatViewModel @Inject constructor(
     fun startEdit(messageId: String) {
         val m = editable(messageId) ?: return
         val stash = data.value.editing?.stashedDraft ?: draft
-        data.update { it.copy(editing = EditSession(m.id, m.body.orEmpty(), stash), menuOpen = false) }
+        data.update { it.copy(editing = EditSession(m.id, m.body.orEmpty(), stash), menuOpen = false, replyingToId = null) }
         draft = m.body.orEmpty()
     }
 
@@ -441,6 +462,7 @@ class ChatViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     data.update { it.copy(messages = it.messages.withDeleted(id)) }
                     if (data.value.editing?.messageId == id) cancelEdit()
+                    if (data.value.replyingToId == id) cancelReply()
                 }
                 is ApiResult.Failure -> data.update { it.copy(message = UserMessage(result.error.message)) }
             }
@@ -577,6 +599,10 @@ class ChatViewModel @Inject constructor(
             sending = sending,
             pollDraft = pollDraft,
             editing = editing != null,
+            replying = replyingToId?.let { id -> messages.firstOrNull { it.id == id } }?.let { m ->
+                val directory = MemberDirectory(g?.members.orEmpty(), me)
+                ReplyingUi(m.id, replyAuthorName(m.authorId, null, directory), m.asReply().snippet)
+            },
             confirmDeleteId = confirmDeleteId,
             calendar = cal,
             info = infoSheet?.let { sheet ->

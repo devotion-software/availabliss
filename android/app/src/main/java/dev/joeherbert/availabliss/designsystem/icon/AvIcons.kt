@@ -41,6 +41,7 @@ object AvIcons {
     val AddPerson = line("AddPerson", circle(10f, 8f, 4f), "M3 20c1.2-3.5 3.8-5 7-5s5.8 1.5 7 5M19 8v6M16 11h6")
     val Clock = line("Clock", circle(12f, 12f, 9f), "M12 7v5l3 2")
     val Pencil = line("Pencil", "M4 20h4L19 9l-4-4L4 16v4z")
+    val Reply = line("Reply", "M9 14L4 9l5-5", "M4 9h10a6 6 0 0 1 6 6v4", stroke = 2.2f)
     val Link = line("Link", "M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1", "M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1")
     val Repeat = line("Repeat", "M17 2l4 4-4 4", "M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4", "M21 13v2a3 3 0 0 1-3 3H3", stroke = 2.2f)
     val Shield = line("Shield", "M12 3l8 3v6c0 4.5-3.3 8.3-8 9-4.7-.7-8-4.5-8-9V6l8-3z")

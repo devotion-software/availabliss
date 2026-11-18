@@ -47,6 +47,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
@@ -64,6 +67,9 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
  * [editing]: editing one of your messages. An "Editing message" strip with a cancel
  * button sits above the field, the + toggle is hidden, the field is focused, and the
  * send button becomes a check ("Save").
+ *
+ * [replyingTo] (a name): your next message replies to theirs. A "Replying to …" strip with
+ * [replyingSnippet] and a cancel button sits above the field, and the field is focused.
  */
 @Composable
 fun ChatComposer(
@@ -79,6 +85,9 @@ fun ChatComposer(
     sending: Boolean = false,
     editing: Boolean = false,
     onCancelEdit: () -> Unit = {},
+    replyingTo: String? = null,
+    replyingSnippet: String = "",
+    onCancelReply: () -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
     val canSend = text.isNotBlank() && !sending
@@ -94,6 +103,16 @@ fun ChatComposer(
             keyboard?.show()
         }
     }
+    val replying = replyingTo != null && !editing
+    LaunchedEffect(replying, replyingSnippet) {
+        if (replying) {
+            runCatching { focus.requestFocus() }
+            keyboard?.show()
+        }
+    }
+    // Kept while the strip animates out.
+    var shownReply by remember { mutableStateOf(replyingTo to replyingSnippet) }
+    if (replyingTo != null) shownReply = replyingTo to replyingSnippet
     Column(modifier.fillMaxWidth()) {
         AnimatedVisibility(visible = editing, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             Row(
@@ -108,6 +127,31 @@ fun ChatComposer(
                 Icon(AvIcons.Pencil, null, tint = colors.accentInk, modifier = Modifier.size(16.dp))
                 Text("Editing message", style = AvailablissTheme.type.captionStrong, color = colors.ink, modifier = Modifier.weight(1f))
                 PlainIconButton(AvIcons.Close, "Cancel editing", onCancelEdit, size = 40.dp, iconSize = 16.dp, tint = colors.muted)
+            }
+        }
+        AnimatedVisibility(visible = replying, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            val (name, snippet) = shownReply
+            Row(
+                Modifier
+                    .padding(start = 12.dp, end = 12.dp, top = 10.dp)
+                    .fillMaxWidth()
+                    .glass(RoundedCornerShape(22.dp))
+                    .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(Modifier.width(3.dp).height(32.dp).clip(RoundedCornerShape(1.5.dp)).background(colors.accentInk))
+                Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
+                    Text(
+                        "Replying to ${if (name == "You") "yourself" else name}",
+                        style = AvailablissTheme.type.label,
+                        color = colors.ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(snippet, style = AvailablissTheme.type.caption, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                PlainIconButton(AvIcons.Close, "Cancel reply", onCancelReply, size = 40.dp, iconSize = 16.dp, tint = colors.muted)
             }
         }
         AnimatedVisibility(visible = menuOpen, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
@@ -211,6 +255,16 @@ private fun ChatComposerPreview() {
     AvailablissPreviewTheme {
         Box(Modifier.background(AvailablissTheme.colors.bg)) {
             ChatComposer("", {}, {}, menuOpen = true, onToggleMenu = {}, onPoll = {}, onProposeTime = {}, onAddEvent = {})
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun ChatComposerReplyingPreview() {
+    AvailablissPreviewTheme {
+        Box(Modifier.background(AvailablissTheme.colors.bg)) {
+            ChatComposer("", {}, {}, menuOpen = false, onToggleMenu = {}, onPoll = {}, onProposeTime = {}, onAddEvent = {}, replyingTo = "Priya", replyingSnippet = "Has everyone put their calendar in yet?")
         }
     }
 }

@@ -4,9 +4,13 @@ import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageKind
+import dev.joeherbert.availabliss.core.network.model.MessageReply
+import dev.joeherbert.availabliss.core.network.model.asReply
+import dev.joeherbert.availabliss.core.network.model.canReply
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
+import dev.joeherbert.availabliss.designsystem.component.chat.BubbleQuote
 import dev.joeherbert.availabliss.designsystem.component.chat.PollOptionUi
 import dev.joeherbert.availabliss.designsystem.component.chat.PollUi
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardTone
@@ -40,6 +44,10 @@ sealed interface ChatItem {
         val deleted: Boolean = false,
         /** Your own, non-deleted text message: long-press offers Edit and Delete. */
         val canEdit: Boolean = false,
+        /** Can be replied to (swipe right, or Reply in the long-press menu). */
+        val canReply: Boolean = false,
+        /** The message this one replies to, quoted above the text. */
+        val quote: BubbleQuote? = null,
     ) : ChatItem {
         override val key get() = id
     }
@@ -73,7 +81,7 @@ sealed interface ChatItem {
         override val key get() = id
     }
 
-    data class PollItem(val id: String, val poll: PollUi, val own: Boolean, val author: AvatarPerson?) : ChatItem {
+    data class PollItem(val id: String, val poll: PollUi, val own: Boolean, val author: AvatarPerson?, val canReply: Boolean = true) : ChatItem {
         override val key get() = id
     }
 
@@ -182,6 +190,8 @@ fun buildChatItems(
                         edited = m.isEdited && receipt == null,
                         deleted = m.deleted,
                         canEdit = own && m.kind == MessageKind.Text && !m.deleted,
+                        canReply = m.canReply,
+                        quote = if (m.deleted) null else m.replyTo?.let { quoteFor(it, directory) },
                     )
                 }
             }
@@ -225,6 +235,29 @@ private fun receiptFor(m: Message, directory: MemberDirectory): ChatItem.Receipt
 
 private val Message.isEdited: Boolean get() = editedAt != null && !deleted
 
+/** "You", the member's name, or the name the server sent (someone who has left). */
+fun replyAuthorName(authorId: String?, fallback: String?, directory: MemberDirectory): String = when {
+    directory.isMe(authorId) -> "You"
+    else -> authorId?.let { directory[it]?.name } ?: fallback ?: "Someone"
+}
+
+private fun quoteFor(reply: MessageReply, directory: MemberDirectory) = BubbleQuote(
+    messageId = reply.id,
+    name = replyAuthorName(reply.authorId, reply.authorName, directory),
+    snippet = reply.snippet,
+    deleted = reply.deleted,
+)
+
+/** Quotes aren't republished when the original changes: refreshes loaded replies to [original]. */
+private fun List<Message>.withQuotesOf(original: Message): List<Message> = map { m ->
+    val quote = m.replyTo
+    if (quote?.id != original.id) m
+    else {
+        val fresh = original.asReply()
+        m.copy(replyTo = quote.copy(text = fresh.text, deleted = fresh.deleted))
+    }
+}
+
 /**
  * Applies an edited or deleted message (from `message.updated` or your own PATCH) to
  * the loaded list, by id. The update's `receipt` is null on live events, so the
@@ -232,11 +265,12 @@ private val Message.isEdited: Boolean get() = editedAt != null && !deleted
  */
 fun List<Message>.withUpdated(updated: Message): List<Message> = map { m ->
     if (m.id == updated.id) updated.copy(receipt = updated.receipt ?: m.receipt) else m
-}
+}.withQuotesOf(updated)
 
 /** Marks a message deleted locally after your own DELETE succeeds. */
-fun List<Message>.withDeleted(messageId: String): List<Message> = map { m ->
-    if (m.id == messageId) m.copy(body = null, deleted = true) else m
+fun List<Message>.withDeleted(messageId: String): List<Message> {
+    val deleted = firstOrNull { it.id == messageId }?.copy(body = null, deleted = true) ?: return this
+    return map { m -> if (m.id == messageId) deleted else m }.withQuotesOf(deleted)
 }
 
 private fun Poll.toUi(directory: MemberDirectory, canClose: Boolean, title: String): PollUi {
