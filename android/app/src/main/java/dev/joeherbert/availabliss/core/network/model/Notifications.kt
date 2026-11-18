@@ -17,6 +17,8 @@ enum class NotificationKind(override val wire: String) : WireEnum {
     InviteReceived("invite.received"),
     Message("message"),
     EventCreated("event.created"),
+    /** Your role in a group changed (made an admin, no longer one, or handed ownership); `data.role` is the new one. */
+    RoleChanged("role.changed"),
 
     /** A kind added on the server after this build. */
     Unknown(""),

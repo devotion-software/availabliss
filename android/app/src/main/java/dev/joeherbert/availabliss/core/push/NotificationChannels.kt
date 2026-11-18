@@ -23,6 +23,7 @@ enum class Channel(
     Nudge("nudge", R.string.channel_nudges_name, R.string.channel_nudges_description, NotificationManager.IMPORTANCE_DEFAULT),
     InviteAccepted("invite.accepted", R.string.channel_invites_name, R.string.channel_invites_description, NotificationManager.IMPORTANCE_DEFAULT),
     InviteReceived("invite.received", R.string.channel_invite_received_name, R.string.channel_invite_received_description, NotificationManager.IMPORTANCE_HIGH),
+    RoleChanged("role.changed", R.string.channel_role_changed_name, R.string.channel_role_changed_description, NotificationManager.IMPORTANCE_DEFAULT),
     General("general", R.string.channel_general_name, R.string.channel_general_description, NotificationManager.IMPORTANCE_DEFAULT);
 
     companion object {

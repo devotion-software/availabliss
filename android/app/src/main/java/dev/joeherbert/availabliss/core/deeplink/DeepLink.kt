@@ -91,7 +91,7 @@ sealed interface DeepLink {
                     proposalId?.let(::Proposal) ?: groupId?.let(::GroupCalendar)
                 "message" -> groupId?.let(::GroupChat)
                 "event.created" -> groupId?.let(::GroupEvents)
-                "invite.accepted" -> groupId?.let(::GroupCalendar)
+                "invite.accepted", "role.changed" -> groupId?.let(::GroupCalendar)
                 // Someone invited you by username: open the invite, as `/invite/:token` does.
                 "invite.received" -> token?.let(::Invite) ?: Activity
                 "nudge" -> MyTime

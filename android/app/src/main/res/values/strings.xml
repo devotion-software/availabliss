@@ -20,6 +20,8 @@
     <string name="channel_invites_description">When someone accepts your invite</string>
     <string name="channel_invite_received_name">Invites</string>
     <string name="channel_invite_received_description">When someone invites you to a group</string>
+    <string name="channel_role_changed_name">Admin changes</string>
+    <string name="channel_role_changed_description">When you\'re made an admin or owner of a group, or are no longer an admin</string>
     <!-- The device owner in a chat notification. -->
     <string name="notification_you">You</string>
 </resources>
