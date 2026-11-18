@@ -60,9 +60,21 @@ data class MonthCellUi(
     /** How many members' preferred times this day fits (shown as a heart on days that work). */
     val preferredCount: Int = 0,
     val accessibilityLabel: String = "",
-    /** Today: its number sits on an accent pill. */
+    /**
+     * Today: its number sits on an inverted pill on a day that works; on one that doesn't, the cell
+     * is outlined in the accent with its number in accent (a pill would fade with the cell).
+     */
     val today: Boolean = false,
 )
+
+/** How far cells that don't work fade; today's content doesn't, only its background. */
+private const val BUSY_FADE = 0.5f
+private const val HIDDEN_FADE = 0.35f
+
+/** Today on a day that doesn't work: an accent outline rather than the cell's own border. */
+@Composable
+private fun Modifier.todayOutline(today: Boolean, shape: Shape, fallback: Color): Modifier =
+    if (today) border(1.5.dp, AvailablissTheme.colors.accent, shape) else border(1.dp, fallback, shape)
 
 /**
  * Picks out today's date with a pill behind it in [pill]. Drawn outside the layout, so cells keep
@@ -141,6 +153,9 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
         CellState.Busy -> Triple(colors.busyBg, colors.ink, colors.glassBorder)
         else -> Triple(colors.surface, colors.ink, colors.glassBorder)
     }
+    // Today on a day that doesn't work keeps its content at full strength; only the cell fades.
+    val plainToday = cell.today && cell.state != CellState.Match
+    val fade = if (cell.state == CellState.Busy) BUSY_FADE else 1f
     Box(modifier) {
     Column(
         Modifier
@@ -148,10 +163,10 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
             .height(54.dp)
             .then(if (cell.selected) Modifier.outlineOutside(shape, colors.ink) else Modifier)
             .then(if (cell.state == CellState.Match) Modifier.softShadow(shape, colors.accent, offsetY = 12.dp, blur = 24.dp, spread = (-14).dp) else Modifier)
-            .alpha(if (cell.state == CellState.Busy) 0.5f else 1f)
+            .alpha(if (plainToday) 1f else fade)
             .clip(shape)
-            .background(bg)
-            .border(1.dp, border, shape)
+            .background(if (plainToday) bg.copy(alpha = bg.alpha * fade) else bg)
+            .then(if (plainToday) Modifier.todayOutline(true, shape, border) else Modifier.border(1.dp, border, shape))
             .clickable(role = Role.Button, onClick = onClick)
             .semantics {
                 contentDescription = cell.accessibilityLabel
@@ -164,10 +179,10 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
         val onAccent = cell.state == CellState.Match
         Text(
             cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp,
-            color = if (!cell.today) fg else if (onAccent) colors.accent else colors.onAccent,
-            modifier = Modifier.todayPill(cell.today, if (onAccent) colors.onAccent else colors.accent),
+            color = if (plainToday) colors.accentInk else if (!cell.today) fg else colors.accent,
+            modifier = Modifier.todayPill(cell.today && onAccent, colors.onAccent),
         )
-        Text(cell.note, style = AvailablissTheme.type.micro, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(cell.note, style = AvailablissTheme.type.micro, color = if (plainToday) colors.muted else fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
     if (cell.state == CellState.Match && cell.preferredCount > 0) {
         Row(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 7.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -178,7 +193,10 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
     }
 }
 
-/** A day outside the group's timing, or already past: a quiet placeholder ("Past", "Today"). */
+/**
+ * A day outside the group's timing, or already past: a quiet placeholder ("Past", "Today").
+ * Today stays readable: outlined in the accent, its date in accent, only the cell faded.
+ */
 @Composable
 private fun HiddenCell(cell: MonthCellUi, modifier: Modifier = Modifier) {
     val colors = AvailablissTheme.colors
@@ -186,20 +204,19 @@ private fun HiddenCell(cell: MonthCellUi, modifier: Modifier = Modifier) {
     Column(
         modifier
             .height(54.dp)
-            .alpha(0.35f)
+            .alpha(if (cell.today) 1f else HIDDEN_FADE)
             .clip(shape)
-            .background(colors.surface)
-            .border(1.dp, colors.glassBorder, shape)
+            .background(if (cell.today) colors.surface.copy(alpha = colors.surface.alpha * HIDDEN_FADE) else colors.surface)
+            .todayOutline(cell.today, shape, colors.glassBorder)
             .semantics { contentDescription = cell.accessibilityLabel }
             .padding(horizontal = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
         Text(
             cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp,
-            color = if (cell.today) colors.onAccent else colors.ink,
-            modifier = Modifier.todayPill(cell.today, colors.accent),
+            color = if (cell.today) colors.accentInk else colors.ink,
         )
-        Text(cell.note, style = AvailablissTheme.type.micro, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(cell.note, style = AvailablissTheme.type.micro, color = if (cell.today) colors.muted else colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
