@@ -343,7 +343,8 @@ export interface Poll {
 	question: string;
 	multi: boolean;
 	closed: boolean;
-	options: { id: string; label: string; voterIds: string[] }[];
+	/** A date poll's options each carry `slot` (the time it stands for); text polls have none. */
+	options: { id: string; label: string; voterIds: string[]; slot?: { start: string; end: string; allDay: boolean } | null }[];
 }
 
 export type MessageKind = 'text' | 'poll' | 'proposal' | 'event' | 'system';

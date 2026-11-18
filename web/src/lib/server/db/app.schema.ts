@@ -394,7 +394,11 @@ export const pollOptions = mysqlTable(
 			.notNull()
 			.references(() => polls.id, { onDelete: 'cascade' }),
 		label: varchar('label', { length: 100 }).notNull(),
-		position: int('position').notNull()
+		position: int('position').notNull(),
+		/** A date poll's option: the time it stands for (null for a text option). */
+		start: farInstant('start'),
+		end: farInstant('end'),
+		allDay: boolean('all_day').default(false).notNull()
 	},
 	(t) => [index('poll_options_poll_idx').on(t.pollId)]
 );

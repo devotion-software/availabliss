@@ -119,6 +119,25 @@ describe('chat', () => {
 		expect((await apiError(deleteMessage(poll.id, member))).code).toBe('validation_error');
 	});
 
+	test('a date poll keeps its times, labelled and in order, and votes like any poll', async () => {
+		const message = await sendPoll(groupId, owner, {
+			question: 'Which evening?',
+			multi: true,
+			slots: [
+				{ start: '2031-03-06T18:00:00.000Z', end: '2031-03-06T21:00:00.000Z', allDay: false },
+				{ start: '2031-03-04T18:00:00.000Z', end: '2031-03-04T21:00:00.000Z', allDay: false }
+			]
+		});
+		const poll = message.poll!;
+		expect(poll.options.map((o) => o.slot?.start)).toEqual(['2031-03-04T18:00:00.000Z', '2031-03-06T18:00:00.000Z']);
+		expect(poll.options[0].label).toContain('4 Mar');
+		const voted = await vote(poll.id, member, [poll.options[0].id, poll.options[1].id]);
+		expect(voted.options.map((o) => o.voterIds)).toEqual([[member], [member]]);
+		// Text polls carry no times.
+		const text = await sendPoll(groupId, owner, { question: 'Pizza?', options: ['Yes', 'No'], multi: false });
+		expect(text.poll!.options[0].slot).toBeUndefined();
+	});
+
 	test('replies quote the original as it is now, from the same chat only', async () => {
 		const original = await sendText(groupId, owner, 'Who is bringing the snacks?\nAnd drinks?');
 		expect(original.replyTo).toBeNull();

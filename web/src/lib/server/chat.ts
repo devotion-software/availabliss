@@ -6,7 +6,8 @@ import { groupMembers, groups, messageReceipts, messages, pollOptions, polls, po
 import { badRequest, conflict, forbidden, notFound } from './http';
 import { alias } from 'drizzle-orm/mysql-core';
 import { newId } from './ids';
-import { memberIds, memberName, requireMember } from './groups';
+import { getGroupRow, memberIds, memberName, requireMember } from './groups';
+import { slotLabel } from './availability/labels';
 import { publishToGroup } from './realtime';
 import { markChatRead, notify } from './notifications';
 import { displayName } from './names';
@@ -40,7 +41,12 @@ async function loadPolls(pollIds: string[]): Promise<Map<string, Poll>> {
 			closed: p.closedAt !== null,
 			options: optionRows
 				.filter((o) => o.pollId === p.id)
-				.map((o) => ({ id: o.id, label: o.label, voterIds: voteRows.filter((v) => v.optionId === o.id).map((v) => v.userId) }))
+				.map((o) => ({
+					id: o.id,
+					label: o.label,
+					voterIds: voteRows.filter((v) => v.optionId === o.id).map((v) => v.userId),
+					...(o.start && o.end && { slot: { start: o.start.toISOString(), end: o.end.toISOString(), allDay: o.allDay } })
+				}))
 		});
 	}
 	return result;
@@ -495,16 +501,33 @@ export async function deleteMessage(messageId: string, userId: string): Promise<
 	await publishUpdated(messageId, userId);
 }
 
-export async function sendPoll(
-	groupId: string,
-	userId: string,
-	input: { question: string; options: string[]; multi: boolean }
-): Promise<Message> {
+export type PollInput =
+	| { question: string; options: string[]; multi: boolean }
+	/** A date poll: a shortlist of times from the group calendar, labelled in the group's time zone. */
+	| { question: string; slots: { start: string; end: string; allDay: boolean }[]; multi: boolean };
+
+export async function sendPoll(groupId: string, userId: string, input: PollInput): Promise<Message> {
 	await requireMember(groupId, userId);
 	const pollId = newId();
+	let options: (typeof pollOptions.$inferInsert)[];
+	if ('slots' in input) {
+		const group = await getGroupRow(groupId);
+		const sorted = [...input.slots].sort((a, b) => a.start.localeCompare(b.start));
+		options = sorted.map((s, position) => ({
+			id: newId(),
+			pollId,
+			position,
+			label: slotLabel({ start: Date.parse(s.start), end: Date.parse(s.end) }, group.requirement).slice(0, 100),
+			start: new Date(s.start),
+			end: new Date(s.end),
+			allDay: s.allDay
+		}));
+	} else {
+		options = input.options.map((label, position) => ({ id: newId(), pollId, label, position }));
+	}
 	await db.transaction(async (tx) => {
 		await tx.insert(polls).values({ id: pollId, groupId, createdBy: userId, question: input.question, multi: input.multi });
-		await tx.insert(pollOptions).values(input.options.map((label, position) => ({ id: newId(), pollId, label, position })));
+		await tx.insert(pollOptions).values(options);
 	});
 	return postMessage(groupId, userId, { kind: 'poll', pollId });
 }

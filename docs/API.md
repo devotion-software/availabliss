@@ -747,7 +747,9 @@ interface MessageReply {                // the quoted message, as it is now
 }
 interface Poll {
   id: string; question: string; multi: boolean; closed: boolean;
-  options: { id: string; label: string; voterIds: string[] }[];
+  // A date poll's options carry `slot` (the time each stands for; label made in the group's time zone).
+  // Show who's busy per option with the conflicts endpoint, and let its creator propose the winner.
+  options: { id: string; label: string; voterIds: string[]; slot?: { start: string; end: string; allDay: boolean } | null }[];
 }
 interface MessageInfo {
   messageId: string; sentAt: string;
@@ -761,7 +763,7 @@ interface MessageInfo {
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/groups/:id/messages?before=<messageId>&limit=50` | | `{ messages: Message[]; hasMore: boolean }` (newest last) |
 | POST 🔒 | `/groups/:id/attachments` | `multipart/form-data` with one file in the field `file` | `201` `Attachment`, not yet in any message: send its id in `attachmentIds`. Photos (JPEG, PNG, WebP, GIF, HEIC where the server can read it; up to 15 MB) are turned upright, stripped of metadata (location included), shrunk to at most 2560 px and stored as JPEG (PNG if transparent), so `name`, `mime` and `size` can differ from what was sent; an animated GIF is kept as it is. Files (up to 25 MB) must be one of: pdf, txt, md, csv, rtf, ics, vcf, doc(x), xls(x), ppt(x), odt, ods, odp, pages, numbers, key, epub, zip, mp3, m4a, wav, mp4, mov, pkpass, pkpasses (by extension; a file sent as `application/vnd.apple.pkpass` without one gets `.pkpass`); anything else is `400`. A Wallet pass whose pass.json can be read comes back as `kind: 'pass'` with `pass` details (else as a plain `file`). Uploads not sent within a day are deleted |
-| POST 🔒 | `/groups/:id/messages` | `{ body, replyToId? }`, or `{ attachmentIds: string[] (1–10), body?: caption, replyToId? }`, or `{ location: { lat (−90…90), lng (−180…180), name?, address?, accuracy? (metres, ≥ 0) }, replyToId? }`, or `{ poll: { question, options: string[], multi? } }` | `Message`. `replyToId` must be a message in the same chat (else `400`), not a group update (`400`) and not deleted (`409`). `attachmentIds` must be your own unsent uploads to this group (else `400`) |
+| POST 🔒 | `/groups/:id/messages` | `{ body, replyToId? }`, or `{ attachmentIds: string[] (1–10), body?: caption, replyToId? }`, or `{ location: { lat (−90…90), lng (−180…180), name?, address?, accuracy? (metres, ≥ 0) }, replyToId? }`, or `{ poll: { question, options: string[], multi? } }`, or a date poll `{ poll: { question, slots: { start, end, allDay? }[] (2–5, different), multi? (default true) } }` | `Message`. `replyToId` must be a message in the same chat (else `400`), not a group update (`400`) and not deleted (`409`). `attachmentIds` must be your own unsent uploads to this group (else `400`) |
 | POST 🔒 | `/groups/:id/messages/receipts` | `{ upTo: messageId, state: 'delivered' \| 'seen' }` | `204` |
 | PATCH 🔒 | `/messages/:id` | `{ body }` | `Message` (the sender's own text messages only; a location can't be edited: `400`). With attachments `body` is the caption and may be `""` to remove it |
 | DELETE 🔒 | `/messages/:id` | | `204` (the sender's own text messages only; it stays in the chat as deleted, and its attachments are deleted for good) |

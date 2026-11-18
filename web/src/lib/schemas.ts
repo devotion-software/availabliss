@@ -277,11 +277,27 @@ export const createMessageSchema = z.union([
 		replyToId: z.string().min(1).max(36).nullish()
 	}),
 	z.object({
-		poll: z.object({
-			question: trimmed(200),
-			options: z.array(trimmed(100)).min(2).max(10),
-			multi: z.boolean().default(false)
-		})
+		poll: z.union([
+			z.object({
+				question: trimmed(200),
+				options: z.array(trimmed(100)).min(2).max(10),
+				multi: z.boolean().default(false)
+			}),
+			// A date poll: 2–5 times from the group calendar (votes default to "pick all that work").
+			z.object({
+				question: trimmed(200),
+				slots: z
+					.array(
+						z
+							.object({ start: z.iso.datetime(), end: z.iso.datetime(), allDay: z.boolean().default(false) })
+							.refine((s) => s.end > s.start, 'Each time must end after it starts')
+					)
+					.min(2)
+					.max(5)
+					.refine((list) => new Set(list.map((s) => s.start + s.end)).size === list.length, 'Pick different times'),
+				multi: z.boolean().default(true)
+			})
+		])
 	})
 ]);
 
