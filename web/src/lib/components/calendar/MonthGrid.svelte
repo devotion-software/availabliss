@@ -244,19 +244,30 @@
 	.compact .match.end {
 		border-radius: 5px 16px 16px 5px;
 	}
-	/* Today: the number on an accent pill (inverted on a cell already filled with the accent). */
-	.today .num {
+	/* Today on a day that works: the number on an inverted pill. */
+	.today.match .num {
 		align-self: flex-start;
 		margin-left: -6px;
 		padding: 2px 6px;
 		border-radius: 999px;
-		background: var(--accent);
-		color: var(--on-accent);
-		opacity: 1;
-	}
-	.today.match .num {
 		background: var(--on-accent);
 		color: var(--accent);
+	}
+	/* Today on a day that doesn't: an accent outline and its number in accent, at full strength
+	   (a pill would fade with the cell). Only a busy cell's background fades. */
+	.today:not(.match) {
+		border: 1.5px solid var(--accent);
+	}
+	.today:not(.match) .num {
+		color: var(--accent-ink);
+		opacity: 1;
+	}
+	.cell.busy.today {
+		opacity: 1;
+		background: color-mix(in srgb, var(--busy-bg) 50%, transparent);
+	}
+	.busy.today .note {
+		color: var(--muted);
 	}
 	.cell {
 		position: relative;
