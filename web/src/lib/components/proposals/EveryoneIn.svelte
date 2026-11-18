@@ -7,8 +7,12 @@
 	import Avatar from '#lib/components/ui/Avatar.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import { memberMap, memberLabel } from '#lib/client/members';
+	import { everyoneIn } from './responses';
 
-	/** The confirmed state: "Everyone's in." with who's coming, Add to calendar and Go to chat. */
+	/**
+	 * The confirmed state: "Everyone's in." (or "It's on." when confirmed before everyone accepted)
+	 * with who's coming, who can't or never replied, Add to calendar and Go to chat.
+	 */
 	interface Props {
 		proposal: Proposal;
 		group: Group;
@@ -26,12 +30,14 @@
 		...group.members.filter((m) => m.userId === proposal.createdBy),
 		...group.members.filter((m) => m.userId !== proposal.createdBy)
 	]);
-	const accepted = $derived(new Set(proposal.responses.filter((r) => r.response === 'accepted').map((r) => r.userId)));
-	// Everyone who accepted (everyone in the group when it confirmed).
-	const coming = $derived(ordered.filter((m) => accepted.has(m.userId)));
-	// A proposal confirms only once every member has accepted, and replies then close, so anyone
-	// without an acceptance joined the group afterwards.
-	const joinedLater = $derived(ordered.filter((m) => !accepted.has(m.userId)));
+	const replies = $derived(new Map(proposal.responses.map((r) => [r.userId, r.response])));
+	const coming = $derived(ordered.filter((m) => replies.get(m.userId) === 'accepted'));
+	// Confirmed anyway without them: said they can't make it, or never replied.
+	const cantMakeIt = $derived(ordered.filter((m) => replies.get(m.userId) === 'declined'));
+	const notReplied = $derived(ordered.filter((m) => replies.get(m.userId) === 'pending'));
+	// Replies are only asked of the members at the time, so anyone without one joined the group afterwards.
+	const joinedLater = $derived(ordered.filter((m) => !replies.has(m.userId)));
+	const allIn = $derived(everyoneIn(proposal));
 	const count = $derived(coming.length || proposal.responses.length || group.members.length);
 
 	// The confirmed event's cover photo, if someone has added one.
@@ -55,15 +61,17 @@
 		<Logo size={34} />
 		<div class="status-text">
 			<span class="who">Availabliss <span class="now">· confirmed</span></span>
-			<span>Everyone accepted {range} for {group.name}</span>
+			<span>{allIn ? 'Everyone accepted' : "It's on:"} {range} for {group.name}</span>
 		</div>
 	</div>
 
 	<div class="hero">
 		<span class="bloom"><Logo size={132} /></span>
-		<h1>Everyone's in.</h1>
+		<h1>{allIn ? "Everyone's in." : "It's on."}</h1>
 		<p class="when">
-			<span class="lead">{count === 2 ? 'Both of you' : `All ${count} of you`} can make</span>
+			<span class="lead"
+				>{allIn ? (count === 2 ? 'Both of you' : `All ${count} of you`) : `${coming.length} of ${proposal.responses.length}`} can make</span
+			>
 			<span class="date">{parts.date}</span>
 			{#if parts.time}<span class="time">{parts.time}</span>{/if}
 			{#if proposal.location}<span class="place">in {proposal.location}</span>{/if}
@@ -85,6 +93,21 @@
 			{/each}
 		</section>
 	{/if}
+	{#each [{ id: 'cant', title: 'Can’t make it', people: cantMakeIt }, { id: 'pending', title: 'Not replied', people: notReplied }] as list (list.id)}
+		{#if list.people.length}
+			<section class="people glass quiet" aria-labelledby="{list.id}-heading">
+				<h2 class="people-head" id="{list.id}-heading"><span>{list.title}</span><span>{list.people.length}</span></h2>
+				{#each list.people as m (m.userId)}
+					<div class="person">
+						<Avatar name={m.name} id={m.userId} image={m.image} size={28} />
+						<div class="who">
+							<span class="name">{memberLabel(members, m.userId, me)}</span>
+						</div>
+					</div>
+				{/each}
+			</section>
+		{/if}
+	{/each}
 	{#if joinedLater.length}
 		<section class="people glass quiet" aria-labelledby="later-heading">
 			<h2 class="people-head" id="later-heading"><span>Joined since</span></h2>

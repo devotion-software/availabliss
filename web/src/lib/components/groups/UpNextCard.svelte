@@ -22,7 +22,7 @@
 	<a class="open" {href} aria-label="Open {event.title}"></a>
 	{#if cover}<img class="cover" src={cover} alt="" onerror={() => (failed = cover)} />{/if}
 	<div class="top">
-		<StatusPill tone="mint" icon="check" size="md">Everyone's in</StatusPill>
+		<StatusPill tone="mint" icon="check" size="md">It's on</StatusPill>
 		<a class="group" href="/app/groups/{event.groupId}">{event.groupName}</a>
 	</div>
 	<div class="what">

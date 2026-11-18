@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
 	import type { Member, Proposal, ResponseKind } from '#lib/types';
-	import { cancelProposal, getProposal, overrideResponse, respondToProposal } from '#lib/client/proposals';
+	import { cancelProposal, confirmProposal, getProposal, overrideResponse, respondToProposal } from '#lib/client/proposals';
 	import { live, proposalOf } from '#lib/client/live.svelte';
 	import { useFormat } from '#lib/client/format';
 	import { isAdminRole, memberMap, memberLabel } from '#lib/client/members';
@@ -16,7 +16,7 @@
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import OverrideSheet from '#lib/components/proposals/OverrideSheet.svelte';
 	import EveryoneIn from '#lib/components/proposals/EveryoneIn.svelte';
-	import { RESPONSE_PILL, acceptedCount, askedCount, myResponse } from '#lib/components/proposals/responses';
+	import { RESPONSE_PILL, acceptedCount, askedCount, listNames, myResponse } from '#lib/components/proposals/responses';
 	import { clashText } from '#lib/components/proposals/clash';
 
 	let { data } = $props();
@@ -35,6 +35,8 @@
 	const total = $derived(askedCount(proposal, group));
 	const mine = $derived(myResponse(proposal, me));
 	const canWithdraw = $derived(proposal.status === 'open' && (proposal.createdBy === me || admin));
+	// "Confirm anyway": the proposer or an admin, once someone besides them can make it (the server checks the same).
+	const canConfirmAnyway = $derived(canWithdraw && proposal.responses.some((r) => r.response === 'accepted' && r.userId !== me));
 	const startHint = $derived(proposal.allDay ? '' : fmt.current.startsAt(proposal.start));
 	const sub = $derived([startHint, proposal.location].filter(Boolean).join(' · '));
 	const busyIds = $derived(proposal.status === 'open' ? (proposal.busyMemberIds ?? []) : []);
@@ -111,6 +113,30 @@
 			await apply(() => overrideResponse(proposal.id, userId, response));
 		} catch (err) {
 			toasts.error(err);
+		}
+	}
+
+	let confirmOpen = $state(false);
+	// "Priya can't make it and Tom hasn't replied. Everyone will be told it's on, with 2 of 4 coming."
+	const confirmMessage = $derived.by(() => {
+		const name = (id: string) => (id === me ? 'You' : memberLabel(members, id, me, { first: true }));
+		const of = (kind: ResponseKind) => rows.filter((r) => r.response === kind && proposal.responses.some((x) => x.userId === r.member.userId));
+		const declined = of('declined').map((r) => name(r.member.userId));
+		const pending = of('pending').map((r) => name(r.member.userId));
+		const parts = [
+			declined.length ? `${listNames(declined)} can’t make it` : '',
+			pending.length ? `${listNames(pending)} ${pending.length === 1 ? 'hasn’t' : 'haven’t'} replied` : ''
+		].filter(Boolean);
+		const who = parts.length ? `${parts.join(' and ')}. ` : '';
+		return `${who}Everyone will be told it’s on, with ${yes} of ${total} coming.`;
+	});
+	async function confirmAnyway() {
+		try {
+			await apply(() => confirmProposal(proposal.id));
+			invalidate('app:groups');
+		} catch (err) {
+			toasts.error(err);
+			throw err;
 		}
 	}
 
@@ -221,6 +247,12 @@
 							As an admin you can set anyone's reply.
 						</p>
 					{/if}
+					{#if canConfirmAnyway}
+						<div class="anyway">
+							<Button variant="secondary" icon="check" block onclick={() => (confirmOpen = true)}>Confirm anyway</Button>
+							<p class="hint">Not everyone can make it? Go ahead with who can.</p>
+						</div>
+					{/if}
 					{#if canWithdraw}
 						<Button variant="ghost" size="sm" icon="trash" onclick={() => (withdrawOpen = true)}>Withdraw proposal</Button>
 					{/if}
@@ -262,6 +294,13 @@
 {#if overrideFor}
 	<OverrideSheet bind:open={overrideOpen} name={overrideFor.name} current={overrideFor.current} onpick={applyOverride} />
 {/if}
+<ConfirmSheet
+	bind:open={confirmOpen}
+	title="Confirm anyway?"
+	message={confirmMessage}
+	confirmLabel="Confirm the plan"
+	onconfirm={confirmAnyway}
+/>
 <ConfirmSheet
 	bind:open={withdrawOpen}
 	title="Withdraw this proposal?"
@@ -388,6 +427,12 @@
 		align-items: center;
 		font-size: 12px;
 		color: var(--muted);
+	}
+	.anyway {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
 	}
 	.main > :global(.btn.ghost) {
 		align-self: flex-start;

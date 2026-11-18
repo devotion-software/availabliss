@@ -4,7 +4,7 @@
 	import { memberMap, memberLabel } from '#lib/client/members';
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
-	import { RESPONSE_PILL, acceptedCount, askedCount, myResponse } from './responses';
+	import { RESPONSE_PILL, acceptedCount, askedCount, confirmedStatus, myResponse } from './responses';
 	import { clashShort } from './clash';
 
 	/** A proposal in a list: date badge, who proposed, range, acceptance, your status. */
@@ -38,7 +38,7 @@
 		{#if proposal.status === 'open'}
 			<span class="count">{yes} of {total} accepted{#if clash}<span class="clash"> · {clash}</span>{/if}</span>
 		{:else if proposal.status === 'confirmed'}
-			<span class="count">Everyone's in</span>
+			<span class="count">{confirmedStatus(proposal)}</span>
 		{:else}
 			<span class="count off">Withdrawn</span>
 		{/if}

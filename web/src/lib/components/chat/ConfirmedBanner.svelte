@@ -21,6 +21,8 @@
 	let { message, compact = false }: Props = $props();
 
 	const fmt = useFormat();
+	// "It's on" when it was confirmed before everyone accepted ("It's on for …").
+	const headline = $derived(message.body?.startsWith("It's on") ? "It's on" : "Everyone's in");
 	let event = $state<GroupEvent | null>(null);
 	$effect(() => {
 		const id = message.eventId;
@@ -96,11 +98,11 @@
 				class="row"
 				href={href ?? undefined}
 				role={href ? undefined : 'group'}
-				aria-label="Everyone's in. {event.title}, {line}"
+				aria-label="{headline}. {event.title}, {line}"
 			>
 				<span class="tick" aria-hidden="true"><Icon name="check" size={24} strokeWidth={2.6} /></span>
 				<span class="text" aria-hidden="true">
-					<span class="eyebrow">Everyone's in</span>
+					<span class="eyebrow">{headline}</span>
 					<span class="title">{event.title}</span>
 					{#if line}<span class="meta">{line}</span>{/if}
 				</span>
