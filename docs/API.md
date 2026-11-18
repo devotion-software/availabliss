@@ -604,6 +604,7 @@ interface MessageInfo {
 | PATCH 🔒 | `/messages/:id` | `{ body }` | `Message` (the sender's own text messages only) |
 | DELETE 🔒 | `/messages/:id` | | `204` (the sender's own text messages only; it stays in the chat as deleted) |
 | GET 🔒 | `/messages/:id/info` | | `MessageInfo` (any member of the group) |
+| GET 🔒 | `/messages/:id/thread` | | `{ rootId: string; messages: Message[]; truncated: boolean }`: the thread the message is in. `rootId` is the first message of its chain of replies (following `replyTo` up); `messages` is that message and every reply to it, and replies to those, oldest first (deleted ones included), at most 200 (the earliest; `truncated` when there were more). Any member of the group |
 | POST 🔒 | `/polls/:id/vote` | `{ optionIds: string[] }` (empty = remove vote) | `Poll` |
 | POST 🔒 | `/polls/:id/close` | | `Poll` (only the poll's author) |
 

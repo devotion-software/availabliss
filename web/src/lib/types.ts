@@ -306,6 +306,14 @@ export interface Message {
 	replyTo: MessageReply | null;
 }
 
+/** A message's thread: the first message of its chain of replies, then every reply under it, oldest first. */
+export interface MessageThread {
+	rootId: string;
+	messages: Message[];
+	/** More replies than the server returns (the earliest are kept). */
+	truncated: boolean;
+}
+
 /** The quoted message shown above a reply, as it is now (edits and deletion included). */
 export interface MessageReply {
 	id: string;

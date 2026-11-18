@@ -155,6 +155,13 @@
       "when": 1794959289025,
       "tag": "0021_certain_changeling",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1794990980169,
+      "tag": "0022_dapper_karnak",
+      "breakpoints": true
     }
   ]
 }

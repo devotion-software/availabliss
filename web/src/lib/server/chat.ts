@@ -1,6 +1,6 @@
 /** Group chat: messages, polls and per-recipient delivery / read receipts. */
 import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
-import type { Message, MessageInfo, MessageKind, MessageReply, Poll } from '#lib/types';
+import type { Message, MessageInfo, MessageKind, MessageReply, MessageThread, Poll } from '#lib/types';
 import { db } from './db';
 import { groups, messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
 import { badRequest, conflict, forbidden, notFound } from './http';
@@ -279,6 +279,58 @@ export async function listMessages(groupId: string, userId: string, before: stri
 	const hasMore = rows.length > limit;
 	const page = rows.slice(0, limit).reverse();
 	return { messages: await toMessages(page, userId, (await memberIds(groupId)).length), hasMore };
+}
+
+/** Most messages a thread returns (the root and the earliest replies). */
+export const THREAD_LIMIT = 200;
+/** How far up a chain of replies the root is looked for. */
+const THREAD_MAX_DEPTH = 100;
+
+/**
+ * The thread a message is part of: the first message of its chain of replies (walking
+ * `replyTo` up), then every reply to it and replies to those, oldest first.
+ */
+export async function messageThread(messageId: string, userId: string): Promise<MessageThread> {
+	const start = await db.query.messages.findFirst({ where: eq(messages.id, messageId) });
+	if (!start) throw notFound('Message not found');
+	await requireMember(start.groupId, userId);
+	const groupId = start.groupId;
+
+	let root = start;
+	const climbed = new Set([root.id]);
+	while (root.replyToId && climbed.size < THREAD_MAX_DEPTH) {
+		const parent = await db.query.messages.findFirst({ where: and(eq(messages.id, root.replyToId), eq(messages.groupId, groupId)) });
+		if (!parent || climbed.has(parent.id)) break;
+		climbed.add(parent.id);
+		root = parent;
+	}
+
+	// Breadth first, a level of replies at a time, until the cap.
+	const rows: MessageRow[] = [root];
+	const seen = new Set([root.id]);
+	let frontier = [root.id];
+	let truncated = false;
+	while (frontier.length && !truncated) {
+		const level = await db
+			.select()
+			.from(messages)
+			.where(and(eq(messages.groupId, groupId), inArray(messages.replyToId, frontier)))
+			.orderBy(asc(messages.seq))
+			.limit(THREAD_LIMIT + 1);
+		frontier = [];
+		for (const row of level) {
+			if (seen.has(row.id)) continue;
+			if (rows.length >= THREAD_LIMIT) {
+				truncated = true;
+				break;
+			}
+			seen.add(row.id);
+			rows.push(row);
+			frontier.push(row.id);
+		}
+	}
+	rows.sort((a, b) => a.seq - b.seq);
+	return { rootId: root.id, messages: await toMessages(rows, userId, (await memberIds(groupId)).length), truncated };
 }
 
 interface PostInput {

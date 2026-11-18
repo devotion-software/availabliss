@@ -379,7 +379,7 @@ export const messages = mysqlTable(
 		// Set when the author deletes it: the row stays (as "This message was deleted") with its body cleared.
 		deletedAt: instant('deleted_at')
 	},
-	(t) => [index('messages_group_seq_idx').on(t.groupId, t.seq)]
+	(t) => [index('messages_group_seq_idx').on(t.groupId, t.seq), index('messages_reply_to_idx').on(t.replyToId)]
 );
 
 /** Per-recipient delivery and read state for each message. */

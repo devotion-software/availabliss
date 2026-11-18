@@ -5,7 +5,7 @@ import { db } from '#lib/server/db';
 import { devices } from '#lib/server/db/schema';
 import { createGroup } from '#lib/server/groups';
 import { createEvent, deleteEvent, getEvent, listEvents, updateEvent, upcomingFor } from '#lib/server/events';
-import { closePoll, deleteMessage, editMessage, listMessages, markReceipts, messageInfo, sendPoll, sendText, vote } from '#lib/server/chat';
+import { closePoll, deleteMessage, editMessage, listMessages, markReceipts, messageInfo, messageThread, sendPoll, sendText, THREAD_LIMIT, vote } from '#lib/server/chat';
 import { groupSummaries } from '#lib/server/group-summaries';
 import { newId } from '#lib/server/ids';
 import { messageReceipts, messages } from '#lib/server/db/schema';
@@ -155,6 +155,51 @@ describe('chat', () => {
 		const elsewhere = await sendText(other, outsider, 'Over here');
 		expect((await apiError(sendText(groupId, owner, 'Sneaky', elsewhere.id))).code).toBe('validation_error');
 		expect((await apiError(sendText(groupId, owner, 'Ghost', 'missing'))).code).toBe('validation_error');
+	});
+
+	test('a thread is the first message of a chain of replies and everything under it', async () => {
+		const root = await sendText(groupId, owner, 'Picnic on Saturday?');
+		const a = await sendText(groupId, member, 'Yes!', root.id);
+		await sendText(groupId, admin, 'Unrelated');
+		const b = await sendText(groupId, admin, 'Where?', root.id);
+		const a1 = await sendText(groupId, owner, 'Great', a.id);
+		const b1 = await sendText(groupId, member, 'The park', b.id);
+		const b1a = await sendText(groupId, admin, 'Which one?', b1.id);
+		await deleteMessage(a1.id, owner);
+
+		// From any message in it, oldest first, deleted ones included.
+		const expected = [root.id, a.id, b.id, a1.id, b1.id, b1a.id];
+		for (const from of [root.id, b1a.id, a1.id]) {
+			const thread = await messageThread(from, member);
+			expect(thread.rootId).toBe(root.id);
+			expect(thread.truncated).toBe(false);
+			expect(thread.messages.map((m) => m.id)).toEqual(expected);
+		}
+		const thread = await messageThread(b.id, owner);
+		expect(thread.messages.find((m) => m.id === a1.id)).toMatchObject({ deleted: true, body: null });
+		expect(thread.messages.find((m) => m.id === b1.id)!.replyTo).toMatchObject({ id: b.id, text: 'Where?' });
+
+		// A message nobody replied to is a thread of one.
+		const lone = await sendText(groupId, owner, 'Anyone?');
+		expect((await messageThread(lone.id, admin)).messages.map((m) => m.id)).toEqual([lone.id]);
+
+		expect((await apiError(messageThread(root.id, outsider))).code).toBe('not_found');
+		expect((await apiError(messageThread('missing', owner))).code).toBe('not_found');
+	});
+
+	test('a long thread is capped at the earliest replies', async () => {
+		const root = await sendText(groupId, owner, 'Count off');
+		const ids = [root.id];
+		await db.insert(messages).values(
+			Array.from({ length: THREAD_LIMIT + 5 }, (_, i) => {
+				const id = newId();
+				ids.push(id);
+				return { id, groupId, authorId: member, kind: 'text' as const, body: `${i + 1}`, replyToId: root.id };
+			})
+		);
+		const thread = await messageThread(ids.at(-1)!, owner);
+		expect(thread.truncated).toBe(true);
+		expect(thread.messages.map((m) => m.id)).toEqual(ids.slice(0, THREAD_LIMIT));
 	});
 
 	test('unread counts skip history from before joining', async () => {
