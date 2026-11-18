@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static app shortcuts (long-press the launcher icon). Each opens a deep link that
+     MainActivity hands to DeepLink.parse; see core/deeplink/DeepLink.kt. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_my_plans"
+        android:shortcutId="my_plans"
+        android:shortcutLongLabel="@string/shortcut_my_plans_long"
+        android:shortcutShortLabel="@string/shortcut_my_plans_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="availabliss://app/my-plans"
+            android:targetClass="dev.joeherbert.availabliss.MainActivity"
+            android:targetPackage="dev.joeherbert.availabliss" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_group"
+        android:shortcutId="new_group"
+        android:shortcutLongLabel="@string/shortcut_new_group_long"
+        android:shortcutShortLabel="@string/shortcut_new_group_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="availabliss://app/new-group"
+            android:targetClass="dev.joeherbert.availabliss.MainActivity"
+            android:targetPackage="dev.joeherbert.availabliss" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_my_time"
+        android:shortcutId="my_time"
+        android:shortcutLongLabel="@string/shortcut_my_time_long"
+        android:shortcutShortLabel="@string/shortcut_my_time_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="availabliss://app/my-time"
+            android:targetClass="dev.joeherbert.availabliss.MainActivity"
+            android:targetPackage="dev.joeherbert.availabliss" />
+    </shortcut>
+</shortcuts>

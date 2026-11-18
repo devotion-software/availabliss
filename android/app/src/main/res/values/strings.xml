@@ -26,4 +26,25 @@
     <string name="channel_role_changed_description">When you\'re made an admin or owner of a group, or are no longer an admin</string>
     <!-- The device owner in a chat notification. -->
     <string name="notification_you">You</string>
+
+    <!-- Home-screen widgets (core/widget). -->
+    <string name="widget_next_plan_name">Next plan</string>
+    <string name="widget_next_plan_description">Your next plan: what, when and with which group</string>
+    <string name="widget_waiting_name">Waiting for you</string>
+    <string name="widget_waiting_description">Proposals waiting for your reply</string>
+    <string name="widget_preview_next_plan_title">Dinner at Luca\'s</string>
+    <string name="widget_preview_next_plan_when">Tomorrow 19:00</string>
+    <string name="widget_preview_next_plan_group">Book club</string>
+    <string name="widget_preview_waiting_title">2 proposals waiting for you</string>
+    <string name="widget_preview_waiting_group_1">Book club</string>
+    <string name="widget_preview_waiting_group_2">Climbing</string>
+    <string name="widget_preview_reply">Reply</string>
+
+    <!-- App shortcuts (xml/shortcuts.xml). -->
+    <string name="shortcut_my_plans_short">My plans</string>
+    <string name="shortcut_my_plans_long">Every plan across your groups</string>
+    <string name="shortcut_new_group_short">New group</string>
+    <string name="shortcut_new_group_long">Start a new group</string>
+    <string name="shortcut_my_time_short">My time</string>
+    <string name="shortcut_my_time_long">Your busy times</string>
 </resources>

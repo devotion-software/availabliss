@@ -13,6 +13,8 @@ import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ProposalStatus
 import dev.joeherbert.availabliss.core.network.model.RespondRequest
 import dev.joeherbert.availabliss.core.network.model.ResponseKind
+import dev.joeherbert.availabliss.core.network.onSuccess
+import dev.joeherbert.availabliss.core.widget.Widgets
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
@@ -23,6 +25,7 @@ import javax.inject.Singleton
 class ProposalsRepository @Inject constructor(
     private val api: AvailablissApi,
     private val call: ApiCaller,
+    private val widgets: Widgets,
 ) {
     suspend fun list(groupId: String, status: ProposalStatus? = null): ApiResult<List<Proposal>> =
         call { api.getProposals(groupId, status?.name?.lowercase()) }.map { it.proposals }
@@ -38,7 +41,8 @@ class ProposalsRepository @Inject constructor(
 
     /** [response] must be accepted or declined. */
     suspend fun respond(id: String, response: ResponseKind): ApiResult<Proposal> =
-        call { api.respond(id, RespondRequest(response)) }
+        // Replying changes what the widgets show (one fewer waiting; maybe a new next plan).
+        call { api.respond(id, RespondRequest(response)) }.onSuccess { widgets.refreshSoon() }
 
     suspend fun override(id: String, userId: String, response: ResponseKind): ApiResult<Proposal> =
         call { api.overrideResponse(id, OverrideRequest(userId, response)) }
@@ -57,6 +61,7 @@ class ProposalsRepository @Inject constructor(
 class EventsRepository @Inject constructor(
     private val api: AvailablissApi,
     private val call: ApiCaller,
+    private val widgets: Widgets,
 ) {
     suspend fun list(groupId: String, from: String? = null, to: String? = null): ApiResult<List<GroupEvent>> =
         call { api.getEvents(groupId, from, to) }.map { it.events }
@@ -66,7 +71,8 @@ class EventsRepository @Inject constructor(
     suspend fun upcoming(): ApiResult<List<GroupEvent>> = call { api.getUpcoming() }.map { it.events }
 
     /** Every plan across your groups ("My plans"): going, can't make it and past. */
-    suspend fun myPlans(): ApiResult<dev.joeherbert.availabliss.core.network.model.MyPlansResponse> = call { api.getMyPlans() }
+    suspend fun myPlans(): ApiResult<dev.joeherbert.availabliss.core.network.model.MyPlansResponse> =
+        call { api.getMyPlans() }.onSuccess(widgets::onPlans) // The "Next plan" widget's plans.
 
     suspend fun create(groupId: String, request: CreateEventRequest): ApiResult<GroupEvent> =
         call { api.createEvent(groupId, request) }

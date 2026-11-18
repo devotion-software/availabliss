@@ -64,7 +64,36 @@
                 <data android:pathPrefix="/app/groups/" />
                 <data android:pathPrefix="/app/proposals/" />
             </intent-filter>
+
+            <!-- Long-press shortcuts: My plans, New group, My time. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Home-screen widgets (core/widget), drawn with Glance from a cached snapshot. -->
+        <receiver
+            android:name=".core.widget.NextPlanWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_next_plan_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_next_plan_info" />
+        </receiver>
+        <receiver
+            android:name=".core.widget.WaitingWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_waiting_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_waiting_info" />
+        </receiver>
 
         <service
             android:name=".core.push.AvailablissMessagingService"

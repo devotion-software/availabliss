@@ -23,6 +23,10 @@ sealed interface DeepLink {
     data class AuthCallback(val code: String?, val error: String?) : DeepLink
     data object MyTime : DeepLink
     data object Activity : DeepLink
+    /** Every plan across your groups (from Activity); the "My plans" app shortcut. */
+    data object MyPlans : DeepLink
+    /** The new group form; the "New group" app shortcut. */
+    data object NewGroup : DeepLink
 
     /** A URI that [parse] maps back to this link; used for notification intents. */
     fun toUri(): Uri = when (this) {
@@ -35,6 +39,8 @@ sealed interface DeepLink {
         is AuthCallback -> Uri.parse("$SCHEME://auth/callback")
         MyTime -> Uri.parse("$SCHEME://app/my-time")
         Activity -> Uri.parse("$SCHEME://app/activity")
+        MyPlans -> Uri.parse("$SCHEME://app/my-plans")
+        NewGroup -> Uri.parse("$SCHEME://app/new-group")
     }
 
     companion object {
@@ -78,6 +84,8 @@ sealed interface DeepLink {
             "proposals" -> rest.getOrNull(1)?.let(::Proposal)
             "my-time" -> MyTime
             "activity" -> Activity
+            "my-plans" -> MyPlans
+            "new-group" -> NewGroup
             else -> null
         }
 

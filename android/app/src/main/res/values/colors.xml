@@ -3,4 +3,9 @@
     <color name="av_bg">#ECEEF7</color>
     <color name="av_accent">#5546FF</color>
     <color name="ic_launcher_background">#ECEEF7</color>
+    <!-- Widget picker previews (layout/widget_*_preview.xml). -->
+    <color name="av_ink">#1A1B3A</color>
+    <color name="av_muted">#4D5072</color>
+    <color name="av_accent_ink">#3B2FD0</color>
+    <color name="av_accent_soft">#245546FF</color>
 </resources>

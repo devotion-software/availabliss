@@ -2,4 +2,8 @@
 <resources>
     <color name="av_bg">#0C0D1D</color>
     <color name="av_accent">#6A5CFF</color>
+    <color name="av_ink">#F1F2FA</color>
+    <color name="av_muted">#A6A9C8</color>
+    <color name="av_accent_ink">#B4ACFF</color>
+    <color name="av_accent_soft">#3D8276FF</color>
 </resources>

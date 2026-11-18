@@ -144,6 +144,9 @@ dependencies {
 
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.browser)
+    // Home-screen widgets (Next plan, Waiting for you).
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.coil.gif)

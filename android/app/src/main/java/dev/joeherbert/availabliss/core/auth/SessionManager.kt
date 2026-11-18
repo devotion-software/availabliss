@@ -19,6 +19,7 @@ import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.AuthInterceptor
 import dev.joeherbert.availabliss.core.network.PasskeyCookieJar
 import dev.joeherbert.availabliss.core.push.PushRegistrar
+import dev.joeherbert.availabliss.core.widget.Widgets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -56,6 +57,7 @@ class SessionManager @Inject constructor(
     private val cookieJar: PasskeyCookieJar,
     private val plans: PlanRepository,
     private val billing: StoreBilling,
+    private val widgets: Widgets,
     authInterceptor: AuthInterceptor,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
@@ -114,6 +116,8 @@ class SessionManager @Inject constructor(
             }
         }
         syncScheduler.syncSoon()
+        // The home-screen widgets' plans and waiting proposals.
+        widgets.refreshSoon()
     }
 
     /**
@@ -161,6 +165,7 @@ class SessionManager @Inject constructor(
         notifications.clear()
         notificationSettings.clear()
         prefs.clearSession()
+        widgets.onSignedOut()
     }
 
     private companion object {

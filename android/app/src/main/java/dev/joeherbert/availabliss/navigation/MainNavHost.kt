@@ -326,6 +326,12 @@ internal fun NavHostController.open(link: DeepLink) {
         is DeepLink.Calendars -> navigate(CalendarsRoute) { launchSingleTop = true }
         DeepLink.MyTime -> switchTab(MyTimeRoute)
         DeepLink.Activity -> switchTab(ActivityRoute)
+        // Over Activity, where My plans lives, so back returns there.
+        DeepLink.MyPlans -> {
+            switchTab(ActivityRoute)
+            navigate(MyPlansRoute) { launchSingleTop = true }
+        }
+        DeepLink.NewGroup -> navigate(NewGroupRoute()) { launchSingleTop = true }
         is DeepLink.AuthCallback -> Unit // Already signed in.
     }
 }

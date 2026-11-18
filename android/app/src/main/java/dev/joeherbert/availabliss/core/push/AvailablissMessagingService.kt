@@ -6,6 +6,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import dev.joeherbert.availabliss.core.common.ApplicationScope
 import dev.joeherbert.availabliss.core.data.NotificationsRepository
 import dev.joeherbert.availabliss.core.live.LiveConnectionObserver
+import dev.joeherbert.availabliss.core.widget.Widgets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -18,6 +19,7 @@ class AvailablissMessagingService : FirebaseMessagingService() {
     @Inject lateinit var notifier: PushNotifier
     @Inject lateinit var notifications: NotificationsRepository
     @Inject lateinit var lifecycle: LiveConnectionObserver
+    @Inject lateinit var widgets: Widgets
     @Inject @ApplicationScope lateinit var scope: CoroutineScope
 
     override fun onNewToken(token: String) {
@@ -31,5 +33,6 @@ class AvailablissMessagingService : FirebaseMessagingService() {
         // In the foreground the live stream already updates the UI; just refresh the badge.
         scope.launch { notifications.refresh() }
         if (!lifecycle.isForeground) notifier.show(title, body, data)
+        if (Widgets.refreshesOn(data["kind"])) widgets.refreshSoon()
     }
 }

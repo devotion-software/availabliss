@@ -25,6 +25,7 @@ import dev.joeherbert.availabliss.core.network.model.Role
 import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.core.network.model.UpdateGroupRequest
 import dev.joeherbert.availabliss.core.network.onSuccess
+import dev.joeherbert.availabliss.core.widget.Widgets
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -46,6 +47,7 @@ import javax.inject.Singleton
 class GroupsRepository @Inject constructor(
     private val api: AvailablissApi,
     private val call: ApiCaller,
+    private val widgets: Widgets,
 ) {
     private val _groups = MutableStateFlow<List<GroupSummary>?>(null)
     /** `null` until first loaded. */
@@ -58,7 +60,11 @@ class GroupsRepository @Inject constructor(
     fun cachedGroup(id: String): Group? = details.value[id]
 
     suspend fun refreshGroups(): ApiResult<List<GroupSummary>> =
-        call { api.getGroups() }.map { it.groups }.onSuccess { _groups.value = it }
+        call { api.getGroups() }.map { it.groups }.onSuccess {
+            _groups.value = it
+            // Proposals waiting for your reply, for the "Waiting for you" widget.
+            widgets.onGroups(it)
+        }
 
     suspend fun refreshGroup(id: String): ApiResult<Group> = call { api.getGroup(id) }.onSuccess(::cache)
 
@@ -211,5 +217,6 @@ class GroupsRepository @Inject constructor(
     fun forget(id: String) {
         details.update { it - id }
         _groups.update { list -> list?.filterNot { it.id == id } }
+        _groups.value?.let(widgets::onGroups)
     }
 }
