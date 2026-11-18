@@ -38,6 +38,10 @@ enum API {
             .init(.patch, "/me/templates/\(id.pathEncoded)", body: RenameTemplateBody(name: name))
         }
         static func deleteTemplate(id: String) -> Endpoint<EmptyResponse> { .init(.delete, "/me/templates/\(id.pathEncoded)") }
+        /// Your secret calendar feed link of every group's plans (made the first time it's asked for).
+        static func calendarFeed() -> Endpoint<CalendarFeed> { .init(.get, "/me/calendar-feed") }
+        /// Swaps the feed link for a new one; calendars subscribed with the old one stop updating.
+        static func resetCalendarFeed() -> Endpoint<CalendarFeed> { .init(.post, "/me/calendar-feed/reset") }
     }
 
     // MARK: Usernames

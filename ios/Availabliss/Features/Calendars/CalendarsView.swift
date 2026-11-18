@@ -39,6 +39,7 @@ struct CalendarsView: View {
                     RegionCard(onChange: changeRegion)
                     if case .settings = mode {
                         BusyBufferCard(onError: { model.error = $0 })
+                        CalendarFeedCard(model: model)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -457,6 +458,57 @@ private struct BusyBufferCard: View {
                     onError(error.userMessage)
                 }
             }
+        }
+    }
+}
+
+/// "Subscribe to your plans": a secret webcal link of your plans from every group, for Apple
+/// Calendar or another app to subscribe to, so edits and cancellations follow automatically.
+private struct CalendarFeedCard: View {
+    let model: CalendarsViewModel
+    @Environment(\.openURL) private var openURL
+    @Environment(\.theme) private var theme
+    @State private var confirmsReset = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Subscribe to your plans").bodyFont(14, .semibold).accessibilityAddTraits(.isHeader)
+                Text("Your plans from every group in Apple Calendar or another app. Changes and cancellations follow automatically.")
+                    .bodyFont(12, relativeTo: .caption)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button {
+                if let feed = model.calendarFeed { openURL(feed.webcalUrl) }
+            } label: {
+                LoadingLabel(title: "Subscribe in Calendar", systemImage: "calendar.badge.plus", isLoading: model.calendarFeed == nil)
+            }
+            .buttonStyle(.accent)
+            .disabled(model.calendarFeed == nil || model.isResettingFeed)
+            HStack {
+                Button("Copy link", systemImage: "doc.on.doc") {
+                    guard let feed = model.calendarFeed else { return }
+                    UIPasteboard.general.url = feed.url
+                    model.toast = "Link copied"
+                }
+                .buttonStyle(.textAction)
+                Spacer()
+                Button(model.isResettingFeed ? "Resetting\u{2026}" : "Reset link") { confirmsReset = true }
+                    .buttonStyle(.textAction)
+            }
+            .disabled(model.calendarFeed == nil || model.isResettingFeed)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(cornerRadius: 20)
+        .task { await model.loadCalendarFeed() }
+        .confirmSheet(
+            "Reset your calendar link?",
+            isPresented: $confirmsReset,
+            message: "Calendars subscribed with the old link stop updating. You\u{2019}ll need to subscribe again."
+        ) {
+            [ConfirmOption("Reset link", kind: .destructive) { Task { await model.resetCalendarFeed() } }]
         }
     }
 }

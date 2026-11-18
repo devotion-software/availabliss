@@ -47,6 +47,13 @@ struct OAuthCompleteBody: Encodable, Sendable { let code: String }
 
 struct CalendarBusyBody: Encodable, Sendable { let busy: Bool }
 
+/// GET /me/calendar-feed and POST /me/calendar-feed/reset: your secret link to subscribe to
+/// your plans. `webcalUrl` is for calendar apps to subscribe to; `url` is the one to copy.
+struct CalendarFeed: Decodable, Sendable, Equatable {
+    let url: URL
+    let webcalUrl: URL
+}
+
 /// Native apps upload busy time from on-device calendars. Titles never leave the device.
 struct DeviceSync: Encodable, Sendable {
     struct DeviceCalendar: Encodable, Sendable {

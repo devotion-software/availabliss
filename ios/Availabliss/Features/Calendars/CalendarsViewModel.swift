@@ -12,6 +12,9 @@ final class CalendarsViewModel {
     private(set) var syncingIds: Set<String> = []
     var error: String?
     var toast: String?
+    /// Your secret link to subscribe to your plans; loaded when its card first appears.
+    private(set) var calendarFeed: CalendarFeed?
+    private(set) var isResettingFeed = false
 
     private let api: APIClient
 
@@ -111,6 +114,28 @@ final class CalendarsViewModel {
         } catch {
             self.error = error.userMessage
         }
+    }
+
+    /// Fetches the calendar feed link (the server makes one the first time).
+    func loadCalendarFeed() async {
+        guard calendarFeed == nil else { return }
+        do {
+            calendarFeed = try await api.send(API.Me.calendarFeed())
+        } catch where !error.isCancellation {
+            self.error = error.userMessage
+        } catch {}
+    }
+
+    /// Swaps the feed link for a new one; calendars subscribed with the old one stop updating.
+    func resetCalendarFeed() async {
+        isResettingFeed = true
+        defer { isResettingFeed = false }
+        do {
+            calendarFeed = try await api.send(API.Me.resetCalendarFeed())
+            toast = "New link ready"
+        } catch where !error.isCancellation {
+            self.error = error.userMessage
+        } catch {}
     }
 
     private func replace(_ id: String, _ change: (inout CalendarConnection) -> Void) {
