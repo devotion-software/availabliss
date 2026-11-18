@@ -32,7 +32,63 @@ data class Message(
     val receipt: Receipt? = null,
     /** The message this one replies to, as it is now. */
     val replyTo: MessageReply? = null,
+    /** Photos, GIFs and files sent with it, in order (empty for most messages, and once deleted). */
+    val attachments: List<Attachment> = emptyList(),
+    /**
+     * With [attachments]: the caption, or null. [body] is then the caption or a summary for older
+     * apps ("📷 Photo"), so show this instead.
+     */
+    val caption: String? = null,
 )
+
+/** Unknown kinds decode as [File]. */
+@Serializable(with = AttachmentKindSerializer::class)
+enum class AttachmentKind(override val wire: String) : WireEnum {
+    Image("image"),
+    Gif("gif"),
+    File("file"),
+}
+
+object AttachmentKindSerializer :
+    LenientEnumSerializer<AttachmentKind>("AttachmentKind", AttachmentKind.entries.toTypedArray(), AttachmentKind.File)
+
+/** A photo, GIF or file in a message. [url] / [thumbnailUrl] are signed links (no auth header needed) that last about a week. */
+@Serializable
+data class Attachment(
+    val id: String,
+    val kind: AttachmentKind = AttachmentKind.File,
+    val name: String = "",
+    val mime: String = "application/octet-stream",
+    /** Bytes. */
+    val size: Long = 0,
+    /** Pixels, for images and GIFs. */
+    val width: Int? = null,
+    val height: Int? = null,
+    val url: String,
+    /** A smaller preview for photos; null for GIFs (show [url], animated) and files. */
+    val thumbnailUrl: String? = null,
+) {
+    /** Shown in the chat as a picture (photos and GIFs). */
+    val isVisual: Boolean get() = kind == AttachmentKind.Image || kind == AttachmentKind.Gif
+}
+
+/** What the attachments are, in words: "Photo", "3 photos", "GIF", "Plan.pdf", "2 files", "2 attachments". Empty for none. */
+fun attachmentsSummary(attachments: List<Attachment>): String {
+    if (attachments.isEmpty()) return ""
+    val n = attachments.size
+    val kinds = attachments.map { it.kind }.toSet()
+    return when {
+        kinds == setOf(AttachmentKind.Image) -> if (n == 1) "Photo" else "$n photos"
+        kinds == setOf(AttachmentKind.Gif) -> if (n == 1) "GIF" else "$n GIFs"
+        kinds.all { it == AttachmentKind.Image || it == AttachmentKind.Gif } -> "$n photos"
+        kinds == setOf(AttachmentKind.File) -> if (n == 1) attachments[0].name.ifBlank { "File" } else "$n files"
+        else -> "$n attachments"
+    }
+}
+
+/** The text to show with the message: its caption when it has attachments, else its body. */
+val Message.displayText: String?
+    get() = if (attachments.isNotEmpty()) caption?.takeIf { it.isNotBlank() } else body
 
 /** A quoted message above a reply: who sent it and one line of it. */
 @Serializable
@@ -65,7 +121,13 @@ fun Message.asReply(authorName: String? = null): MessageReply = MessageReply(
     authorId = authorId,
     authorName = authorName,
     kind = kind,
-    text = if (deleted) null else (if (kind == MessageKind.Poll) poll?.question else body)?.split(Regex("\\s+"))?.joinToString(" ")?.trim(),
+    text = if (deleted) null else (
+        when {
+            kind == MessageKind.Poll -> poll?.question
+            attachments.isNotEmpty() -> displayText ?: attachmentsSummary(attachments)
+            else -> body
+        }
+    )?.split(Regex("\\s+"))?.joinToString(" ")?.trim(),
     deleted = deleted,
 )
 
@@ -118,6 +180,10 @@ data class MessageThread(
 
 @Serializable
 data class SendTextRequest(val body: String, val replyToId: String? = null)
+
+/** Sends uploaded attachments (1–10) with an optional caption. */
+@Serializable
+data class SendAttachmentsRequest(val attachmentIds: List<String>, val body: String? = null, val replyToId: String? = null)
 
 @Serializable
 data class SendPollRequest(val poll: NewPoll)

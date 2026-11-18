@@ -39,6 +39,16 @@ import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
 import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
 import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
+import android.net.Uri
+import dev.joeherbert.availabliss.core.data.AttachmentFiles
+import dev.joeherbert.availabliss.core.data.PickedFile
+import dev.joeherbert.availabliss.core.network.model.Attachment
+import dev.joeherbert.availabliss.core.network.model.attachmentsSummary
+import dev.joeherbert.availabliss.core.network.model.displayText
+import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUiKind
+import dev.joeherbert.availabliss.designsystem.component.chat.ComposerAttachment
+import dev.joeherbert.availabliss.designsystem.component.chat.MAX_ATTACHMENTS
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,6 +100,31 @@ data class ThreadActionsUi(val messageId: String, val title: String, val snippet
 /** Scroll the chat to [messageId] and flash it ("Show in chat" from a thread). */
 data class ShowInChatRequest(val messageId: String, val nonce: Long = System.nanoTime())
 
+/** The full-screen photo viewer: a message's photos and GIFs, opened at [startIndex]. */
+data class ViewerUi(val attachments: List<Attachment>, val startIndex: Int)
+
+/** A photo or file picked in the composer: uploading, uploaded (ready to send) or failed. */
+private data class PendingUpload(
+    val localId: String,
+    val uri: Uri,
+    val file: PickedFile? = null,
+    val kind: AttachmentUiKind = AttachmentUiKind.File,
+    val name: String = "",
+    val progress: Float = 0f,
+    val uploaded: Attachment? = null,
+    val error: String? = null,
+) {
+    fun toUi() = ComposerAttachment(
+        id = localId,
+        kind = kind,
+        name = name,
+        preview = uri.takeIf { kind != AttachmentUiKind.File },
+        progress = progress,
+        uploaded = uploaded != null,
+        error = error,
+    )
+}
+
 /** Poll creation form. */
 data class PollDraft(
     val question: String = "",
@@ -136,10 +171,18 @@ data class ChatUiState(
     val thread: ThreadUi? = null,
     val showInChat: ShowInChatRequest? = null,
     val message: UserMessage? = null,
+    /** Photos and files picked for the next message. */
+    val attachments: List<ComposerAttachment> = emptyList(),
+    /** Editing a message with attachments: its caption can be emptied. */
+    val editingCaption: Boolean = false,
+    /** Attachments downloading (to open, share or save): progress 0–1 by id, below 0 when unknown. */
+    val downloads: Map<String, Float> = emptyMap(),
+    /** Non-null while the photo viewer is open. */
+    val viewer: ViewerUi? = null,
 )
 
 /** Editing [messageId]; [original] is its text, [stashedDraft] the composer draft to restore afterwards. */
-private data class EditSession(val messageId: String, val original: String, val stashedDraft: String)
+private data class EditSession(val messageId: String, val original: String, val stashedDraft: String, val hasAttachments: Boolean = false)
 
 private data class ThreadSession(
     val focusId: String,
@@ -172,6 +215,9 @@ private data class ChatData(
     val thread: ThreadSession? = null,
     val showInChat: ShowInChatRequest? = null,
     val message: UserMessage? = null,
+    val pending: List<PendingUpload> = emptyList(),
+    val downloads: Map<String, Float> = emptyMap(),
+    val viewer: ViewerUi? = null,
 )
 
 /** What the message list is built from; everything else in [ChatData] changes without rebuilding it. */
@@ -191,6 +237,7 @@ class ChatViewModel @Inject constructor(
     private val events: EventsRepository,
     private val users: UserRepository,
     private val addToCalendar: AddToCalendarDelegate,
+    private val files: AttachmentFiles,
     liveEvents: LiveEvents,
 ) : ViewModel() {
 
@@ -203,6 +250,7 @@ class ChatViewModel @Inject constructor(
     private var visible = false
     private var lastSeenSent: String? = null
     private var receiptJob: Job? = null
+    private val uploadJobs = mutableMapOf<String, Job>()
 
     private val meIds = users.user.map { it?.id }.distinctUntilChanged()
 
@@ -421,6 +469,7 @@ class ChatViewModel @Inject constructor(
 
     fun send() {
         if (data.value.editing != null) return saveEdit()
+        if (data.value.pending.isNotEmpty()) return sendAttachments()
         val text = draft.trim()
         if (text.isEmpty() || data.value.sending) return
         draft = ""
@@ -437,6 +486,150 @@ class ChatViewModel @Inject constructor(
                     data.update { it.copy(sending = false, replyingToId = it.replyingToId ?: replyTo, message = UserMessage(result.error.message)) }
                 }
             }
+        }
+    }
+
+    private fun sendAttachments() {
+        val d = data.value
+        if (d.sending || d.pending.any { it.uploaded == null }) return
+        val ids = d.pending.mapNotNull { it.uploaded?.id }
+        val text = draft.trim()
+        draft = ""
+        val replyTo = d.replyingToId
+        data.update { it.copy(sending = true, menuOpen = false, replyingToId = null) }
+        viewModelScope.launch {
+            when (val result = chat.sendAttachments(groupId, ids, text, replyTo)) {
+                is ApiResult.Success -> {
+                    appendMessage(result.value)
+                    data.update { cur -> cur.copy(sending = false, pending = cur.pending.filterNot { it.uploaded?.id in ids }) }
+                }
+                is ApiResult.Failure -> {
+                    if (draft.isEmpty()) draft = text
+                    data.update { it.copy(sending = false, replyingToId = it.replyingToId ?: replyTo, message = UserMessage(result.error.message)) }
+                }
+            }
+        }
+    }
+    // endregion
+
+    // region Attachments
+    /** Photos or files picked to send: each starts uploading straight away (up to [MAX_ATTACHMENTS] per message). */
+    fun onPicked(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        val room = MAX_ATTACHMENTS - data.value.pending.size
+        val taken = uris.distinct().take(room.coerceAtLeast(0))
+        val entries = taken.map { PendingUpload(localId = UUID.randomUUID().toString(), uri = it) }
+        data.update {
+            it.copy(
+                pending = it.pending + entries,
+                menuOpen = false,
+                message = if (taken.size < uris.distinct().size) UserMessage("You can send up to $MAX_ATTACHMENTS photos and files at a time") else it.message,
+            )
+        }
+        entries.forEach { upload(it.localId) }
+    }
+
+    fun removeAttachment(localId: String) {
+        uploadJobs.remove(localId)?.cancel()
+        data.update { d -> d.copy(pending = d.pending.filterNot { it.localId == localId }) }
+    }
+
+    fun retryAttachment(localId: String) {
+        updatePending(localId) { it.copy(error = null, progress = 0f) }
+        upload(localId)
+    }
+
+    private fun updatePending(localId: String, transform: (PendingUpload) -> PendingUpload) = data.update { d ->
+        d.copy(pending = d.pending.map { if (it.localId == localId) transform(it) else it })
+    }
+
+    private fun upload(localId: String) {
+        uploadJobs.remove(localId)?.cancel()
+        uploadJobs[localId] = viewModelScope.launch {
+            val entry = data.value.pending.firstOrNull { it.localId == localId } ?: return@launch
+            val file = entry.file ?: runCatching { files.describe(entry.uri) }.getOrNull()
+            if (file == null) {
+                updatePending(localId) { it.copy(error = "Couldn't read this file") }
+                return@launch
+            }
+            val kind = when {
+                file.isGif -> AttachmentUiKind.Gif
+                file.isImage -> AttachmentUiKind.Image
+                else -> AttachmentUiKind.File
+            }
+            updatePending(localId) { it.copy(file = file, kind = kind, name = file.name) }
+            uploadLimitError(file.mime, file.size)?.let { error ->
+                updatePending(localId) { it.copy(error = error) }
+                return@launch
+            }
+            var reported = -1
+            val source = files.prepare(file) { written, total ->
+                if (total > 0) {
+                    val percent = (written * 100 / total).toInt().coerceIn(0, 100)
+                    if (percent != reported) {
+                        reported = percent
+                        updatePending(localId) { if (it.uploaded == null && it.error == null) it.copy(progress = percent / 100f) else it }
+                    }
+                }
+            }
+            if (source == null) {
+                updatePending(localId) { it.copy(error = "Couldn't read this photo") }
+                return@launch
+            }
+            when (val result = chat.upload(groupId, source.name, source.body)) {
+                is ApiResult.Success -> updatePending(localId) { it.copy(uploaded = result.value, progress = 1f) }
+                is ApiResult.Failure -> updatePending(localId) { it.copy(error = result.error.message) }
+            }
+            uploadJobs.remove(localId)
+        }
+    }
+
+    /** Taps on a photo (opens the viewer over the message's photos) or a file (downloads and opens it). */
+    fun openAttachment(messageId: String, attachmentId: String) {
+        val m = (data.value.messages + data.value.thread?.messages.orEmpty()).firstOrNull { it.id == messageId } ?: return
+        val a = m.attachments.firstOrNull { it.id == attachmentId } ?: return
+        if (a.isVisual) {
+            val visuals = m.attachments.filter { it.isVisual }
+            data.update { it.copy(viewer = ViewerUi(visuals, visuals.indexOf(a).coerceAtLeast(0)), menuOpen = false) }
+        } else {
+            withDownload(a) { file ->
+                if (!files.open(file, a.mime)) data.update { it.copy(message = UserMessage("No app on this phone can open ${a.name}")) }
+            }
+        }
+    }
+
+    fun closeViewer() = data.update { it.copy(viewer = null) }
+
+    fun shareAttachment(attachment: Attachment) = withDownload(attachment) { file -> files.share(file, attachment.mime) }
+
+    fun saveAttachment(attachment: Attachment) = withDownload(attachment) { file ->
+        val saved = files.saveToPictures(file, attachment.mime)
+        data.update { it.copy(message = UserMessage(if (saved) "Saved to Pictures" else "Couldn't save the photo")) }
+    }
+
+    /** Downloads [attachment] to the cache (once at a time per attachment), then runs [then]. */
+    private fun withDownload(attachment: Attachment, then: suspend (java.io.File) -> Unit) {
+        if (attachment.id in data.value.downloads) return
+        data.update { it.copy(downloads = it.downloads + (attachment.id to -1f)) }
+        viewModelScope.launch {
+            var reported = -1
+            val result = runCatching {
+                files.download(attachment) { p ->
+                    val percent = (p * 100).toInt()
+                    if (percent != reported) {
+                        reported = percent
+                        data.update { d -> if (attachment.id in d.downloads) d.copy(downloads = d.downloads + (attachment.id to p)) else d }
+                    }
+                }
+            }
+            data.update { it.copy(downloads = it.downloads - attachment.id) }
+            result.fold(
+                onSuccess = { then(it) },
+                onFailure = { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    data.update { it.copy(message = UserMessage("Couldn't download ${attachment.name}")) }
+                },
+            )
         }
     }
     // endregion
@@ -462,8 +655,9 @@ class ChatViewModel @Inject constructor(
     fun startEdit(messageId: String) {
         val m = editable(messageId) ?: return
         val stash = data.value.editing?.stashedDraft ?: draft
-        data.update { it.copy(editing = EditSession(m.id, m.body.orEmpty(), stash), menuOpen = false, replyingToId = null) }
-        draft = m.body.orEmpty()
+        val text = m.displayText.orEmpty()
+        data.update { it.copy(editing = EditSession(m.id, text, stash, hasAttachments = m.attachments.isNotEmpty()), menuOpen = false, replyingToId = null) }
+        draft = text
     }
 
     /** Leaves edit mode, restoring whatever draft was there before. */
@@ -476,7 +670,7 @@ class ChatViewModel @Inject constructor(
     private fun saveEdit() {
         val session = data.value.editing ?: return
         val text = draft.trim()
-        if (text.isEmpty() || data.value.sending) return
+        if ((text.isEmpty() && !session.hasAttachments) || data.value.sending) return
         if (text == session.original.trim()) return cancelEdit()
         data.update { it.copy(sending = true) }
         viewModelScope.launch {
@@ -733,6 +927,10 @@ class ChatViewModel @Inject constructor(
                 sheet.toUi(messages.firstOrNull { it.id == sheet.messageId }, MemberDirectory(g?.members.orEmpty(), me))
             },
             message = message,
+            attachments = pending.map { it.toUi() },
+            editingCaption = editing?.hasAttachments == true,
+            downloads = downloads,
+            viewer = viewer,
         )
     }
 
@@ -766,7 +964,8 @@ class ChatViewModel @Inject constructor(
     private fun InfoSheet.toUi(message: Message?, directory: MemberDirectory): MessageInfoUi {
         fun person(userId: String, time: String) = InfoPerson(directory.avatar(userId), directory.displayName(userId), time)
         fun clock(iso: String) = DateTimes.localDateTime(iso)?.let(DateTimes::time).orEmpty()
-        val text = message?.body ?: message?.poll?.question.orEmpty()
+        val text = message?.takeIf { it.attachments.isNotEmpty() }?.let { it.displayText ?: attachmentsSummary(it.attachments) }
+            ?: message?.body ?: message?.poll?.question.orEmpty()
         val own = message == null || directory.isMe(message.authorId)
         val sent = sentAtLabel(info?.sentAt ?: message?.createdAt.orEmpty())
         return MessageInfoUi(
@@ -786,5 +985,21 @@ class ChatViewModel @Inject constructor(
         const val RECEIPT_DEBOUNCE_MS = 600L
         /** How many older pages "Show in chat" loads looking for a message. */
         const val MAX_PAGES_TO_FIND = 20
+    }
+}
+
+private const val MAX_PHOTO_BYTES = 15L * 1024 * 1024
+private const val MAX_FILE_BYTES = 25L * 1024 * 1024
+
+/**
+ * Why a picked file of [mime] and [size] bytes is too big to send, or null. GIFs are sent as they are;
+ * other photos are shrunk on the device when they're over the limit, so only GIFs and files are checked.
+ */
+fun uploadLimitError(mime: String, size: Long?): String? {
+    if (size == null) return null
+    return when {
+        mime == "image/gif" && size > MAX_PHOTO_BYTES -> "GIFs can be up to 15 MB"
+        !mime.startsWith("image/") && size > MAX_FILE_BYTES -> "Files can be up to 25 MB"
+        else -> null
     }
 }

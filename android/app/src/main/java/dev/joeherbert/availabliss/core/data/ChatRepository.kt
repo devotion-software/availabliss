@@ -2,7 +2,9 @@ package dev.joeherbert.availabliss.core.data
 
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.AvailablissApi
+import dev.joeherbert.availabliss.core.network.model.Attachment
 import dev.joeherbert.availabliss.core.network.model.Message
+import dev.joeherbert.availabliss.core.network.model.SendAttachmentsRequest
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
 import dev.joeherbert.availabliss.core.network.model.MessageThread
 import dev.joeherbert.availabliss.core.network.model.MessagesResponse
@@ -13,6 +15,8 @@ import dev.joeherbert.availabliss.core.network.model.ReceiptsRequest
 import dev.joeherbert.availabliss.core.network.model.SendPollRequest
 import dev.joeherbert.availabliss.core.network.model.SendTextRequest
 import dev.joeherbert.availabliss.core.network.model.VoteRequest
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,13 +33,21 @@ class ChatRepository @Inject constructor(
     suspend fun sendText(groupId: String, body: String, replyToId: String? = null): ApiResult<Message> =
         call { api.sendText(groupId, SendTextRequest(body.trim(), replyToId)) }
 
+    /** Sends uploaded attachments with an optional caption. */
+    suspend fun sendAttachments(groupId: String, attachmentIds: List<String>, caption: String, replyToId: String? = null): ApiResult<Message> =
+        call { api.sendAttachments(groupId, SendAttachmentsRequest(attachmentIds, caption.trim().takeIf { it.isNotEmpty() }, replyToId)) }
+
+    /** Uploads one file as [name] (not yet sent). */
+    suspend fun upload(groupId: String, name: String, body: RequestBody): ApiResult<Attachment> =
+        call { api.uploadAttachment(groupId, MultipartBody.Part.createFormData("file", name, body)) }
+
     suspend fun sendPoll(groupId: String, question: String, options: List<String>, multi: Boolean): ApiResult<Message> =
         call { api.sendPoll(groupId, SendPollRequest(NewPoll(question.trim(), options.map { it.trim() }, multi))) }
 
     suspend fun markReceipts(groupId: String, upTo: String, state: ReceiptState): ApiResult<Unit> =
         call { api.sendReceipts(groupId, ReceiptsRequest(upTo, state)) }
 
-    /** Edits your own text message. */
+    /** Edits your own text message (with attachments, its caption; empty removes it). */
     suspend fun edit(messageId: String, body: String): ApiResult<Message> =
         call { api.editMessage(messageId, SendTextRequest(body.trim())) }
 

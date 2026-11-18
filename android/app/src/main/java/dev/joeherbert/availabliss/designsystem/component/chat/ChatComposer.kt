@@ -96,9 +96,19 @@ fun ChatComposer(
     canCancelReply: Boolean = true,
     cancelReplyLabel: String = "Cancel reply",
     focusOnReply: Boolean = true,
+    /** Photos and files picked to send, shown as a tray above the field (not while editing). */
+    attachments: List<ComposerAttachment> = emptyList(),
+    onRemoveAttachment: (String) -> Unit = {},
+    onRetryAttachment: (String) -> Unit = {},
+    /** Set to offer Photos and File in the + menu. */
+    onPhotos: (() -> Unit)? = null,
+    onFiles: (() -> Unit)? = null,
+    /** Editing a message with attachments: an empty caption can be saved. */
+    allowEmptyText: Boolean = false,
 ) {
     val colors = AvailablissTheme.colors
-    val canSend = text.isNotBlank() && !sending
+    val tray = if (editing) emptyList() else attachments
+    val canSend = composerCanSend(text, tray, sending, allowEmptyText = editing && allowEmptyText)
     // Local selection, so text set from outside (an edit's prefill, a restored draft)
     // puts the caret at the end while typing keeps it where it is.
     var field by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
@@ -167,18 +177,29 @@ fun ChatComposer(
             }
         }
         AnimatedVisibility(visible = menuOpen, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-            Row(
+            Column(
                 Modifier
                     .padding(start = 12.dp, end = 12.dp, top = 10.dp)
                     .fillMaxWidth()
                     .glass(RoundedCornerShape(22.dp))
                     .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                MenuTile("Poll", AvIcons.Poll, onPoll, Modifier.weight(1f))
-                MenuTile("Propose a time", AvIcons.ProposalCheck, onProposeTime, Modifier.weight(1f))
-                MenuTile("Add event", AvIcons.CalendarAdd, onAddEvent, Modifier.weight(1f))
+                if (onPhotos != null || onFiles != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        onPhotos?.let { MenuTile("Photos", AvIcons.Photo, it, Modifier.weight(1f), compact = true) }
+                        onFiles?.let { MenuTile("File", AvIcons.Attach, it, Modifier.weight(1f), compact = true) }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    MenuTile("Poll", AvIcons.Poll, onPoll, Modifier.weight(1f))
+                    MenuTile("Propose a time", AvIcons.ProposalCheck, onProposeTime, Modifier.weight(1f))
+                    MenuTile("Add event", AvIcons.CalendarAdd, onAddEvent, Modifier.weight(1f))
+                }
             }
+        }
+        AnimatedVisibility(visible = tray.isNotEmpty(), enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            AttachmentTray(tray, onRemoveAttachment, onRetryAttachment, Modifier.padding(top = 10.dp).fillMaxWidth())
         }
         Row(
             Modifier
@@ -197,7 +218,7 @@ fun ChatComposer(
                     .background(if (menuOpen) colors.solid else colors.surface)
                     .clickable(role = Role.Button, onClick = onToggleMenu)
                     .semantics {
-                        contentDescription = "Add poll, proposal or event"
+                        contentDescription = if (onPhotos != null) "Attach, or add a poll, proposal or event" else "Add poll, proposal or event"
                         stateDescription = if (menuOpen) "Expanded" else "Collapsed"
                     },
                 contentAlignment = Alignment.Center,
@@ -222,7 +243,7 @@ fun ChatComposer(
                     .semantics { contentDescription = "Message" },
                 decorationBox = { inner ->
                     Box(Modifier.defaultMinSize(minHeight = 44.dp).padding(vertical = 11.dp), contentAlignment = Alignment.CenterStart) {
-                        if (text.isEmpty()) Text(placeholder, style = AvailablissTheme.type.bodyMediumRegular, color = colors.muted)
+                        if (text.isEmpty()) Text(if (tray.isNotEmpty() || (editing && allowEmptyText)) "Add a caption" else placeholder, style = AvailablissTheme.type.bodyMediumRegular, color = colors.muted)
                         inner()
                     }
                 },
@@ -243,21 +264,33 @@ fun ChatComposer(
     }
 }
 
+/** [compact]: icon beside the label in a shorter tile (Photos / File). */
 @Composable
-private fun MenuTile(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier) {
+private fun MenuTile(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier, compact: Boolean = false) {
     val colors = AvailablissTheme.colors
-    Column(
-        modifier
-            .defaultMinSize(minHeight = 72.dp)
-            .clip(Shapes.control)
-            .background(colors.surface)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
-    ) {
-        Icon(icon, null, tint = colors.accentInk, modifier = Modifier.size(22.dp))
-        Text(label, style = AvailablissTheme.type.captionStrong, color = colors.ink)
+    val base = modifier
+        .defaultMinSize(minHeight = if (compact) 48.dp else 72.dp)
+        .clip(Shapes.control)
+        .background(colors.surface)
+        .clickable(role = Role.Button, onClick = onClick)
+    if (compact) {
+        Row(
+            base.padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        ) {
+            Icon(icon, null, tint = colors.accentInk, modifier = Modifier.size(20.dp))
+            Text(label, style = AvailablissTheme.type.captionStrong, color = colors.ink)
+        }
+    } else {
+        Column(
+            base.padding(vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+        ) {
+            Icon(icon, null, tint = colors.accentInk, modifier = Modifier.size(22.dp))
+            Text(label, style = AvailablissTheme.type.captionStrong, color = colors.ink)
+        }
     }
 }
 
@@ -266,7 +299,14 @@ private fun MenuTile(label: String, icon: ImageVector, onClick: () -> Unit, modi
 private fun ChatComposerPreview() {
     AvailablissPreviewTheme {
         Box(Modifier.background(AvailablissTheme.colors.bg)) {
-            ChatComposer("", {}, {}, menuOpen = true, onToggleMenu = {}, onPoll = {}, onProposeTime = {}, onAddEvent = {})
+            ChatComposer(
+                "", {}, {}, menuOpen = true, onToggleMenu = {}, onPoll = {}, onProposeTime = {}, onAddEvent = {}, onPhotos = {}, onFiles = {},
+                attachments = listOf(
+                    ComposerAttachment("1", AttachmentUiKind.Image, "IMG_0001.jpg", progress = 0.4f),
+                    ComposerAttachment("2", AttachmentUiKind.File, "Itinerary.pdf", uploaded = true),
+                    ComposerAttachment("3", AttachmentUiKind.Image, "IMG_0002.jpg", error = "Couldn't upload"),
+                ),
+            )
         }
     }
 }

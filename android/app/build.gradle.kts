@@ -146,6 +146,7 @@ dependencies {
     implementation(libs.androidx.browser)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.coil.gif)
     // Pro purchases through Google Play Billing (brings the BILLING permission). Not the RevenueCat UI library: the paywall is ours.
     implementation(libs.revenuecat.purchases)
 

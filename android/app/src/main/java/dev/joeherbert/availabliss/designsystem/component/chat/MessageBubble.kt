@@ -84,6 +84,12 @@ fun MessageBubble(
     /** The message this one replies to; tapping it calls [onQuoteClick] with its id. */
     quote: BubbleQuote? = null,
     onQuoteClick: (String) -> Unit = {},
+    /** Photos, GIFs and files, above [text] (the caption, which may be empty). */
+    attachments: List<AttachmentUi> = emptyList(),
+    /** Tapping a photo (opens the viewer) or a file (downloads and opens it), by attachment id. */
+    onOpenAttachment: (String) -> Unit = {},
+    /** Files downloading to open: progress 0–1 by attachment id (below 0 when unknown). */
+    downloads: Map<String, Float> = emptyMap(),
 ) {
     val colors = AvailablissTheme.colors
     var menuOpen by remember { mutableStateOf(false) }
@@ -100,7 +106,23 @@ fun MessageBubble(
                 if (deleted) Modifier.semantics { contentDescription = accessibilityLabel ?: "Message deleted" }
                 else interactions(onClick, accessibilityLabel, actions, onLongClick = { menuOpen = true }),
             )
-            if (quote != null && !deleted) {
+            if (attachments.isNotEmpty() && !deleted) {
+                val longPress: (() -> Unit)? = if (actions.isNotEmpty()) ({ menuOpen = true }) else null
+                Column(
+                    interaction.width(IntrinsicSize.Max).padding(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (quote != null) QuoteBlock(quote, own, onQuoteClick, Modifier.fillMaxWidth().widthIn(max = 240.dp).padding(4.dp))
+                    val (images, files) = attachments.partition { it.visual }
+                    AttachmentGallery(images, onOpenAttachment, onLongClick = longPress)
+                    files.forEach { f ->
+                        FileAttachmentCard(f, own, onOpenAttachment, progress = downloads[f.id], onLongClick = longPress)
+                    }
+                    if (text.isNotBlank()) {
+                        BubbleText(text = text, modifier = Modifier.widthIn(max = 240.dp).padding(start = 8.dp, end = 8.dp, top = 2.dp, bottom = 5.dp), own = own)
+                    }
+                }
+            } else if (quote != null && !deleted) {
                 // As wide as the wider of quote and text, so a short reply doesn't stretch to the quote.
                 Column(
                     interaction.width(IntrinsicSize.Max).padding(horizontal = 8.dp, vertical = 8.dp),

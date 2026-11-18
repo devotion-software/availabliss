@@ -40,6 +40,8 @@ import dev.joeherbert.availabliss.core.network.model.Member
 import dev.joeherbert.availabliss.core.network.model.LeaveGroupRequest
 import dev.joeherbert.availabliss.core.network.model.MemberRoleRequest
 import dev.joeherbert.availabliss.core.network.model.Message
+import dev.joeherbert.availabliss.core.network.model.Attachment
+import dev.joeherbert.availabliss.core.network.model.SendAttachmentsRequest
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
 import dev.joeherbert.availabliss.core.network.model.MessageThread
 import dev.joeherbert.availabliss.core.network.model.MessagesResponse
@@ -70,6 +72,8 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
+import retrofit2.http.Part
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -369,6 +373,14 @@ interface AvailablissApi {
 
     @POST("api/v1/groups/{id}/messages")
     suspend fun sendText(@Path("id") groupId: String, @Body body: SendTextRequest): Message
+
+    @POST("api/v1/groups/{id}/messages")
+    suspend fun sendAttachments(@Path("id") groupId: String, @Body body: SendAttachmentsRequest): Message
+
+    /** One photo, GIF or file (multipart field `file`); returns it unsent, to send by id with [sendAttachments]. */
+    @Multipart
+    @POST("api/v1/groups/{id}/attachments")
+    suspend fun uploadAttachment(@Path("id") groupId: String, @Part file: okhttp3.MultipartBody.Part): Attachment
 
     @POST("api/v1/groups/{id}/messages")
     suspend fun sendPoll(@Path("id") groupId: String, @Body body: SendPollRequest): Message

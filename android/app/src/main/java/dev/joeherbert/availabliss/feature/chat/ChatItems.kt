@@ -1,7 +1,15 @@
 package dev.joeherbert.availabliss.feature.chat
 
 import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.network.model.Attachment
+import dev.joeherbert.availabliss.core.network.model.AttachmentKind
 import dev.joeherbert.availabliss.core.network.model.GroupEvent
+import dev.joeherbert.availabliss.core.network.model.attachmentsSummary
+import dev.joeherbert.availabliss.core.network.model.displayText
+import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUi
+import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUiKind
+import dev.joeherbert.availabliss.designsystem.component.chat.fileIconFor
+import dev.joeherbert.availabliss.designsystem.component.chat.formatFileSize
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageKind
 import dev.joeherbert.availabliss.core.network.model.MessageReply
@@ -50,6 +58,8 @@ sealed interface ChatItem {
         val quote: BubbleQuote? = null,
         /** A reply, or replied to: long-press offers View thread. */
         val inThread: Boolean = false,
+        /** Photos, GIFs and files; [text] is then the caption (possibly empty). */
+        val attachments: List<AttachmentUi> = emptyList(),
     ) : ChatItem {
         override val key get() = id
     }
@@ -166,11 +176,13 @@ fun buildChatItems(
 
             else -> {
                 val text = when {
-                    !m.deleted -> m.body.orEmpty()
+                    !m.deleted -> m.displayText.orEmpty()
                     own -> "You deleted this message"
                     else -> "This message was deleted"
                 }
-                if (text.isNotBlank()) {
+                val attachments = if (m.deleted) emptyList() else m.attachments.map { it.toUi() }
+                if (text.isNotBlank() || attachments.isNotEmpty()) {
+                    val spoken = listOf(attachmentsSpoken(m.attachments), text).filter { it.isNotBlank() }.joinToString(", ")
                     val next = messages.getOrNull(index + 1)
                     val continues = next != null && next.authorId == m.authorId && next.kind == MessageKind.Text &&
                         DateTimes.localDate(next.createdAt) == date
@@ -185,8 +197,8 @@ fun buildChatItems(
                         showAvatar = !continues,
                         accessibilityLabel = when {
                             m.deleted -> "Message deleted"
-                            own -> "Your message: $text${if (m.isEdited) ", edited" else ""}. Tap for message info"
-                            else -> "$authorName: $text${if (m.isEdited) ", edited" else ""}"
+                            own -> "Your message: $spoken${if (m.isEdited) ", edited" else ""}. Tap for message info"
+                            else -> "$authorName: $spoken${if (m.isEdited) ", edited" else ""}"
                         },
                         authorName = if (!own && startsRun) m.authorId?.let { directory.avatar(it).name } else null,
                         // Your latest message says "Edited" on its receipt line instead.
@@ -196,6 +208,7 @@ fun buildChatItems(
                         canReply = m.canReply,
                         quote = if (m.deleted) null else m.replyTo?.let { quoteFor(it, directory) },
                         inThread = m.replyTo != null || m.id in repliedTo,
+                        attachments = attachments,
                     )
                 }
             }
@@ -205,6 +218,31 @@ fun buildChatItems(
     }
     return items
 }
+
+/** A sent attachment as the bubble draws it. */
+fun Attachment.toUi(): AttachmentUi = AttachmentUi(
+    id = id,
+    kind = when (kind) {
+        AttachmentKind.Image -> AttachmentUiKind.Image
+        AttachmentKind.Gif -> AttachmentUiKind.Gif
+        AttachmentKind.File -> AttachmentUiKind.File
+    },
+    name = name,
+    sizeLabel = formatFileSize(size),
+    preview = when (kind) {
+        AttachmentKind.Image -> thumbnailUrl ?: url
+        AttachmentKind.Gif -> url
+        AttachmentKind.File -> null
+    },
+    width = width,
+    height = height,
+    icon = fileIconFor(name, mime),
+)
+
+/** The attachments for a screen reader: "Photo", "3 photos", "File: Plan.pdf, 1.2 MB". */
+fun attachmentsSpoken(attachments: List<Attachment>): String =
+    if (attachments.size == 1 && attachments[0].kind == AttachmentKind.File) attachments[0].toUi().accessibilityLabel
+    else attachmentsSummary(attachments)
 
 private fun confirmedItem(m: Message, e: GroupEvent, now: Instant): ChatItem.Confirmed {
     val sent = DateTimes.parseInstant(m.createdAt)
@@ -273,7 +311,7 @@ fun List<Message>.withUpdated(updated: Message): List<Message> = map { m ->
 
 /** Marks a message deleted locally after your own DELETE succeeds. */
 fun List<Message>.withDeleted(messageId: String): List<Message> {
-    val deleted = firstOrNull { it.id == messageId }?.copy(body = null, deleted = true) ?: return this
+    val deleted = firstOrNull { it.id == messageId }?.copy(body = null, deleted = true, attachments = emptyList(), caption = null) ?: return this
     return map { m -> if (m.id == messageId) deleted else m }.withQuotesOf(deleted)
 }
 

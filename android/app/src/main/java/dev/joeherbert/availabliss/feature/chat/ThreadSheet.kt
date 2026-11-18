@@ -65,6 +65,8 @@ fun ThreadSheet(
     rowActions: ChatActions,
     addedToCalendar: Set<String>,
     sheetActions: ThreadSheetActions,
+    /** Attachments downloading to open, by id. */
+    downloads: Map<String, Float> = emptyMap(),
 ) {
     val colors = AvailablissTheme.colors
     val listState = rememberLazyListState()
@@ -120,7 +122,7 @@ fun ThreadSheet(
                             label = "thread-highlight",
                         )
                         Box(Modifier.drawBehind { drawRoundRect(flash, topLeft = Offset(-6.dp.toPx(), -6.dp.toPx()), size = Size(size.width + 12.dp.toPx(), size.height + 12.dp.toPx()), cornerRadius = CornerRadius(18.dp.toPx())) }) {
-                            ChatRow(item, rowActions, addedToCalendar, onQuoteClick = highlight, quoteOpensThread = false)
+                            ChatRow(item, rowActions, addedToCalendar, onQuoteClick = highlight, quoteOpensThread = false, downloads = downloads)
                         }
                     }
                     if (thread.truncated) item(key = "truncated") {

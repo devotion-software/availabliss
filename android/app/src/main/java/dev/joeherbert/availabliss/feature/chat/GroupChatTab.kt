@@ -2,6 +2,12 @@ package dev.joeherbert.availabliss.feature.chat
 
 import androidx.compose.runtime.remember
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments
+import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
+import dev.joeherbert.availabliss.designsystem.component.chat.MAX_ATTACHMENTS
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -129,6 +135,13 @@ data class ChatActions(
     /** In a thread: Show in chat in a message's long-press menu. */
     val onShowInChat: ((messageId: String) -> Unit)? = null,
     val onShowInChatHandled: () -> Unit = {},
+    /** Tapped a photo (opens the viewer) or a file (downloads and opens it) in a message. */
+    val onOpenAttachment: (messageId: String, attachmentId: String) -> Unit = { _, _ -> },
+    /** Photos / File in the + menu: open the system pickers. */
+    val onPhotos: () -> Unit = {},
+    val onFiles: () -> Unit = {},
+    val onRemoveAttachment: (String) -> Unit = {},
+    val onRetryAttachment: (String) -> Unit = {},
 )
 
 /** The group's chat (full screen; back returns to the calendar tab). */
@@ -145,7 +158,12 @@ fun GroupChatTab(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
-    UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
+    val viewerSnackbar = rememberSnackbarHostState()
+    // While the photo viewer is open, its messages ("Saved to Pictures") show over it.
+    UserMessageEffect(state.message, if (state.viewer != null) viewerSnackbar else snackbar, viewModel::onMessageShown)
+    // The system photo picker (photos and GIFs, no permission needed) and file picker; the app keeps at most 10 per message.
+    val photoPicker = rememberLauncherForActivityResult(PickMultipleVisualMedia(MAX_ATTACHMENTS)) { uris -> viewModel.onPicked(uris) }
+    val filePicker = rememberLauncherForActivityResult(OpenMultipleDocuments()) { uris -> viewModel.onPicked(uris) }
     AddToCalendarEffect(state.calendar, viewModel::onCalendarIntentHandled)
     LifecycleResumeEffect(Unit) {
         viewModel.onVisibilityChanged(true)
@@ -192,6 +210,17 @@ fun GroupChatTab(
             onOpenGroup = onOpenGroup,
             onOpenThread = viewModel::openThread,
             onShowInChatHandled = viewModel::onShowInChatHandled,
+            onOpenAttachment = viewModel::openAttachment,
+            onPhotos = {
+                viewModel.closeMenu()
+                photoPicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
+            },
+            onFiles = {
+                viewModel.closeMenu()
+                filePicker.launch(arrayOf("*/*"))
+            },
+            onRemoveAttachment = viewModel::removeAttachment,
+            onRetryAttachment = viewModel::retryAttachment,
         )
     }
     // The same rows inside the thread sheet, where tapping one offers Reply / Show in chat.
@@ -217,6 +246,7 @@ fun GroupChatTab(
             draft = viewModel.threadDraft,
             rowActions = threadActions,
             addedToCalendar = state.calendar.added,
+            downloads = state.downloads,
             sheetActions = ThreadSheetActions(
                 onDraftChange = viewModel::onThreadDraftChange,
                 onSend = viewModel::sendInThread,
@@ -229,6 +259,16 @@ fun GroupChatTab(
         )
     }
     state.info?.let { MessageInfoSheet(it, onDismiss = viewModel::closeInfo) }
+    state.viewer?.let { viewer ->
+        AttachmentViewer(
+            viewer = viewer,
+            downloads = state.downloads,
+            snackbar = viewerSnackbar,
+            onShare = viewModel::shareAttachment,
+            onSave = viewModel::saveAttachment,
+            onDismiss = viewModel::closeViewer,
+        )
+    }
     if (state.confirmDeleteId != null) {
         DeleteMessageDialog(onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
     }
@@ -283,6 +323,12 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
                 replyingTo = state.replying?.name,
                 replyingSnippet = state.replying?.snippet.orEmpty(),
                 onCancelReply = actions.onCancelReply,
+                attachments = state.attachments,
+                onRemoveAttachment = actions.onRemoveAttachment,
+                onRetryAttachment = actions.onRetryAttachment,
+                onPhotos = actions.onPhotos,
+                onFiles = actions.onFiles,
+                allowEmptyText = state.editingCaption,
             )
         }
     }
@@ -413,7 +459,7 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
                 label = "quote-highlight",
             )
             Box(Modifier.drawBehind { drawRoundRect(flash, topLeft = Offset(-6.dp.toPx(), -6.dp.toPx()), size = Size(size.width + 12.dp.toPx(), size.height + 12.dp.toPx()), cornerRadius = CornerRadius(18.dp.toPx())) }) {
-                ChatRow(item, actions, state.calendar.added, actions.onOpenThread)
+                ChatRow(item, actions, state.calendar.added, actions.onOpenThread, downloads = state.downloads)
             }
         }
         if (state.loadingOlder) item(key = "loading-older") { LoadingIndicator() }
@@ -472,7 +518,14 @@ private val JUMP_THRESHOLD = 200.dp
 
 /** One chat row. [onQuoteClick] gets the message's own id in the chat (to open its thread), or the quoted id in a thread. */
 @Composable
-internal fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<String>, onQuoteClick: (String) -> Unit, quoteOpensThread: Boolean = true) {
+internal fun ChatRow(
+    item: ChatItem,
+    actions: ChatActions,
+    addedToCalendar: Set<String>,
+    onQuoteClick: (String) -> Unit,
+    quoteOpensThread: Boolean = true,
+    downloads: Map<String, Float> = emptyMap(),
+) {
     when (item) {
         is ChatItem.Day -> ChatMeta(item.label)
         is ChatItem.System -> ChatMeta(item.text)
@@ -497,6 +550,9 @@ internal fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<
             },
             quote = item.quote,
             onQuoteClick = { quotedId -> onQuoteClick(if (quoteOpensThread) item.id else quotedId) },
+            attachments = item.attachments,
+            onOpenAttachment = { attachmentId -> actions.onOpenAttachment(item.id, attachmentId) },
+            downloads = if (item.attachments.isEmpty()) emptyMap() else downloads,
         ) }
         is ChatItem.ProposalCard -> ProposalCard(
             ui = item.card ?: ProposalCardUi("", "", "Proposed a time", "Loading…", ""),

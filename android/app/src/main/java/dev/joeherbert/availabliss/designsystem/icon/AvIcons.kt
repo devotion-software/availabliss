@@ -77,6 +77,17 @@ object AvIcons {
     val Globe = line("Globe", circle(12f, 12f, 9f), "M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z")
     /** Pro and AI planning. */
     val Sparkle = line("Sparkle", "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z")
+    /** Attach a photo or file: a paperclip. */
+    val Attach = line("Attach", "M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48")
+    /** A file attachment: a page with a folded corner. */
+    val File = line("File", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z", "M14 2v6h6")
+    /** A document (PDF, Word, text…): a page with lines. */
+    val FileText = line("FileText", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z", "M14 2v6h6", "M16 13H8M16 17H8M10 9H8")
+    /** An audio file: a note. */
+    val Music = line("Music", "M9 18V5l12-2v13", circle(6f, 18f, 3f), circle(18f, 16f, 3f))
+    /** A video file: a camera. */
+    val Video = line("Video", "M22 8l-6 4 6 4V8z", rect(2f, 6f, 14f, 12f, 2f))
+    val Download = line("Download", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3")
     val Star = line("Star", "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z")
 
     /** Double tick for read receipts (28×18 viewport, as in the concept). */
