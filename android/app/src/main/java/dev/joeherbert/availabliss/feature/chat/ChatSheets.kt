@@ -51,11 +51,11 @@ fun MessageInfoSheet(info: MessageInfoUi, onDismiss: () -> Unit) {
                 Text(
                     info.text,
                     style = AvailablissTheme.type.body,
-                    color = if (info.own) colors.onSolid else colors.ink,
+                    color = if (info.own) colors.onAccent else colors.ink,
                     modifier = Modifier
                         .widthIn(max = 270.dp)
                         .then(
-                            if (info.own) Modifier.clip(OwnBubbleShape).background(colors.solid)
+                            if (info.own) Modifier.clip(OwnBubbleShape).background(colors.accent)
                             else Modifier.glass(IncomingBubbleShape, shadow = false),
                         )
                         .padding(horizontal = 12.dp, vertical = 9.dp),

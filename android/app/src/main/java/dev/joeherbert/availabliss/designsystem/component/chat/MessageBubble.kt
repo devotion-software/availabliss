@@ -50,7 +50,7 @@ import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 
-/** Incoming bubbles: glass, tail bottom-left. Own bubbles: solid, tail bottom-right. */
+/** Incoming bubbles: glass, tail bottom-left. Own bubbles: the theme accent, tail bottom-right. */
 val IncomingBubbleShape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 18.dp, bottomStart = 6.dp)
 val OwnBubbleShape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomEnd = 6.dp, bottomStart = 18.dp)
 
@@ -91,7 +91,7 @@ fun MessageBubble(
     val shape = if (own) OwnBubbleShape else IncomingBubbleShape
     val surface = when {
         deleted -> Modifier.dashedBorder(colors.muted.copy(alpha = 0.6f), shape, width = 1.dp)
-        own -> Modifier.clip(shape).background(colors.solid)
+        own -> Modifier.clip(shape).background(colors.accent)
         else -> Modifier.glass(shape, shadow = false)
     }
     val bubble: @Composable () -> Unit = {
@@ -163,7 +163,7 @@ private fun QuoteBlock(quote: BubbleQuote, own: Boolean, onClick: (String) -> Un
         modifier
             .height(IntrinsicSize.Min)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (own) colors.onSolid.copy(alpha = 0.12f) else colors.accentSoft)
+            .background(if (own) colors.onAccent.copy(alpha = 0.16f) else colors.accentSoft)
             .clickable(role = Role.Button, onClickLabel = "Show the original message") { onClick(quote.messageId) }
             .semantics(mergeDescendants = true) { contentDescription = "Replying to ${quote.name}: ${quote.snippet}" }
             .padding(start = 6.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
@@ -174,13 +174,13 @@ private fun QuoteBlock(quote: BubbleQuote, own: Boolean, onClick: (String) -> Un
                 .width(3.dp)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(1.5.dp))
-                .background(if (own) colors.onSolid.copy(alpha = 0.55f) else colors.accentInk),
+                .background(if (own) colors.onAccent.copy(alpha = 0.6f) else colors.accentInk),
         )
         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(
                 quote.name,
                 style = AvailablissTheme.type.captionStrong,
-                color = if (own) colors.onSolid else colors.accentInk,
+                color = if (own) colors.onAccent else colors.accentInk,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -190,7 +190,7 @@ private fun QuoteBlock(quote: BubbleQuote, own: Boolean, onClick: (String) -> Un
                     fontWeight = FontWeight.Normal,
                     fontStyle = if (quote.deleted) FontStyle.Italic else FontStyle.Normal,
                 ),
-                color = if (own) colors.onSolid.copy(alpha = 0.75f) else colors.muted,
+                color = if (own) colors.onAccent.copy(alpha = 0.82f) else colors.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -226,7 +226,7 @@ private fun BubbleText(text: String, modifier: Modifier, own: Boolean, deleted: 
         style = if (deleted) AvailablissTheme.type.body.copy(fontStyle = FontStyle.Italic) else AvailablissTheme.type.body,
         color = when {
             deleted -> colors.muted
-            own -> colors.onSolid
+            own -> colors.onAccent
             else -> colors.ink
         },
         modifier = modifier,
