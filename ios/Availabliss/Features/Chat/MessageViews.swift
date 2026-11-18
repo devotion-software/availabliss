@@ -52,13 +52,21 @@ struct MessageRow: View {
         }
     }
 
+    /// "Everyone's in", or "It's on" when it was confirmed anyway, then " · 1 maybe" when the
+    /// proposal is loaded and anyone said maybe.
+    private func confirmedHeadline(_ event: GroupEvent) -> String {
+        let headline = message.body?.hasPrefix("It's on") == true ? "It\u{2019}s on" : "Everyone\u{2019}s in"
+        guard let proposalId = event.proposalId, let proposal = model.proposals[proposalId] else { return headline }
+        return headline + proposal.maybeSuffix
+    }
+
     var body: some View {
         switch message.kind {
         case .system:
             // A confirmed proposal ("Everyone's in for …", or "It's on for …" when confirmed anyway)
             // gets a celebratory banner once its event is loaded.
             if let id = message.eventId, let event = model.events[id] {
-                ConfirmedBanner(event: event, messageId: message.id, headline: message.body?.hasPrefix("It's on") == true ? "It\u{2019}s on" : "Everyone\u{2019}s in", isRecent: Date.now.timeIntervalSince(message.createdAt) < 24 * 3600) {
+                ConfirmedBanner(event: event, messageId: message.id, headline: confirmedHeadline(event), isRecent: Date.now.timeIntervalSince(message.createdAt) < 24 * 3600) {
                     if let proposalId = event.proposalId { openProposal(proposalId) }
                 }
             } else {

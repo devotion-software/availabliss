@@ -177,12 +177,13 @@ struct GroupPlansCard: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// "3 of 5 in · you're in".
+    /// "3 of 5 in · 1 maybe · you're in".
     private func status(of proposal: Proposal) -> String {
-        let count = "\(proposal.acceptedCount) of \(group.members.count) in"
+        let count = "\(proposal.acceptedCount) of \(group.members.count) in\(proposal.maybeSuffix)"
         guard let me = app.session.user?.id, let mine = proposal.response(for: me)?.response else { return count }
         switch mine {
         case .accepted: return "\(count) · you're in"
+        case .maybe: return "\(count) · you said maybe"
         case .declined: return "\(count) · you can't make it"
         case .pending: return count
         }
@@ -198,7 +199,7 @@ struct GroupPlansCard: View {
     }
 }
 
-/// Date block + "Ana proposed a time" + "4 of 6 accepted" — used in Plans and in chat.
+/// Date block + "Ana proposed a time" + "4 of 6 accepted · 1 maybe" — used in Plans and in chat.
 struct ProposalCard: View {
     let proposal: Proposal
     let group: Group
@@ -229,7 +230,7 @@ struct ProposalCard: View {
         return "\(who) proposed a time"
     }
 
-    /// "2 of 4 accepted · Priya busy then" (the clash in warn-ink).
+    /// "2 of 4 accepted · 1 maybe · Priya busy then" (the clash in warn-ink).
     private var statusText: Text {
         let base = Text(status).foregroundColor(proposal.status == .cancelled ? theme.muted : theme.okInk)
         guard let clash = Clash.short(proposal.openClashIds, group: group) else { return base }
@@ -240,7 +241,7 @@ struct ProposalCard: View {
         switch proposal.status {
         case .confirmed: proposal.confirmedStatus
         case .cancelled: "Cancelled"
-        case .open: "\(proposal.acceptedCount) of \(group.members.count) accepted"
+        case .open: "\(proposal.acceptedCount) of \(group.members.count) accepted\(proposal.maybeSuffix)"
         }
     }
 

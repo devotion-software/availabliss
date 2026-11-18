@@ -41,6 +41,7 @@ final class ProposalViewModel {
     var isConfirmed: Bool { proposal?.status == .confirmed }
     var memberCount: Int { group?.members.count ?? proposal?.responses.count ?? 0 }
     var acceptedCount: Int { proposal?.acceptedCount ?? 0 }
+    var maybeCount: Int { proposal?.maybeCount ?? 0 }
     var progress: Double { memberCount == 0 ? 0 : Double(acceptedCount) / Double(memberCount) }
 
     /// "Priya is busy then" while open, else nil.
@@ -87,6 +88,9 @@ final class ProposalViewModel {
 
     /// Confirmed: the members who accepted, proposer first.
     var coming: [Member] { members(with: .accepted) }
+
+    /// Confirmed: members who said maybe (might come, not counted as coming).
+    var maybe: [Member] { members(with: .maybe) }
 
     /// Confirmed: members who said they can't make it (confirmed anyway without them).
     var cantMakeIt: [Member] { members(with: .declined) }
@@ -145,20 +149,23 @@ final class ProposalViewModel {
         return proposal.responses.contains { $0.response == .accepted && $0.userId != me }
     }
 
-    /// For the Confirm anyway sheet: "Priya can't make it and Tom hasn't replied."
+    /// For the Confirm anyway sheet: "Priya can't make it, Ana might make it and Tom hasn't replied."
     func confirmAnywayMessage(me: String?) -> String {
         guard let proposal else { return "" }
         let pending = rows.filter { proposal.response(for: $0.userId)?.response == .pending }
         let declined = rows.filter { proposal.response(for: $0.userId)?.response == .declined }
+        let maybe = rows.filter { proposal.response(for: $0.userId)?.response == .maybe }
         func names(_ members: [Member]) -> String {
             Clash.listNames(members.map { $0.userId == me ? "You" : $0.firstName }, max: 4)
         }
         var parts: [String] = []
         if !declined.isEmpty { parts.append("\(names(declined)) can\u{2019}t make it") }
+        if !maybe.isEmpty { parts.append("\(names(maybe)) might make it") }
         if !pending.isEmpty { parts.append("\(names(pending)) \(pending.count == 1 ? "hasn\u{2019}t" : "haven\u{2019}t") replied") }
-        let who = parts.joined(separator: " and ")
+        let who = Clash.listNames(parts, max: parts.count)
         let coming = proposal.acceptedCount
-        return "\(who.isEmpty ? "" : "\(who). ")Everyone will be told it\u{2019}s on, with \(coming) of \(proposal.responses.count) coming."
+        let maybes = proposal.maybeCount > 0 ? " and \(proposal.maybeCount) maybe" : ""
+        return "\(who.isEmpty ? "" : "\(who). ")Everyone will be told it\u{2019}s on, with \(coming) of \(proposal.responses.count) coming\(maybes)."
     }
 
     func note(for member: Member, me: String?) -> String {
@@ -173,6 +180,7 @@ final class ProposalViewModel {
         let busy = proposal.openClashIds.contains(member.userId)
         if busy && response == .pending { return "Busy then \u{00B7} hasn\u{2019}t replied" }
         if busy && response == .accepted { return "Busy then, but in" }
+        if busy && response == .maybe { return "Busy then, but maybe" }
         if response == .pending { return "Hasn\u{2019}t replied" }
         return member.role.isAdmin ? member.role.label : "Synced"
     }

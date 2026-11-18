@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A proposal: acceptance ring, member replies, Accept / Can't make it, admin Override,
+/// A proposal: acceptance ring, member replies, Accept / Maybe / Can't make it, admin Override,
 /// and the "Everyone's in." confirmation with one-tap Add to calendar.
 struct ProposalView: View {
     @Environment(AppModel.self) private var app
@@ -115,6 +115,9 @@ private struct PendingProposalView: View {
                 ConfirmOption("\(member.firstName) can make it", systemImage: "checkmark", kind: .secondary) {
                     Task { await model.override(userId: member.userId, response: .accepted) }
                 },
+                ConfirmOption("\(member.firstName) might make it", systemImage: "questionmark", kind: .secondary) {
+                    Task { await model.override(userId: member.userId, response: .maybe) }
+                },
                 ConfirmOption("\(member.firstName) can\u{2019}t make it", systemImage: "xmark", kind: .secondary) {
                     Task { await model.override(userId: member.userId, response: .declined) }
                 },
@@ -154,7 +157,7 @@ private struct PendingProposalView: View {
                 }
             }
             Spacer(minLength: 0)
-            AcceptanceRing(accepted: model.acceptedCount, total: model.memberCount)
+            AcceptanceRing(accepted: model.acceptedCount, maybe: model.maybeCount, total: model.memberCount)
         }
         .padding(18)
         .glass(cornerRadius: 28)
@@ -185,7 +188,7 @@ private struct PendingProposalView: View {
     private var replyBar: some View {
         let mine = model.myResponse(me)
         return VStack(alignment: .leading, spacing: 10) {
-            Text(mine == .accepted ? "You're in. Changed your mind?" : mine == .declined ? "You said you can't make it." : model.isBusy(me) ? "You're busy then. Can you still make it?" : "Can you make it?")
+            Text(replyPrompt(mine))
                 .bodyFont(13, .semibold, relativeTo: .subheadline)
                 .padding(.leading, 4)
             HStack(spacing: 8) {
@@ -194,6 +197,11 @@ private struct PendingProposalView: View {
                 }
                     .buttonStyle(.secondary)
                     .disabled(mine == .declined || model.isResponding)
+                Button { Task { await model.respond(.maybe) } } label: {
+                    LoadingLabel(title: "Maybe", systemImage: mine == .maybe ? "checkmark" : nil, isLoading: model.sending == .maybe)
+                }
+                    .buttonStyle(.secondary)
+                    .disabled(mine == .maybe || model.isResponding)
                 Button {
                     Task { await model.respond(.accepted) }
                 } label: {
@@ -209,26 +217,50 @@ private struct PendingProposalView: View {
         .padding(.bottom, 8)
         .sensoryFeedback(.success, trigger: mine)
     }
+
+    private func replyPrompt(_ mine: ResponseKind?) -> String {
+        switch mine {
+        case .accepted: "You\u{2019}re in. Changed your mind?"
+        case .maybe: "You said maybe. Know for sure?"
+        case .declined: "You said you can\u{2019}t make it."
+        case .pending, nil: model.isBusy(me) ? "You\u{2019}re busy then. Can you still make it?" : "Can you make it?"
+        }
+    }
 }
 
-/// Big ok-coloured ring: "4/6 accepted".
+/// Big ok-coloured ring: "4/6 accepted", with maybes as a fainter stretch after the yeses and "+1 maybe".
 struct AcceptanceRing: View {
     let accepted: Int
+    var maybe: Int = 0
     let total: Int
     @Environment(\.theme) private var theme
 
     var body: some View {
         ZStack {
-            ProgressRing(progress: total == 0 ? 0 : Double(accepted) / Double(total), lineWidth: 7, color: theme.ok)
+            ProgressRing(progress: fraction(accepted), lineWidth: 7, color: theme.ok)
+            if maybe > 0 {
+                // The maybes carry on from where the yeses end, fainter (ProgressRing's geometry).
+                Circle()
+                    .trim(from: min(1, fraction(accepted)), to: min(1, fraction(accepted + maybe)))
+                    .stroke(theme.ok.opacity(0.35), style: StrokeStyle(lineWidth: 7, lineCap: .butt))
+                    .rotationEffect(.degrees(-90))
+                    .padding(3.5)
+                    .accessibilityHidden(true)
+            }
             VStack(spacing: 0) {
                 Text("\(accepted)/\(total)").displayFont(20, .bold, relativeTo: .headline)
                 Text("accepted").bodyFont(10, relativeTo: .caption2).foregroundStyle(theme.muted)
+                if maybe > 0 {
+                    Text("+\(maybe) maybe").bodyFont(10, .semibold, relativeTo: .caption2).foregroundStyle(theme.okInk)
+                }
             }
         }
         .frame(width: 76, height: 76)
         .accessibilityElement()
-        .accessibilityLabel("\(accepted) of \(total) accepted")
+        .accessibilityLabel(maybe > 0 ? "\(accepted) of \(total) accepted, \(maybe) maybe" : "\(accepted) of \(total) accepted")
     }
+
+    private func fraction(_ count: Int) -> Double { total == 0 ? 0 : Double(count) / Double(total) }
 }
 
 struct ResponsePill: View {
@@ -236,6 +268,7 @@ struct ResponsePill: View {
     var body: some View {
         switch response {
         case .accepted: StatusPill(text: "Accepted", tone: .mint)
+        case .maybe: StatusPill(text: "Maybe", tone: .indigo)
         case .declined: StatusPill(text: "Can\u{2019}t make it", tone: .neutral)
         case .pending: StatusPill(text: "Waiting", tone: .apricot)
         }
@@ -324,6 +357,7 @@ private struct ConfirmedView: View {
     private var changeReplyLabel: String? {
         switch myReply {
         case .accepted: "Can\u{2019}t make it any more?"
+        case .maybe: "Know whether you can make it?"
         case .declined: "Can make it after all?"
         case .pending: "Can you make it?"
         case nil: nil
@@ -336,32 +370,32 @@ private struct ConfirmedView: View {
 
     private var changeReplyMessage: String {
         if myReply == .accepted {
-            let reviewer = model.proposal?.createdBy == me ? "Admins" : "Whoever proposed it and the admins"
-            return "The plan stays on. \(reviewer) will be told, so they can keep it or find another date."
+            let reviewer = model.proposal?.createdBy == me ? "admins" : "whoever proposed it and the admins"
+            return "The plan stays on. If you can\u{2019}t make it, \(reviewer) will be told, so they can keep it or find another date."
         }
         return "Let everyone know whether you\u{2019}re coming."
     }
 
+    /// The replies other than the one you've given: I can make it, I might make it, I can't make it.
     private var changeReplyOptions: [ConfirmOption] {
-        switch myReply {
-        case .accepted:
-            [ConfirmOption("I can\u{2019}t make it", systemImage: "xmark", kind: .destructive) {
-                Task { await model.respond(.declined) }
-            }]
-        case .declined:
-            [ConfirmOption("I can make it", systemImage: "checkmark") {
+        var options: [ConfirmOption] = []
+        if myReply != .accepted {
+            options.append(ConfirmOption("I can make it", systemImage: "checkmark") {
                 Task { await model.respond(.accepted) }
-            }]
-        default:
-            [
-                ConfirmOption("I can make it", systemImage: "checkmark") {
-                    Task { await model.respond(.accepted) }
-                },
-                ConfirmOption("I can\u{2019}t make it", systemImage: "xmark", kind: .secondary) {
-                    Task { await model.respond(.declined) }
-                },
-            ]
+            })
         }
+        if myReply != .maybe {
+            options.append(ConfirmOption("I might make it", systemImage: "questionmark", kind: .secondary) {
+                Task { await model.respond(.maybe) }
+            })
+        }
+        if myReply != .declined {
+            // Going from a yes to a no is dropping out (the reviewers are told), so it's destructive.
+            options.append(ConfirmOption("I can\u{2019}t make it", systemImage: "xmark", kind: myReply == .accepted ? .destructive : .secondary) {
+                Task { await model.respond(.declined) }
+            })
+        }
+        return options
     }
 
     // MARK: Review
@@ -424,7 +458,7 @@ private struct ConfirmedView: View {
         }
     }
 
-    /// Who's coming (everyone who accepted), then, quieter, who can't make it, who never replied
+    /// Who's coming (everyone who accepted), who said maybe, then, quieter, who can't make it, who never replied
     /// and anyone who joined the group since.
     @ViewBuilder
     private var people: some View {
@@ -432,6 +466,11 @@ private struct ConfirmedView: View {
             if !model.coming.isEmpty {
                 GlassList(data: model.coming, id: \.userId, header: "Who\u{2019}s coming", trailingHeader: "\(model.coming.count)", rowMinHeight: 52) { member in
                     personRow(member, note: member.userId == model.proposal?.createdBy ? "Proposed this" : nil)
+                }
+            }
+            if !model.maybe.isEmpty {
+                GlassList(data: model.maybe, id: \.userId, header: "Maybe", trailingHeader: "\(model.maybe.count)", rowMinHeight: 52) { member in
+                    personRow(member, note: "Might make it")
                 }
             }
             if !model.cantMakeIt.isEmpty {

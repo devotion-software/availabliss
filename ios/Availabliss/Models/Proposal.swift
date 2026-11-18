@@ -1,7 +1,11 @@
 import Foundation
 
-enum ResponseKind: String, Codable, Sendable, CaseIterable {
-    case pending, accepted, declined
+/// A reply to a proposal. `maybe` is a soft yes ("I can make it if I must"): counted apart from
+/// `accepted`, and it doesn't confirm a proposal on its own. Unknown values decode as `pending`.
+enum ResponseKind: String, Codable, Sendable, CaseIterable, TolerantDecodable {
+    case pending, accepted, maybe, declined
+
+    static let fallback = ResponseKind.pending
 }
 
 struct Proposal: Codable, Sendable, Identifiable, Equatable {
@@ -39,11 +43,15 @@ struct Proposal: Codable, Sendable, Identifiable, Equatable {
 
     func response(for userId: String) -> Response? { responses.first { $0.userId == userId } }
     var acceptedCount: Int { responses.filter { $0.response == .accepted }.count }
-    /// Everyone it was put to accepted. False once confirmed anyway with someone who can't make it or never replied.
+    /// Soft yeses, counted apart from `acceptedCount`.
+    var maybeCount: Int { responses.filter { $0.response == .maybe }.count }
+    /// " · 1 maybe" when anyone said maybe, else "" (to go after a count of firm yeses).
+    var maybeSuffix: String { maybeCount > 0 ? " \u{00B7} \(maybeCount) maybe" : "" }
+    /// Everyone it was put to firmly accepted (a maybe isn't enough). False once confirmed anyway with someone who can't make it or never replied.
     var everyoneIn: Bool { responses.allSatisfy { $0.response == .accepted } }
-    /// The status line for a confirmed plan: "Everyone's in", or "It's on · 3 of 4 coming".
+    /// The status line for a confirmed plan: "Everyone's in", or "It's on · 3 of 4 coming · 1 maybe".
     var confirmedStatus: String {
-        everyoneIn ? "Everyone\u{2019}s in" : "It\u{2019}s on \u{00B7} \(acceptedCount) of \(responses.count) coming"
+        everyoneIn ? "Everyone\u{2019}s in" : "It\u{2019}s on \u{00B7} \(acceptedCount) of \(responses.count) coming\(maybeSuffix)"
     }
     /// Who's busy then, while it's still open (closed proposals never warn).
     var openClashIds: [String] { status == .open ? busyMemberIds : [] }
