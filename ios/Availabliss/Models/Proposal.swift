@@ -26,12 +26,20 @@ struct Proposal: Codable, Sendable, Identifiable, Equatable {
     let createdBy: String
     let createdAt: Date
     var eventId: String?
+    /// Confirmed before everyone accepted ("Confirm anyway"): who did it. Nil otherwise, and on older servers.
+    var confirmedBy: String?
     var responses: [Response]
     /// Open proposals: members whose calendars or blocked time clash with it (ids only).
     var busyMemberIds: [String] = []
 
     func response(for userId: String) -> Response? { responses.first { $0.userId == userId } }
     var acceptedCount: Int { responses.filter { $0.response == .accepted }.count }
+    /// Everyone it was put to accepted. False once confirmed anyway with someone who can't make it or never replied.
+    var everyoneIn: Bool { responses.allSatisfy { $0.response == .accepted } }
+    /// The status line for a confirmed plan: "Everyone's in", or "It's on · 3 of 4 coming".
+    var confirmedStatus: String {
+        everyoneIn ? "Everyone\u{2019}s in" : "It\u{2019}s on \u{00B7} \(acceptedCount) of \(responses.count) coming"
+    }
     /// Who's busy then, while it's still open (closed proposals never warn).
     var openClashIds: [String] { status == .open ? busyMemberIds : [] }
 }
@@ -52,6 +60,7 @@ extension Proposal {
         createdBy = try c.decode(String.self, forKey: .createdBy)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         eventId = try c.decodeIfPresent(String.self, forKey: .eventId)
+        confirmedBy = try c.decodeIfPresent(String.self, forKey: .confirmedBy)
         responses = try c.decode([Response].self, forKey: .responses)
         busyMemberIds = try c.decodeIfPresent([String].self, forKey: .busyMemberIds) ?? []
     }

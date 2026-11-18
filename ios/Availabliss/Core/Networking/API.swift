@@ -178,6 +178,8 @@ enum API {
         static func respond(id: String, _ response: ResponseKind) -> Endpoint<Proposal> {
             .init(.post, "/proposals/\(id.pathEncoded)/respond", body: RespondBody(response: response))
         }
+        /// "Confirm anyway": the proposer or an admin confirms before everyone has accepted.
+        static func confirm(id: String) -> Endpoint<Proposal> { .init(.post, "/proposals/\(id.pathEncoded)/confirm") }
         static func override(id: String, userId: String, response: ResponseKind) -> Endpoint<Proposal> {
             .init(.post, "/proposals/\(id.pathEncoded)/override", body: OverrideBody(userId: userId, response: response))
         }

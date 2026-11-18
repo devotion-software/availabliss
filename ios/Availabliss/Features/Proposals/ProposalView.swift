@@ -56,6 +56,7 @@ private struct PendingProposalView: View {
     @Environment(\.theme) private var theme
     @State private var overrideTarget: Member?
     @State private var confirmsCancel = false
+    @State private var confirmsAnyway = false
 
     private var me: String? { app.session.user?.id }
 
@@ -78,6 +79,17 @@ private struct PendingProposalView: View {
                     ClashPanel(headline: clash, detail: clashDetail, cornerRadius: 18)
                 }
                 membersList
+                if model.canConfirmAnyway(me: me) {
+                    Button { confirmsAnyway = true } label: {
+                        LoadingLabel(title: "Confirm anyway", systemImage: "checkmark.circle", isLoading: model.isResponding && model.sending == nil)
+                    }
+                    .buttonStyle(.secondary)
+                    .disabled(model.isResponding)
+                    Text("Not everyone can make it? Go ahead with who can.")
+                        .bodyFont(12, relativeTo: .caption)
+                        .foregroundStyle(theme.muted)
+                        .frame(maxWidth: .infinity)
+                }
                 if group.role.isAdmin {
                     Label("As an admin you can set anyone's reply.", systemImage: "shield")
                         .bodyFont(12, relativeTo: .caption)
@@ -110,6 +122,11 @@ private struct PendingProposalView: View {
                     Task { await model.override(userId: member.userId, response: .pending) }
                 },
             ]
+        }
+        .confirmSheet("Confirm anyway?", isPresented: $confirmsAnyway, message: model.confirmAnywayMessage(me: me)) {
+            [ConfirmOption("Confirm the plan", systemImage: "checkmark") {
+                Task { await model.confirmAnyway() }
+            }]
         }
         .confirmSheet("Cancel this proposal?", isPresented: $confirmsCancel, message: "It'll show as cancelled for everyone in the group.", cancelTitle: "Keep proposal") {
             [ConfirmOption("Cancel proposal", kind: .destructive) {
@@ -225,7 +242,8 @@ struct ResponsePill: View {
     }
 }
 
-/// "Everyone's in." — the confirmed state: when, who's coming, Add to calendar and Go to chat.
+/// "Everyone's in." (or "It's on." when confirmed before everyone accepted) — the confirmed state:
+/// when, who's coming, who can't or never replied, Add to calendar and Go to chat.
 private struct ConfirmedView: View {
     let model: ProposalViewModel
     let group: Group
@@ -247,7 +265,7 @@ private struct ConfirmedView: View {
                     VennLogo(size: 132)
                         .scaleEffect(bloom ? 1 : 0.6)
                         .opacity(bloom ? 1 : 0)
-                    Text("Everyone's in.")
+                    Text(model.everyoneIn ? "Everyone\u{2019}s in." : "It\u{2019}s on.")
                         .displayFont(40, .heavy, relativeTo: .largeTitle)
                         .accessibilityAddTraits(.isHeader)
                     when
@@ -274,13 +292,14 @@ private struct ConfirmedView: View {
         return count > 0 ? count : model.acceptedCount
     }
 
-    /// "All 4 of you can make", then the date and time large on their own lines, then the place.
+    /// "All 4 of you can make" (or "3 of 4 can make"), then the date and time large on their own
+    /// lines, then the place.
     @ViewBuilder
     private var when: some View {
         if let proposal = model.proposal {
             let parts = Formatting.spanParts(start: proposal.start, end: proposal.end, allDay: proposal.allDay)
             VStack(spacing: 6) {
-                Text("All \(comingCount) of you can make")
+                Text(model.everyoneIn ? "All \(comingCount) of you can make" : "\(model.coming.count) of \(model.invitedCount) can make")
                     .bodyFont(16)
                     .foregroundStyle(theme.muted)
                     .padding(.bottom, 2)
@@ -305,13 +324,26 @@ private struct ConfirmedView: View {
         }
     }
 
-    /// Who's coming (everyone who accepted), then anyone who joined the group since, quieter.
+    /// Who's coming (everyone who accepted), then, quieter, who can't make it, who never replied
+    /// and anyone who joined the group since.
     @ViewBuilder
     private var people: some View {
         VStack(spacing: 12) {
             if !model.coming.isEmpty {
                 GlassList(data: model.coming, id: \.userId, header: "Who\u{2019}s coming", trailingHeader: "\(model.coming.count)", rowMinHeight: 52) { member in
                     personRow(member, note: member.userId == model.proposal?.createdBy ? "Proposed this" : nil)
+                }
+            }
+            if !model.cantMakeIt.isEmpty {
+                GlassList(data: model.cantMakeIt, id: \.userId, header: "Can\u{2019}t make it", trailingHeader: "\(model.cantMakeIt.count)", rowMinHeight: 48) { member in
+                    personRow(member, note: nil, size: 28)
+                        .opacity(0.65)
+                }
+            }
+            if !model.notReplied.isEmpty {
+                GlassList(data: model.notReplied, id: \.userId, header: "Not replied", trailingHeader: "\(model.notReplied.count)", rowMinHeight: 48) { member in
+                    personRow(member, note: nil, size: 28)
+                        .opacity(0.65)
                 }
             }
             if !model.joinedLater.isEmpty {

@@ -55,9 +55,10 @@ struct MessageRow: View {
     var body: some View {
         switch message.kind {
         case .system:
-            // A confirmed proposal ("Everyone's in for …") gets a celebratory banner once its event is loaded.
+            // A confirmed proposal ("Everyone's in for …", or "It's on for …" when confirmed anyway)
+            // gets a celebratory banner once its event is loaded.
             if let id = message.eventId, let event = model.events[id] {
-                ConfirmedBanner(event: event, messageId: message.id, isRecent: Date.now.timeIntervalSince(message.createdAt) < 24 * 3600) {
+                ConfirmedBanner(event: event, messageId: message.id, headline: message.body?.hasPrefix("It's on") == true ? "It\u{2019}s on" : "Everyone\u{2019}s in", isRecent: Date.now.timeIntervalSince(message.createdAt) < 24 * 3600) {
                     if let proposalId = event.proposalId { openProposal(proposalId) }
                 }
             } else {
@@ -551,6 +552,8 @@ private struct EventMessageCard: View {
 private struct ConfirmedBanner: View {
     let event: GroupEvent
     let messageId: String
+    /// "Everyone's in", or "It's on" when it was confirmed before everyone accepted.
+    let headline: String
     let isRecent: Bool
     let open: () -> Void
     @Environment(\.theme) private var theme
@@ -576,7 +579,7 @@ private struct ConfirmedBanner: View {
                         .frame(width: 44, height: 44)
                         .background(Circle().fill(theme.ok))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Everyone\u{2019}s in").bodyFont(12, .semibold, relativeTo: .caption).foregroundStyle(theme.okInk)
+                        Text(headline).bodyFont(12, .semibold, relativeTo: .caption).foregroundStyle(theme.okInk)
                         Text(event.title).displayFont(17, .bold, relativeTo: .headline).foregroundStyle(theme.ink).lineLimit(2)
                         Text(when).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted).lineLimit(2)
                     }
@@ -587,7 +590,7 @@ private struct ConfirmedBanner: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Everyone\u{2019}s in. \(event.title), \(when)")
+            .accessibilityLabel("\(headline). \(event.title), \(when)")
             .accessibilityAddTraits(event.proposalId == nil ? [] : .isButton)
             AddToCalendarButton(event: event, height: 40)
         }

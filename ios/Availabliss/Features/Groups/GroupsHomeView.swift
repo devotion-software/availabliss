@@ -267,7 +267,7 @@ private struct UpNextCard: View {
         VStack(alignment: .leading, spacing: 14) {
             if let image = event.image { EventCover(imageURL: image, height: 150, cornerRadius: 16) }
             HStack {
-                StatusPill(text: "Everyone's in", tone: .mint, systemImage: "checkmark", fontSize: 12)
+                StatusPill(text: "It\u{2019}s on", tone: .mint, systemImage: "checkmark", fontSize: 12)
                 Spacer()
                 if let groupName = event.groupName {
                     Text(groupName).bodyFont(12, .medium, relativeTo: .caption).foregroundStyle(theme.muted)

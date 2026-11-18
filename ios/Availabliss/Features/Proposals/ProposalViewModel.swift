@@ -85,17 +85,55 @@ final class ProposalViewModel {
         return group.members.filter { $0.userId == proposer } + group.members.filter { $0.userId != proposer }
     }
 
-    /// Confirmed: the members who accepted (everyone at the time), proposer first.
-    var coming: [Member] {
-        guard let proposal else { return [] }
-        return rows.filter { proposal.response(for: $0.userId)?.response == .accepted }
-    }
+    /// Confirmed: the members who accepted, proposer first.
+    var coming: [Member] { members(with: .accepted) }
 
-    /// Confirmed: members without an acceptance. Only people who joined the group after it was
-    /// confirmed (a proposal confirms only once every member has accepted, and replies then close).
+    /// Confirmed: members who said they can't make it (confirmed anyway without them).
+    var cantMakeIt: [Member] { members(with: .declined) }
+
+    /// Confirmed: members who never replied (confirmed anyway before they did).
+    var notReplied: [Member] { members(with: .pending) }
+
+    /// Confirmed: members with no reply at all, i.e. people who joined the group after it was
+    /// confirmed (replies are only asked of the members at the time).
     var joinedLater: [Member] {
         guard let proposal else { return [] }
-        return rows.filter { proposal.response(for: $0.userId)?.response != .accepted }
+        return rows.filter { proposal.response(for: $0.userId) == nil }
+    }
+
+    /// Everyone it was put to can make it ("Everyone's in."), rather than confirmed anyway ("It's on.").
+    var everyoneIn: Bool { proposal?.everyoneIn ?? true }
+
+    /// How many it was put to: who's coming, who can't and who never replied.
+    var invitedCount: Int { proposal?.responses.count ?? 0 }
+
+    private func members(with response: ResponseKind) -> [Member] {
+        guard let proposal else { return [] }
+        return rows.filter { proposal.response(for: $0.userId)?.response == response }
+    }
+
+    /// The proposer or an admin can confirm an open proposal before everyone has accepted, once
+    /// someone besides them can make it (the server checks the same).
+    func canConfirmAnyway(me: String?) -> Bool {
+        guard let proposal, let group, let me, proposal.status == .open else { return false }
+        guard proposal.createdBy == me || group.role.isAdmin else { return false }
+        return proposal.responses.contains { $0.response == .accepted && $0.userId != me }
+    }
+
+    /// For the Confirm anyway sheet: "Priya can't make it and Tom hasn't replied."
+    func confirmAnywayMessage(me: String?) -> String {
+        guard let proposal else { return "" }
+        let pending = rows.filter { proposal.response(for: $0.userId)?.response == .pending }
+        let declined = rows.filter { proposal.response(for: $0.userId)?.response == .declined }
+        func names(_ members: [Member]) -> String {
+            Clash.listNames(members.map { $0.userId == me ? "You" : $0.firstName }, max: 4)
+        }
+        var parts: [String] = []
+        if !declined.isEmpty { parts.append("\(names(declined)) can\u{2019}t make it") }
+        if !pending.isEmpty { parts.append("\(names(pending)) \(pending.count == 1 ? "hasn\u{2019}t" : "haven\u{2019}t") replied") }
+        let who = parts.joined(separator: " and ")
+        let coming = proposal.acceptedCount
+        return "\(who.isEmpty ? "" : "\(who). ")Everyone will be told it\u{2019}s on, with \(coming) of \(proposal.responses.count) coming."
     }
 
     func note(for member: Member, me: String?) -> String {
@@ -124,6 +162,10 @@ final class ProposalViewModel {
 
     func override(userId: String, response: ResponseKind) async {
         await run { try await self.api.send(API.Proposals.override(id: self.proposalId, userId: userId, response: response)) }
+    }
+
+    func confirmAnyway() async {
+        await run { try await self.api.send(API.Proposals.confirm(id: self.proposalId)) }
     }
 
     func cancel() async -> Bool {

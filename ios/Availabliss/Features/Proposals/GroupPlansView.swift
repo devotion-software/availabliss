@@ -238,7 +238,7 @@ struct ProposalCard: View {
 
     private var status: String {
         switch proposal.status {
-        case .confirmed: "Everyone's in"
+        case .confirmed: proposal.confirmedStatus
         case .cancelled: "Cancelled"
         case .open: "\(proposal.acceptedCount) of \(group.members.count) accepted"
         }
