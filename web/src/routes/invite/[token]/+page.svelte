@@ -119,10 +119,16 @@
 		{:else}
 			<EmptyState
 				icon="link"
-				title={data.problem === 'gone' ? 'This invite has expired' : "We couldn't open this invite"}
-				message={data.problem === 'gone'
-					? 'Ask whoever sent it for a fresh link.'
-					: 'Check your connection and try again.'}
+				title={data.problem === 'used-up'
+					? 'This invite link has been used up'
+					: data.problem === 'gone'
+						? 'This invite has expired'
+						: "We couldn't open this invite"}
+				message={data.problem === 'used-up'
+					? 'As many people have joined with it as it allows. Ask whoever sent it for a fresh link.'
+					: data.problem === 'gone'
+						? 'Ask whoever sent it for a fresh link.'
+						: 'Check your connection and try again.'}
 			>
 				{#snippet actions()}
 					<Button href={data.user ? '/app' : '/'} variant="secondary">{data.user ? 'Go to your groups' : 'About Availabliss'}</Button>

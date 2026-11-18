@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { z } from 'zod';
 	import type { GroupInvite } from '#lib/types';
-	import { createInvite, listInvites, revokeInvite } from '#lib/client/groups';
+	import { createInvite, LINK_LIMITS, linkSummary, linkUsage, listInvites, revokeInvite } from '#lib/client/groups';
 	import { live } from '#lib/client/live.svelte';
 	import { checkUsername } from '#lib/client/usernames';
 	import { normalizeUsername, usernameProblem } from '#lib/usernames';
 	import { useFormat } from '#lib/client/format';
 	import { toasts } from '#lib/client/toast.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
+	import Chip from '#lib/components/ui/Chip.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';
 
@@ -24,6 +25,9 @@
 	const fmt = useFormat();
 	let invites = $state<GroupInvite[]>([]);
 	let creating = $state(false);
+	// How many people can join with the next link (null: no limit), and whether it's being chosen for another link.
+	let limit = $state<number | null>(1);
+	let makingAnother = $state(false);
 	let copied = $state(false);
 	let peopleText = $state('');
 	let peopleError = $state<string | null>(null);
@@ -32,6 +36,7 @@
 
 	// The newest link anyone can use.
 	const link = $derived(invites.find((i) => i.email === null && i.username === null && !i.name) ?? null);
+	const choosing = $derived(!link || makingAnother);
 
 	$effect(() => {
 		const id = groupId;
@@ -54,8 +59,10 @@
 	async function makeLink() {
 		creating = true;
 		try {
-			const made = await createInvite(groupId);
+			const made = await createInvite(groupId, [], [], [], limit);
 			invites = [...made.invites, ...invites];
+			makingAnother = false;
+			limit = 1;
 		} catch (err) {
 			toasts.error(err);
 		} finally {
@@ -150,8 +157,18 @@
 
 	<div class="way">
 		<h3>Share a link</h3>
-		<p class="lead">One person can join with each link.</p>
-		{#if link}
+		<p class="lead">{choosing || !link ? 'Choose how many people can join with it.' : linkSummary(link)}</p>
+		{#if choosing}
+			<div class="limits" role="group" aria-label="People who can join with the link">
+				{#each LINK_LIMITS as choice (choice ?? 'unlimited')}
+					<Chip size="sm" selected={limit === choice} onclick={() => (limit = choice)}>{choice ?? 'Unlimited'}</Chip>
+				{/each}
+			</div>
+			<div class="buttons">
+				<Button variant="accent" icon="link" loading={creating} onclick={makeLink}>Create invite link</Button>
+				{#if makingAnother}<Button variant="ghost" size="sm" onclick={() => (makingAnother = false)}>Cancel</Button>{/if}
+			</div>
+		{:else if link}
 			<div class="link">
 				<label class="sr-only" for="invite-url">Invite link</label>
 				<input id="invite-url" readonly value={link.url} onfocus={(e) => e.currentTarget.select()} />
@@ -159,9 +176,8 @@
 			<div class="buttons">
 				<Button variant="solid" size="sm" icon={copied ? 'check' : 'copy'} onclick={copy}>{copied ? 'Copied' : 'Copy link'}</Button>
 				{#if canShare}<Button variant="secondary" size="sm" icon="share" onclick={share}>Share</Button>{/if}
+				<Button variant="ghost" size="sm" icon="plus" onclick={() => (makingAnother = true)}>New link</Button>
 			</div>
-		{:else}
-			<Button variant="accent" icon="link" loading={creating} onclick={makeLink}>Create invite link</Button>
 		{/if}
 	</div>
 
@@ -189,7 +205,7 @@
 					<li>
 						<span class="who">
 							<span class="name">{inviteeLabel(i) ?? 'Invite link'}</span>
-							<span class="sub">{inviteeLabel(i) ? `Invited · invite ${expiry(i)}` : `Link for one person · ${expiry(i)}`}</span>
+							<span class="sub">{inviteeLabel(i) ? `Invited · invite ${expiry(i)}` : `${linkUsage(i)} · ${expiry(i)}`}</span>
 						</span>
 						<IconButton icon="x" label={inviteeLabel(i) ? `Revoke the invite for ${inviteeLabel(i)}` : 'Revoke this link'} variant="plain" size={36} onclick={() => revoke(i)} />
 					</li>
@@ -243,6 +259,11 @@
 		font-weight: 600;
 		color: var(--accent-ink);
 		text-overflow: ellipsis;
+	}
+	.limits {
+		display: flex;
+		gap: 8px;
+		flex-wrap: wrap;
 	}
 	.buttons {
 		display: flex;

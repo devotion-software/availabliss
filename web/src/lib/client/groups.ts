@@ -73,16 +73,40 @@ export const leaveGroup = (groupId: string, newOwnerId: string | null) => {
 export const nudgeGroup = (groupId: string) => api.post<{ nudged: number }>(`/groups/${groupId}/nudge`);
 
 /**
- * Nobody: a link anyone can use. Emails and usernames: one invite each (emailed, or sent to their
- * Activity), only for that person. User ids: likewise to their Activity, for people already in a
- * group with you.
+ * Nobody: a link anyone can use, by `maxUses` people (null: no limit; left out: one). Emails and
+ * usernames: one invite each (emailed, or sent to their Activity), only for that person. User ids:
+ * likewise to their Activity, for people already in a group with you.
  */
-export const createInvite = (groupId: string, emails: string[] = [], usernames: string[] = [], userIds: string[] = []) =>
+export const createInvite = (groupId: string, emails: string[] = [], usernames: string[] = [], userIds: string[] = [], maxUses?: number | null) =>
 	api.post<Invite>(`/groups/${groupId}/invites`, {
 		...(emails.length && { emails }),
 		...(usernames.length && { usernames }),
-		...(userIds.length && { userIds })
+		...(userIds.length && { userIds }),
+		...(maxUses !== undefined && { maxUses })
 	});
+
+/** How many people can join with a link, as offered when making one (null: no limit; one is what links always were). */
+export const LINK_LIMITS: (number | null)[] = [1, 5, 10, 25, null];
+
+/** How many people can still join with a link (null: no limit). */
+const usesLeft = (i: GroupInvite) => (i.maxUses === null ? null : Math.max(i.maxUses - i.uses, 0));
+
+/** "One person can join with this link." / "5 people can…" / "3 of 5 people can still…" / "Anyone with this link can join." */
+export function linkSummary(i: GroupInvite): string {
+	const left = usesLeft(i);
+	if (left === null) return 'Anyone with this link can join.';
+	const total = i.maxUses ?? 1;
+	if (total === 1) return 'One person can join with this link.';
+	return left === total ? `${total} people can join with this link.` : `${left} of ${total} people can still join with this link.`;
+}
+
+/** For the invites list: "Link for one person" / "3 of 5 left" / "Unlimited · 4 joined". */
+export function linkUsage(i: GroupInvite): string {
+	const left = usesLeft(i);
+	if (left === null) return i.uses ? `Unlimited · ${i.uses} joined` : 'Unlimited';
+	const total = i.maxUses ?? 1;
+	return total === 1 ? 'Link for one person' : `${left} of ${total} left`;
+}
 export const listInvites = (groupId: string, fetch?: Fetch) =>
 	api.get<{ invites: GroupInvite[] }>(`/groups/${groupId}/invites`, { fetch }).then((r) => r.invites);
 export const revokeInvite = (groupId: string, inviteId: string) => api.del(`/groups/${groupId}/invites/${inviteId}`);
