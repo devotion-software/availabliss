@@ -21,7 +21,7 @@ struct MessageInfoSheet: View {
     var body: some View {
         BottomSheet(title: "Message info") {
             VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
-                MessageBubble(text: message.text ?? message.poll?.question ?? "", isMine: isMine, attachments: message.files)
+                MessageBubble(text: message.text ?? message.poll?.question ?? "", isMine: isMine, attachments: message.files, location: message.place)
                 Text(sentLine)
                     .bodyFont(11, relativeTo: .caption2)
                     .foregroundStyle(theme.muted)

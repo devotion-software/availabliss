@@ -267,6 +267,20 @@ final class ChatViewModel {
         return messages.contains { $0.id == id }
     }
 
+    /// Shares a place (as a reply, if one is being written). False if it couldn't be sent.
+    func sendLocation(_ location: MessageLocation) async -> Bool {
+        let replying = replyingTo
+        do {
+            let message = try await api.send(API.Chat.send(groupId: groupId, SendMessageBody(replyToId: replying?.id, location: location)))
+            if replyingTo?.id == replying?.id { replyingTo = nil }
+            insert(message)
+            return true
+        } catch {
+            self.error = error.userMessage
+            return false
+        }
+    }
+
     func createPoll(question: String, options: [String], multi: Bool) async -> Bool {
         do {
             let message = try await api.send(API.Chat.send(groupId: groupId, SendMessageBody(poll: .init(question: question, options: options, multi: multi))))
@@ -309,7 +323,7 @@ final class ChatViewModel {
     // MARK: Editing and deleting
 
     func startEditing(_ message: Message) {
-        guard message.kind == .text, !message.isDeleted, message.authorId == me else { return }
+        guard message.kind == .text, !message.isDeleted, message.place == nil, message.authorId == me else { return }
         replyingTo = nil
         if editing == nil { draftBeforeEdit = draft }
         editing = message

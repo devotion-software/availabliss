@@ -45,7 +45,7 @@ struct ChatView: View {
     private var isScrolledBack: Bool { viewportHeight > 0 && contentBottom - viewportHeight > Self.jumpThreshold }
 
     enum ChatSheet: Identifiable {
-        case poll, propose, event, info(Message)
+        case poll, propose, event, location, info(Message)
         /// Not sheets: the photo library and the file picker.
         case photos, files
         /// The thread a message is part of (by the message's id).
@@ -56,6 +56,7 @@ struct ChatView: View {
             case .poll: "poll"
             case .propose: "propose"
             case .event: "event"
+            case .location: "location"
             case .info(let message): "info-\(message.id)"
             case .photos: "photos"
             case .files: "files"
@@ -338,6 +339,8 @@ struct ChatView: View {
             NewProposalSheet(group: group, me: me, draft: .blank(), api: detail.api) { _ in }
         case .event:
             EventEditorSheet(groupId: group.id, target: .new, api: detail.api) { _ in }
+        case .location:
+            LocationPickerSheet { location in await model.sendLocation(location) }
         case .info(let message):
             MessageInfoSheet(message: message, group: group, me: app.session.user?.id, model: model)
         case .photos, .files:
@@ -459,7 +462,7 @@ struct ReplyingStrip: View {
     }
 }
 
-/// The big buttons above the composer: Photos and Files, then Poll, Propose a time and Add event.
+/// The big buttons above the composer: Photos, Files and Location, then Poll, Propose a time and Add event.
 private struct ComposerMenu: View {
     let choose: (ChatView.ChatSheet) -> Void
     @Environment(\.theme) private var theme
@@ -469,6 +472,7 @@ private struct ComposerMenu: View {
             HStack(spacing: 6) {
                 item("Photos", "photo.on.rectangle") { choose(.photos) }
                 item("Files", "paperclip") { choose(.files) }
+                item("Location", "mappin.and.ellipse") { choose(.location) }
             }
             HStack(spacing: 6) {
                 item("Poll", "chart.bar") { choose(.poll) }

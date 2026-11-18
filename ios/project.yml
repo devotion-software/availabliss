@@ -108,6 +108,10 @@ targets:
         NSCalendarsWriteOnlyAccessUsageDescription: Availabliss adds confirmed plans to your calendar.
         NSCalendarsUsageDescription: Availabliss reads when you're busy so your groups can find times that work.
         NSFaceIDUsageDescription: Use Face ID to sign in with your passkey.
+        NSLocationWhenInUseUsageDescription: Availabliss uses your location only when you choose to send where you are to a group chat. It isn't tracked or shared otherwise.
+        # Opens shared places in the Google Maps app when it's installed.
+        LSApplicationQueriesSchemes:
+          - comgooglemaps
         # Google Fonts variable TTFs; AppFont picks the family and sets the weight axis.
         UIAppFonts:
           - BricolageGrotesque-VariableFont_opsz,wdth,wght.ttf

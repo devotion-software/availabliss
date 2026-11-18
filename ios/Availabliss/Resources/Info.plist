@@ -53,6 +53,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
@@ -68,6 +72,8 @@
 	<string>Availabliss adds confirmed plans to your calendar.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to sign in with your passkey.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Availabliss uses your location only when you choose to send where you are to a group chat. It isn't tracked or shared otherwise.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>BricolageGrotesque-VariableFont_opsz,wdth,wght.ttf</string>

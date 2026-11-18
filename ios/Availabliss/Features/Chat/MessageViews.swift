@@ -47,7 +47,7 @@ struct MessageRow: View {
         if let onShowInChat { Button(action: onShowInChat) { Label("Show in chat", systemImage: "text.bubble") } }
         if showsInfo, message.kind == .text { Button(action: openInfo) { Label("Info", systemImage: "info.circle") } }
         if isMine, message.kind == .text {
-            if let onEdit { Button(action: onEdit) { Label("Edit", systemImage: "pencil") } }
+            if let onEdit, message.place == nil { Button(action: onEdit) { Label("Edit", systemImage: "pencil") } }
             if let onDelete { Button(role: .destructive, action: onDelete) { Label("Delete", systemImage: "trash") } }
         }
     }
@@ -76,7 +76,7 @@ struct MessageRow: View {
                 }
             } else if isMine {
                 VStack(alignment: .trailing, spacing: 4) {
-                    MessageBubble(text: message.text ?? "", isMine: true, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files, openImage: openImage, openFile: openFile, openingFileId: openingFileId)
+                    MessageBubble(text: message.text ?? "", isMine: true, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files, location: message.place, openImage: openImage, openFile: openFile, openingFileId: openingFileId)
                         .onTapGesture(perform: openInfo)
                         .contextMenu { menu }
                         .accessibilityAddTraits(.isButton)
@@ -92,7 +92,7 @@ struct MessageRow: View {
             } else {
                 IncomingRow(author: author, showsName: startsRun) {
                     VStack(alignment: .leading, spacing: 4) {
-                        MessageBubble(text: message.text ?? "", isMine: false, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files, openImage: openImage, openFile: openFile, openingFileId: openingFileId)
+                        MessageBubble(text: message.text ?? "", isMine: false, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files, location: message.place, openImage: openImage, openFile: openFile, openingFileId: openingFileId)
                             .onTapGesture(perform: openInfo)
                             .contextMenu { menu }
                         if message.isEdited { EditedLabel() }
@@ -143,7 +143,7 @@ extension MessageRow {
         if let onOpenThread { Button("View thread", action: onOpenThread) }
         if let onShowInChat { Button("Show in chat", action: onShowInChat) }
         if isMine, message.kind == .text {
-            if let onEdit { Button("Edit", action: onEdit) }
+            if let onEdit, message.place == nil { Button("Edit", action: onEdit) }
             if let onDelete { Button("Delete", action: onDelete) }
         }
     }
@@ -349,6 +349,8 @@ struct MessageBubble: View {
     var openQuote: (String) -> Void = { _ in }
     /// Photos, GIFs and files, above the text (the caption).
     var attachments: [Attachment] = []
+    /// A shared place, drawn as a map card (instead of text).
+    var location: MessageLocation?
     var openImage: (Attachment) -> Void = { _ in }
     var openFile: (Attachment) -> Void = { _ in }
     var openingFileId: String?
@@ -374,7 +376,11 @@ struct MessageBubble: View {
                     .padding(.top, -5)
                     .padding(.bottom, text.isEmpty ? -5 : 0)
             }
-            if !text.isEmpty || attachments.isEmpty {
+            if let location {
+                LocationCard(location: location, isMine: isMine)
+                    .padding(.horizontal, -8)
+                    .padding(.vertical, -5)
+            } else if !text.isEmpty || attachments.isEmpty {
                 Text(text)
                     .bodyFont(14)
                     .lineSpacing(2)

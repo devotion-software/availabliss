@@ -32,11 +32,15 @@ struct Message: Codable, Sendable, Identifiable, Equatable {
     var attachments: [Attachment]?
     /// With attachments: the caption, or nil. (`body` then holds a summary such as "📷 Photo" for older apps.)
     var caption: String?
+    /// A shared place (missing from older servers). `body` then holds a fallback for older apps.
+    var location: MessageLocation?
 
     var isDeleted: Bool { deleted == true }
     var files: [Attachment] { isDeleted ? [] : attachments ?? [] }
     /// The text to show in its bubble: the caption when it has attachments, else the body.
-    var text: String? { files.isEmpty ? body : caption }
+    var text: String? { place != nil ? nil : files.isEmpty ? body : caption }
+    /// The place it shares, unless deleted.
+    var place: MessageLocation? { isDeleted ? nil : location }
     var isEdited: Bool { editedAt != nil && !isDeleted }
 
     /// A quoted message above a reply: who sent it and one line of it.
@@ -67,10 +71,24 @@ struct Message: Codable, Sendable, Identifiable, Equatable {
     /// This message as a quote, e.g. for "Replying to …" and to refresh replies after it changes.
     func asReplyPreview(authorName: String?) -> ReplyPreview {
         let caption = text.flatMap { $0.isEmpty ? nil : $0 }
-        let raw = kind == .poll ? poll?.question : files.isEmpty ? body : caption ?? Attachment.summary(files)
+        let raw = kind == .poll ? poll?.question : place.map(\.summary) ?? (files.isEmpty ? body : caption ?? Attachment.summary(files))
         let text = raw.map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
         return ReplyPreview(id: id, authorId: authorId, authorName: authorName, kind: kind, text: isDeleted ? nil : text, deleted: isDeleted)
     }
+}
+
+/// A place shared in a chat message: a one-off pin (the sender's position, or a place they found).
+struct MessageLocation: Codable, Sendable, Equatable, Hashable {
+    let lat: Double
+    let lng: Double
+    /// A place's name, or nil for "my location".
+    var name: String?
+    var address: String?
+    /// How precise a device's position was, in metres.
+    var accuracy: Double?
+
+    /// "📍 Dishoom Shoreditch" or "📍 Location", as the server quotes it.
+    var summary: String { "📍 \(name ?? "Location")" }
 }
 
 /// A photo, GIF, file or Wallet pass in a chat message. `url` / `thumbnailUrl` are signed links: no auth header needed.
@@ -219,6 +237,8 @@ struct SendMessageBody: Encodable, Sendable {
     var replyToId: String?
     /// Uploaded photos and files to send, in order (`body` is then an optional caption).
     var attachmentIds: [String]?
+    /// A place to share (no body).
+    var location: MessageLocation?
 }
 
 struct ReceiptBody: Encodable, Sendable {
