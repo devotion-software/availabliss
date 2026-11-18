@@ -34,3 +34,6 @@ android/keystore.properties
 
 # Profile pictures stored locally when R2 isn't configured (dev)
 web/.uploads/
+
+# Scratch scripts (screenshots etc.)
+web/.tmp-*
