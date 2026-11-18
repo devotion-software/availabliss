@@ -13,6 +13,8 @@ struct AppNotification: Decodable, Sendable, Identifiable, Equatable {
         case inviteReceived = "invite.received"
         case message
         case eventCreated = "event.created"
+        /// Your role in a group changed (made an admin, no longer one, or handed ownership): `data.role` is the new one.
+        case roleChanged = "role.changed"
         case unknown
 
         init(from decoder: Decoder) throws {
