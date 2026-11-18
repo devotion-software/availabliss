@@ -1,9 +1,9 @@
 /** Group events: created directly, or automatically when a proposal is confirmed. */
 import { and, asc, eq, gt, gte, inArray, lt } from 'drizzle-orm';
 import { mediaUrl } from './media-urls';
-import type { GroupEvent } from '#lib/types';
+import type { GroupEvent, ResponseKind } from '#lib/types';
 import { db, type Tx } from './db';
-import { events, groupMembers, groups } from './db/schema';
+import { events, groupMembers, groups, proposalResponses } from './db/schema';
 import { badRequest, forbidden, notFound } from './http';
 import { newId } from './ids';
 import { getGroupRow, memberIds, requireMember } from './groups';
@@ -160,4 +160,54 @@ export async function upcomingFor(userId: string): Promise<(GroupEvent & { group
 		.where(and(inArray(events.groupId, groupIds), gte(events.end, now), lt(events.start, horizon)))
 		.orderBy(asc(events.start));
 	return rows.map((r) => ({ ...toGroupEvent(r.event), groupName: r.groupName }));
+}
+
+export type MyPlan = GroupEvent & {
+	groupName: string;
+	/** Your reply to the proposal it came from; null for an event added straight to the calendar. */
+	myResponse: ResponseKind | null;
+};
+
+/** How far back "past plans" goes, and how many it lists. */
+const PAST_PLANS_DAYS = 365;
+const PAST_PLANS_LIMIT = 100;
+
+/**
+ * Every plan across your groups: upcoming ones you're going to (yes, maybe, not replied, or added
+ * straight to the calendar), upcoming ones you said you can't make, and past ones (newest first).
+ */
+export async function myPlans(userId: string, now = new Date()): Promise<{ going: MyPlan[]; notGoing: MyPlan[]; past: MyPlan[] }> {
+	const groupIds = (await db.select({ id: groupMembers.groupId }).from(groupMembers).where(eq(groupMembers.userId, userId))).map((r) => r.id);
+	if (!groupIds.length) return { going: [], notGoing: [], past: [] };
+	const since = new Date(now.getTime() - PAST_PLANS_DAYS * 86_400_000);
+	const rows = await db
+		.select({ event: events, groupName: groups.name })
+		.from(events)
+		.innerJoin(groups, eq(groups.id, events.groupId))
+		.where(and(inArray(events.groupId, groupIds), gte(events.end, since)))
+		.orderBy(asc(events.start));
+	const proposalIds = rows.flatMap((r) => (r.event.proposalId ? [r.event.proposalId] : []));
+	const replies = proposalIds.length
+		? await db
+				.select({ proposalId: proposalResponses.proposalId, response: proposalResponses.response })
+				.from(proposalResponses)
+				.where(and(eq(proposalResponses.userId, userId), inArray(proposalResponses.proposalId, proposalIds)))
+		: [];
+	const replyOf = new Map(replies.map((r) => [r.proposalId, r.response]));
+	const plans = rows.map(
+		(r): MyPlan => ({
+			...toGroupEvent(r.event),
+			groupName: r.groupName,
+			myResponse: r.event.proposalId ? (replyOf.get(r.event.proposalId) ?? null) : null
+		})
+	);
+	const upcoming = plans.filter((p) => Date.parse(p.end) >= now.getTime());
+	return {
+		going: upcoming.filter((p) => p.myResponse !== 'declined'),
+		notGoing: upcoming.filter((p) => p.myResponse === 'declined'),
+		past: plans
+			.filter((p) => Date.parse(p.end) < now.getTime())
+			.reverse()
+			.slice(0, PAST_PLANS_LIMIT)
+	};
 }

@@ -258,6 +258,17 @@ proposals = `proposal.created`, `proposal.changed`; plans = `proposal.confirmed`
 reminders = `reminder`; nudges = `nudge`), muted the group, or is in quiet hours. Invites and role
 changes always push. Activity still records everything.
 
+### My plans
+
+| Method | Path | Body | Response |
+| ------ | ---- | ---- | -------- |
+| GET 🔒 | `/me/plans` | | `{ going: MyPlan[]; notGoing: MyPlan[]; past: MyPlan[] }`: every plan across your groups. `going`: upcoming ones you said yes or maybe to, haven't replied to, or that were added straight to the calendar (soonest first); `notGoing`: upcoming ones you said you can't make; `past`: the last year, newest first (at most 100) |
+| GET 🔒 | `/me/plans.ics` | | `text/calendar` with every plan in `going` ("Add all to calendar" on the web) |
+
+```ts
+type MyPlan = GroupEvent & { groupName: string; myResponse: ResponseKind | null }; // null: added straight to the calendar
+```
+
 ### Calendar feed (webcal)
 
 | Method | Path | Body | Response |
