@@ -7,6 +7,7 @@
 		'chevron-right': '<path d="M9 5l7 7-7 7"/>',
 		'chevron-down': '<path d="M6 9l6 6 6-6"/>',
 		'arrow-right': '<path d="M5 12h14M13 6l6 6-6 6"/>',
+		'arrow-down': '<path d="M12 5v14M6 13l6 6 6-6"/>',
 		check: '<path d="M5 12l5 5L20 7"/>',
 		x: '<path d="M6 6l12 12M18 6L6 18"/>',
 		calendar: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',

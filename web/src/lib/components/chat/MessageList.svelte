@@ -19,6 +19,7 @@
 	import MessageInfoSheet from './MessageInfoSheet.svelte';
 	import MessageMenu, { type MessageMenuAnchor } from './MessageMenu.svelte';
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
+	import IconButton from '#lib/components/ui/IconButton.svelte';
 
 	/** The scrolling message log for a thread. Reports visibility so `seen` receipts are honest. */
 	interface Props {
@@ -49,6 +50,22 @@
 	// Plain (non-reactive) bookkeeping for scroll behaviour.
 	let atBottom = true;
 	let lastId = '';
+
+	// Scrolled back further than this from the newest message, the jump-to-latest button shows,
+	// counting messages from others that arrive meanwhile.
+	const JUMP_THRESHOLD = 200;
+	let scrolledBack = $state(false);
+	let unseen = $state(0);
+	function onscroll() {
+		if (!scroller) return;
+		scrolledBack = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight > JUMP_THRESHOLD;
+		if (!scrolledBack) unseen = 0;
+	}
+	function jumpToLatest() {
+		unseen = 0;
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		scroller?.scrollTo({ top: scroller.scrollHeight, behavior: reduce ? 'auto' : 'smooth' });
+	}
 
 	const RUN_GAP_MS = 5 * 60_000;
 	const items = $derived.by(() => {
@@ -105,6 +122,7 @@
 		if (!el || !log) return;
 		const observer = new ResizeObserver(() => {
 			if (atBottom) el.scrollTop = el.scrollHeight;
+			onscroll();
 		});
 		observer.observe(el);
 		observer.observe(log);
@@ -117,9 +135,14 @@
 		const id = last?.id ?? '';
 		if (id === lastId) return;
 		const initial = lastId === '';
+		const previous = lastId;
 		lastId = id;
 		if (initial || atBottom || last?.authorId === meId) {
 			tick().then(() => scroller?.scrollTo({ top: scroller.scrollHeight, behavior: initial ? 'auto' : 'smooth' }));
+		} else {
+			// Scrolled back: stay put and count what's new on the jump button.
+			const from = thread.messages.findIndex((m) => m.id === previous);
+			if (from >= 0) unseen += thread.messages.slice(from + 1).filter((m) => m.kind !== 'system' && m.authorId !== meId).length;
 		}
 	});
 
@@ -175,74 +198,87 @@
 	}
 </script>
 
-<div class="scroller" class:compact bind:this={scroller}>
-	<div class="log" role="log" aria-label="Messages" aria-busy={thread.loading}>
-		{#if thread.hasMore}
-			<div class="older">
-				<Button variant="ghost" size="sm" loading={thread.loadingOlder} onclick={loadOlder}>Load earlier messages</Button>
-			</div>
-		{/if}
-		{#if thread.loading && !thread.messages.length}
-			<div class="center"><Spinner /></div>
-		{:else if !thread.messages.length}
-			<EmptyState compact icon="chat" title="No messages yet" message="Say hello, start a poll, or propose a time." />
-		{/if}
+<div class="list">
+	<div class="scroller" class:compact bind:this={scroller} {onscroll}>
+		<div class="log" role="log" aria-label="Messages" aria-busy={thread.loading}>
+			{#if thread.hasMore}
+				<div class="older">
+					<Button variant="ghost" size="sm" loading={thread.loadingOlder} onclick={loadOlder}>Load earlier messages</Button>
+				</div>
+			{/if}
+			{#if thread.loading && !thread.messages.length}
+				<div class="center"><Spinner /></div>
+			{:else if !thread.messages.length}
+				<EmptyState compact icon="chat" title="No messages yet" message="Say hello, start a poll, or propose a time." />
+			{/if}
 
-		{#each items as item (item.m.id)}
-			{@const m = item.m}
-			{#if item.divider}<span class="divider">{item.divider}</span>{/if}
-			<div class="item" class:tight={!item.first} class:highlight={highlighted === m.id} data-message-id={m.id}>
-				{#if isConfirmationMessage(m)}
-					<ConfirmedBanner message={m} {compact} />
-				{:else if m.kind === 'system'}
-					<p class="system">{m.body}</p>
-				{:else if m.kind === 'poll' && m.poll}
-					<div class="poll-line" class:mine={item.mine}>
-						<PollCard
-							poll={m.poll}
-							{meId}
+			{#each items as item (item.m.id)}
+				{@const m = item.m}
+				{#if item.divider}<span class="divider">{item.divider}</span>{/if}
+				<div class="item" class:tight={!item.first} class:highlight={highlighted === m.id} data-message-id={m.id}>
+					{#if isConfirmationMessage(m)}
+						<ConfirmedBanner message={m} {compact} />
+					{:else if m.kind === 'system'}
+						<p class="system">{m.body}</p>
+					{:else if m.kind === 'poll' && m.poll}
+						<div class="poll-line" class:mine={item.mine}>
+							<PollCard
+								poll={m.poll}
+								{meId}
+								mine={item.mine}
+								authorName={m.authorId ? members.get(m.authorId)?.name : undefined}
+								{compact}
+								canClose={item.mine}
+								onvote={(ids) => thread.vote(m.poll!.id, ids)}
+								onclose={() => thread.closePoll(m.poll!.id)}
+							/>
+							{#if thread.canReply(m)}
+								<button type="button" class="poll-reply" aria-label="Reply to the poll" title="Reply" onclick={() => reply(m)}>
+									<Icon name="reply" size={17} strokeWidth={2.2} />
+								</button>
+							{/if}
+						</div>
+					{:else if m.kind === 'proposal' && m.proposalId}
+						<ProposalCard proposalId={m.proposalId} {members} {meId} {compact} />
+					{:else if m.kind === 'event'}
+						<EventCard message={m} {meId} {admin} {compact} />
+					{:else}
+						<MessageBubble
+							message={m}
 							mine={item.mine}
-							authorName={m.authorId ? members.get(m.authorId)?.name : undefined}
+							author={m.authorId ? members.get(m.authorId) : undefined}
+							first={item.first}
+							last={item.last}
 							{compact}
-							canClose={item.mine}
-							onvote={(ids) => thread.vote(m.poll!.id, ids)}
-							onclose={() => thread.closePoll(m.poll!.id)}
+							showEdited={!item.receipt}
+							canModify={thread.canModify(m)}
+							canReply={thread.canReply(m)}
+							quote={item.quote}
+							oninfo={openInfo}
+							onmenu={openMenu}
+							onreply={reply}
+							onquote={showOriginal}
 						/>
-						{#if thread.canReply(m)}
-							<button type="button" class="poll-reply" aria-label="Reply to the poll" title="Reply" onclick={() => reply(m)}>
-								<Icon name="reply" size={17} strokeWidth={2.2} />
-							</button>
-						{/if}
-					</div>
-				{:else if m.kind === 'proposal' && m.proposalId}
-					<ProposalCard proposalId={m.proposalId} {members} {meId} {compact} />
-				{:else if m.kind === 'event'}
-					<EventCard message={m} {meId} {admin} {compact} />
-				{:else}
-					<MessageBubble
-						message={m}
-						mine={item.mine}
-						author={m.authorId ? members.get(m.authorId) : undefined}
-						first={item.first}
-						last={item.last}
-						{compact}
-						showEdited={!item.receipt}
-						canModify={thread.canModify(m)}
-						canReply={thread.canReply(m)}
-						quote={item.quote}
-						oninfo={openInfo}
-						onmenu={openMenu}
-						onreply={reply}
-						onquote={showOriginal}
-					/>
-				{/if}
-				{#if item.receipt}
-					<ReadReceipt message={m} {members} onopen={() => openInfo(m)} />
-				{/if}
-			</div>
-		{/each}
-		<span class="sentinel" bind:this={sentinel} aria-hidden="true"></span>
+					{/if}
+					{#if item.receipt}
+						<ReadReceipt message={m} {members} onopen={() => openInfo(m)} />
+					{/if}
+				</div>
+			{/each}
+			<span class="sentinel" bind:this={sentinel} aria-hidden="true"></span>
+		</div>
 	</div>
+	{#if scrolledBack}
+		<div class="jump" class:compact>
+			<IconButton
+				icon="arrow-down"
+				label={unseen > 0 ? `Jump to latest message, ${unseen} new` : 'Jump to latest message'}
+				size={compact ? 40 : 44}
+				badge={unseen}
+				onclick={jumpToLatest}
+			/>
+		</div>
+	{/if}
 </div>
 
 <MessageInfoSheet bind:open={infoOpen} message={infoMessage} {members} {meId} />
@@ -266,6 +302,34 @@
 />
 
 <style>
+	.list {
+		position: relative;
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.jump {
+		position: absolute;
+		right: 14px;
+		bottom: 8px;
+		animation: jump-in 0.2s var(--ease-out);
+	}
+	.jump.compact {
+		right: 6px;
+		bottom: 4px;
+	}
+	@keyframes jump-in {
+		from {
+			opacity: 0;
+			transform: scale(0.6);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.jump {
+			animation: none;
+		}
+	}
 	.scroller {
 		flex: 1;
 		min-height: 0;
