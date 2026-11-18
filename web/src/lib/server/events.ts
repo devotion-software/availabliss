@@ -123,10 +123,14 @@ export async function updateEvent(eventId: string, userId: string, patch: Partia
 }
 
 export async function deleteEvent(eventId: string, userId: string): Promise<void> {
-	const row = await requireEditable(eventId, userId);
-	await db.delete(events).where(eq(events.id, eventId));
+	await removeEvent(await requireEditable(eventId, userId));
+}
+
+/** Deletes the event (and its cover photo) and tells the group; callers check who may. */
+export async function removeEvent(row: EventRow): Promise<void> {
+	await db.delete(events).where(eq(events.id, row.id));
 	await deleteStored(row.image);
-	await publishToGroup(row.groupId, 'event.changed', { id: eventId, deleted: true });
+	await publishToGroup(row.groupId, 'event.changed', { id: row.id, deleted: true });
 }
 
 /** Sets (or with null, removes) the event's cover photo: the creator or an admin, like other edits. */

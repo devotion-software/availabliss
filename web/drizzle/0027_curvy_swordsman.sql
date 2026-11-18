@@ -1,0 +1,2 @@
+ALTER TABLE `notifications` MODIFY COLUMN `kind` enum('proposal.created','proposal.confirmed','proposal.changed','nudge','invite.accepted','invite.received','message','event.created') NOT NULL;--> statement-breakpoint
+ALTER TABLE `proposal_responses` ADD `dropped_out` boolean DEFAULT false NOT NULL;

@@ -60,7 +60,7 @@ Non-2xx responses have the body:
 `code` is one of `unauthorized` (401), `upgrade_required` (402), `forbidden` (403),
 `not_found` (404), `validation_error` (400), `conflict` (409), `rate_limited` (429),
 `server_error` (500). `conflict` also covers acting on something no longer open:
-responding to or cancelling a confirmed or cancelled proposal, or voting in a closed poll. `upgrade_required` means the action needs Pro (see Plans): show
+responding to or cancelling a cancelled proposal, overriding a reply or confirming once it's confirmed, or voting in a closed poll. `upgrade_required` means the action needs Pro (see Plans): show
 the upgrade screen rather than a plain error.
 `issues` is only present for `validation_error`.
 
@@ -516,7 +516,9 @@ interface Proposal {
   createdBy: string; createdAt: string;
   eventId: string | null;               // set once confirmed
   confirmedBy?: string | null;          // confirmed before everyone accepted ("Confirm anyway"): who did it; null otherwise
-  responses: { userId: string; response: ResponseKind; setBy: string | null; updatedAt: string }[];
+  responses: { userId: string; response: ResponseKind; setBy: string | null; updatedAt: string;
+               droppedOut?: boolean }[];   // confirmed: said they can't make it after it was confirmed, not yet reviewed
+  needsReview?: boolean;                // confirmed: someone who was coming dropped out; the creator or an admin should keep or cancel it
   busyMemberIds: string[];              // open proposals: members busy at this time (empty otherwise)
 }
 ```
@@ -530,10 +532,11 @@ A time doesn't have to work for everyone to be proposed. Clients warn first
 | POST 🔒 | `/groups/:id/proposals` | `{ start, end, allDay?, title?, location?, note? }` | `Proposal` (creator auto-accepts; posts a chat card) |
 | GET 🔒 | `/groups/:id/conflicts?start=&end=` | | `{ busyMemberIds: string[] }` (who's busy then; ISO instants, `end` after `start`, at most 120 days apart) |
 | GET 🔒 | `/proposals/:id` | | `Proposal` |
-| POST 🔒 | `/proposals/:id/respond` | `{ response: 'accepted' \| 'declined' }` | `Proposal` |
+| POST 🔒 | `/proposals/:id/respond` | `{ response: 'accepted' \| 'declined' }` | `Proposal` (open, or confirmed: see below) |
 | POST 👑 | `/proposals/:id/override` | `{ userId, response: ResponseKind }` | `Proposal` |
 | POST 🔒 | `/proposals/:id/confirm` | | `Proposal` ("Confirm anyway": creator or admin; open only; `409` until someone besides the caller has accepted) |
-| DELETE 🔒 | `/proposals/:id` | | `204` (creator or admin; marks cancelled) |
+| POST 🔒 | `/proposals/:id/keep` | | `Proposal` ("Keep the plan": creator or admin; confirmed only; clears `needsReview`) |
+| DELETE 🔒 | `/proposals/:id` | | `204` (creator or admin; marks cancelled; a confirmed plan's event is deleted too) |
 
 When every member has accepted, the proposal becomes `confirmed`, an `Event` is
 created, and every member gets a push notification and a `proposal.confirmed`
@@ -544,6 +547,18 @@ it); the same happens, with `confirmedBy` set, a chat message "It's on for …
 "It's on". Replies stay as they were, so `responses` says who's coming
 (`accepted`), who can't (`declined`) and who never replied (`pending`). Members
 with no response joined the group after it was confirmed.
+
+Replies can still change once confirmed (members who joined since can't reply:
+`409`). The plan stays confirmed. When someone who was coming says they can't
+make it any more, their response gets `droppedOut: true`, the proposal
+`needsReview: true`, the chat gets "Priya Shah can't make it any more", and the
+creator and admins get a `proposal.changed` notification. One of them then
+either keeps the plan (`POST /proposals/:id/keep`, which clears the review;
+they stay as can't make it) or cancels it (`DELETE /proposals/:id`, which
+deletes the event, posts "… cancelled the plan for …" and notifies everyone
+else with `proposal.changed`). Someone changing back to `accepted` just updates
+(and clears their `droppedOut`). Copies people added to their own calendars are
+left alone, as when an event is deleted.
 
 ### Events
 
@@ -704,7 +719,7 @@ Native apps keep this open while foregrounded and rely on push otherwise.
 ```ts
 interface Notification {
   id: string; groupId: string | null;
-  kind: 'proposal.created' | 'proposal.confirmed' | 'nudge' | 'invite.accepted' | 'invite.received' | 'message' | 'event.created';
+  kind: 'proposal.created' | 'proposal.confirmed' | 'proposal.changed' | 'nudge' | 'invite.accepted' | 'invite.received' | 'message' | 'event.created';
   title: string; body: string;
   data: Record<string, string>;        // e.g. { proposalId }
   readAt: string | null; createdAt: string;

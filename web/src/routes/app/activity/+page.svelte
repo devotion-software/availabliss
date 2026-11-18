@@ -17,6 +17,7 @@
 	const ICON: Record<AppNotification['kind'], IconName> = {
 		'proposal.created': 'check-circle',
 		'proposal.confirmed': 'sparkle',
+		'proposal.changed': 'alert',
 		nudge: 'megaphone',
 		'invite.accepted': 'user-plus',
 		'invite.received': 'user-plus',

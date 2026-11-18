@@ -190,6 +190,13 @@
       "when": 1794998984167,
       "tag": "0026_lying_maria_hill",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1794999334234,
+      "tag": "0027_curvy_swordsman",
+      "breakpoints": true
     }
   ]
 }

@@ -241,6 +241,8 @@ export interface ProposalResponse {
 	response: ResponseKind;
 	setBy: string | null;
 	updatedAt: string;
+	/** Confirmed proposals: said they can't make it after it was confirmed, not yet reviewed (see `needsReview`). */
+	droppedOut: boolean;
 }
 
 export interface Proposal {
@@ -262,6 +264,11 @@ export interface Proposal {
 	 */
 	confirmedBy: string | null;
 	responses: ProposalResponse[];
+	/**
+	 * Confirmed proposals: someone who was coming can't make it any more, and the proposer or an
+	 * admin hasn't yet chosen to keep the plan (`POST /proposals/:id/keep`) or cancel it.
+	 */
+	needsReview: boolean;
 	/** Open proposals only: members whose calendars or blocks say they're busy at this time. */
 	busyMemberIds: string[];
 }
@@ -416,6 +423,8 @@ export interface MessageInfo {
 export const NOTIFICATION_KINDS = [
 	'proposal.created',
 	'proposal.confirmed',
+	/** A confirmed plan changed: someone can't make it any more, or it was cancelled. */
+	'proposal.changed',
 	'nudge',
 	'invite.accepted',
 	'invite.received',

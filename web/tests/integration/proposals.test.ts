@@ -10,6 +10,7 @@ import {
 	confirmAnyway,
 	createProposal,
 	getProposal,
+	keepPlan,
 	listProposals,
 	onMemberJoined,
 	onMemberLeft,
@@ -105,9 +106,8 @@ describe('responding', () => {
 		const system = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
 		expect(system.length).toBe(1);
 
-		// Confirmed proposals are closed to further changes.
-		expect((await apiError(respond(p.id, g.member, 'declined'))).code).toBe('conflict');
-		expect((await apiError(cancelProposal(p.id, g.owner))).code).toBe('conflict');
+		// Confirmed proposals take no more admin overrides (replies can still change: see below).
+		expect((await apiError(override(p.id, g.admin, g.member, 'declined'))).code).toBe('conflict');
 		expect(await listProposals(g.groupId, g.member, 'confirmed')).toEqual([expect.objectContaining({ id: p.id })]);
 		expect(await listProposals(g.groupId, g.member, 'open')).toEqual([]);
 	});
@@ -220,6 +220,85 @@ describe('confirmAnyway', () => {
 		await respond(p.id, g.admin, 'accepted');
 		await cancelProposal(p.id, g.owner);
 		expect((await apiError(confirmAnyway(p.id, g.owner))).code).toBe('conflict');
+	});
+});
+
+describe('changing a reply once confirmed', () => {
+	async function confirmed() {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.member, slot(22));
+		await respond(p.id, g.admin, 'accepted');
+		await respond(p.id, g.owner, 'accepted');
+		return { g, p: await getProposal(p.id, g.owner) };
+	}
+
+	test('someone who was coming can drop out: the plan stays confirmed and needs review', async () => {
+		const { g, p } = await confirmed();
+		expect(p).toMatchObject({ status: 'confirmed', needsReview: false });
+
+		const after = await respond(p.id, g.admin, 'declined');
+		expect(after).toMatchObject({ status: 'confirmed', eventId: p.eventId, needsReview: true });
+		expect(after.responses.find((r) => r.userId === g.admin)).toMatchObject({ response: 'declined', droppedOut: true });
+		expect(await db.query.events.findFirst({ where: eq(events.id, p.eventId!) })).toBeTruthy();
+
+		// The proposer (and the owner, an admin) hear about it; the one who dropped out doesn't.
+		const told = await db.select().from(notifications).where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.changed')));
+		expect(told.map((n) => n.userId).sort()).toEqual([g.owner, g.member].sort());
+		expect(told[0].data).toMatchObject({ proposalId: p.id });
+		expect(told[0].body).toContain('any more');
+		const system = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		expect(system.some((m) => m.body?.endsWith("can't make it any more"))).toBe(true);
+
+		// Changing back just updates, and clears the review.
+		const back = await respond(p.id, g.admin, 'accepted');
+		expect(back).toMatchObject({ status: 'confirmed', needsReview: false });
+		expect(back.responses.find((r) => r.userId === g.admin)).toMatchObject({ response: 'accepted', droppedOut: false });
+	});
+
+	test('keeping the plan clears the review; only the proposer or an admin can', async () => {
+		const { g, p } = await confirmed();
+		await respond(p.id, g.owner, 'declined');
+		expect((await apiError(keepPlan(p.id, g.outsider))).code).toBe('not_found');
+		const g2member = await fx.user();
+		await fx.join(g.groupId, g2member);
+		expect((await apiError(keepPlan(p.id, g2member))).code).toBe('forbidden');
+
+		const kept = await keepPlan(p.id, g.member);
+		expect(kept).toMatchObject({ status: 'confirmed', needsReview: false });
+		expect(kept.responses.find((r) => r.userId === g.owner)).toMatchObject({ response: 'declined', droppedOut: false });
+		// Someone who joined after it was confirmed wasn't asked, so can't reply.
+		expect((await apiError(respond(p.id, g2member, 'accepted'))).code).toBe('conflict');
+	});
+
+	test('cancelling the plan deletes its event and tells everyone', async () => {
+		const { g, p } = await confirmed();
+		await respond(p.id, g.admin, 'declined');
+		const plain = await fx.user();
+		await fx.join(g.groupId, plain);
+		expect((await apiError(cancelProposal(p.id, plain))).code).toBe('forbidden');
+
+		await cancelProposal(p.id, g.owner);
+		const after = await getProposal(p.id, g.member);
+		expect(after).toMatchObject({ status: 'cancelled', needsReview: false });
+		expect(await db.query.events.findFirst({ where: eq(events.id, p.eventId!) })).toBeUndefined();
+		const system = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		expect(system.some((m) => m.body?.includes('cancelled the plan for'))).toBe(true);
+		const told = await db.select().from(notifications).where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.changed')));
+		expect(told.filter((n) => n.body.includes('cancelled')).map((n) => n.userId).sort()).toEqual([g.admin, g.member, plain].sort());
+
+		expect((await apiError(respond(p.id, g.member, 'declined'))).code).toBe('conflict');
+		expect((await apiError(keepPlan(p.id, g.owner))).code).toBe('conflict');
+		expect((await apiError(cancelProposal(p.id, g.owner))).code).toBe('conflict');
+	});
+
+	test('someone who never replied can still say either way, without a review', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(23));
+		await respond(p.id, g.admin, 'accepted');
+		await confirmAnyway(p.id, g.owner);
+		const declined = await respond(p.id, g.member, 'declined');
+		expect(declined).toMatchObject({ status: 'confirmed', needsReview: false });
+		expect((await respond(p.id, g.member, 'accepted')).responses.find((r) => r.userId === g.member)?.response).toBe('accepted');
 	});
 });
 

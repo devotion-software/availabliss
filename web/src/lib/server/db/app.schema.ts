@@ -287,6 +287,9 @@ export const proposalResponses = mysqlTable(
 		response: mysqlEnum('response', RESPONSE_KINDS).default('pending').notNull(),
 		// Set when an admin overrode this member's response.
 		setBy: varchar('set_by', { length: 36 }),
+		// Said they can't make it after it was confirmed, and the proposer or an admin hasn't
+		// yet chosen to keep the plan or cancel it.
+		droppedOut: boolean('dropped_out').default(false).notNull(),
 		updatedAt: updatedAt()
 	},
 	(t) => [primaryKey({ columns: [t.proposalId, t.userId] })]

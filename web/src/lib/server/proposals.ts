@@ -4,11 +4,15 @@
  * confirmed, an event is created and everyone is notified. The proposer or an
  * admin can also confirm it before then ("Confirm anyway"), once someone else
  * can make it.
+ *
+ * Once confirmed, members can still change their reply. Someone who was coming
+ * saying they can't any more marks the plan for review: the proposer and admins
+ * are told, and one of them keeps the plan or cancels it (deleting its event).
  */
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Proposal, ResponseKind } from '#lib/types';
 import { db } from './db';
-import { events, proposalResponses, proposals, user } from './db/schema';
+import { events, groupMembers, proposalResponses, proposals, user } from './db/schema';
 import { conflict, forbidden, notFound } from './http';
 import { newId } from './ids';
 import { getGroupRow, memberIds, requireMember } from './groups';
@@ -16,7 +20,7 @@ import { publishToGroup } from './realtime';
 import { unarchiveOnActivity } from './auto-archive';
 import { notify } from './notifications';
 import { postMessage } from './chat';
-import { insertEvent, toGroupEvent } from './events';
+import { insertEvent, removeEvent, toGroupEvent } from './events';
 import { slotLabel } from './availability/labels';
 import { sendConfirmedEmail } from './email';
 import { env } from './env';
@@ -44,8 +48,10 @@ const toProposal = (row: ProposalRow, responses: ResponseRow[], busyMemberIds: s
 		userId: r.userId,
 		response: r.response,
 		setBy: r.setBy,
-		updatedAt: r.updatedAt.toISOString()
+		updatedAt: r.updatedAt.toISOString(),
+		droppedOut: row.status === 'confirmed' && r.droppedOut
 	})),
+	needsReview: row.status === 'confirmed' && responses.some((r) => r.droppedOut),
 	busyMemberIds
 });
 
@@ -195,9 +201,84 @@ async function requireOpen(proposalId: string): Promise<ProposalRow> {
 }
 
 export async function respond(proposalId: string, userId: string, response: 'accepted' | 'declined'): Promise<Proposal> {
-	const row = await requireOpen(proposalId);
+	const row = await getRow(proposalId);
 	await requireMember(row.groupId, userId);
+	if (row.status === 'confirmed') return changeConfirmedResponse(row, userId, response);
+	if (row.status !== 'open') throw conflict(`This proposal is already ${row.status}`);
 	return setResponse(proposalId, userId, response, null);
+}
+
+/**
+ * A reply changed after the plan was confirmed. It stays confirmed. Someone who was coming
+ * saying they can't any more marks it for review (`droppedOut`) and tells the proposer and
+ * admins, who keep it or cancel it; anyone else's change (including coming after all) just
+ * updates. Only people asked at the time can reply: members who joined since can't.
+ */
+async function changeConfirmedResponse(row: ProposalRow, userId: string, response: 'accepted' | 'declined'): Promise<Proposal> {
+	const current = await db.query.proposalResponses.findFirst({
+		where: and(eq(proposalResponses.proposalId, row.id), eq(proposalResponses.userId, userId))
+	});
+	if (!current) throw conflict('You joined after this was confirmed');
+	if (current.response === response) return fetchProposal(row.id);
+
+	const droppedOut = current.response === 'accepted' && response === 'declined';
+	await db
+		.update(proposalResponses)
+		.set({ response, setBy: null, droppedOut, updatedAt: new Date() })
+		.where(and(eq(proposalResponses.proposalId, row.id), eq(proposalResponses.userId, userId)));
+	const proposal = await fetchProposal(row.id);
+	await publishToGroup(row.groupId, 'proposal.updated', proposal);
+
+	if (droppedOut) {
+		const [group, who, reviewers] = await Promise.all([
+			getGroupRow(row.groupId),
+			db.query.user.findFirst({ where: eq(user.id, userId), columns: { name: true, email: true } }),
+			reviewerIds(row)
+		]);
+		const name = displayName(who);
+		const when = slotLabel({ start: row.start.getTime(), end: row.end.getTime() }, group.requirement);
+		await postMessage(row.groupId, null, { kind: 'system', body: `${name} can't make it any more` });
+		await notify(
+			reviewers.filter((id) => id !== userId),
+			{
+				kind: 'proposal.changed',
+				groupId: row.groupId,
+				title: group.name,
+				body: `${name} can't make ${when} any more. Keep the plan, or find another date?`,
+				data: { proposalId: row.id }
+			}
+		);
+	}
+	return proposal;
+}
+
+/** Who can keep or cancel a confirmed plan: its proposer and the group's admins (and owner). */
+async function reviewerIds(row: ProposalRow): Promise<string[]> {
+	const admins = await db
+		.select({ userId: groupMembers.userId })
+		.from(groupMembers)
+		.where(and(eq(groupMembers.groupId, row.groupId), inArray(groupMembers.role, ['owner', 'admin'])));
+	const members = await memberIds(row.groupId);
+	return [...new Set([row.createdBy, ...admins.map((a) => a.userId)])].filter((id) => members.includes(id));
+}
+
+async function requireReviewer(row: ProposalRow, userId: string, action: string) {
+	const role = await requireMember(row.groupId, userId);
+	if (row.createdBy !== userId && role === 'member') throw forbidden(`Only the proposer or an admin can ${action} this`);
+}
+
+/**
+ * "Keep the plan": after someone said they can't make it any more, the proposer or an admin
+ * keeps it as it is. Clears the review; those people stay as can't make it.
+ */
+export async function keepPlan(proposalId: string, userId: string): Promise<Proposal> {
+	const row = await getRow(proposalId);
+	await requireReviewer(row, userId, 'keep');
+	if (row.status !== 'confirmed') throw conflict(`This proposal is ${row.status}`);
+	await db.update(proposalResponses).set({ droppedOut: false }).where(eq(proposalResponses.proposalId, proposalId));
+	const proposal = await fetchProposal(proposalId);
+	await publishToGroup(row.groupId, 'proposal.updated', proposal);
+	return proposal;
 }
 
 export async function override(proposalId: string, adminId: string, targetId: string, response: ResponseKind): Promise<Proposal> {
@@ -208,9 +289,10 @@ export async function override(proposalId: string, adminId: string, targetId: st
 }
 
 export async function cancelProposal(proposalId: string, userId: string): Promise<void> {
-	const row = await requireOpen(proposalId);
-	const role = await requireMember(row.groupId, userId);
-	if (row.createdBy !== userId && role === 'member') throw forbidden('Only the proposer or an admin can cancel this');
+	const row = await getRow(proposalId);
+	await requireReviewer(row, userId, 'cancel');
+	if (row.status === 'confirmed') return cancelPlan(row, userId);
+	if (row.status !== 'open') throw conflict(`This proposal is already ${row.status}`);
 	// Guarded so a cancel racing the last acceptance can't cancel a confirmed proposal.
 	const [result] = await db
 		.update(proposals)
@@ -218,6 +300,42 @@ export async function cancelProposal(proposalId: string, userId: string): Promis
 		.where(and(eq(proposals.id, proposalId), eq(proposals.status, 'open')));
 	if (!result.affectedRows) throw conflict(`This proposal is already ${(await getRow(proposalId)).status}`);
 	await publishToGroup(row.groupId, 'proposal.updated', await fetchProposal(proposalId));
+}
+
+/**
+ * Cancels a confirmed plan (e.g. "Cancel and find another date" after someone dropped out):
+ * marks it cancelled, deletes its event, and tells the group in the chat and everyone else
+ * with a notification.
+ */
+async function cancelPlan(row: ProposalRow, userId: string): Promise<void> {
+	// Guarded so two cancels (or a cancel racing another) only cancel once.
+	const [result] = await db
+		.update(proposals)
+		.set({ status: 'cancelled' })
+		.where(and(eq(proposals.id, row.id), eq(proposals.status, 'confirmed')));
+	if (!result.affectedRows) throw conflict(`This proposal is already ${(await getRow(row.id)).status}`);
+	await db.update(proposalResponses).set({ droppedOut: false }).where(eq(proposalResponses.proposalId, row.id));
+	const event = row.eventId ? await db.query.events.findFirst({ where: eq(events.id, row.eventId) }) : null;
+	if (event) await removeEvent(event);
+
+	const [group, who] = await Promise.all([
+		getGroupRow(row.groupId),
+		db.query.user.findFirst({ where: eq(user.id, userId), columns: { name: true, email: true } })
+	]);
+	const name = displayName(who);
+	const when = slotLabel({ start: row.start.getTime(), end: row.end.getTime() }, group.requirement);
+	await postMessage(row.groupId, null, { kind: 'system', body: `${name} cancelled the plan for ${when}` });
+	await publishToGroup(row.groupId, 'proposal.updated', await fetchProposal(row.id));
+	await notify(
+		(await memberIds(row.groupId)).filter((id) => id !== userId),
+		{
+			kind: 'proposal.changed',
+			groupId: row.groupId,
+			title: group.name,
+			body: `${name} cancelled the plan for ${when}.`,
+			data: { proposalId: row.id }
+		}
+	);
 }
 
 /**
