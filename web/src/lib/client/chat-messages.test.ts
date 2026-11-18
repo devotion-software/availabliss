@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Message } from '#lib/types';
 import type { Member } from '#lib/types';
-import { applyMessageUpdate, canModifyMessage, canReplyTo, deletedCopy, replyAuthorName, replyPreview, replySnippet, replyingTo, threadReplyTarget, withThreadMessage } from './chat-messages';
+import { applyMessageUpdate, canEditMessage, canModifyMessage, canReplyTo, deletedCopy, replyAuthorName, replyPreview, replySnippet, replyingTo, threadReplyTarget, withThreadMessage } from './chat-messages';
 
 const msg = (over: Partial<Message> = {}): Message => ({
 	id: 'm1',
@@ -33,6 +33,20 @@ describe('canModifyMessage', () => {
 		expect(canModifyMessage(msg({ id: 'temp-1' }), 'me')).toBe(false);
 		expect(canModifyMessage(msg({ kind: 'poll' }), 'me')).toBe(false);
 		expect(canModifyMessage(msg({ kind: 'system', authorId: null }), 'me')).toBe(false);
+	});
+});
+
+describe('shared places', () => {
+	const place = { lat: 51.5, lng: -0.1, name: 'Dishoom', address: null, accuracy: null };
+	test('can be deleted but not edited', () => {
+		expect(canModifyMessage(msg({ location: place }), 'me')).toBe(true);
+		expect(canEditMessage(msg({ location: place }), 'me')).toBe(false);
+		expect(canEditMessage(msg(), 'me')).toBe(true);
+	});
+	test('are quoted by name, and lose the place once deleted', () => {
+		expect(replyPreview(msg({ location: place, body: '📍 Dishoom\nhttps://…' })).text).toBe('📍 Dishoom');
+		expect(replyPreview(msg({ location: { ...place, name: null } })).text).toBe('📍 Location');
+		expect(deletedCopy(msg({ location: place })).location).toBeNull();
 	});
 });
 

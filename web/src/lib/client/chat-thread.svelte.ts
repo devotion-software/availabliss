@@ -3,7 +3,7 @@
  * with optimistic inserts, polls, live updates and read receipts.
  * Used by the full chat screen and the desktop chat panel alike.
  */
-import type { Message, Poll } from '#lib/types';
+import type { Message, MessageLocation, Poll } from '#lib/types';
 import { live, receiptUpdates } from './live.svelte';
 import {
 	closePoll,
@@ -11,13 +11,14 @@ import {
 	editMessage,
 	listMessages,
 	sendMessage,
+	sendLocation,
 	sendPoll,
 	sendReceipt,
 	votePoll,
 	type MessagePage,
 	type PollInput
 } from './chat';
-import { applyMessageUpdate, canModifyMessage, canReplyTo, deletedCopy, isTempMessage, replyPreview } from './chat-messages';
+import { applyMessageUpdate, canEditMessage, canModifyMessage, canReplyTo, deletedCopy, isTempMessage, replyPreview } from './chat-messages';
 import { toasts } from './toast.svelte';
 
 const PAGE = 50;
@@ -162,8 +163,13 @@ export class ChatThread {
 		return canModifyMessage(message, this.meId);
 	}
 
+	/** …and all but shared places can be edited. */
+	canEdit(message: Message) {
+		return canEditMessage(message, this.meId);
+	}
+
 	startEdit(message: Message) {
-		if (!this.canModify(message)) return;
+		if (!this.canEdit(message)) return;
 		this.replyingTo = null;
 		this.editing = message;
 	}
@@ -206,6 +212,18 @@ export class ChatThread {
 		if (current) this.messages = applyMessageUpdate(this.messages, deletedCopy(current));
 		if (this.editing?.id === message.id) this.editing = null;
 		if (this.replyingTo?.id === message.id) this.replyingTo = null;
+	}
+
+	/** Shares a place (as a reply, if one is being written). Failures toast and throw. */
+	async sendLocation(location: MessageLocation) {
+		const replying = this.replyingTo;
+		try {
+			this.#insert(await sendLocation(this.groupId, location, replying?.id));
+			if (this.replyingTo?.id === replying?.id) this.replyingTo = null;
+		} catch (err) {
+			toasts.error(err);
+			throw err;
+		}
 	}
 
 	async sendPoll(poll: PollInput) {

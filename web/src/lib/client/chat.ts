@@ -1,5 +1,5 @@
 import { api, apiUrl, ApiError, type Fetch } from './api';
-import type { ApiErrorBody, Attachment, Message, MessageInfo, MessageThread, Poll } from '#lib/types';
+import type { ApiErrorBody, Attachment, Message, MessageInfo, MessageLocation, MessageThread, Poll } from '#lib/types';
 
 export interface MessagePage {
 	messages: Message[];
@@ -20,6 +20,9 @@ export const sendMessage = (groupId: string, body: string, replyToId?: string | 
 		...(attachmentIds.length ? { attachmentIds, ...(body && { body }) } : { body }),
 		...(replyToId && { replyToId })
 	});
+/** Shares a place (your position, or one you found). */
+export const sendLocation = (groupId: string, location: MessageLocation, replyToId?: string | null) =>
+	api.post<Message>(`/groups/${groupId}/messages`, { location, ...(replyToId && { replyToId }) });
 export const sendPoll = (groupId: string, poll: PollInput) => api.post<Message>(`/groups/${groupId}/messages`, { poll });
 export const sendReceipt = (groupId: string, upTo: string, state: 'delivered' | 'seen') =>
 	api.post(`/groups/${groupId}/messages/receipts`, { upTo, state });

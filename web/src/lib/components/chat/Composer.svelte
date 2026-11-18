@@ -21,6 +21,8 @@
 		/** The + menu's actions (no + menu when `plain`). */
 		onpoll?: () => void;
 		onpropose?: () => void;
+		/** Location in the + menu (not in `plain` threads). */
+		onlocation?: () => void;
 		compact?: boolean;
 		editing?: Message | null;
 		/** Saves the edit; should throw on failure (stays in edit mode). */
@@ -42,6 +44,7 @@
 		onsend,
 		onpoll = () => {},
 		onpropose = () => {},
+		onlocation,
 		compact = false,
 		editing = null,
 		onsaveedit,
@@ -219,6 +222,12 @@
 				<Icon name="paperclip" size={22} />
 				Files
 			</button>
+			{#if !plain && onlocation}
+				<button type="button" onclick={() => choose(onlocation)}>
+					<Icon name="map-pin" size={22} />
+					Location
+				</button>
+			{/if}
 			{#if !plain}
 				<button type="button" onclick={() => choose(onpoll)}>
 					<Icon name="poll" size={22} />
@@ -323,9 +332,9 @@
 	.compact .menu {
 		padding: 0;
 	}
-	@media (min-width: 420px) {
+	@media (min-width: 560px) {
 		.menu:not(.few) {
-			grid-template-columns: repeat(5, minmax(0, 1fr));
+			grid-template-columns: repeat(6, minmax(0, 1fr));
 		}
 	}
 	.compact .menu:not(.few) {

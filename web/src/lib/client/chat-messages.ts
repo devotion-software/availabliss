@@ -1,12 +1,16 @@
 /** Pure helpers for chat messages: who can edit/delete what, and applying edits and deletions. */
 import type { Member, Message, MessageReply } from '#lib/types';
 import { attachmentSummary } from './attachments';
+import { locationSummary } from './location';
 
 export const isTempMessage = (m: Message) => m.id.startsWith('temp-');
 
 /** Only your own, sent, non-deleted text messages can be edited or deleted. */
 export const canModifyMessage = (m: Message, meId: string) =>
 	m.kind === 'text' && m.authorId === meId && !m.deleted && !isTempMessage(m);
+
+/** …and of those, all but shared places can be edited (they can only be deleted). */
+export const canEditMessage = (m: Message, meId: string) => canModifyMessage(m, meId) && !m.location;
 
 /**
  * Replaces a message by id with an edited or deleted copy (`message.updated` or a PATCH/DELETE result),
@@ -28,7 +32,14 @@ export const canReplyTo = (m: Message) => (m.kind === 'text' || m.kind === 'poll
 /** A message as a quote: for "Replying to …", an optimistic reply, and refreshing quotes after it changes. */
 export function replyPreview(m: Message, authorName: string | null = null): MessageReply {
 	// With attachments: the caption, else what they are ("Photo", "GIF", "Plan.pdf").
-	const raw = m.kind === 'poll' ? m.poll?.question : m.attachments?.length ? m.caption || attachmentSummary(m.attachments) : m.body;
+	const raw =
+		m.kind === 'poll'
+			? m.poll?.question
+			: m.location
+				? locationSummary(m.location)
+				: m.attachments?.length
+					? m.caption || attachmentSummary(m.attachments)
+					: m.body;
 	return {
 		id: m.id,
 		authorId: m.authorId,
@@ -89,4 +100,4 @@ export function threadReplyTarget(thread: Message[], pickedId: string | null, me
 }
 
 /** A message as it reads once deleted: no text, flagged deleted. */
-export const deletedCopy = (m: Message): Message => ({ ...m, body: null, deleted: true });
+export const deletedCopy = (m: Message): Message => ({ ...m, body: null, deleted: true, location: null });

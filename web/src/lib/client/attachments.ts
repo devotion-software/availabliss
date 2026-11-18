@@ -141,8 +141,8 @@ export function opensWallet(userAgent: string): boolean {
 }
 
 /** The text a message shows: with attachments its caption (or nothing), otherwise its body. */
-export const messageText = (m: Pick<Message, 'body' | 'caption' | 'attachments'>): string | null =>
-	m.attachments?.length ? m.caption : m.body;
+export const messageText = (m: Pick<Message, 'body' | 'caption' | 'attachments'> & { location?: Message['location'] }): string | null =>
+	m.location ? null : m.attachments?.length ? m.caption : m.body;
 
 /** How big one picture is drawn in a bubble: its aspect ratio, within `maxW` × `maxH` and at least `min` on each side. */
 export function fitImage(width: number | null, height: number | null, maxW = 240, maxH = 320, min = 80): { width: number; height: number } {

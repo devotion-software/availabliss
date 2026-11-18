@@ -11,6 +11,7 @@
 	import MessageList from '#lib/components/chat/MessageList.svelte';
 	import Composer from '#lib/components/chat/Composer.svelte';
 	import PollComposerSheet from '#lib/components/chat/PollComposerSheet.svelte';
+	import LocationSheet from '#lib/components/chat/LocationSheet.svelte';
 	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
 	import { dropFiles } from '#lib/components/chat/drop-files';
 
@@ -18,6 +19,7 @@
 
 	let pollOpen = $state(false);
 	let proposeOpen = $state(false);
+	let locationOpen = $state(false);
 	let composer: ReturnType<typeof Composer> | undefined = $state();
 
 	const group = $derived(data.group);
@@ -84,6 +86,7 @@
 			onsend={(b, ids) => thread.send(b, ids)}
 			onpoll={() => (pollOpen = true)}
 			onpropose={() => (proposeOpen = true)}
+			onlocation={() => (locationOpen = true)}
 			editing={thread.editing}
 			onsaveedit={(b) => thread.saveEdit(b)}
 			oncanceledit={() => thread.cancelEdit()}
@@ -94,6 +97,7 @@
 </div>
 
 <PollComposerSheet bind:open={pollOpen} onsubmit={(poll) => thread.sendPoll(poll)} />
+<LocationSheet bind:open={locationOpen} onsend={(location) => thread.sendLocation(location)} />
 <ProposeSheet bind:open={proposeOpen} {group} meId={data.user.id} initial={null} />
 
 <style>

@@ -7,6 +7,7 @@
 	import MessageList from './MessageList.svelte';
 	import Composer from './Composer.svelte';
 	import PollComposerSheet from './PollComposerSheet.svelte';
+	import LocationSheet from './LocationSheet.svelte';
 	import { dropFiles } from './drop-files';
 
 	/** Compact chat beside the desktop group calendar (Web.dc.html). */
@@ -18,6 +19,7 @@
 	let { group, me, onpropose }: Props = $props();
 
 	let pollOpen = $state(false);
+	let locationOpen = $state(false);
 	let composer: ReturnType<typeof Composer> | undefined = $state();
 
 	// One thread per group; recreated if you switch groups.
@@ -44,6 +46,7 @@
 	</div>
 	<Composer bind:this={composer} groupId={group.id} compact onsend={(b, ids) => thread.send(b, ids)} onpoll={() => (pollOpen = true)}
 		{onpropose}
+		onlocation={() => (locationOpen = true)}
 		editing={thread.editing}
 		onsaveedit={(b) => thread.saveEdit(b)}
 		oncanceledit={() => thread.cancelEdit()}
@@ -53,6 +56,7 @@
 </section>
 
 <PollComposerSheet bind:open={pollOpen} onsubmit={(poll) => thread.sendPoll(poll)} />
+<LocationSheet bind:open={locationOpen} onsend={(location) => thread.sendLocation(location)} />
 
 <style>
 	.panel {

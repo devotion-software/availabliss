@@ -311,7 +311,7 @@
 	oninfo={() => menuMessage && openInfo(menuMessage)}
 	onreply={menuMessage && thread.canReply(menuMessage) ? () => menuMessage && reply(menuMessage) : undefined}
 	onthread={menuMessage && inThread(menuMessage) ? () => menuMessage && (threadFor = menuMessage.id) : undefined}
-	onedit={menuMessage && thread.canModify(menuMessage) ? () => menuMessage && thread.startEdit(menuMessage) : undefined}
+	onedit={menuMessage && thread.canEdit(menuMessage) ? () => menuMessage && thread.startEdit(menuMessage) : undefined}
 	ondelete={menuMessage && thread.canModify(menuMessage) ? () => menuMessage && confirmDelete(menuMessage) : undefined}
 />
 
