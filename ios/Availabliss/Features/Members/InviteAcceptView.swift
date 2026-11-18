@@ -158,8 +158,9 @@ struct InviteAcceptView: View {
             preview = try await api.send(API.Invites.preview(token: token))
             loadError = nil
         } catch let failure as APIError {
-            if case .notFound = failure {
-                loadError = "This invite has expired or was already used."
+            if case .notFound(let message) = failure {
+                // A link that's full says so ("This invite link has been used up"); anything else is gone.
+                loadError = message.contains("used up") ? message : "This invite has expired or was already used."
             } else {
                 loadError = failure.userMessage
             }

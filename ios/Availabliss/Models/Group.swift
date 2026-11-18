@@ -184,12 +184,64 @@ struct GroupInvite: Decodable, Sendable, Identifiable, Hashable {
     /// The account name of the person it was sent to in Activity (older servers omit it).
     var name: String?
     let url: URL
+    /// How many people can join with it (nil: no limit). Older servers omit it and `uses`: single-use.
+    var maxUses: Int?
+    /// How many people have joined with it so far.
+    var uses: Int?
     let expiresAt: Date
 
     /// A link anyone can use (not for a particular person).
     var isLink: Bool { email == nil && username == nil && name == nil }
     /// Who it's for: "@sam", "sam@example.com" or (sent to someone without a username) their name; nil for a link.
     var recipient: String? { username.map { "@\($0)" } ?? email ?? name }
+
+    /// How many people can still join with it (nil: no limit).
+    var usesLeft: Int? {
+        guard let uses else { return 1 }
+        return maxUses.map { max($0 - uses, 0) }
+    }
+
+    /// "One person can join with this link." / "5 people can…" / "3 of 5 people can still…" / "Anyone with this link can join."
+    var linkSummary: String {
+        guard let left = usesLeft else { return "Anyone with this link can join." }
+        let total = maxUses ?? 1
+        if total == 1 { return "One person can join with this link." }
+        if left == total { return "\(total) people can join with this link." }
+        return "\(left) of \(total) people can still join with this link."
+    }
+
+    /// For the invites list: "Link for one person" / "3 of 5 left" / "Unlimited · 4 joined".
+    var linkUsage: String {
+        guard let left = usesLeft else {
+            return (uses ?? 0) > 0 ? "Unlimited · \(uses ?? 0) joined" : "Unlimited"
+        }
+        let total = maxUses ?? 1
+        return total == 1 ? "Link for one person" : "\(left) of \(total) left"
+    }
+}
+
+/// How many people can join with an invite link.
+enum LinkLimit: Hashable, Sendable {
+    case people(Int)
+    case unlimited
+
+    /// The choices offered when making a link; one person is what links always were.
+    static let choices: [LinkLimit] = [.people(1), .people(5), .people(10), .people(25), .unlimited]
+    static let standard: LinkLimit = .people(1)
+
+    var label: String {
+        switch self {
+        case .people(let n): "\(n)"
+        case .unlimited: "Unlimited"
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .people(let n): n == 1 ? "One person" : "\(n) people"
+        case .unlimited: "Unlimited"
+        }
+    }
 }
 
 struct GroupInvitesResponse: Decodable, Sendable { let invites: [GroupInvite] }
@@ -198,6 +250,22 @@ struct CreateInviteBody: Encodable, Sendable {
     var emails: [String]?
     var usernames: [String]?
     var userIds: [String]?
+    /// For a link: how many people can join with it (sent as null for no limit; left out: one).
+    var maxUses: LinkLimit?
+
+    private enum CodingKeys: String, CodingKey { case emails, usernames, userIds, maxUses }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(emails, forKey: .emails)
+        try c.encodeIfPresent(usernames, forKey: .usernames)
+        try c.encodeIfPresent(userIds, forKey: .userIds)
+        switch maxUses {
+        case .people(let n): try c.encode(n, forKey: .maxUses)
+        case .unlimited: try c.encodeNil(forKey: .maxUses)
+        case nil: break
+        }
+    }
 }
 
 struct InvitePreview: Decodable, Sendable {

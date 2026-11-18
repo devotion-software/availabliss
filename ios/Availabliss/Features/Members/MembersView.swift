@@ -86,24 +86,7 @@ struct MembersView: View {
     private var inviteCard: some View {
         GlassPanel(cornerRadius: 24) {
             Text("Invite people").sectionLabelStyle()
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Share a link").bodyFont(15, .semibold)
-                Text("One person can join with each link.").bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
-            }
-            if let link = model.link {
-                ShareLink(item: link.url, subject: Text("Join \(model.group?.name ?? "my group") on Availabliss"),
-                          message: Text("Join \(model.group?.name ?? "my group") on Availabliss so we can find a time that works.")) {
-                    Label("Share invite link", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(.accent)
-            } else {
-                Button {
-                    Task { await model.createLink() }
-                } label: {
-                    LoadingLabel(title: "Create invite link", systemImage: "link", isLoading: model.isCreatingInvite)
-                }
-                .buttonStyle(.accent)
-            }
+            InviteLinkSection(model: model, groupName: model.group?.name ?? "my group")
             Rectangle().fill(theme.line).frame(height: 1).padding(.vertical, 4)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Or invite particular people").bodyFont(15, .semibold)
@@ -174,7 +157,8 @@ private struct MemberRow: View {
     }
 }
 
-/// "sam@example.com" / "@sam" · "Invited · invite expires Saturday 28 November" with Revoke.
+/// "sam@example.com" / "@sam" · "Invited · invite expires Saturday 28 November", or a link with
+/// "3 of 5 left · expires …", with Revoke.
 private struct InviteRow: View {
     let invite: GroupInvite
     let revoke: () -> Void
@@ -211,6 +195,6 @@ private struct InviteRow: View {
 
     private var status: String {
         let expires = invite.expiresAt.formatted(.dateTime.weekday(.wide).day().month(.wide))
-        return invite.isLink ? "Link for one person · expires \(expires)" : "Invited · invite expires \(expires)"
+        return invite.isLink ? "\(invite.linkUsage) · expires \(expires)" : "Invited · invite expires \(expires)"
     }
 }

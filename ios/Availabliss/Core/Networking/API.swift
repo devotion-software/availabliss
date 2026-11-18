@@ -127,14 +127,15 @@ enum API {
             .init(.get, "/groups/\(groupId.pathEncoded)/conflicts", query: ["start": iso(start), "end": iso(end)])
         }
         static func nudge(groupId: String) -> Endpoint<NudgeResponse> { .init(.post, "/groups/\(groupId.pathEncoded)/nudge") }
-        /// No one: a link anyone can use. Emails / usernames: one invite each, only for that person
+        /// No one: a link anyone can use, by `maxUses` people (left out: one). Emails / usernames: one invite each, only for that person
         /// (emailed, or sent to their Activity). 404 for a username nobody has, 409 if they're in already.
         /// User ids: likewise sent to their Activity, for people you're already in a group with.
-        static func createInvite(groupId: String, emails: [String] = [], usernames: [String] = [], userIds: [String] = []) -> Endpoint<InviteLink> {
+        static func createInvite(groupId: String, emails: [String] = [], usernames: [String] = [], userIds: [String] = [], maxUses: LinkLimit? = nil) -> Endpoint<InviteLink> {
             .init(.post, "/groups/\(groupId.pathEncoded)/invites", body: CreateInviteBody(
                 emails: emails.isEmpty ? nil : emails,
                 usernames: usernames.isEmpty ? nil : usernames,
-                userIds: userIds.isEmpty ? nil : userIds
+                userIds: userIds.isEmpty ? nil : userIds,
+                maxUses: maxUses
             ))
         }
         static func preferences(groupId: String) -> Endpoint<GroupPreferencesResponse> { .init(.get, "/groups/\(groupId.pathEncoded)/preferences") }

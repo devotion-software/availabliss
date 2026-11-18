@@ -45,14 +45,18 @@ final class MembersViewModel {
         } catch {}
     }
 
-    func createLink() async {
+    /// Makes a link that `limit` people can join with. Returns whether it worked.
+    @discardableResult
+    func createLink(limit: LinkLimit = .standard) async -> Bool {
         isCreatingInvite = true
         defer { isCreatingInvite = false }
         do {
-            let made = try await api.send(API.Groups.createInvite(groupId: groupId))
+            let made = try await api.send(API.Groups.createInvite(groupId: groupId, maxUses: limit))
             invites.insert(contentsOf: made.invites ?? [], at: 0)
+            return true
         } catch {
             self.error = error.userMessage
+            return false
         }
     }
 

@@ -214,22 +214,7 @@ private struct InvitePeopleStep: View {
                         .bodyFont(14).foregroundStyle(theme.muted)
                 }
                 GlassPanel(cornerRadius: 24) {
-                    Text("Share a link").bodyFont(15, .semibold)
-                    Text("One person can join with each link.").bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
-                    if let link = model.link {
-                        ShareLink(item: link.url, subject: Text("Join \(group.name) on Availabliss"),
-                                  message: Text("Join \(group.name) on Availabliss so we can find a time that works.")) {
-                            Label("Share invite link", systemImage: "square.and.arrow.up")
-                        }
-                        .buttonStyle(.accent)
-                    } else {
-                        Button {
-                            Task { await model.createLink() }
-                        } label: {
-                            LoadingLabel(title: "Create invite link", systemImage: "link", isLoading: model.isCreatingInvite)
-                        }
-                        .buttonStyle(.accent)
-                    }
+                    InviteLinkSection(model: model, groupName: group.name)
                 }
                 GlassPanel(cornerRadius: 24) {
                     Text("Or invite by email or username").bodyFont(15, .semibold)
