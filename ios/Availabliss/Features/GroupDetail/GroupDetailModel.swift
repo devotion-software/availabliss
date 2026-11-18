@@ -83,6 +83,7 @@ final class GroupDetailModel {
     /// Seeds the Chat badge with the server's unread count (only the groups list carries it).
     func loadUnread() async {
         guard let summaries = try? await api.send(API.Groups.list()).groups else { return }
+        WidgetSync.shared.onGroups(summaries)
         unreadLoaded = true
         if !isChatVisible { unreadCount = summaries.first { $0.id == groupId }?.unreadCount ?? 0 }
     }

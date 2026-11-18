@@ -6,6 +6,8 @@ enum DeepLink: Equatable, Sendable {
     case group(id: String)
     case groupChat(id: String)
     case proposal(id: String)
+    /// `availabliss://app/my-plans` — My plans (from the Next plan widget when nothing's coming up).
+    case myPlans
     /// `availabliss://calendars` — OAuth return / calendar settings. `complete` is the
     /// one-time code to finish a Google / Microsoft connection with.
     case calendars(complete: String?, error: String?)
@@ -31,6 +33,8 @@ enum DeepLink: Equatable, Sendable {
             self = .group(id: segments[2])
         case 4 where segments[0] == "app" && segments[1] == "groups" && segments[3] == "chat":
             self = .groupChat(id: segments[2])
+        case 2 where segments[0] == "app" && segments[1] == "my-plans":
+            self = .myPlans
         case 3 where segments[0] == "app" && segments[1] == "proposals":
             self = .proposal(id: segments[2])
         default:

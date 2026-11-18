@@ -28,6 +28,7 @@ final class MyPlansViewModel {
             going = response.going
             notGoing = response.notGoing
             past = response.past
+            WidgetSync.shared.onPlans(response)
             loaded = true
             loadError = nil
         } catch where !error.isCancellation {

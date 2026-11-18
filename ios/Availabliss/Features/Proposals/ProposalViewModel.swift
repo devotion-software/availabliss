@@ -191,6 +191,8 @@ final class ProposalViewModel {
         sending = response
         defer { sending = nil }
         await run { try await self.api.send(API.Proposals.respond(id: self.proposalId, response)) }
+        // The plan may now be yours (Next plan) and it's no longer waiting for you.
+        if error == nil { await WidgetSync.shared.refresh() }
     }
 
     func override(userId: String, response: ResponseKind) async {

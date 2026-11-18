@@ -23,9 +23,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let data = DeepLink.data(fromPush: notification.request.content.userInfo)
         let isChatMessage = data["kind"] == "message" || data["messageId"] != nil
         let visibleChat = await MainActor.run { app.router.visibleChatGroupId }
+        // Not awaited: the banner shouldn't wait on the widgets' refetch.
+        let kind = data["kind"]
+        Task { @MainActor in await app.pushReceived(kind: kind) }
         // The message is already arriving in the open chat over the live stream.
         if isChatMessage, let groupId = data["groupId"], groupId == visibleChat { return [] }
         return [.banner, .list, .sound]
+    }
+
+    /// A push delivered to the app in the background (one sent with `content-available`): keeps the
+    /// widgets current.
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
+        let data = DeepLink.data(fromPush: userInfo)
+        guard WidgetSync.refreshesOn(kind: data["kind"]) else { return .noData }
+        await app.pushReceived(kind: data["kind"])
+        return .newData
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {

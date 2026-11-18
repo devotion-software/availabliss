@@ -25,6 +25,7 @@ final class GroupsHomeViewModel {
             async let groupList = api.send(API.Groups.list())
             async let upcoming = try? api.send(API.Me.upcoming())
             groups = try await groupList.groups
+            WidgetSync.shared.onGroups(groups)
             let now = Date()
             upNext = await Array((upcoming?.events ?? []).filter { $0.end > now }.sorted { $0.start < $1.start }.prefix(Self.upNextLimit))
             loadError = nil

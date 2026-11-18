@@ -13,5 +13,9 @@
 		<string>webcredentials:$(ASSOCIATED_DOMAIN_HOST)$(ASSOCIATED_DOMAIN_MODE)</string>
 		<string>applinks:$(ASSOCIATED_DOMAIN_HOST)$(ASSOCIATED_DOMAIN_MODE)</string>
 	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.dev.joeherbert.availabliss</string>
+	</array>
 </dict>
 </plist>

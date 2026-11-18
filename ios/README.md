@@ -47,6 +47,10 @@ Values reach the app through Info.plist keys (`AVAPIBaseURL`, …) read by `App/
   The app registers its token with `POST /devices` after sign-in.
 - **Background Modes** — Background fetch (calendar refresh, `BGAppRefreshTask` id
   `dev.joeherbert.availabliss.calendar-refresh`) and Remote notifications.
+- **App Groups** — `group.dev.joeherbert.availabliss`, on both the app's App ID and the widget
+  extension's (`dev.joeherbert.availabliss.widgets`). The app writes the widgets' snapshot there
+  (`Shared/WidgetSnapshot.swift`); the `AvailablissWidgets` extension (Next plan, Waiting for you)
+  only reads it. Siri / Shortcuts intents (`Core/Widgets/AppIntents.swift`) run in the app.
 
 ### Pro purchases (RevenueCat)
 

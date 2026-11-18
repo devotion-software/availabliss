@@ -27,6 +27,9 @@ final class AppModel {
     private(set) var templatesVersion = 0
     @ObservationIgnored private var liveTask: Task<Void, Never>?
 
+    /// The running app's model, for App Intents (which run in the app's process but outside the view tree).
+    private(set) static weak var shared: AppModel?
+
     init(config: AppConfig = .load()) {
         self.config = config
         let tokenStore = TokenStore()
@@ -40,6 +43,10 @@ final class AppModel {
         self.deviceCalendar = DeviceCalendarService(api: api)
         self.push = PushManager(api: api, currentUserId: { session.user?.id })
         unauthorized.handler = { [weak self] token in self?.session.handleUnauthorized(token: token) }
+        WidgetSync.shared.configure(api: api)
+        // New or renamed groups become phrases Siri recognises ("When's everyone in <group> free…").
+        WidgetSync.shared.onGroupsChanged = { AvailablissShortcuts.updateAppShortcutParameters() }
+        Self.shared = self
     }
 
     var auth: AuthService { AuthService(api: api, config: config) }
@@ -103,6 +110,14 @@ final class AppModel {
     func backgroundRefresh() async {
         DeviceCalendarService.scheduleBackgroundRefresh()
         await deviceCalendar.syncIfAuthorized()
+        await WidgetSync.shared.refresh()
+    }
+
+    /// A push arrived (in the foreground, or a background push): refreshes the widgets if it's one
+    /// that can change them (a proposal, event or reminder).
+    func pushReceived(kind: String?) async {
+        guard session.isSignedIn, WidgetSync.refreshesOn(kind: kind) else { return }
+        await WidgetSync.shared.refresh()
     }
 
     func open(_ link: DeepLink) {
@@ -161,6 +176,7 @@ final class AppModel {
         await refreshUnread()
         await deviceCalendar.syncIfAuthorized()
         DeviceCalendarService.scheduleBackgroundRefresh()
+        await WidgetSync.shared.refresh()
     }
 
     private func didSignOut() {
@@ -175,6 +191,7 @@ final class AppModel {
         push.forget()
         push.setBadge(0)
         router.reset()
+        WidgetSync.shared.onSignedOut()
     }
 
     /// App-wide reactions to live events: delivery receipts and the Activity badge.
