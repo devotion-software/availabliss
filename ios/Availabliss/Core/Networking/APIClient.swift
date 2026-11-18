@@ -42,7 +42,8 @@ final class APIClient: Sendable {
     /// Like `send`, for uploads: reports how much of the body has gone (0…1) as it's sent.
     func upload<Response>(_ endpoint: Endpoint<Response>, progress: @escaping @Sendable (Double) -> Void) async throws -> Response {
         let request = try makeRequest(for: endpoint)
-        let (data, _) = try await perform(request, unauthorizedEndsSession: endpoint.unauthorizedEndsSession, session: .availablissUploads, delegate: UploadProgress(report: progress))
+        let (data, _) = try await perform(
+            request, unauthorizedEndsSession: endpoint.unauthorizedEndsSession, session: .availablissUploads, delegate: UploadProgress(report: progress))
         do {
             return try JSONCoding.decoder.decode(Response.self, from: data)
         } catch {

@@ -71,7 +71,7 @@ final class MyTimeViewModel {
             guard generation == self.generation else { return }
             days = (0..<count).map { today.adding(days: $0) }
             setIntervals(loaded)
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             self.error = error.userMessage
             // Show free days rather than a loader that never ends.
             if !hasLoaded {
@@ -96,7 +96,7 @@ final class MyTimeViewModel {
                 guard generation == self.generation, days.last == last else { return }
                 days += (0..<count).map { from.adding(days: $0) }
                 setIntervals(intervals + loaded)
-            } catch where !error.isCancellation {
+            } catch  where !error.isCancellation {
                 self.error = error.userMessage
             } catch {}
         }
@@ -139,9 +139,11 @@ final class MyTimeViewModel {
     func ignore(_ interval: BusyInterval, series: Bool) async -> Bool {
         guard let calendarId = interval.calendarId else { return false }
         do {
-            _ = try await api.send(API.Me.ignoreBusy(BusyIgnoreBody(
-                calendarId: calendarId, eventKey: interval.eventKey ?? "", start: interval.start, end: interval.end, series: series
-            )))
+            _ = try await api.send(
+                API.Me.ignoreBusy(
+                    BusyIgnoreBody(
+                        calendarId: calendarId, eventKey: interval.eventKey ?? "", start: interval.start, end: interval.end, series: series
+                    )))
             await load()
             return true
         } catch {

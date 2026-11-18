@@ -53,8 +53,14 @@ struct ScreenHeader<Trailing: View>: View {
 }
 
 extension ScreenHeader where Trailing == EmptyView {
-    init(title: String, subtitle: String? = nil, subtitleSystemImage: String? = nil, titleSize: CGFloat = 24, backLabel: String = "Back", onBack: (() -> Void)? = nil, onTitle: (() -> Void)? = nil, leading: AnyView? = nil) {
-        self.init(title: title, subtitle: subtitle, subtitleSystemImage: subtitleSystemImage, titleSize: titleSize, backLabel: backLabel, onBack: onBack, onTitle: onTitle, leading: leading) { EmptyView() }
+    init(
+        title: String, subtitle: String? = nil, subtitleSystemImage: String? = nil, titleSize: CGFloat = 24, backLabel: String = "Back", onBack: (() -> Void)? = nil,
+        onTitle: (() -> Void)? = nil, leading: AnyView? = nil
+    ) {
+        self.init(
+            title: title, subtitle: subtitle, subtitleSystemImage: subtitleSystemImage, titleSize: titleSize, backLabel: backLabel, onBack: onBack, onTitle: onTitle,
+            leading: leading
+        ) { EmptyView() }
     }
 }
 
@@ -100,7 +106,11 @@ struct BottomSheet<Content: View>: View {
                 content
             }
             .padding(18)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+            .onGeometryChange(for: CGFloat.self) {
+                $0.size.height
+            } action: {
+                height = $0
+            }
         }
         .scrollBounceBehavior(.basedOnSize)
         .foregroundStyle(theme.ink)

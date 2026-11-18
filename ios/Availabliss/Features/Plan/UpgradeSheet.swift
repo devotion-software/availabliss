@@ -36,7 +36,9 @@ struct UpgradeSheet: View {
 
     private var perks: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Perk(systemImage: "person.3", title: "Unlimited groups", text: "Free accounts can create \(plan?.groupLimit ?? 3). Joining other people's groups is always free.")
+            Perk(
+                systemImage: "person.3", title: "Unlimited groups",
+                text: "Free accounts can create \(plan?.groupLimit ?? 3). Joining other people's groups is always free.")
             if plan?.aiPlanner.available == true {
                 Perk(systemImage: "sparkles", title: "AI planning", text: "Picks the best time, suggests things to do and drafts the plan.")
             }
@@ -137,7 +139,7 @@ struct UpgradeSheet: View {
             guard !plan.isPro, let key = plan.purchase.ios, let userId = app.session.user?.id else { return }
             try await app.billing.prepare(apiKey: key, userId: userId)
             packages = try await app.billing.packages()
-        } catch where error.isCancellation {
+        } catch  where error.isCancellation {
         } catch {
             if plan == nil { loadError = error.userMessage } else { packages = []; self.error = error.userMessage }
         }

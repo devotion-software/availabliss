@@ -92,7 +92,8 @@ struct SignInMethodsSection: View {
 
     private func mergeMessage(_ pending: Pending) -> String {
         let groups = pending.candidate.groups == 1 ? "1 group" : "\(pending.candidate.groups) groups"
-        return "That \(pending.provider.label) sign-in belongs to \(pending.candidate.email) (in \(groups)). Its groups, busy times, calendars, chats and Pro move into this account, then it's deleted. This can't be undone."
+        return
+            "That \(pending.provider.label) sign-in belongs to \(pending.candidate.email) (in \(groups)). Its groups, busy times, calendars, chats and Pro move into this account, then it's deleted. This can't be undone."
     }
 
     private func load() async {
@@ -111,7 +112,7 @@ struct SignInMethodsSection: View {
             } catch APIError.mergeCandidate(let candidate, _) {
                 pending = Pending(provider: provider, idToken: token.idToken, nonce: token.nonce, candidate: candidate)
             }
-        } catch where error.isCancellation {
+        } catch  where error.isCancellation {
         } catch {
             self.error = error.userMessage
         }

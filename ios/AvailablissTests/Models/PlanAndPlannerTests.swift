@@ -1,21 +1,24 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Ported from Android `PlanLabelsTest` and `PlannerResultTest`.
 struct PlanAndPlannerTests {
     private let freePlan = """
-    {"tier":"free","proUntil":null,"lifetime":false,"willRenew":false,"store":null,"groupLimit":3,"groupsOwned":2,
-     "canCreateGroup":true,"aiPlanner":{"available":false,"included":false},
-     "purchase":{"ios":null,"android":null,"web":null,"entitlement":"pro"}}
-    """
+        {"tier":"free","proUntil":null,"lifetime":false,"willRenew":false,"store":null,"groupLimit":3,"groupsOwned":2,
+         "canCreateGroup":true,"aiPlanner":{"available":false,"included":false},
+         "purchase":{"ios":null,"android":null,"web":null,"entitlement":"pro"}}
+        """
 
     private func pro(proUntil: String?, lifetime: Bool = false, willRenew: Bool = false) throws -> Plan {
-        try Fixtures.decode(Plan.self, """
-        {"tier":"pro","proUntil":\(proUntil.map { "\"\($0)\"" } ?? "null"),"lifetime":\(lifetime),"willRenew":\(willRenew),
-         "store":"app_store","groupLimit":null,"groupsOwned":7,"canCreateGroup":true,"aiPlanner":{"available":true,"included":true},
-         "purchase":{"ios":"appl_x","android":null,"web":null,"entitlement":"pro"}}
-        """)
+        try Fixtures.decode(
+            Plan.self,
+            """
+            {"tier":"pro","proUntil":\(proUntil.map { "\"\($0)\"" } ?? "null"),"lifetime":\(lifetime),"willRenew":\(willRenew),
+             "store":"app_store","groupLimit":null,"groupsOwned":7,"canCreateGroup":true,"aiPlanner":{"available":true,"included":true},
+             "purchase":{"ios":"appl_x","android":null,"web":null,"entitlement":"pro"}}
+            """)
     }
 
     @Test func decodesThePlanFromTheAPI() throws {
@@ -44,22 +47,24 @@ struct PlanAndPlannerTests {
     }
 
     @Test func parsesThePlannerResult() throws {
-        let result = try Fixtures.decode(PlannerResult.self, """
-        {
-          "best": { "slot": { "start": "2026-11-27T18:00:00.000Z", "end": "2026-11-29T23:59:00.000Z", "label": "Fri 27 – Sun 29 Nov" },
-                    "why": "The only weekend everyone's free before December." },
-          "alternatives": [
-            { "slot": { "start": "2026-12-04T18:00:00.000Z", "end": "2026-12-06T23:59:00.000Z", "label": "Fri 4 – Sun 6 Dec" }, "why": "A week later." }
-          ],
-          "ideas": [
-            { "title": "Catbells at sunrise", "description": "A short climb." },
-            { "title": "Pub quiz in Keswick", "description": "Thursdays." }
-          ],
-          "checklist": ["Propose it", "Book somewhere", "Sort out lifts"],
-          "proposalTitle": "Lakes weekend",
-          "proposalNote": "Cottage near Keswick?"
-        }
-        """)
+        let result = try Fixtures.decode(
+            PlannerResult.self,
+            """
+            {
+              "best": { "slot": { "start": "2026-11-27T18:00:00.000Z", "end": "2026-11-29T23:59:00.000Z", "label": "Fri 27 – Sun 29 Nov" },
+                        "why": "The only weekend everyone's free before December." },
+              "alternatives": [
+                { "slot": { "start": "2026-12-04T18:00:00.000Z", "end": "2026-12-06T23:59:00.000Z", "label": "Fri 4 – Sun 6 Dec" }, "why": "A week later." }
+              ],
+              "ideas": [
+                { "title": "Catbells at sunrise", "description": "A short climb." },
+                { "title": "Pub quiz in Keswick", "description": "Thursdays." }
+              ],
+              "checklist": ["Propose it", "Book somewhere", "Sort out lifts"],
+              "proposalTitle": "Lakes weekend",
+              "proposalNote": "Cottage near Keswick?"
+            }
+            """)
         #expect(result.best.slot.label == "Fri 27 – Sun 29 Nov")
         #expect(result.best.slot.start == Fixtures.date("2026-11-27T18:00:00Z"))
         #expect(result.best.why.hasPrefix("The only weekend"))

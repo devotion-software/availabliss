@@ -137,18 +137,22 @@ struct DateRangeInput: View {
 
     /// Moving the start keeps the length: the end moves with it.
     private var startBinding: Binding<Date> {
-        Binding(get: { start }, set: { newStart in
-            let length = end.timeIntervalSince(start)
-            start = newStart
-            end = DateRangeRules.end(afterMovingStartTo: newStart, length: length, allDay: allDay, upper: bounds?.upperBound)
-        })
+        Binding(
+            get: { start },
+            set: { newStart in
+                let length = end.timeIntervalSince(start)
+                start = newStart
+                end = DateRangeRules.end(afterMovingStartTo: newStart, length: length, allDay: allDay, upper: bounds?.upperBound)
+            })
     }
 
     /// The end can't go before the start: an earlier time keeps the old length from the start instead.
     private var endBinding: Binding<Date> {
-        Binding(get: { end }, set: { newEnd in
-            end = DateRangeRules.end(settingEndTo: newEnd, start: start, previousEnd: end, allDay: allDay)
-        })
+        Binding(
+            get: { end },
+            set: { newEnd in
+                end = DateRangeRules.end(settingEndTo: newEnd, start: start, previousEnd: end, allDay: allDay)
+            })
     }
 }
 

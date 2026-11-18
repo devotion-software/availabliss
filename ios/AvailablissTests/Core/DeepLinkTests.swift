@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Links and push notifications open the right screen. The iOS routes, compared with Android `PushRoutingTest`.

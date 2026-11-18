@@ -94,12 +94,13 @@ final class GroupAvailabilityViewModel {
     /// (higher first; none counts lowest), then the earliest.
     func bestOptions(limit: Int = 3, now: Date = .now) -> [Slot] {
         let upcoming = (availability?.slots ?? []).filter { $0.start > now }
-        return Array(upcoming.sorted { a, b in
-            if a.missingCount != b.missingCount { return a.missingCount < b.missingCount }
-            let scoreA = a.score ?? -.infinity, scoreB = b.score ?? -.infinity
-            if scoreA != scoreB { return scoreA > scoreB }
-            return a.start < b.start
-        }.prefix(limit))
+        return Array(
+            upcoming.sorted { a, b in
+                if a.missingCount != b.missingCount { return a.missingCount < b.missingCount }
+                let scoreA = a.score ?? -.infinity, scoreB = b.score ?? -.infinity
+                if scoreA != scoreB { return scoreA > scoreB }
+                return a.start < b.start
+            }.prefix(limit))
     }
 
     // MARK: Loading
@@ -276,7 +277,7 @@ final class GroupAvailabilityViewModel {
                 let loaded = try await fetchMonth(requested)
                 guard requested == month else { return }
                 show(loaded)
-            } catch where !error.isCancellation {
+            } catch  where !error.isCancellation {
                 self.error = error.userMessage
                 return
             } catch {
@@ -290,12 +291,14 @@ final class GroupAvailabilityViewModel {
     /// One month's availability: from the cache, the request already on its way, or a new one.
     private func fetchMonth(_ month: CalendarDay) async throws -> Availability {
         if let cached = months[month] { return cached }
-        let task = monthRequests[month] ?? {
-            let api = self.api, groupId = self.groupId
-            let task = Task { try await api.send(API.GroupAvailability.range(groupId: groupId, from: month, to: month.lastOfMonth())) }
-            monthRequests[month] = task
-            return task
-        }()
+        let task =
+            monthRequests[month]
+            ?? {
+                let api = self.api, groupId = self.groupId
+                let task = Task { try await api.send(API.GroupAvailability.range(groupId: groupId, from: month, to: month.lastOfMonth())) }
+                monthRequests[month] = task
+                return task
+            }()
         let generation = self.generation
         defer { if generation == self.generation { monthRequests[month] = nil } }
         let loaded = try await task.value
@@ -330,7 +333,7 @@ final class GroupAvailabilityViewModel {
     private func loadDay(_ date: CalendarDay) async {
         do {
             _ = try await fetchDay(date)
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             self.error = error.userMessage
         } catch {}
     }
@@ -339,12 +342,14 @@ final class GroupAvailabilityViewModel {
     @discardableResult
     private func fetchDay(_ date: CalendarDay) async throws -> DayAvailability {
         if let cached = dayDetails[date] { return cached }
-        let task = dayRequests[date] ?? {
-            let api = self.api, groupId = self.groupId
-            let task = Task { try await api.send(API.GroupAvailability.day(groupId: groupId, date: date)) }
-            dayRequests[date] = task
-            return task
-        }()
+        let task =
+            dayRequests[date]
+            ?? {
+                let api = self.api, groupId = self.groupId
+                let task = Task { try await api.send(API.GroupAvailability.day(groupId: groupId, date: date)) }
+                dayRequests[date] = task
+                return task
+            }()
         let generation = self.generation
         defer { if generation == self.generation { dayRequests[date] = nil } }
         let detail = try await task.value

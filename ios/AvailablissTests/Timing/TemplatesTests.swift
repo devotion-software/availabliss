@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Ported from web `client/templates.test.ts` and Android `TemplatesTest`.
@@ -67,12 +68,14 @@ struct TemplatesTests {
     }
 
     @Test func templatesDecodeFromTheAPI() throws {
-        let response = try Fixtures.decode(TemplatesResponse.self, """
-        {"templates":[{"id":"t1","name":"Weekends","createdAt":"2026-01-10T00:00:00.000Z","requirement":
-          {"length":{"type":"span","startDay":4,"startTime":"18:00","endDay":6,"endTime":"23:59","weeksLater":0},"window":null,
-           "days":[4,5,6],"bankHolidays":true,"schoolHolidaysOnly":false,"schoolAuthority":null,"customSchoolHolidays":[],
-           "range":{"from":"2026-01-10","to":"2026-03-10"},"dates":[],"timezone":"Europe/London"}}]}
-        """)
+        let response = try Fixtures.decode(
+            TemplatesResponse.self,
+            """
+            {"templates":[{"id":"t1","name":"Weekends","createdAt":"2026-01-10T00:00:00.000Z","requirement":
+              {"length":{"type":"span","startDay":4,"startTime":"18:00","endDay":6,"endTime":"23:59","weeksLater":0},"window":null,
+               "days":[4,5,6],"bankHolidays":true,"schoolHolidaysOnly":false,"schoolAuthority":null,"customSchoolHolidays":[],
+               "range":{"from":"2026-01-10","to":"2026-03-10"},"dates":[],"timezone":"Europe/London"}}]}
+            """)
         #expect(response.templates.map(\.name) == ["Weekends"])
         #expect(response.templates.matching(savedWeekend())?.id == "t1")
     }

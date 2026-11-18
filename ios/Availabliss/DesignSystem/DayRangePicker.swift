@@ -84,7 +84,9 @@ struct DayRangePicker: View {
             let isEndpoint = isStart || isEnd
             let inRange = range?.contains(day) ?? false
             let isDisabled = earliest.map { day < $0 } ?? false
-            Button { tap(day) } label: {
+            Button {
+                tap(day)
+            } label: {
                 Text("\(day.day)")
                     .bodyFont(15, .semibold)
                     .monospacedDigit()

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Ported from Android `DaySummaryTest` and `MyTimeViewsTest` (free minutes and levels).
@@ -15,7 +16,9 @@ struct DaySummaryTests {
         DaySummary.describe(DaySummary.longestFree(DaySummary.merge(busy)))
     }
 
-    private func busy(_ start: String, _ end: String, _ source: BusyInterval.Source = .calendar, label: String? = nil, title: String? = nil, ignored: Bool = false) -> BusyInterval {
+    private func busy(_ start: String, _ end: String, _ source: BusyInterval.Source = .calendar, label: String? = nil, title: String? = nil, ignored: Bool = false)
+        -> BusyInterval
+    {
         BusyInterval(
             start: Fixtures.date(start), end: Fixtures.date(end), source: source, label: label, calendarId: source == .calendar ? "c" : nil,
             blockId: source == .manual ? "b" : nil, ignoreId: ignored ? "i" : nil, title: title
@@ -76,10 +79,11 @@ struct DaySummaryTests {
             busy("2026-11-17T22:00:00Z", "2026-11-17T23:00:00Z", ignored: true)
         )
         // Calendar busy first, so your blocks draw on top.
-        #expect(summary.segments == [
-            DaySummary.Segment(from: h(9), to: h(17), manual: false),
-            DaySummary.Segment(from: h(19), to: h(21, 30), manual: true),
-        ])
+        #expect(
+            summary.segments == [
+                DaySummary.Segment(from: h(9), to: h(17), manual: false),
+                DaySummary.Segment(from: h(19), to: h(21, 30), manual: true),
+            ])
         #expect(summary.busy == [h(9)...h(17), h(19)...h(21, 30)])
         // 06:00 – 09:00 is the longest free stretch.
         #expect(summary.text == "Free until 09:00")

@@ -49,7 +49,7 @@ enum APIError: LocalizedError, Sendable, Equatable {
     var errorDescription: String? {
         switch self {
         case .unauthorized(let m), .upgradeRequired(let m), .forbidden(let m), .notFound(let m), .conflict(let m),
-             .rateLimited(let m), .server(let m), .http(_, let m), .mergeCandidate(_, let m):
+            .rateLimited(let m), .server(let m), .http(_, let m), .mergeCandidate(_, let m):
             m
         case .validation(let m, let issues):
             issues.isEmpty ? m : issues.map(\.message).joined(separator: "\n")

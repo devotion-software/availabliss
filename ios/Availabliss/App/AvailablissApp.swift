@@ -16,7 +16,8 @@ struct AvailablissApp: App {
                 }
                 .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                     if let url = activity.webpageURL,
-                       let link = DeepLink(url: url, associatedHost: delegate.app.config.associatedDomainHost) {
+                        let link = DeepLink(url: url, associatedHost: delegate.app.config.associatedDomainHost)
+                    {
                         delegate.app.open(link)
                     }
                 }

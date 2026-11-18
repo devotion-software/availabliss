@@ -184,14 +184,16 @@ struct InviteRecipientsField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            InputField(placeholder: "Email or username", text: Binding(get: { draft.text }, set: { draft.setText($0) }),
-                       height: 48, cornerRadius: 14)
-                .keyboardType(.emailAddress)
-                .textContentType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.next)
-                .onSubmit { Task { await draft.add() } }
+            InputField(
+                placeholder: "Email or username", text: Binding(get: { draft.text }, set: { draft.setText($0) }),
+                height: 48, cornerRadius: 14
+            )
+            .keyboardType(.emailAddress)
+            .textContentType(.emailAddress)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.next)
+            .onSubmit { Task { await draft.add() } }
             feedback
             if !draft.recipients.isEmpty {
                 VStack(spacing: 0) {

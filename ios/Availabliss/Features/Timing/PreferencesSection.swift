@@ -21,8 +21,12 @@ struct PreferencesSection: View {
             HStack {
                 Label("Preferred times", systemImage: "heart").bodyFont(16, .semibold).foregroundStyle(theme.ink)
                 Spacer()
-                Button { adding = true } label: { Label("Add", systemImage: "plus") }
-                    .buttonStyle(.glassPill)
+                Button {
+                    adding = true
+                } label: {
+                    Label("Add", systemImage: "plus")
+                }
+                .buttonStyle(.glassPill)
             }
             Text("Say when you\u{2019}d rather meet. It never rules a date out: times that work and fit someone\u{2019}s preference are marked with a heart.")
                 .bodyFont(13, relativeTo: .subheadline)
@@ -127,7 +131,9 @@ private struct AddPreferenceSheet: View {
                 }
                 SegmentedControl(
                     selection: $timing,
-                    options: [SegmentOption(value: .any, label: "Any time"), SegmentOption(value: .after, label: "After"), SegmentOption(value: .between, label: "Between")],
+                    options: [
+                        SegmentOption(value: .any, label: "Any time"), SegmentOption(value: .after, label: "After"), SegmentOption(value: .between, label: "Between"),
+                    ],
                     accessibilityLabel: "Time of day"
                 )
                 if timing != .any {
@@ -164,11 +170,12 @@ private struct AddPreferenceSheet: View {
             guard let dates else { return }
             body = NewGroupPreference(kind: .dates, from: dates.from.description, to: dates.to.description)
         case .weekly:
-            let window: GroupPreference.Window? = switch timing {
-            case .any: nil
-            case .after: .init(from: WallTime(from).description, to: "23:59")
-            case .between: .init(from: WallTime(from).description, to: WallTime(to).description)
-            }
+            let window: GroupPreference.Window? =
+                switch timing {
+                case .any: nil
+                case .after: .init(from: WallTime(from).description, to: "23:59")
+                case .between: .init(from: WallTime(from).description, to: WallTime(to).description)
+                }
             body = NewGroupPreference(kind: .weekly, days: days.sorted(), window: window)
         }
         do {

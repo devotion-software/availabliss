@@ -65,12 +65,15 @@ struct GroupSettingsView: View {
         .onAppear { myName = myNameInGroup ?? "" }
         .onChange(of: myNameInGroup) { old, new in if myName == (old ?? "") { myName = new ?? "" } }
         .sheet(isPresented: $confirmsDelete) { deleteSheet }
-        .sheet(isPresented: $confirmsLeave, onDismiss: {
-            if deletesAfterLeaveSheet {
-                deletesAfterLeaveSheet = false
-                confirmsDelete = true
+        .sheet(
+            isPresented: $confirmsLeave,
+            onDismiss: {
+                if deletesAfterLeaveSheet {
+                    deletesAfterLeaveSheet = false
+                    confirmsDelete = true
+                }
             }
-        }) { leaveSheet }
+        ) { leaveSheet }
         .errorAlert($error)
         .toast($toast)
     }
@@ -82,11 +85,17 @@ struct GroupSettingsView: View {
         HStack(spacing: 14) {
             if canEdit {
                 Menu {
-                    Button { showsPhotoPicker = true } label: {
+                    Button {
+                        showsPhotoPicker = true
+                    } label: {
                         Label(group.image == nil ? "Add photo" : "Change photo", systemImage: "photo")
                     }
                     if group.image != nil {
-                        Button(role: .destructive) { setPhoto(nil) } label: { Label("Remove photo", systemImage: "trash") }
+                        Button(role: .destructive) {
+                            setPhoto(nil)
+                        } label: {
+                            Label("Remove photo", systemImage: "trash")
+                        }
                     }
                 } label: {
                     tile.overlay(alignment: .bottomTrailing) { cameraBadge }
@@ -221,12 +230,14 @@ struct GroupSettingsView: View {
         GlassPanel(cornerRadius: 24) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Your name in this group").bodyFont(15, .semibold)
-                Text(myNameInGroup == nil
-                     ? "\(group.name) sees you as \(accountName), your account name. Choose another name just for this group."
-                     : "Only \(group.name) sees this. Everywhere else you\u{2019}re \(accountName).")
-                    .bodyFont(13, relativeTo: .subheadline)
-                    .foregroundStyle(theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    myNameInGroup == nil
+                        ? "\(group.name) sees you as \(accountName), your account name. Choose another name just for this group."
+                        : "Only \(group.name) sees this. Everywhere else you\u{2019}re \(accountName)."
+                )
+                .bodyFont(13, relativeTo: .subheadline)
+                .foregroundStyle(theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
                 InputField(placeholder: accountName, text: $myName)
@@ -234,7 +245,9 @@ struct GroupSettingsView: View {
                     .submitLabel(.done)
                     .onSubmit { saveMyName(myNameToSave) }
                 if myNameChanged {
-                    Button { saveMyName(myNameToSave) } label: {
+                    Button {
+                        saveMyName(myNameToSave)
+                    } label: {
                         LoadingLabel(title: "Save", isLoading: isSavingMyName)
                     }
                     .buttonStyle(.filled(.accent, height: 50, cornerRadius: 16, fontSize: 15, fullWidth: false))
@@ -309,9 +322,13 @@ struct GroupSettingsView: View {
             .disabled(isSavingRhythm)
             if let rhythm = group.rhythm {
                 Divider().overlay(theme.line).padding(.vertical, 2)
-                Toggle(isOn: Binding(get: { rhythm.prompt }, set: { on in
-                    setRhythm(Group.Rhythm(every: rhythm.every, prompt: on))
-                })) {
+                Toggle(
+                    isOn: Binding(
+                        get: { rhythm.prompt },
+                        set: { on in
+                            setRhythm(Group.Rhythm(every: rhythm.every, prompt: on))
+                        })
+                ) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Suggest the next one in the chat").bodyFont(15, .semibold)
                         Text("Once a plan has ended and nothing newer is planned, it posts the best time for the next one.")
@@ -355,12 +372,14 @@ struct GroupSettingsView: View {
         GlassPanel(cornerRadius: 24) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(group.isArchived ? "Archived" : "Archive").bodyFont(15, .semibold)
-                Text(group.isArchived
-                     ? "It\u{2019}s under Archived on everyone\u{2019}s groups list. Unarchive it to bring it back."
-                     : "Moves it to Archived at the bottom of everyone\u{2019}s groups list. Nothing is deleted, and you can unarchive it any time.")
-                    .bodyFont(13, relativeTo: .subheadline)
-                    .foregroundStyle(theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    group.isArchived
+                        ? "It\u{2019}s under Archived on everyone\u{2019}s groups list. Unarchive it to bring it back."
+                        : "Moves it to Archived at the bottom of everyone\u{2019}s groups list. Nothing is deleted, and you can unarchive it any time."
+                )
+                .bodyFont(13, relativeTo: .subheadline)
+                .foregroundStyle(theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
             }
             Button {
                 Task {
@@ -370,8 +389,9 @@ struct GroupSettingsView: View {
                     if await update(UpdateGroupBody(archived: archive)) { toast = archive ? "Group archived" : "Group unarchived" }
                 }
             } label: {
-                LoadingLabel(title: group.isArchived ? "Unarchive group" : "Archive group",
-                             systemImage: group.isArchived ? "tray.and.arrow.up" : "archivebox", isLoading: isArchiving)
+                LoadingLabel(
+                    title: group.isArchived ? "Unarchive group" : "Archive group",
+                    systemImage: group.isArchived ? "tray.and.arrow.up" : "archivebox", isLoading: isArchiving)
             }
             .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
             .disabled(isArchiving)
@@ -411,7 +431,9 @@ struct GroupSettingsView: View {
                     .foregroundStyle(theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Button { confirmsLeave = true } label: {
+            Button {
+                confirmsLeave = true
+            } label: {
                 Label("Leave group", systemImage: "rectangle.portrait.and.arrow.right")
             }
             .buttonStyle(.filled(.warning, height: 44, cornerRadius: 14, fontSize: 14))
@@ -426,16 +448,20 @@ struct GroupSettingsView: View {
 
     @ViewBuilder private var leaveSheet: some View {
         if let me = app.session.user?.id {
-            LeaveGroupSheet(group: group, me: me, api: detail.api, onMemberUpdated: { member in
-                var updated = group
-                if let index = updated.members.firstIndex(where: { $0.userId == member.userId }) { updated.members[index] = member }
-                detail.update(updated)
-            }, onLeft: {
-                app.router.closeGroup(group.id)
-            }, onDeleteInstead: {
-                deletesAfterLeaveSheet = true
-                confirmsLeave = false
-            })
+            LeaveGroupSheet(
+                group: group, me: me, api: detail.api,
+                onMemberUpdated: { member in
+                    var updated = group
+                    if let index = updated.members.firstIndex(where: { $0.userId == member.userId }) { updated.members[index] = member }
+                    detail.update(updated)
+                },
+                onLeft: {
+                    app.router.closeGroup(group.id)
+                },
+                onDeleteInstead: {
+                    deletesAfterLeaveSheet = true
+                    confirmsLeave = false
+                })
         }
     }
 
@@ -451,7 +477,9 @@ struct GroupSettingsView: View {
                     .foregroundStyle(theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Button { confirmsDelete = true } label: {
+            Button {
+                confirmsDelete = true
+            } label: {
                 Label("Delete group", systemImage: "trash")
             }
             .buttonStyle(.filled(.warning, height: 44, cornerRadius: 14, fontSize: 14))

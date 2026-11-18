@@ -33,8 +33,12 @@ struct LeaveGroupSheet: View {
             if others.isEmpty {
                 caption("Nobody else is in \(group.name), so there\u{2019}s no one to hand it to. Delete the group instead if you\u{2019}re done with it.")
                 if myRole == .owner {
-                    Button { onDeleteInstead() } label: { Label("Delete group", systemImage: "trash") }
-                        .buttonStyle(.filled(.warning))
+                    Button {
+                        onDeleteInstead()
+                    } label: {
+                        Label("Delete group", systemImage: "trash")
+                    }
+                    .buttonStyle(.filled(.warning))
                 }
                 Button("Cancel") { dismiss() }.buttonStyle(.filled(.secondary))
             } else if needsAdmin {
@@ -84,7 +88,9 @@ struct LeaveGroupSheet: View {
     private func picker(_ members: [Member]) -> some View {
         VStack(spacing: 0) {
             ForEach(members) { member in
-                Button { picked = member.userId } label: {
+                Button {
+                    picked = member.userId
+                } label: {
                     HStack(spacing: 12) {
                         Avatar(name: member.name, imageURL: member.image, color: theme.tile(forUser: member.userId))
                         Text(member.name).bodyFont(15, .semibold).lineLimit(1)

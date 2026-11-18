@@ -79,13 +79,14 @@ enum RequirementLength: Codable, Sendable, Equatable {
         case "days":
             self = .days(count: try container.decode(Int.self, forKey: .count))
         case "span":
-            self = .span(Span(
-                startDay: try container.decode(Int.self, forKey: .startDay),
-                startTime: try container.decode(WallTime.self, forKey: .startTime),
-                endDay: try container.decode(Int.self, forKey: .endDay),
-                endTime: try container.decode(WallTime.self, forKey: .endTime),
-                weeksLater: try container.decode(Int.self, forKey: .weeksLater)
-            ))
+            self = .span(
+                Span(
+                    startDay: try container.decode(Int.self, forKey: .startDay),
+                    startTime: try container.decode(WallTime.self, forKey: .startTime),
+                    endDay: try container.decode(Int.self, forKey: .endDay),
+                    endTime: try container.decode(WallTime.self, forKey: .endTime),
+                    weeksLater: try container.decode(Int.self, forKey: .weeksLater)
+                ))
         case let other:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown length type \(other)")
         }

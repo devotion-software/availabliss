@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Swift Testing has an `Attachment` too.
@@ -37,10 +38,12 @@ struct ChatModelTests {
     }
 
     @Test func anEditedOrDeletedMessageDecodes() throws {
-        let m = try Fixtures.decode(Message.self, """
-        {"id":"1","groupId":"g","authorId":"me","kind":"text","body":null,"poll":null,"proposalId":null,"eventId":null,
-         "createdAt":"2026-11-16T12:00:00.000Z","editedAt":"2026-11-16T12:05:00.000Z","deleted":true,"receipt":null}
-        """)
+        let m = try Fixtures.decode(
+            Message.self,
+            """
+            {"id":"1","groupId":"g","authorId":"me","kind":"text","body":null,"poll":null,"proposalId":null,"eventId":null,
+             "createdAt":"2026-11-16T12:00:00.000Z","editedAt":"2026-11-16T12:05:00.000Z","deleted":true,"receipt":null}
+            """)
         #expect(m.isDeleted)
         #expect(m.body == nil)
         #expect(m.editedAt == Fixtures.date("2026-11-16T12:05:00Z"))
@@ -69,7 +72,8 @@ struct ChatModelTests {
     }
 
     @Test func unknownAttachmentKindsShowAsFiles() throws {
-        let a = try Fixtures.decode(Attachment.self, #"{"id":"x","kind":"hologram","name":"x.holo","mime":"application/x","size":1,"width":null,"height":null,"url":"u","thumbnailUrl":null}"#)
+        let a = try Fixtures.decode(
+            Attachment.self, #"{"id":"x","kind":"hologram","name":"x.holo","mime":"application/x","size":1,"width":null,"height":null,"url":"u","thumbnailUrl":null}"#)
         #expect(a.kind == .file)
         #expect(!a.isVisual)
         #expect(a.aspectRatio == nil)
@@ -77,13 +81,15 @@ struct ChatModelTests {
     }
 
     @Test func walletPassesDecodeAndAreSummarised() throws {
-        let a = try Fixtures.decode(Attachment.self, """
-        {"id":"w","kind":"pass","name":"Gig.pkpass","mime":"application/vnd.apple.pkpass","size":1882,"width":null,"height":null,"url":"u","thumbnailUrl":"logo",
-         "pass":{"style":"eventTicket","organizationName":"Roundhouse","description":"Concert ticket","logoText":null,"passTypeIdentifier":"p","serialNumber":"s",
-         "relevantDate":"2026-12-02T00:30:00.000Z","expirationDate":null,"voided":false,"eventName":"Winter Gig","venue":"Roundhouse, London",
-         "fields":[{"label":"Event","value":"Winter Gig","date":false},{"label":"Seat","value":"12A","date":false}],
-         "backgroundColor":"#201840","foregroundColor":"#ffffff","labelColor":null,"count":1,"future":true}}
-        """)
+        let a = try Fixtures.decode(
+            Attachment.self,
+            """
+            {"id":"w","kind":"pass","name":"Gig.pkpass","mime":"application/vnd.apple.pkpass","size":1882,"width":null,"height":null,"url":"u","thumbnailUrl":"logo",
+             "pass":{"style":"eventTicket","organizationName":"Roundhouse","description":"Concert ticket","logoText":null,"passTypeIdentifier":"p","serialNumber":"s",
+             "relevantDate":"2026-12-02T00:30:00.000Z","expirationDate":null,"voided":false,"eventName":"Winter Gig","venue":"Roundhouse, London",
+             "fields":[{"label":"Event","value":"Winter Gig","date":false},{"label":"Seat","value":"12A","date":false}],
+             "backgroundColor":"#201840","foregroundColor":"#ffffff","labelColor":null,"count":1,"future":true}}
+            """)
         #expect(a.kind == .pass)
         #expect(!a.isVisual)
         #expect(a.pass?.eventName == "Winter Gig")
@@ -169,10 +175,12 @@ struct ChatModelTests {
         #expect(m.asReplyPreview(authorName: nil).text == "📍 Dishoom Shoreditch")
         #expect(MessageLocation(lat: 0, lng: 0).summary == "📍 Location")
         #expect(Self.message("2", deleted: true, location: dishoom).place == nil)
-        let decoded = try Fixtures.decode(Message.self, """
-        {"id":"1","groupId":"g","authorId":"me","kind":"text","body":"📍 Location","createdAt":"2026-11-16T12:00:00.000Z",
-         "location":{"lat":51.5,"lng":-0.07,"accuracy":12.5}}
-        """)
+        let decoded = try Fixtures.decode(
+            Message.self,
+            """
+            {"id":"1","groupId":"g","authorId":"me","kind":"text","body":"📍 Location","createdAt":"2026-11-16T12:00:00.000Z",
+             "location":{"lat":51.5,"lng":-0.07,"accuracy":12.5}}
+            """)
         #expect(decoded.place?.accuracy == 12.5)
         #expect(decoded.place?.name == nil)
     }
@@ -193,12 +201,14 @@ struct ChatModelTests {
     // MARK: Polls
 
     private func poll(_ votes: [Int], slots: Bool = false) -> Poll {
-        Poll(id: "q", question: "When?", multi: true, closed: false, options: votes.enumerated().map { i, count in
-            Poll.Option(
-                id: "o\(i)", label: "Option \(i)", voterIds: (0..<count).map { "u\($0)" },
-                slot: slots ? PollSlot(start: Fixtures.date("2026-11-2\(i)T18:00:00Z"), end: Fixtures.date("2026-11-2\(i)T22:00:00Z"), allDay: false) : nil
-            )
-        })
+        Poll(
+            id: "q", question: "When?", multi: true, closed: false,
+            options: votes.enumerated().map { i, count in
+                Poll.Option(
+                    id: "o\(i)", label: "Option \(i)", voterIds: (0..<count).map { "u\($0)" },
+                    slot: slots ? PollSlot(start: Fixtures.date("2026-11-2\(i)T18:00:00Z"), end: Fixtures.date("2026-11-2\(i)T22:00:00Z"), allDay: false) : nil
+                )
+            })
     }
 
     @Test func theLeaderHasTheMostVotesAndTheEarliestWinsATie() {
@@ -211,7 +221,8 @@ struct ChatModelTests {
     @Test func datePollsHaveSlots() throws {
         #expect(!poll([1, 2]).isDatePoll)
         #expect(poll([1, 2], slots: true).isDatePoll)
-        let option = try Fixtures.decode(Poll.Option.self, #"{"id":"o","label":"Fri","voterIds":[],"slot":{"start":"2026-11-20T18:00:00Z","end":"2026-11-20T22:00:00Z"}}"#)
+        let option = try Fixtures.decode(
+            Poll.Option.self, #"{"id":"o","label":"Fri","voterIds":[],"slot":{"start":"2026-11-20T18:00:00Z","end":"2026-11-20T22:00:00Z"}}"#)
         // Older servers leave out allDay.
         #expect(option.slot?.allDay == false)
         #expect(option.slot?.draft.start == Fixtures.date("2026-11-20T18:00:00Z"))

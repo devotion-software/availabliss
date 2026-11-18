@@ -18,8 +18,8 @@ struct AppleSignIn {
 
         let authorization = try await AuthorizationRunner().perform([request])
         guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-              let tokenData = credential.identityToken,
-              let token = String(data: tokenData, encoding: .utf8)
+            let tokenData = credential.identityToken,
+            let token = String(data: tokenData, encoding: .utf8)
         else { throw AuthFlowError.invalidServerResponse }
         return Result(identityToken: token, rawNonce: rawNonce)
     }

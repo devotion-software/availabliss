@@ -130,12 +130,14 @@ struct WhoNeedsToBeFreeSection: View {
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            Text(model.usesQuorum
-                 ? "A time works when enough of you are free. We'll show who's missing."
-                 : "A time works only when everyone who isn't optional is free.")
-                .bodyFont(12, relativeTo: .caption)
-                .foregroundStyle(theme.muted)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                model.usesQuorum
+                    ? "A time works when enough of you are free. We'll show who's missing."
+                    : "A time works only when everyone who isn't optional is free."
+            )
+            .bodyFont(12, relativeTo: .caption)
+            .foregroundStyle(theme.muted)
+            .fixedSize(horizontal: false, vertical: true)
             if !members.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(Array(members.enumerated()), id: \.element.id) { index, member in

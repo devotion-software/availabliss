@@ -176,9 +176,11 @@ struct WeekCards: View {
     var body: some View {
         VStack(spacing: 8) {
             ForEach(model.weekDays, id: \.self) { day in
-                WeekDayCard(day: day, detail: model.dayDetails[day], status: model.day(day)?.status, works: model.works(day), group: group, isSelected: day == model.selectedDay)
-                    .onTapGesture { withAnimation(.spring(response: 0.3)) { model.pick(day) } }
-                    .accessibilityAddTraits(day == model.selectedDay ? [.isButton, .isSelected] : .isButton)
+                WeekDayCard(
+                    day: day, detail: model.dayDetails[day], status: model.day(day)?.status, works: model.works(day), group: group, isSelected: day == model.selectedDay
+                )
+                .onTapGesture { withAnimation(.spring(response: 0.3)) { model.pick(day) } }
+                .accessibilityAddTraits(day == model.selectedDay ? [.isButton, .isSelected] : .isButton)
             }
         }
     }
@@ -346,14 +348,17 @@ struct DayTimeline: View {
                     ForEach(detail.everyoneFree, id: \.self) { span in
                         let left = axis.fraction(span.start, on: date) * width
                         let right = axis.fraction(span.end, on: date) * width
-                        Text(span.end >= date.adding(days: 1).startDate() ? "\(Formatting.time(span.start)) – late" : "\(Formatting.time(span.start)) – \(Formatting.time(span.end))")
-                            .bodyFont(11, .semibold, relativeTo: .caption2)
-                            .foregroundStyle(theme.onAccent)
-                            .lineLimit(1)
-                            .padding(.leading, 8)
-                            .frame(width: max(0, right - left), height: 30, alignment: .leading)
-                            .background(RoundedRectangle(cornerRadius: 9).fill(theme.accent))
-                            .offset(x: left)
+                        Text(
+                            span.end >= date.adding(days: 1).startDate()
+                                ? "\(Formatting.time(span.start)) – late" : "\(Formatting.time(span.start)) – \(Formatting.time(span.end))"
+                        )
+                        .bodyFont(11, .semibold, relativeTo: .caption2)
+                        .foregroundStyle(theme.onAccent)
+                        .lineLimit(1)
+                        .padding(.leading, 8)
+                        .frame(width: max(0, right - left), height: 30, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 9).fill(theme.accent))
+                        .offset(x: left)
                     }
                 }
                 .accessibilityLabel(everyoneAccessibilityText)
@@ -415,8 +420,8 @@ private struct MemberTrack: View {
                 let left = axis.fraction(busy.start, on: date) * width
                 let right = axis.fraction(busy.end, on: date) * width
                 RoundedRectangle(cornerRadius: 7).fill(theme.busyFill)
-                .frame(width: max(2, right - left), height: 22)
-                .offset(x: left)
+                    .frame(width: max(2, right - left), height: 22)
+                    .offset(x: left)
             }
         }
         .overlay {

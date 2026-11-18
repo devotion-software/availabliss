@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Ported from Android `RepeatLabelsTest`. Blocks are read in the device's calendar, as the app does.
@@ -10,8 +11,9 @@ struct RepeatLabelsTests {
     private func start(_ day: String, _ hour: Int = 7) -> Date { Fixtures.at(Fixtures.day(day), hour) }
 
     @Test func ordinals() {
-        #expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31, 101, 111].map(ManualBlock.Repeat.ordinal)
-            == ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "31st", "101st", "111th"])
+        #expect(
+            [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31, 101, 111].map(ManualBlock.Repeat.ordinal)
+                == ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "31st", "101st", "111th"])
     }
 
     @Test func monthlyWeekdayIsTheLastOneInTheMonthsLastSevenDays() {
@@ -34,16 +36,17 @@ struct RepeatLabelsTests {
     @Test(.enabled(if: TestLocale.isBritish, TestLocale.reason))
     func menuChoicesReadFromTheStartDate() {
         let from = start("2026-11-16")
-        #expect(ManualBlock.Repeat.allCases.map { $0.choice(from: from) } == [
-            "Never",
-            "Every day",
-            "Every weekday (Mon\u{2013}Fri)",
-            "Every week on Monday",
-            "Every 2 weeks on Monday",
-            "Every month on the 16th",
-            "Every month on the 3rd Monday",
-            "Every year on 16 November",
-        ])
+        #expect(
+            ManualBlock.Repeat.allCases.map { $0.choice(from: from) } == [
+                "Never",
+                "Every day",
+                "Every weekday (Mon\u{2013}Fri)",
+                "Every week on Monday",
+                "Every 2 weeks on Monday",
+                "Every month on the 16th",
+                "Every month on the 3rd Monday",
+                "Every year on 16 November",
+            ])
         #expect(ManualBlock.Repeat.unknown.choice(from: from) == "Repeats")
         #expect(ManualBlock.Repeat.monthlyWeekday.choice(from: start("2026-11-30")) == "Every month on the last Monday")
         #expect(ManualBlock.Repeat.monthlyWeekday.choice(from: start("2026-11-24")) == "Every month on the last Tuesday")

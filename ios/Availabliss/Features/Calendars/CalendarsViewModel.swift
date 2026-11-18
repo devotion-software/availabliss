@@ -31,7 +31,7 @@ final class CalendarsViewModel {
         defer { isLoading = false }
         do {
             connections = try await api.send(API.Calendars.list()).connections
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             self.error = error.userMessage
         } catch {}
     }
@@ -69,7 +69,7 @@ final class CalendarsViewModel {
             _ = try await api.send(API.Calendars.completeOAuth(provider: provider, code: complete))
             await load()
             toast = "\(provider.displayName) connected"
-        } catch where error.isCancellation {
+        } catch  where error.isCancellation {
         } catch {
             self.error = error.userMessage
         }
@@ -102,7 +102,7 @@ final class CalendarsViewModel {
             case .reauthRequired: error = "Couldn't sync \(updated.provider.displayName). It needs reconnecting."
             case .error: error = "Couldn't sync \(updated.provider.displayName). Try again in a moment."
             }
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             self.error = error.userMessage
         } catch {}
     }
@@ -121,7 +121,7 @@ final class CalendarsViewModel {
         guard calendarFeed == nil else { return }
         do {
             calendarFeed = try await api.send(API.Me.calendarFeed())
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             self.error = error.userMessage
         } catch {}
     }
@@ -133,7 +133,7 @@ final class CalendarsViewModel {
         do {
             calendarFeed = try await api.send(API.Me.resetCalendarFeed())
             toast = "New link ready"
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             self.error = error.userMessage
         } catch {}
     }

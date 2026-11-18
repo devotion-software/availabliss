@@ -42,12 +42,17 @@ struct ProfileView: View {
         .confirmSheet("Sign out?", isPresented: $confirmsSignOut, message: "You'll need to sign in again to use Availabliss on this device.") {
             [ConfirmOption("Sign out", kind: .destructive) { Task { await app.signOut() } }]
         }
-        .confirmSheet("Delete your account?", isPresented: $confirmsDelete, message: "This removes you from every group and deletes your busy times, blocks and messages. It can't be undone.") {
-            [ConfirmOption("Delete account", systemImage: "trash", kind: .destructive) {
-                Task {
-                    do { try await app.deleteAccount() } catch { self.error = error.userMessage }
+        .confirmSheet(
+            "Delete your account?", isPresented: $confirmsDelete,
+            message: "This removes you from every group and deletes your busy times, blocks and messages. It can't be undone."
+        ) {
+            [
+                ConfirmOption("Delete account", systemImage: "trash", kind: .destructive) {
+                    Task {
+                        do { try await app.deleteAccount() } catch { self.error = error.userMessage }
+                    }
                 }
-            }]
+            ]
         }
         .sheet(isPresented: $editsName) {
             EditNameSheet(initialName: app.session.user?.name ?? "") { toast = "Name updated" }
@@ -71,11 +76,17 @@ struct ProfileView: View {
         let name = app.session.user?.name.trimmingCharacters(in: .whitespaces) ?? ""
         return HStack(spacing: 14) {
             Menu {
-                Button { showsPhotoPicker = true } label: {
+                Button {
+                    showsPhotoPicker = true
+                } label: {
                     Label(app.session.user?.image == nil ? "Add a photo" : "Choose a new photo", systemImage: "photo")
                 }
                 if app.session.user?.image != nil {
-                    Button(role: .destructive) { Task { await setPhoto(nil) } } label: { Label("Remove photo", systemImage: "trash") }
+                    Button(role: .destructive) {
+                        Task { await setPhoto(nil) }
+                    } label: {
+                        Label("Remove photo", systemImage: "trash")
+                    }
                 }
             } label: {
                 Avatar(name: name.isEmpty ? (app.session.user?.email ?? "?") : name, imageURL: app.session.user?.image, color: theme.tiles[0], size: 56)
@@ -109,7 +120,9 @@ struct ProfileView: View {
                 } else {
                     Text(name).displayFont(24, .bold).lineLimit(2).accessibilityAddTraits(.isHeader)
                 }
-                Button { editsUsername = true } label: {
+                Button {
+                    editsUsername = true
+                } label: {
                     Text(app.session.user?.username.map { "@\($0)" } ?? "Choose a username")
                         .bodyFont(14, .semibold, relativeTo: .subheadline)
                         .foregroundStyle(theme.accentInk)
@@ -146,7 +159,9 @@ struct ProfileView: View {
                 app.router.push(.calendars)
             }
             divider
-            SettingsRow(title: "Region", systemImage: "mappin.and.ellipse", value: app.session.user?.country.flatMap { Locale.current.localizedString(forRegionCode: $0) }) {
+            SettingsRow(
+                title: "Region", systemImage: "mappin.and.ellipse", value: app.session.user?.country.flatMap { Locale.current.localizedString(forRegionCode: $0) }
+            ) {
                 app.router.push(.region)
             }
             divider
@@ -169,7 +184,7 @@ struct ProfileView: View {
         do {
             try await app.auth.registerPasskey(name: UIDevice.current.name)
             toast = "Passkey added"
-        } catch where error.isCancellation {
+        } catch  where error.isCancellation {
         } catch {
             self.error = error.userMessage
         }

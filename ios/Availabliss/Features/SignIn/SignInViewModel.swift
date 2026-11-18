@@ -76,7 +76,7 @@ final class SignInViewModel {
         defer { busyMethod = nil }
         do {
             try await work()
-        } catch where error.isCancellation {
+        } catch  where error.isCancellation {
             // User backed out of a system sheet.
         } catch {
             self.error = error.userMessage

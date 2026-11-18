@@ -82,16 +82,19 @@ struct NotificationsCard: View {
 
     /// A compact time picker for one end of quiet hours; `change` builds the new quiet hours from the picked "HH:MM".
     private func timePicker(_ label: String, time: String, change: @escaping (String) -> QuietHours) -> some View {
-        DatePicker(label, selection: Binding(
-            get: { Self.date(from: time) },
-            set: { date in
-                let picked = Self.time(from: date)
-                guard picked != time else { return }
-                let hours = change(picked)
-                lastQuietHours = hours
-                save(NotificationSettingsPatch(quietHours: .some(hours))) { $0.quietHours = hours }
-            }
-        ), displayedComponents: .hourAndMinute)
+        DatePicker(
+            label,
+            selection: Binding(
+                get: { Self.date(from: time) },
+                set: { date in
+                    let picked = Self.time(from: date)
+                    guard picked != time else { return }
+                    let hours = change(picked)
+                    lastQuietHours = hours
+                    save(NotificationSettingsPatch(quietHours: .some(hours))) { $0.quietHours = hours }
+                }
+            ), displayedComponents: .hourAndMinute
+        )
         .datePickerStyle(.compact)
         .labelsHidden()
         .tint(theme.accent)
@@ -124,7 +127,7 @@ struct NotificationsCard: View {
             draft = settings
             if let hours = settings.quietHours { lastQuietHours = hours }
             loadError = nil
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             if draft == nil { loadError = error.userMessage }
         } catch {}
     }

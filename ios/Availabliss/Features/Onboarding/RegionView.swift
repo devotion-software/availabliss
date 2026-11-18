@@ -33,11 +33,13 @@ struct RegionView: View {
                     Text(isOnboarding ? "About you" : "Where are you?")
                         .displayFont(30, .bold)
                         .accessibilityAddTraits(.isHeader)
-                    Text(isOnboarding
-                         ? "Your name is how your groups see you, and people can invite you by your username. Your region sets bank holidays and school term dates."
-                         : "We use this for bank holidays and school term dates, so your groups can plan around them.")
-                        .bodyFont(14)
-                        .foregroundStyle(theme.muted)
+                    Text(
+                        isOnboarding
+                            ? "Your name is how your groups see you, and people can invite you by your username. Your region sets bank holidays and school term dates."
+                            : "We use this for bank holidays and school term dates, so your groups can plan around them."
+                    )
+                    .bodyFont(14)
+                    .foregroundStyle(theme.muted)
                 }
                 if isOnboarding {
                     VStack(alignment: .leading, spacing: 6) {

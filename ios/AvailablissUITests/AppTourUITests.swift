@@ -132,7 +132,8 @@ final class AppTourUITests: XCTestCase {
             let (data, _) = try await URLSession.shared.data(from: components.url!)
             // The code is in the body, not the subject; Mailpit's snippet is the text body.
             if let snippet = try JSONDecoder().decode(Search.self, from: data).messages.first?.Snippet,
-               let match = snippet.firstMatch(of: /\b\d{6}\b/) {
+                let match = snippet.firstMatch(of: /\b\d{6}\b/)
+            {
                 return String(match.output)
             }
             try await Task.sleep(for: .milliseconds(500))
@@ -140,4 +141,3 @@ final class AppTourUITests: XCTestCase {
         throw XCTSkip("No sign-in code arrived in Mailpit for \(email)")
     }
 }
-

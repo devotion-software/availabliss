@@ -96,7 +96,9 @@ final class AttachmentImages {
         inFlight[key] = task
         let image = await task.value
         inFlight[key] = nil
-        if let image { cache.setObject(image, forKey: key as NSString, cost: Int(image.size.width * image.size.height * image.scale * 4) * max(image.images?.count ?? 1, 1)) }
+        if let image {
+            cache.setObject(image, forKey: key as NSString, cost: Int(image.size.width * image.size.height * image.scale * 4) * max(image.images?.count ?? 1, 1))
+        }
         return image
     }
 
@@ -245,7 +247,9 @@ struct AttachmentGallery: View {
     }
 
     private func tile(_ attachment: Attachment, extra: Int) -> some View {
-        Button { openImage(attachment) } label: {
+        Button {
+            openImage(attachment)
+        } label: {
             AttachmentImage(attachment: attachment)
                 .overlay {
                     if extra > 0 {
@@ -373,7 +377,9 @@ struct AttachmentTray: View {
                         UploadRing(progress: upload.progress)
                     }
                 } else if upload.error != nil {
-                    Button { retry(upload) } label: {
+                    Button {
+                        retry(upload)
+                    } label: {
                         ZStack {
                             RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.black.opacity(0.45))
                             Image(systemName: "arrow.clockwise").font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
@@ -384,7 +390,9 @@ struct AttachmentTray: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                Button { remove(upload) } label: {
+                Button {
+                    remove(upload)
+                } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .heavy))
                         .foregroundStyle(theme.onSolid)
@@ -445,7 +453,9 @@ struct AttachmentViewer: View {
         }
         .overlay(alignment: .top) {
             HStack {
-                Button { dismiss() } label: {
+                Button {
+                    dismiss()
+                } label: {
                     Image(systemName: "xmark").font(.system(size: 16, weight: .bold)).frame(width: 44, height: 44)
                 }
                 .accessibilityLabel("Close")
@@ -454,8 +464,12 @@ struct AttachmentViewer: View {
                     Text("\(index + 1) of \(attachments.count)").font(.system(size: 15, weight: .semibold))
                 }
                 Spacer()
-                Button { Task { await share() } } label: {
-                    if isPreparingShare { ProgressView().tint(.white).frame(width: 44, height: 44) } else {
+                Button {
+                    Task { await share() }
+                } label: {
+                    if isPreparingShare {
+                        ProgressView().tint(.white).frame(width: 44, height: 44)
+                    } else {
                         Image(systemName: "square.and.arrow.up").font(.system(size: 17, weight: .semibold)).frame(width: 44, height: 44)
                     }
                 }
@@ -543,7 +557,7 @@ private struct ZoomingScrollView: UIViewRepresentable {
             imageView.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
             imageView.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
-            imageView.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor)
+            imageView.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
         ])
         context.coordinator.imageView = imageView
         if image.images != nil { imageView.startAnimating() }

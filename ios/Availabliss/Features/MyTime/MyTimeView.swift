@@ -76,9 +76,11 @@ struct MyTimeView: View {
         } message: { block in
             "\(block.note ?? "Busy") · \(block.scheduleDescription)"
         } options: { block in
-            [ConfirmOption(block.repeat == .none ? "Remove block" : "Remove every occurrence", systemImage: "trash", kind: .destructive) {
-                Task { await model.remove(block) }
-            }]
+            [
+                ConfirmOption(block.repeat == .none ? "Remove block" : "Remove every occurrence", systemImage: "trash", kind: .destructive) {
+                    Task { await model.remove(block) }
+                }
+            ]
         }
         .toast($toast)
         .errorAlert($model.error)
@@ -151,21 +153,21 @@ struct MyTimeView: View {
     @ViewBuilder
     private var everyWeek: some View {
         if !model.recurringBlocks.isEmpty {
-        VStack(alignment: .leading, spacing: 6) {
-            SectionHeading(title: "Repeating")
-            VStack(spacing: 0) {
-                ForEach(Array(model.recurringBlocks.enumerated()), id: \.element.id) { index, block in
-                    if index > 0 { theme.line.frame(height: 1) }
-                    RecurringBlockRow(block: block) {
-                        draft = BlockDraft(day: CalendarDay(block.start), editing: block)
-                    } onRemove: {
-                        model.pendingRemoval = block
+            VStack(alignment: .leading, spacing: 6) {
+                SectionHeading(title: "Repeating")
+                VStack(spacing: 0) {
+                    ForEach(Array(model.recurringBlocks.enumerated()), id: \.element.id) { index, block in
+                        if index > 0 { theme.line.frame(height: 1) }
+                        RecurringBlockRow(block: block) {
+                            draft = BlockDraft(day: CalendarDay(block.start), editing: block)
+                        } onRemove: {
+                            model.pendingRemoval = block
+                        }
                     }
                 }
+                .padding(.horizontal, 14)
+                .glass(cornerRadius: 24)
             }
-            .padding(.horizontal, 14)
-            .glass(cornerRadius: 24)
-        }
         }
     }
 }

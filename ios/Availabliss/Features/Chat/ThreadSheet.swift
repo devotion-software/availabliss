@@ -47,7 +47,8 @@ struct ThreadSheet: View {
         .quickLookPreview($previewFile)
         .onDisappear { model.closeThread() }
         .confirmSheet(item: $actionsFor) { message in
-            ReplyNames.name(of: message.authorId, fallback: nil, group: group, me: me) == "You" ? "Your message" : "\(ReplyNames.name(of: message.authorId, fallback: nil, group: group, me: me))\u{2019}s message"
+            ReplyNames.name(of: message.authorId, fallback: nil, group: group, me: me) == "You"
+                ? "Your message" : "\(ReplyNames.name(of: message.authorId, fallback: nil, group: group, me: me))\u{2019}s message"
         } message: { message in
             message.asReplyPreview(authorName: nil).snippet
         } options: { message in

@@ -6,7 +6,7 @@ IMAGE ?= availabliss-web
 .DEFAULT_GOAL := help
 .PHONY: help setup hooks env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test test-integration smoke e2e openapi \
 	seed-demo clean-demo set-plan apple-secret school-holidays \
-	docker-build docker-run ios-project ios-open ios-build ios-test ios-uitest android-build android-test android-tour clean
+	docker-build docker-run ios-project ios-open ios-build ios-test ios-uitest ios-lint ios-format android-build android-test android-tour clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -125,6 +125,16 @@ ios-open: ios-project ## Generate and open the Xcode project
 
 ios-build: ios-project ## Build the iOS app for the simulator (IOS_SIM="iPhone 18 Pro")
 	$(IOS_BUILD) build
+
+# swift-format ships with Xcode (16+); the style is ios/.swift-format (see ios/README.md).
+IOS_SOURCES := ios/Availabliss ios/AvailablissTests ios/AvailablissUITests ios/AvailablissWidgets ios/Shared
+SWIFT_FORMAT := $(XCODE_ENV) xcrun swift-format
+
+ios-lint: ## Check the iOS Swift sources' formatting and lint rules (swift-format)
+	$(SWIFT_FORMAT) lint --strict --recursive --parallel $(IOS_SOURCES)
+
+ios-format: ## Format the iOS Swift sources in place (swift-format)
+	$(SWIFT_FORMAT) format --in-place --recursive --parallel $(IOS_SOURCES)
 
 # In English (UK), so the tests that check dates and times word for word run (see AvailablissTests/Support/TestLocale.swift).
 ios-test: ios-project ## Run the iOS unit tests in the simulator (IOS_SIM="iPhone 18 Pro")

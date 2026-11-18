@@ -199,7 +199,8 @@ struct WalletPassCard: View {
             do {
                 adding = PassToAdd(pass: try await store.pass(for: attachment))
             } catch let error as URLError {
-                self.error = error.code == .notConnectedToInternet
+                self.error =
+                    error.code == .notConnectedToInternet
                     ? "Check your connection and try again."
                     : "The pass couldn't be downloaded. Try again."
             } catch {

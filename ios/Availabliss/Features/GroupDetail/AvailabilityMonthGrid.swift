@@ -177,9 +177,12 @@ struct DayCell: View {
     private var shape: UnevenRoundedRectangle {
         let big: CGFloat = 16, small: CGFloat = 5
         switch info?.slotPosition {
-        case .start: return UnevenRoundedRectangle(topLeadingRadius: big, bottomLeadingRadius: big, bottomTrailingRadius: small, topTrailingRadius: small, style: .continuous)
-        case .middle: return UnevenRoundedRectangle(topLeadingRadius: small, bottomLeadingRadius: small, bottomTrailingRadius: small, topTrailingRadius: small, style: .continuous)
-        case .end: return UnevenRoundedRectangle(topLeadingRadius: small, bottomLeadingRadius: small, bottomTrailingRadius: big, topTrailingRadius: big, style: .continuous)
+        case .start:
+            return UnevenRoundedRectangle(topLeadingRadius: big, bottomLeadingRadius: big, bottomTrailingRadius: small, topTrailingRadius: small, style: .continuous)
+        case .middle:
+            return UnevenRoundedRectangle(topLeadingRadius: small, bottomLeadingRadius: small, bottomTrailingRadius: small, topTrailingRadius: small, style: .continuous)
+        case .end:
+            return UnevenRoundedRectangle(topLeadingRadius: small, bottomLeadingRadius: small, bottomTrailingRadius: big, topTrailingRadius: big, style: .continuous)
         default: return UnevenRoundedRectangle(topLeadingRadius: big, bottomLeadingRadius: big, bottomTrailingRadius: big, topTrailingRadius: big, style: .continuous)
         }
     }

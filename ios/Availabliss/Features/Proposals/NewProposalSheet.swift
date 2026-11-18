@@ -182,7 +182,7 @@ struct NewProposalSheet: View {
         do {
             try await Task.sleep(for: .milliseconds(250))
             busyIds = try await api.send(API.Groups.conflicts(groupId: groupId, start: span.start, end: span.end)).busyMemberIds
-        } catch where error.isCancellation {
+        } catch  where error.isCancellation {
             // Superseded by a newer time.
         } catch {
             busyIds = []
@@ -197,10 +197,13 @@ struct NewProposalSheet: View {
             return trimmed.isEmpty ? nil : trimmed
         }
         do {
-            let proposal = try await api.send(API.Proposals.create(groupId: groupId, CreateProposalBody(
-                start: span.start, end: span.end, allDay: draft.allDay,
-                title: clean(title), location: clean(location), note: clean(note)
-            )))
+            let proposal = try await api.send(
+                API.Proposals.create(
+                    groupId: groupId,
+                    CreateProposalBody(
+                        start: span.start, end: span.end, allDay: draft.allDay,
+                        title: clean(title), location: clean(location), note: clean(note)
+                    )))
             dismiss()
             onCreated(proposal)
         } catch {

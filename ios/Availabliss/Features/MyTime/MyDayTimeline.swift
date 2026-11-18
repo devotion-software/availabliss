@@ -192,7 +192,9 @@ private struct BusyBox: View {
     private var accessibilityText: String {
         let label = piece.interval.label
         let event = piece.interval.title.map { "\($0), " } ?? ""
-        let what = isManual ? "Blocked by you\(label.map { ": \($0)" } ?? "")"
+        let what =
+            isManual
+            ? "Blocked by you\(label.map { ": \($0)" } ?? "")"
             : piece.interval.isIgnored ? "Marked not busy, \(event)from \(label ?? "a calendar")" : "\(event)busy from \(label ?? "a calendar")"
         let edit = isManual ? "Edit: " : ""
         return "\(edit)\(what), \(Formatting.longDay(piece.day.startDate())) \(DayLayout.clock(piece.from)) to \(DayLayout.clock(piece.to))"
@@ -222,7 +224,11 @@ struct AllDayChip: View {
             .opacity(interval.isIgnored ? 0.55 : 1)
             .contentShape(shape)
             .onTapGesture(perform: onTap)
-            .accessibilityLabel(isManual ? "Edit: blocked by you all day, \(interval.label ?? "Busy")" : "\(interval.title.map { "\($0), " } ?? "")busy all day from \(interval.label ?? "a calendar")")
+            .accessibilityLabel(
+                isManual
+                    ? "Edit: blocked by you all day, \(interval.label ?? "Busy")"
+                    : "\(interval.title.map { "\($0), " } ?? "")busy all day from \(interval.label ?? "a calendar")"
+            )
             .accessibilityAddTraits(.isButton)
     }
 }

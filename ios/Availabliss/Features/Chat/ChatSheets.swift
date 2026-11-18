@@ -32,7 +32,8 @@ struct MessageInfoSheet: View {
                     ReceiptSection(title: "Seen by", seen: true, rows: info.seen.map { ($0.userId, Formatting.time($0.at)) }, group: group)
                 }
                 if !info.delivered.isEmpty {
-                    ReceiptSection(title: "Delivered to, not seen yet", seen: false, rows: info.delivered.map { ($0.userId, "Delivered \(Formatting.time($0.at))") }, group: group)
+                    ReceiptSection(
+                        title: "Delivered to, not seen yet", seen: false, rows: info.delivered.map { ($0.userId, "Delivered \(Formatting.time($0.at))") }, group: group)
                 }
                 if !info.pending.isEmpty {
                     ReceiptSection(title: "Not delivered yet", seen: false, rows: info.pending.map { ($0, "Pending") }, group: group)

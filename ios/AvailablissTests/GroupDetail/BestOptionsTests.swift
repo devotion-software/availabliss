@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// "Best options" on a group's calendar, and the "most of us are free" wording. Ported from Android
@@ -13,17 +14,17 @@ struct BestOptionsTests {
         let date = String(format: "2026-11-%02d", day)
         func list(_ ids: [String]) -> String { "[" + ids.map { "\"\($0)\"" }.joined(separator: ",") + "]" }
         return """
-        {"start":"\(date)T18:00:00Z","end":"\(date)T22:00:00Z","label":"Day \(day)","preferredBy":\(list(preferredBy)),
-         "missingMemberIds":\(list(missing)),"score":\(score.map { "\($0)" } ?? "null"),"fairFor":\(list(fairFor))}
-        """
+            {"start":"\(date)T18:00:00Z","end":"\(date)T22:00:00Z","label":"Day \(day)","preferredBy":\(list(preferredBy)),
+             "missingMemberIds":\(list(missing)),"score":\(score.map { "\($0)" } ?? "null"),"fairFor":\(list(fairFor))}
+            """
     }
 
     /// Loads a month whose slots are `slots`, through a stubbed API.
     private func viewModel(_ slots: [String]) async -> GroupAvailabilityViewModel {
         let availability = """
-        {"from":"2026-11-01","to":"2026-11-30","visibleWeekdays":[],"days":[],"slots":[\(slots.joined(separator: ","))],
-         "syncedCount":4,"memberCount":4,"pendingMemberIds":[]}
-        """
+            {"from":"2026-11-01","to":"2026-11-30","visibleWeekdays":[],"days":[],"slots":[\(slots.joined(separator: ","))],
+             "syncedCount":4,"memberCount":4,"pendingMemberIds":[]}
+            """
         let api = Fixtures.api { request in
             request.url?.path.hasSuffix("/availability") == true ? .json(availability) : .notFound
         }
@@ -75,13 +76,15 @@ struct BestOptionsTests {
     }
 
     @Test func olderServersDecodeWithoutTheNewFields() throws {
-        let availability = try Fixtures.decode(Availability.self, """
-        {"from":"2026-11-01","to":"2026-11-30","visibleWeekdays":[4,5,6],
-         "days":[{"date":"2026-11-13","status":"match","busyMemberIds":[],"slotPosition":"start","holiday":null},
-                 {"date":"2026-11-14","status":"match","busyMemberIds":["tom"],"slotPosition":"end","holiday":null,"partial":true}],
-         "slots":[{"start":"2026-11-13T18:00:00Z","end":"2026-11-15T23:59:00Z","label":"Fri 13 – Sun 15 Nov"}],
-         "syncedCount":3,"memberCount":4,"pendingMemberIds":["leo"]}
-        """)
+        let availability = try Fixtures.decode(
+            Availability.self,
+            """
+            {"from":"2026-11-01","to":"2026-11-30","visibleWeekdays":[4,5,6],
+             "days":[{"date":"2026-11-13","status":"match","busyMemberIds":[],"slotPosition":"start","holiday":null},
+                     {"date":"2026-11-14","status":"match","busyMemberIds":["tom"],"slotPosition":"end","holiday":null,"partial":true}],
+             "slots":[{"start":"2026-11-13T18:00:00Z","end":"2026-11-15T23:59:00Z","label":"Fri 13 – Sun 15 Nov"}],
+             "syncedCount":3,"memberCount":4,"pendingMemberIds":["leo"]}
+            """)
         #expect(availability.slots.first?.missingCount == 0)
         #expect(availability.slots.first?.score == nil)
         #expect(availability.day(Fixtures.day("2026-11-13"))?.isPartial == false)

@@ -60,7 +60,7 @@ struct CalendarDay: Hashable, Comparable, Sendable, Codable, CustomStringConvert
 
     /// API weekday: 0 = Monday … 6 = Sunday.
     func weekday(calendar: Calendar = .current) -> Int {
-        let gregorian = calendar.component(.weekday, from: startDate(calendar: calendar)) // 1 = Sunday
+        let gregorian = calendar.component(.weekday, from: startDate(calendar: calendar))  // 1 = Sunday
         return (gregorian + 5) % 7
     }
 

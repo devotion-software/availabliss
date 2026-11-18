@@ -96,7 +96,7 @@ struct PlannerSheet: View {
         let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             result = try await ask(trimmed.isEmpty ? nil : trimmed)
-        } catch where error.isCancellation {
+        } catch  where error.isCancellation {
         } catch {
             // 402 without Pro, 409 when nothing works yet, 429 past the hourly limit: the server's message says which.
             failure = error.userMessage
@@ -197,22 +197,22 @@ extension PlannerResult {
     /// A canned answer for previews (decoded like the real response).
     static let fixture: PlannerResult = {
         let json = """
-        {
-          "best": { "slot": { "start": "2026-11-27T18:00:00.000Z", "end": "2026-11-29T23:59:00.000Z", "label": "Fri 27 – Sun 29 Nov" },
-                    "why": "Everyone's free all weekend and it's before the December rush, so it's the easiest one to lock in." },
-          "alternatives": [
-            { "slot": { "start": "2026-12-04T18:00:00.000Z", "end": "2026-12-06T23:59:00.000Z", "label": "Fri 4 – Sun 6 Dec" },
-              "why": "Also clear for all five, a week later if the 27th feels too soon." }
-          ],
-          "ideas": [
-            { "title": "Cottage near Keswick", "description": "Split five ways it's cheaper than a hotel, and there's a pub walk from the door." },
-            { "title": "Catbells at sunrise", "description": "A short climb with big views; fine for kids." }
-          ],
-          "checklist": ["Propose the weekend in the group", "Book somewhere to stay once everyone's in", "Sort out lifts from the station"],
-          "proposalTitle": "Lake District weekend",
-          "proposalNote": "Thinking a cottage near Keswick, splitting the cost."
-        }
-        """
+            {
+              "best": { "slot": { "start": "2026-11-27T18:00:00.000Z", "end": "2026-11-29T23:59:00.000Z", "label": "Fri 27 – Sun 29 Nov" },
+                        "why": "Everyone's free all weekend and it's before the December rush, so it's the easiest one to lock in." },
+              "alternatives": [
+                { "slot": { "start": "2026-12-04T18:00:00.000Z", "end": "2026-12-06T23:59:00.000Z", "label": "Fri 4 – Sun 6 Dec" },
+                  "why": "Also clear for all five, a week later if the 27th feels too soon." }
+              ],
+              "ideas": [
+                { "title": "Cottage near Keswick", "description": "Split five ways it's cheaper than a hotel, and there's a pub walk from the door." },
+                { "title": "Catbells at sunrise", "description": "A short climb with big views; fine for kids." }
+              ],
+              "checklist": ["Propose the weekend in the group", "Book somewhere to stay once everyone's in", "Sort out lifts from the station"],
+              "proposalTitle": "Lake District weekend",
+              "proposalNote": "Thinking a cottage near Keswick, splitting the cost."
+            }
+            """
         return try! JSONCoding.decoder.decode(PlannerResult.self, from: Data(json.utf8))
     }()
 }
@@ -222,6 +222,9 @@ extension PlannerResult {
 }
 
 #Preview("Planner: ask") {
-    PlannerSheet(ask: { _ in try await Task.sleep(for: .seconds(2)); return .fixture }, propose: { _, _, _ in })
+    PlannerSheet(
+        ask: { _ in
+            try await Task.sleep(for: .seconds(2)); return .fixture
+        }, propose: { _, _, _ in })
 }
 #endif

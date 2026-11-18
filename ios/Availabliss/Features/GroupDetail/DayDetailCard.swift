@@ -20,11 +20,14 @@ struct DayDetailCard: View {
                     Text(subtitle(works: works, slot: slot)).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
                 }
                 Spacer()
-                StatusPill(text: works ? (slot?.missingCount ?? 0 > 0 ? "Most of us" : "Works") : (isPast ? "Past" : "Doesn\u{2019}t fit"), tone: works ? .mint : .neutral)
+                StatusPill(
+                    text: works ? (slot?.missingCount ?? 0 > 0 ? "Most of us" : "Works") : (isPast ? "Past" : "Doesn\u{2019}t fit"), tone: works ? .mint : .neutral)
             }
             if works, let who = model.day(model.selectedDay)?.preferredBy, !who.isEmpty {
                 Label {
-                    Text("\(Formatting.list(who.map { $0 == me ? "You" : (group.member($0)?.firstName ?? "Someone") })) \(who.count == 1 && who.first != me ? "prefers" : "prefer") this")
+                    Text(
+                        "\(Formatting.list(who.map { $0 == me ? "You" : (group.member($0)?.firstName ?? "Someone") })) \(who.count == 1 && who.first != me ? "prefers" : "prefer") this"
+                    )
                 } icon: {
                     Image(systemName: "heart.fill")
                 }
@@ -59,9 +62,10 @@ struct DayDetailCard: View {
             let allDay = free.start <= day.startDate() && free.end >= nextDay
             let end = free.end >= nextDay ? "midnight" : Formatting.time(free.end)
             Button(allDay ? "Propose all day" : "Propose \(Formatting.time(free.start)) – \(end)") {
-                propose(allDay
-                    ? ProposalDraft(start: day.startDate(), end: nextDay, allDay: true)
-                    : ProposalDraft(start: free.start, end: free.end, allDay: false))
+                propose(
+                    allDay
+                        ? ProposalDraft(start: day.startDate(), end: nextDay, allDay: true)
+                        : ProposalDraft(start: free.start, end: free.end, allDay: false))
             }
             .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))
         } else if let status = model.day(day)?.status, status == .busy || status == .free {

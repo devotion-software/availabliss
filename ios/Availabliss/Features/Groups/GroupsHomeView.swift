@@ -41,7 +41,8 @@ struct GroupsHomeView: View {
                 case .messageCreated:
                     // Only the unread badge changes, so patch it rather than refetching.
                     if let message = event.payload(as: Message.self), message.authorId != app.session.user?.id,
-                       message.groupId != app.router.visibleChatGroupId {
+                        message.groupId != app.router.visibleChatGroupId
+                    {
                         model.addUnread(groupId: message.groupId)
                     }
                 case .groupUpdated, .memberChanged, .proposalCreated, .proposalConfirmed, .eventChanged, .availabilityChanged, .reconnected:
@@ -109,7 +110,8 @@ struct GroupsHomeView: View {
         } else if let error = model.loadError, model.groups.isEmpty {
             StatusView(kind: .error(error) { Task { await model.load() } })
         } else if model.groups.isEmpty {
-            StatusView(kind: .empty(title: "No groups yet", message: "Start one and invite your people. We'll find the times that work.", systemImage: "circle.hexagongrid"))
+            StatusView(
+                kind: .empty(title: "No groups yet", message: "Start one and invite your people. We'll find the times that work.", systemImage: "circle.hexagongrid"))
         } else {
             let active = model.groups.filter { !$0.isArchived }
             let archived = model.groups.filter(\.isArchived)

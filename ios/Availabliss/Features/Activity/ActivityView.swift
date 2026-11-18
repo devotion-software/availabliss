@@ -20,7 +20,7 @@ final class ActivityViewModel {
         do {
             notifications = try await api.send(API.Notifications.list()).notifications.sorted { $0.createdAt > $1.createdAt }
             loadError = nil
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             loadError = error.userMessage
         } catch {}
     }
@@ -100,7 +100,9 @@ struct ActivityView: View {
             LazyVStack(spacing: 10) {
                 ForEach(model.notifications) { notification in
                     Button {
-                        if let link = DeepLink(data: notification.data.merging(["kind": notification.kind.rawValue, "groupId": notification.groupId ?? ""]) { current, _ in current }) {
+                        if let link = DeepLink(
+                            data: notification.data.merging(["kind": notification.kind.rawValue, "groupId": notification.groupId ?? ""]) { current, _ in current })
+                        {
                             app.openFromActivity(link)
                         }
                     } label: {

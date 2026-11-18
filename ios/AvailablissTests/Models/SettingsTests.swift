@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Notification settings, linked sign-ins and profile patches. Ported from Android
@@ -33,7 +34,8 @@ struct SettingsTests {
     }
 
     @Test func decodesLinkedAccounts() throws {
-        let accounts = try Fixtures.decode(LinkedAccounts.self, #"{"linked":[{"provider":"apple","linkedAt":"2026-11-01T10:00:00.000Z"}],"available":["apple","google"]}"#)
+        let accounts = try Fixtures.decode(
+            LinkedAccounts.self, #"{"linked":[{"provider":"apple","linkedAt":"2026-11-01T10:00:00.000Z"}],"available":["apple","google"]}"#)
         #expect(accounts.isLinked(.apple))
         #expect(!accounts.isLinked(.google))
         #expect(accounts.available == [.apple, .google])
@@ -42,7 +44,9 @@ struct SettingsTests {
 
     @Test func linkRequestsLeaveOutNonceAndMergeUnlessSet() throws {
         #expect(try Fixtures.encode(LinkAccountBody(provider: .google, idToken: "t", nonce: nil, merge: nil)) == #"{"idToken":"t","provider":"google"}"#)
-        #expect(try Fixtures.encode(LinkAccountBody(provider: .apple, idToken: "t", nonce: "n", merge: true)) == #"{"idToken":"t","merge":true,"nonce":"n","provider":"apple"}"#)
+        #expect(
+            try Fixtures.encode(LinkAccountBody(provider: .apple, idToken: "t", nonce: "n", merge: true))
+                == #"{"idToken":"t","merge":true,"nonce":"n","provider":"apple"}"#)
     }
 
     @Test func aRegionUpdateClearsWhatItDoesntSet() throws {
@@ -53,7 +57,8 @@ struct SettingsTests {
     }
 
     @Test func accountNamesFallBackToTheEmail() throws {
-        let user = try Fixtures.decode(User.self, #"{"id":"u","name":" ","email":"s@example.com","themeMode":"light","colorTheme":"grove","timezone":"Europe/London","onboarded":false}"#)
+        let user = try Fixtures.decode(
+            User.self, #"{"id":"u","name":" ","email":"s@example.com","themeMode":"light","colorTheme":"grove","timezone":"Europe/London","onboarded":false}"#)
         #expect(user.accountName == "s@example.com")
         #expect(user.colorTheme.label == "Grove")
     }

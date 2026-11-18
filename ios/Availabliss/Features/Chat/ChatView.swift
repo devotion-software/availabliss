@@ -144,10 +144,18 @@ struct ChatView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 8)
-                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.scrollSpace)).maxY } action: { contentBottom = $0 }
+                .onGeometryChange(for: CGFloat.self) {
+                    $0.frame(in: .named(Self.scrollSpace)).maxY
+                } action: {
+                    contentBottom = $0
+                }
             }
             .coordinateSpace(name: Self.scrollSpace)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
+            .onGeometryChange(for: CGFloat.self) {
+                $0.size.height
+            } action: {
+                viewportHeight = $0
+            }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             .overlay(alignment: .bottomTrailing) {
@@ -185,7 +193,8 @@ struct ChatView: View {
     /// or, if you sent it, the list goes to it.
     private func newestChanged(from oldId: String?, to newId: String?, proxy: ScrollViewProxy) {
         guard let oldId, let newId, oldId != newId,
-              let oldIndex = model.messages.firstIndex(where: { $0.id == oldId }) else { return }
+            let oldIndex = model.messages.firstIndex(where: { $0.id == oldId })
+        else { return }
         let added = model.messages[(oldIndex + 1)...]
         if added.contains(where: { $0.authorId != nil && $0.authorId == me }) {
             scrollToLatest(proxy: proxy)
@@ -459,7 +468,10 @@ struct Composer: View {
                     .background(Circle().fill(theme.accent))
             }
             .buttonStyle(.pressable)
-            .disabled(!(canSend ?? !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || (editingId != nil && !allowsEmpty && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || isSending)
+            .disabled(
+                !(canSend ?? !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    || (editingId != nil && !allowsEmpty && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || isSending
+            )
             .accessibilityLabel(editingId == nil ? "Send" : "Save")
         }
         .padding(6)

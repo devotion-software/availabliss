@@ -86,7 +86,7 @@ struct TemplatesSection: View {
     private func load() async {
         do {
             templates = try await api.send(API.Me.templates()).templates
-        } catch where error.isCancellation {
+        } catch  where error.isCancellation {
         } catch {
             templates = []
         }

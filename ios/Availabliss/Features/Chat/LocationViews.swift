@@ -15,7 +15,7 @@ enum LocationLinks {
         var components = URLComponents(string: "https://maps.apple.com/")!
         components.queryItems = [
             URLQueryItem(name: "ll", value: pair(location)),
-            URLQueryItem(name: "q", value: location.name ?? "Shared location")
+            URLQueryItem(name: "q", value: location.name ?? "Shared location"),
         ]
         return components.url!
     }
@@ -56,7 +56,9 @@ struct LocationCard: View {
     }
 
     var body: some View {
-        Button { choosing = true } label: {
+        Button {
+            choosing = true
+        } label: {
             VStack(alignment: .leading, spacing: 0) {
                 LocationSnapshot(location: location, scheme: colorScheme)
                     .frame(width: Self.width, height: Self.mapHeight)
@@ -95,7 +97,7 @@ struct LocationCard: View {
             [
                 ConfirmOption("Apple Maps", systemImage: "map") { openURL(LocationLinks.appleMaps(location)) },
                 ConfirmOption("Google Maps", systemImage: "globe", kind: .secondary) { openURL(LocationLinks.googleMaps(location)) },
-                ConfirmOption("what3words", systemImage: "square.grid.3x3", kind: .secondary) { openURL(LocationLinks.what3words(location)) }
+                ConfirmOption("what3words", systemImage: "square.grid.3x3", kind: .secondary) { openURL(LocationLinks.what3words(location)) },
             ]
         }
     }
@@ -267,13 +269,17 @@ struct LocationPickerSheet: View {
                 }
             }
             if let picked {
-                Button { Task { await share(picked.location) } } label: {
+                Button {
+                    Task { await share(picked.location) }
+                } label: {
                     LoadingLabel(title: "Send \(picked.name)", systemImage: "mappin.and.ellipse", isLoading: isSending)
                 }
                 .buttonStyle(.accent)
                 .disabled(isSending)
             }
-            Button { if let myLocation { Task { await share(myLocation) } } } label: {
+            Button {
+                if let myLocation { Task { await share(myLocation) } }
+            } label: {
                 LoadingLabel(title: "Send my current location", systemImage: "location.fill", isLoading: isSending && picked == nil)
             }
             .buttonStyle(picked == nil ? .filled(.primary) : .filled(.secondary))
@@ -305,8 +311,12 @@ struct LocationPickerSheet: View {
             if isSearching {
                 ProgressView()
             } else if !query.isEmpty {
-                Button { clearSearch() } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(theme.muted) }
-                    .accessibilityLabel("Clear search")
+                Button {
+                    clearSearch()
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(theme.muted)
+                }
+                .accessibilityLabel("Clear search")
             }
         }
         .padding(.horizontal, 14)
@@ -318,7 +328,9 @@ struct LocationPickerSheet: View {
     private var resultsList: some View {
         VStack(spacing: 0) {
             ForEach(results) { place in
-                Button { pick(place) } label: {
+                Button {
+                    pick(place)
+                } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "mappin.circle.fill")
                             .font(.system(size: 22))

@@ -76,11 +76,13 @@ struct CalendarBusySheet: View {
                 }
             }
 
-            Text("Availabliss only reads when you're busy, never what the event is, so it can't be edited here. Change it in your calendar and it updates here automatically, or choose which calendars count as busy.")
-                .bodyFont(13, relativeTo: .subheadline)
-                .foregroundStyle(theme.muted)
-                .lineSpacing(3)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                "Availabliss only reads when you're busy, never what the event is, so it can't be edited here. Change it in your calendar and it updates here automatically, or choose which calendars count as busy."
+            )
+            .bodyFont(13, relativeTo: .subheadline)
+            .foregroundStyle(theme.muted)
+            .lineSpacing(3)
+            .fixedSize(horizontal: false, vertical: true)
 
             Button {
                 dismiss()
@@ -106,7 +108,8 @@ struct CalendarBusySheet: View {
     /// "Mon 2 Nov · 09:00 – 10:00", or just the day(s) when it covers whole days.
     private var when: String {
         let calendar = Calendar.current
-        let allDay = interval.start < interval.end
+        let allDay =
+            interval.start < interval.end
             && calendar.startOfDay(for: interval.start) == interval.start
             && calendar.startOfDay(for: interval.end) == interval.end
         return Formatting.span(start: interval.start, end: interval.end, allDay: allDay)

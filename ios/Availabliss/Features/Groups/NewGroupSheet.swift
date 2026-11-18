@@ -119,9 +119,12 @@ struct NewGroupSheet: View {
     @ViewBuilder
     private var details: some View {
         StepDots(current: stepIndex, total: steps.count)
-        Text(basedOn.map { "Starting from \($0.name). Name it and pick a colour; you\u{2019}ll choose who to invite next." } ?? "Name it and pick a colour. Timing comes next.")
-            .bodyFont(14)
-            .foregroundStyle(theme.muted)
+        Text(
+            basedOn.map { "Starting from \($0.name). Name it and pick a colour; you\u{2019}ll choose who to invite next." }
+                ?? "Name it and pick a colour. Timing comes next."
+        )
+        .bodyFont(14)
+        .foregroundStyle(theme.muted)
         HStack(spacing: 14) {
             GroupTile(monogram: monogram, colorToken: color, size: 56, cornerRadius: 18)
             InputField(placeholder: "e.g. Lake District crew", text: $name)

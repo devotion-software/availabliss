@@ -64,7 +64,9 @@ struct ChatComposerArea: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: state.uploads.map(\.id))
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: state.editing?.id)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showsMenu)
-        .photosPicker(isPresented: $pickingPhotos, selection: $photoSelection, maxSelectionCount: AttachmentFormat.maxPerMessage, matching: .images, preferredItemEncoding: .current)
+        .photosPicker(
+            isPresented: $pickingPhotos, selection: $photoSelection, maxSelectionCount: AttachmentFormat.maxPerMessage, matching: .images, preferredItemEncoding: .current
+        )
         .onChange(of: photoSelection) { _, items in
             guard !items.isEmpty else { return }
             photoSelection = []
@@ -99,7 +101,7 @@ struct ChatComposerArea: View {
                 name: ReplyNames.name(of: replying.authorId, fallback: nil, group: group, me: me),
                 snippet: replying.asReplyPreview(authorName: nil).snippet
             ) { model.cancelReplying() }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if target == .thread, let replying = model.threadReplyingTo {
             ReplyingStrip(
                 name: ReplyNames.name(of: replying.authorId, fallback: nil, group: group, me: me),
@@ -129,7 +131,7 @@ struct ChatComposerArea: View {
         for item in items {
             let type = item.supportedContentTypes.first { $0.conforms(to: .gif) } ?? item.supportedContentTypes.first
             guard let data = try? await item.loadTransferable(type: Data.self),
-                  let photo = await Task.detached(priority: .userInitiated, operation: { AttachmentFormat.photo(data: data, type: type) }).value
+                let photo = await Task.detached(priority: .userInitiated, operation: { AttachmentFormat.photo(data: data, type: type) }).value
             else { failed += 1; continue }
             picked.append(photo)
         }

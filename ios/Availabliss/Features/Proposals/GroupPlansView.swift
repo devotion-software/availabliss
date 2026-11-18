@@ -43,8 +43,12 @@ struct GroupPlansView: View {
         HStack {
             Text("Proposals").displayFont(19, .semibold).accessibilityAddTraits(.isHeader)
             Spacer()
-            Button { editingEvent = .new } label: { Label("Add event", systemImage: "plus") }
-                .buttonStyle(.glassPill)
+            Button {
+                editingEvent = .new
+            } label: {
+                Label("Add event", systemImage: "plus")
+            }
+            .buttonStyle(.glassPill)
         }
         .padding(.top, detail.events.isEmpty ? 0 : 6)
     }
@@ -57,7 +61,9 @@ struct GroupPlansView: View {
                 .glass(cornerRadius: 24)
         } else {
             ForEach(open) { proposal in
-                Button { app.router.push(.proposal(id: proposal.id)) } label: {
+                Button {
+                    app.router.push(.proposal(id: proposal.id))
+                } label: {
                     ProposalCard(proposal: proposal, group: group, me: app.session.user?.id)
                 }
                 .buttonStyle(.pressable)
@@ -96,7 +102,7 @@ struct GroupPlansView: View {
     private func load() async {
         do {
             try await detail.loadPlans()
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             self.error = error.userMessage
         } catch {}
     }
@@ -142,11 +148,16 @@ struct GroupPlansCard: View {
                 ForEach(items) { item in
                     switch item {
                     case .proposal(let proposal):
-                        row(date: proposal.start, title: proposal.title ?? Formatting.span(start: proposal.start, end: proposal.end, allDay: proposal.allDay), detail: status(of: proposal), action: needsReply(proposal) ? "Reply" : nil) {
+                        row(
+                            date: proposal.start, title: proposal.title ?? Formatting.span(start: proposal.start, end: proposal.end, allDay: proposal.allDay),
+                            detail: status(of: proposal), action: needsReply(proposal) ? "Reply" : nil
+                        ) {
                             app.router.push(.proposal(id: proposal.id))
                         }
                     case .event(let event):
-                        row(date: event.start, title: event.title, detail: Formatting.span(start: event.start, end: event.end, allDay: event.allDay), action: nil, onTap: openPlans)
+                        row(
+                            date: event.start, title: event.title, detail: Formatting.span(start: event.start, end: event.end, allDay: event.allDay), action: nil,
+                            onTap: openPlans)
                     }
                 }
             }

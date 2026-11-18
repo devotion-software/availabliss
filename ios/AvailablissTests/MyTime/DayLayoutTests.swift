@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Ported from web `mytime/parts.test.ts` and Android `DaysLayoutTest`.
@@ -76,7 +77,8 @@ struct DayLayoutTests {
     @Test func overlapsShareAClusterLaneCountBackToBackItemsDoNot() {
         let day = week
         func item(_ label: String, _ from: Double, _ to: Double) -> DayLayout.Placed {
-            let interval = BusyInterval(start: Fixtures.date("2026-11-02T00:00:00Z"), end: Fixtures.date("2026-11-02T01:00:00Z"), source: .manual, label: label, calendarId: nil, blockId: label)
+            let interval = BusyInterval(
+                start: Fixtures.date("2026-11-02T00:00:00Z"), end: Fixtures.date("2026-11-02T01:00:00Z"), source: .manual, label: label, calendarId: nil, blockId: label)
             return DayLayout.Placed(interval: interval, day: day, from: from, to: to, continuesBefore: false, continuesAfter: false)
         }
         let out = DayLayout.assignLanes([item("a", 60, 180), item("b", 120, 240), item("c", 200, 260), item("d", 260, 300)])

@@ -31,7 +31,7 @@ final class MyPlansViewModel {
             WidgetSync.shared.onPlans(response)
             loaded = true
             loadError = nil
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             loadError = error.userMessage
         } catch {}
     }
@@ -91,8 +91,11 @@ struct MyPlansView: View {
         } else if let error = model.loadError, !model.loaded {
             StatusView(kind: .error(error) { Task { await model.load() } })
         } else if model.isEmpty {
-            StatusView(kind: .empty(title: "No plans yet", message: "When a time is confirmed or an event is added in one of your groups, it shows up here.", systemImage: "calendar"))
-                .glass(cornerRadius: 24)
+            StatusView(
+                kind: .empty(
+                    title: "No plans yet", message: "When a time is confirmed or an event is added in one of your groups, it shows up here.", systemImage: "calendar")
+            )
+            .glass(cornerRadius: 24)
         } else {
             comingUp
             if !model.notGoing.isEmpty {
@@ -159,7 +162,9 @@ struct MyPlansView: View {
     }
 
     private func planButton(_ plan: MyPlan, quiet: Bool = false) -> some View {
-        Button { open(plan) } label: {
+        Button {
+            open(plan)
+        } label: {
             MyPlanRow(plan: plan, added: app.deviceCalendar.addedState(plan.id) != .notAdded, quiet: quiet)
         }
         .buttonStyle(.pressable)

@@ -30,10 +30,11 @@ struct MyTimeMonth: View {
                 ZStack {
                     grid
                         .id(month)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: pageEdge).combined(with: .opacity),
-                            removal: .move(edge: pageEdge == .trailing ? .leading : .trailing).combined(with: .opacity)
-                        ))
+                        .transition(
+                            .asymmetric(
+                                insertion: .move(edge: pageEdge).combined(with: .opacity),
+                                removal: .move(edge: pageEdge == .trailing ? .leading : .trailing).combined(with: .opacity)
+                            ))
                 }
                 .modifier(SwipeToStep(onDrag: { lastSwipeAt = .now }) { delta in page(by: delta) })
                 .clipped()
@@ -47,19 +48,27 @@ struct MyTimeMonth: View {
 
     private var heading: some View {
         HStack(spacing: 6) {
-            Button { page(by: -1) } label: { chevron("chevron.left") }
-                .disabled(month <= Self.firstMonth)
-                .opacity(month <= Self.firstMonth ? 0.35 : 1)
-                .accessibilityLabel("Previous month")
+            Button {
+                page(by: -1)
+            } label: {
+                chevron("chevron.left")
+            }
+            .disabled(month <= Self.firstMonth)
+            .opacity(month <= Self.firstMonth ? 0.35 : 1)
+            .accessibilityLabel("Previous month")
             Text(monthTitle)
                 .displayFont(19, .semibold, relativeTo: .headline)
                 .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
                 .contentTransition(.numericText())
-            Button { page(by: 1) } label: { chevron("chevron.right") }
-                .disabled(month >= Self.lastMonth)
-                .opacity(month >= Self.lastMonth ? 0.35 : 1)
-                .accessibilityLabel("Next month")
+            Button {
+                page(by: 1)
+            } label: {
+                chevron("chevron.right")
+            }
+            .disabled(month >= Self.lastMonth)
+            .opacity(month >= Self.lastMonth ? 0.35 : 1)
+            .accessibilityLabel("Next month")
             if month != Self.firstMonth {
                 Button("Today") { go(to: Self.firstMonth) }
                     .bodyFont(12, .semibold, relativeTo: .caption)

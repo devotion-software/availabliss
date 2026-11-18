@@ -42,13 +42,16 @@ struct SaveTemplateRow: View {
         .task(id: app.templatesVersion) {
             if let list = try? await api.send(API.Me.templates()).templates { templates = list }
         }
-        .sheet(isPresented: $isNaming, onDismiss: {
-            guard let saved else { return }
-            self.saved = nil
-            toast = "Saved \u{201C}\(saved.name)\u{201D}. Pick it next time you create a group."
-            templates = (templates ?? []) + [saved]
-            onSaved(saved)
-        }) {
+        .sheet(
+            isPresented: $isNaming,
+            onDismiss: {
+                guard let saved else { return }
+                self.saved = nil
+                toast = "Saved \u{201C}\(saved.name)\u{201D}. Pick it next time you create a group."
+                templates = (templates ?? []) + [saved]
+                onSaved(saved)
+            }
+        ) {
             SaveTemplateSheet(requirement: requirement, suggestion: suggestion, api: api) { saved = $0 }
         }
     }

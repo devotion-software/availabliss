@@ -21,11 +21,14 @@ struct OnboardingView: View {
                 RegionView(api: app.api, mode: .onboarding { go(to: 1) })
                     .transition(transition)
             case 1:
-                CalendarsView(api: app.api, mode: .onboarding(
-                    onBack: { go(to: 0) },
-                    onContinue: { calendarsDone(markByHand: false) },
-                    onSkip: { calendarsDone(markByHand: true) }
-                ))
+                CalendarsView(
+                    api: app.api,
+                    mode: .onboarding(
+                        onBack: { go(to: 0) },
+                        onContinue: { calendarsDone(markByHand: false) },
+                        onSkip: { calendarsDone(markByHand: true) }
+                    )
+                )
                 .transition(transition)
             case 2:
                 FirstGroupStep(api: app.api, timezone: app.session.user?.timezone ?? TimeZone.current.identifier) { group in

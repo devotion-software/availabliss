@@ -24,7 +24,9 @@ struct DayLayout: Sendable {
         let continuesBefore: Bool
         let continuesAfter: Bool
 
-        var id: String { "\(day)-\(interval.start.timeIntervalSince1970)-\(interval.end.timeIntervalSince1970)-\(interval.blockId ?? interval.calendarId ?? "")-\(interval.label ?? "")-\(interval.title ?? "")" }
+        var id: String {
+            "\(day)-\(interval.start.timeIntervalSince1970)-\(interval.end.timeIntervalSince1970)-\(interval.blockId ?? interval.calendarId ?? "")-\(interval.label ?? "")-\(interval.title ?? "")"
+        }
         var minutes: Double { to - from }
     }
 
@@ -58,14 +60,15 @@ struct DayLayout: Sendable {
                     whole.append(interval)
                     continue
                 }
-                pieces.append(Placed(
-                    interval: interval,
-                    day: day,
-                    from: max(0, start) * scale,
-                    to: min(length, end) * scale,
-                    continuesBefore: start < 0,
-                    continuesAfter: end > length
-                ))
+                pieces.append(
+                    Placed(
+                        interval: interval,
+                        day: day,
+                        from: max(0, start) * scale,
+                        to: min(length, end) * scale,
+                        continuesBefore: start < 0,
+                        continuesAfter: end > length
+                    ))
             }
             allDay[day] = whole
             timed[day] = Self.assignLanes(pieces)

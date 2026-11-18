@@ -1,4 +1,5 @@
 import Testing
+
 @testable import Availabliss
 
 /// Ported from web `proposals/clash.test.ts` and Android `ClashTest`.

@@ -126,18 +126,20 @@ struct UsernameField: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 2) {
                 Text("@").bodyFont(16, .semibold).foregroundStyle(theme.muted).accessibilityHidden(true)
-                TextField("", text: Binding(get: { model.text }, set: { model.setText($0) }),
-                          prompt: Text("username").foregroundStyle(theme.muted))
-                    .bodyFont(16)
-                    .foregroundStyle(theme.ink)
-                    .textContentType(.username)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .submitLabel(.done)
-                    .focused($isFocused)
-                    .accessibilityLabel("Username")
-                    .accessibilityValue(model.text.isEmpty ? "" : "@\(model.text)")
-                    .accessibilityHint(message ?? "")
+                TextField(
+                    "", text: Binding(get: { model.text }, set: { model.setText($0) }),
+                    prompt: Text("username").foregroundStyle(theme.muted)
+                )
+                .bodyFont(16)
+                .foregroundStyle(theme.ink)
+                .textContentType(.username)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.done)
+                .focused($isFocused)
+                .accessibilityLabel("Username")
+                .accessibilityValue(model.text.isEmpty ? "" : "@\(model.text)")
+                .accessibilityHint(message ?? "")
                 indicator.frame(width: 22)
             }
             .padding(.leading, 16)

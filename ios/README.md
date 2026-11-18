@@ -133,3 +133,30 @@ Both targets use Xcode even if `xcode-select` still points at the Command Line T
 `ios-uitest` resets the simulator's Keychain first, so each run starts signed out.
 For the local dev server set `API_BASE_URL = http:/$()/localhost:5190` in
 `Config/Secrets.xcconfig`; `NSAllowsLocalNetworking` lets debug builds use plain http locally.
+
+## Formatting and linting
+
+```sh
+make ios-lint      # check (CI runs this); fails on any formatting difference or lint warning
+make ios-format    # rewrite the sources in place
+```
+
+Both use [swift-format](https://github.com/swiftlang/swift-format), which ships with Xcode 16+
+(`xcrun swift-format`), so there's nothing to install. The style lives in `.swift-format` (JSON,
+so the reasons are here): 4-space indent, 170-column lines (the code runs long on purpose; at the
+default 100 most SwiftUI modifier chains would wrap), existing line breaks respected, trailing
+commas kept as written, and `#if` blocks not indented. Documentation comments are left alone
+(`BeginDocumentationCommentWithOneLineSummary`, `ValidateDocumentationComments` and
+`AllPublicDeclarationsHaveDocumentation` stay off).
+
+Rules turned off because they'd churn or fight idioms the codebase uses on purpose:
+
+| Rule | Why it's off |
+| ---- | ------------ |
+| `NoAccessLevelOnExtensionDeclaration` | We write `private extension Foo { … }`; the rule rewrites it to `fileprivate` on every member. |
+| `OneCasePerLine`, `OneVariableDeclarationPerLine` | Compact `enum Edge { case left(CGFloat), right(CGFloat) }` and `let cx: CGFloat = 20, cy = …` read better on one line. |
+| `DoNotUseSemicolons` | One-line closures such as `write { $0.signedIn = true; $0.plans = upcoming }`. |
+| `AlwaysUseLowerCamelCase` | `Decodable` structs mirror JSON keys (`id_token`, Mailpit's `Snippet`). |
+| `AvoidRetroactiveConformances` | The one retroactive conformance (`UINavigationController: @retroactive UIGestureRecognizerDelegate`, for swipe-back with a hidden bar) is deliberate and marked. |
+| `OnlyOneTrailingClosureArgument` | SwiftUI APIs such as `.sheet(isPresented:onDismiss:content:)` are meant to be called with a closure argument plus a trailing closure. |
+| `ReplaceForEachWithForLoop` | `requests.values.forEach { $0.cancel() }` is clearer than a loop. |

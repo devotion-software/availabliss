@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Maybes (soft yeses) are counted apart from firm yeses. Ported from Android `ProposalFormattingTest`.
@@ -49,13 +50,15 @@ struct ProposalTests {
     }
 
     @Test func myPlansDecodeTheEventWithTheGroupAndMyReply() throws {
-        let plans = try Fixtures.decode(MyPlansResponse.self, """
-        {"going":[{"id":"e1","groupId":"g","proposalId":"p","title":"Lakes","start":"2026-11-27T18:00:00Z","end":"2026-11-29T23:59:00Z",
-                   "allDay":false,"createdBy":"u","createdAt":"2026-11-10T10:00:00Z","groupName":"Walkers","myResponse":"maybe"}],
-         "notGoing":[],
-         "past":[{"id":"e0","groupId":"g","proposalId":null,"title":"Picnic","start":"2026-06-01T12:00:00Z","end":"2026-06-01T15:00:00Z",
-                  "allDay":false,"createdBy":"u","createdAt":"2026-05-10T10:00:00Z","groupName":"Walkers"}]}
-        """)
+        let plans = try Fixtures.decode(
+            MyPlansResponse.self,
+            """
+            {"going":[{"id":"e1","groupId":"g","proposalId":"p","title":"Lakes","start":"2026-11-27T18:00:00Z","end":"2026-11-29T23:59:00Z",
+                       "allDay":false,"createdBy":"u","createdAt":"2026-11-10T10:00:00Z","groupName":"Walkers","myResponse":"maybe"}],
+             "notGoing":[],
+             "past":[{"id":"e0","groupId":"g","proposalId":null,"title":"Picnic","start":"2026-06-01T12:00:00Z","end":"2026-06-01T15:00:00Z",
+                      "allDay":false,"createdBy":"u","createdAt":"2026-05-10T10:00:00Z","groupName":"Walkers"}]}
+            """)
         #expect(plans.going.first?.event.title == "Lakes")
         #expect(plans.going.first?.groupName == "Walkers")
         #expect(plans.going.first?.myResponse == .maybe)

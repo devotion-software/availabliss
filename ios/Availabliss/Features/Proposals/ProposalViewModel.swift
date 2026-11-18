@@ -31,7 +31,7 @@ final class ProposalViewModel {
             }
             await loadEventIfConfirmed()
             loadError = nil
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             loadError = error.userMessage
         } catch {}
     }

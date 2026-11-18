@@ -40,7 +40,7 @@ final class MembersViewModel {
         do {
             group = try await api.send(API.Groups.get(id: groupId))
             if isAdmin { invites = (try? await api.send(API.Groups.invites(groupId: groupId)).invites) ?? invites }
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             self.error = error.userMessage
         } catch {}
     }

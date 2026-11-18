@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Editing and deleting in the chat, and live updates to messages. Ported from Android
@@ -13,11 +14,11 @@ struct ChatViewModelTests {
     }
 
     private static let page = """
-    {"hasMore":false,"messages":[
-      \(json("1", author: "me", body: "Hello", extra: #","receipt":\#(receipt)"#)),
-      \(json("2", author: "p", body: "Hi back", extra: #","replyTo":{"id":"1","authorId":"me","authorName":"Sam","kind":"text","text":"Hello","deleted":false}"#)),
-      \(json("3", author: "p", body: "Park?"))]}
-    """
+        {"hasMore":false,"messages":[
+          \(json("1", author: "me", body: "Hello", extra: #","receipt":\#(receipt)"#)),
+          \(json("2", author: "p", body: "Hi back", extra: #","replyTo":{"id":"1","authorId":"me","authorName":"Sam","kind":"text","text":"Hello","deleted":false}"#)),
+          \(json("3", author: "p", body: "Park?"))]}
+        """
 
     /// A chat loaded as "me" through a stubbed API. `requests` records each request's method and path.
     private func loadedChat() async -> (ChatViewModel, Recorder) {
@@ -49,7 +50,8 @@ struct ChatViewModelTests {
     @Test func anEditReplacesTheMessageButKeepsItsReceiptAndRefreshesQuotes() async throws {
         let (chat, _) = await loadedChat()
         let receipt = try #require(chat.messages[0].receipt)
-        await chat.apply(live(.messageUpdated, payload: Self.json("1", author: "me", body: "Edited text", extra: #","editedAt":"2026-11-16T12:05:00.000Z","receipt":null"#)))
+        await chat.apply(
+            live(.messageUpdated, payload: Self.json("1", author: "me", body: "Edited text", extra: #","editedAt":"2026-11-16T12:05:00.000Z","receipt":null"#)))
         #expect(chat.messages[0].body == "Edited text")
         #expect(chat.messages[0].isEdited)
         #expect(chat.messages[0].receipt == receipt)
@@ -62,13 +64,15 @@ struct ChatViewModelTests {
         let (chat, _) = await loadedChat()
         let before = chat.messages
         await chat.apply(live(.messageUpdated, payload: Self.json("9", author: "me", body: "x")))
-        await chat.apply(live(.messageUpdated, groupId: "g2", payload: #"{"id":"1","groupId":"g2","authorId":"me","kind":"text","body":"x","createdAt":"2026-11-16T12:00:00.000Z"}"#))
+        await chat.apply(
+            live(.messageUpdated, groupId: "g2", payload: #"{"id":"1","groupId":"g2","authorId":"me","kind":"text","body":"x","createdAt":"2026-11-16T12:00:00.000Z"}"#))
         #expect(chat.messages == before)
     }
 
     @Test func aDeleteFromSomeoneElseClearsTheMessageAndItsQuotes() async {
         let (chat, _) = await loadedChat()
-        await chat.apply(live(.messageUpdated, payload: #"{"id":"1","groupId":"g1","authorId":"me","kind":"text","body":null,"deleted":true,"createdAt":"2026-11-16T12:01:00.000Z"}"#))
+        await chat.apply(
+            live(.messageUpdated, payload: #"{"id":"1","groupId":"g1","authorId":"me","kind":"text","body":null,"deleted":true,"createdAt":"2026-11-16T12:01:00.000Z"}"#))
         #expect(chat.messages[0].isDeleted)
         #expect(chat.messages[0].body == nil)
         #expect(chat.messages[0].receipt != nil)
@@ -123,7 +127,8 @@ struct ChatViewModelTests {
         let (chat, _) = await loadedChat()
         chat.startReplying(to: chat.messages[2])
         #expect(chat.replyingTo?.id == "3")
-        await chat.apply(live(.messageUpdated, payload: #"{"id":"3","groupId":"g1","authorId":"p","kind":"text","body":null,"deleted":true,"createdAt":"2026-11-16T12:03:00.000Z"}"#))
+        await chat.apply(
+            live(.messageUpdated, payload: #"{"id":"3","groupId":"g1","authorId":"p","kind":"text","body":null,"deleted":true,"createdAt":"2026-11-16T12:03:00.000Z"}"#))
         #expect(chat.replyingTo == nil)
     }
 }

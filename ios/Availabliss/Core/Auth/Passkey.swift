@@ -63,7 +63,8 @@ enum Base64URL {
     }
 
     static func decode(_ string: String) -> Data? {
-        var base64 = string
+        var base64 =
+            string
             .replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")
         base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
@@ -82,7 +83,7 @@ enum PasskeyCoordinator {
 
     static func registration(options: PasskeyCreationOptions, fallbackRelyingParty: String) throws -> ASAuthorizationRequest {
         guard let challenge = Base64URL.decode(options.challenge),
-              let userID = Base64URL.decode(options.user.id) ?? options.user.id.data(using: .utf8)
+            let userID = Base64URL.decode(options.user.id) ?? options.user.id.data(using: .utf8)
         else { throw AuthFlowError.invalidServerResponse }
         let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: options.rp.id ?? fallbackRelyingParty)
         return provider.createCredentialRegistrationRequest(challenge: challenge, name: options.user.name, userID: userID)
@@ -107,7 +108,7 @@ enum PasskeyCoordinator {
 
     static func registrationJSON(from credential: ASAuthorizationCredential) throws -> PasskeyRegistrationJSON {
         guard let registration = credential as? ASAuthorizationPlatformPublicKeyCredentialRegistration,
-              let attestation = registration.rawAttestationObject
+            let attestation = registration.rawAttestationObject
         else { throw AuthFlowError.invalidServerResponse }
         let id = Base64URL.encode(registration.credentialID)
         return PasskeyRegistrationJSON(

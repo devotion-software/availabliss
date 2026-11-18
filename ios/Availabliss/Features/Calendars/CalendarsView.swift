@@ -289,11 +289,13 @@ private struct AccessPrompt: View {
         GlassPanel(cornerRadius: 24, spacing: 10) {
             Label("Calendars on this iPhone", systemImage: "iphone")
                 .bodyFont(15, .semibold)
-            Text(denied
-                 ? "Calendar access is turned off. Allow it in Settings to use the calendars on this phone."
-                 : "Use the calendars already on this phone (iCloud, Google, Exchange…). Only start and end times are shared.")
-                .bodyFont(13)
-                .foregroundStyle(theme.muted)
+            Text(
+                denied
+                    ? "Calendar access is turned off. Allow it in Settings to use the calendars on this phone."
+                    : "Use the calendars already on this phone (iCloud, Google, Exchange…). Only start and end times are shared."
+            )
+            .bodyFont(13)
+            .foregroundStyle(theme.muted)
             Button(denied ? "Open Settings" : "Allow calendar access") {
                 if denied, let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } else { request() }
             }
@@ -322,8 +324,16 @@ private struct ConnectionSection: View {
                 }
             )
             .contextMenu {
-                Button { Task { await model.sync(connection) } } label: { Label("Sync now", systemImage: "arrow.clockwise") }
-                Button(role: .destructive) { Task { await model.disconnect(connection) } } label: { Label("Disconnect", systemImage: "trash") }
+                Button {
+                    Task { await model.sync(connection) }
+                } label: {
+                    Label("Sync now", systemImage: "arrow.clockwise")
+                }
+                Button(role: .destructive) {
+                    Task { await model.disconnect(connection) }
+                } label: {
+                    Label("Disconnect", systemImage: "trash")
+                }
             }
             VStack(alignment: .leading, spacing: 0) {
                 if connection.status != .ok {

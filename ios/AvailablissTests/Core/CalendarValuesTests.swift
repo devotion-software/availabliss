@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// Days and wall-clock times as the API sends them, and the shared date wording.
@@ -35,8 +36,9 @@ struct CalendarValuesTests {
         #expect(Fixtures.day("2026-12-31").adding(days: 1, calendar: london) == Fixtures.day("2027-01-01"))
         // Across the clocks going back.
         #expect(Fixtures.day("2026-10-24").adding(days: 2, calendar: london) == Fixtures.day("2026-10-26"))
-        #expect(Fixtures.day("2026-12-30").through(Fixtures.day("2027-01-02"), calendar: london).map(\.description)
-            == ["2026-12-30", "2026-12-31", "2027-01-01", "2027-01-02"])
+        #expect(
+            Fixtures.day("2026-12-30").through(Fixtures.day("2027-01-02"), calendar: london).map(\.description)
+                == ["2026-12-30", "2026-12-31", "2027-01-01", "2027-01-02"])
         #expect(Fixtures.range("2026-12-19", "2027-01-03").contains(Fixtures.day("2027-01-03")))
         #expect(!Fixtures.range("2026-12-19", "2027-01-03").contains(Fixtures.day("2027-01-04")))
     }

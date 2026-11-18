@@ -61,16 +61,17 @@ final class Billing {
     }
 
     private static func describe(_ package: Package) -> ProPackage {
-        let (title, period): (String, String) = switch package.packageType {
-        case .annual: ("Yearly", "/year")
-        case .sixMonth: ("6 months", "/6 months")
-        case .threeMonth: ("3 months", "/3 months")
-        case .twoMonth: ("2 months", "/2 months")
-        case .monthly: ("Monthly", "/month")
-        case .weekly: ("Weekly", "/week")
-        case .lifetime: ("Lifetime", " once")
-        default: (package.storeProduct.localizedTitle, "")
-        }
+        let (title, period): (String, String) =
+            switch package.packageType {
+            case .annual: ("Yearly", "/year")
+            case .sixMonth: ("6 months", "/6 months")
+            case .threeMonth: ("3 months", "/3 months")
+            case .twoMonth: ("2 months", "/2 months")
+            case .monthly: ("Monthly", "/month")
+            case .weekly: ("Weekly", "/week")
+            case .lifetime: ("Lifetime", " once")
+            default: (package.storeProduct.localizedTitle, "")
+            }
         return ProPackage(
             id: package.identifier,
             title: title,

@@ -126,10 +126,16 @@ struct EventEditorSheet: View {
             }
             .overlay(alignment: .bottomTrailing) {
                 Menu {
-                    Button { showsPhotoPicker = true } label: { Label("Change photo", systemImage: "photo") }
+                    Button {
+                        showsPhotoPicker = true
+                    } label: {
+                        Label("Change photo", systemImage: "photo")
+                    }
                     Button(role: .destructive) {
                         coverChange = savedCover == nil ? nil : .remove
-                    } label: { Label("Remove photo", systemImage: "trash") }
+                    } label: {
+                        Label("Remove photo", systemImage: "trash")
+                    }
                 } label: {
                     Label("Cover", systemImage: "photo")
                         .bodyFont(13, .semibold, relativeTo: .subheadline)
@@ -142,7 +148,9 @@ struct EventEditorSheet: View {
                 .accessibilityLabel("Cover photo")
             }
         } else {
-            Button { showsPhotoPicker = true } label: {
+            Button {
+                showsPhotoPicker = true
+            } label: {
                 Label("Add a cover photo", systemImage: "photo")
                     .bodyFont(15, .medium)
                     .foregroundStyle(theme.accentInk)
@@ -162,7 +170,8 @@ struct EventEditorSheet: View {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
         }
-        return EventBody(title: title.trimmingCharacters(in: .whitespaces), start: startValue, end: endValue, allDay: allDay, location: clean(location), note: clean(note))
+        return EventBody(
+            title: title.trimmingCharacters(in: .whitespaces), start: startValue, end: endValue, allDay: allDay, location: clean(location), note: clean(note))
     }
 
     private func save() async {

@@ -142,11 +142,23 @@ private struct MemberRow: View {
             if canManage {
                 Menu {
                     if member.role == .member {
-                        Button { perform(.makeAdmin) } label: { Label("Make admin", systemImage: "shield") }
+                        Button {
+                            perform(.makeAdmin)
+                        } label: {
+                            Label("Make admin", systemImage: "shield")
+                        }
                     } else {
-                        Button { perform(.makeMember) } label: { Label("Remove admin", systemImage: "shield.slash") }
+                        Button {
+                            perform(.makeMember)
+                        } label: {
+                            Label("Remove admin", systemImage: "shield.slash")
+                        }
                     }
-                    Button(role: .destructive) { perform(.remove) } label: { Label("Remove from group", systemImage: "person.badge.minus") }
+                    Button(role: .destructive) {
+                        perform(.remove)
+                    } label: {
+                        Label("Remove from group", systemImage: "person.badge.minus")
+                    }
                 } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16, weight: .semibold)).foregroundStyle(theme.muted).frame(width: 44, height: 44)
                 }

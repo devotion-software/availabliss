@@ -27,7 +27,11 @@ struct SignInView: View {
                     Spacer(minLength: 20)
                     if let model {
                         SignInForm(model: model)
-                            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { formFrame = $0 }
+                            .onGeometryChange(for: CGRect.self) {
+                                $0.frame(in: .global)
+                            } action: {
+                                formFrame = $0
+                            }
                     }
                 }
                 .padding(.horizontal, 24)
@@ -55,8 +59,9 @@ struct SignInView: View {
         // Opened from an emailed invite: start with the address it was sent to.
         .task(id: app.router.pendingInvite?.token) {
             guard let token = app.router.pendingInvite?.token,
-                  let invited = try? await app.api.send(API.Invites.preview(token: token)).email,
-                  let model, model.email.isEmpty, model.step == .email else { return }
+                let invited = try? await app.api.send(API.Invites.preview(token: token)).email,
+                let model, model.email.isEmpty, model.step == .email
+            else { return }
             model.email = invited
         }
     }
@@ -77,7 +82,8 @@ struct SignInView: View {
         let showsStrapline: Bool
 
         @MainActor static var current: HeroSize {
-            let screen = UIApplication.shared.connectedScenes
+            let screen =
+                UIApplication.shared.connectedScenes
                 .compactMap { ($0 as? UIWindowScene)?.screen.bounds.height }
                 .first ?? 874
             return HeroSize(titleSize: screen < 850 ? 36 : 44, showsStrapline: screen >= 700)

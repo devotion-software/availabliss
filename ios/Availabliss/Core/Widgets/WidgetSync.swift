@@ -29,7 +29,9 @@ final class WidgetSync {
     func onPlans(_ response: MyPlansResponse, now: Date = .now) {
         guard isSignedIn else { return }
         let upcoming = WidgetSnapshots.plans(from: response, now: now)
-        write { $0.signedIn = true; $0.plans = upcoming }
+        write {
+            $0.signedIn = true; $0.plans = upcoming
+        }
     }
 
     /// The groups list loaded or changed: the proposals waiting for your reply, and the groups Siri can ask about.
@@ -51,7 +53,7 @@ final class WidgetSync {
     func onSignedOut() {
         refreshTask?.cancel()
         refreshTask = nil
-        write { _ in .signedOut }
+        replace { _ in .signedOut }
         onGroupsChanged?()
     }
 
@@ -81,14 +83,14 @@ final class WidgetSync {
     }
 
     private func write(_ transform: (inout WidgetSnapshot) -> Void) {
-        write { snapshot in
+        replace { snapshot in
             var copy = snapshot
             transform(&copy)
             return copy
         }
     }
 
-    private func write(_ transform: (WidgetSnapshot) -> WidgetSnapshot) {
+    private func replace(_ transform: (WidgetSnapshot) -> WidgetSnapshot) {
         if WidgetSnapshotStore.update(transform) {
             WidgetCenter.shared.reloadAllTimelines()
         }

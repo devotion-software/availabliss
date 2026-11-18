@@ -227,6 +227,11 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: '26.6'
+      # swift-format ships in Xcode's toolchain; style in ios/.swift-format. Fix locally with `make ios-format`.
+      - name: Lint (swift-format)
+        run: |
+          xcrun swift-format --version
+          make ios-lint
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate project

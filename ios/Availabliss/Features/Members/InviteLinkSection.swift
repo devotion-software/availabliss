@@ -47,8 +47,10 @@ struct InviteLinkSection: View {
                     .frame(maxWidth: .infinity)
             }
         } else if let link = model.link {
-            ShareLink(item: link.url, subject: Text("Join \(groupName) on Availabliss"),
-                      message: Text("Join \(groupName) on Availabliss so we can find a time that works.")) {
+            ShareLink(
+                item: link.url, subject: Text("Join \(groupName) on Availabliss"),
+                message: Text("Join \(groupName) on Availabliss so we can find a time that works.")
+            ) {
                 Label("Share invite link", systemImage: "square.and.arrow.up")
             }
             .buttonStyle(.accent)

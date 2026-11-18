@@ -23,14 +23,17 @@ struct GroupContainerView: View {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let group = detail.group {
-                    GroupTopBar(detail: detail, group: group, section: section, unreadCount: detail.unreadCount,
-                                onNewGroup: { showsNewGroup = true }, toast: $toast, error: $error)
+                    GroupTopBar(
+                        detail: detail, group: group, section: section, unreadCount: detail.unreadCount,
+                        onNewGroup: { showsNewGroup = true }, toast: $toast, error: $error)
                 }
             }
             .sheet(isPresented: $showsNewGroup) {
                 if let group = detail.group {
-                    NewGroupSheet(api: app.api, timezone: app.session.user?.timezone ?? TimeZone.current.identifier,
-                                  basedOn: group, me: app.session.user?.id) { created in
+                    NewGroupSheet(
+                        api: app.api, timezone: app.session.user?.timezone ?? TimeZone.current.identifier,
+                        basedOn: group, me: app.session.user?.id
+                    ) { created in
                         app.router.push(.group(id: created.id))
                     }
                 }
@@ -53,9 +56,11 @@ struct GroupContainerView: View {
         if let group = detail.group {
             switch section {
             case nil:
-                GroupAvailabilityView(detail: detail, group: group, onOpenTiming: {
-                    app.router.push(.groupSection(id: group.id, section: .timing))
-                })
+                GroupAvailabilityView(
+                    detail: detail, group: group,
+                    onOpenTiming: {
+                        app.router.push(.groupSection(id: group.id, section: .timing))
+                    })
             case .chat:
                 ChatView(detail: detail, group: group)
             case .plans:
@@ -105,15 +110,21 @@ private struct GroupTopBar: View {
     var body: some View {
         SwiftUI.Group {
             if section == .settings {
-                ScreenHeader(title: "Group settings", subtitle: group.name, titleSize: 22,
-                             backLabel: app.router.isOverGroup(group.id) ? "Back to calendar" : "Back", onBack: { app.router.back() })
+                ScreenHeader(
+                    title: "Group settings", subtitle: group.name, titleSize: 22,
+                    backLabel: app.router.isOverGroup(group.id) ? "Back to calendar" : "Back", onBack: { app.router.back() })
             } else if let section, app.router.isOverGroup(group.id) {
-                ScreenHeader(title: group.name, titleSize: 22, backLabel: "Back to calendar", onBack: { app.router.back() },
-                             leading: section == .chat ? tile : nil)
+                ScreenHeader(
+                    title: group.name, titleSize: 22, backLabel: "Back to calendar", onBack: { app.router.back() },
+                    leading: section == .chat ? tile : nil)
             } else if section != nil {
                 // Opened from elsewhere (Activity): back returns there; the name opens the group.
-                ScreenHeader(title: group.name, titleSize: 22, onBack: { app.router.back() }, onTitle: { app.router.pop(); app.open(.group(id: group.id)) },
-                             leading: section == .chat ? tile : nil)
+                ScreenHeader(
+                    title: group.name, titleSize: 22, onBack: { app.router.back() },
+                    onTitle: {
+                        app.router.pop(); app.open(.group(id: group.id))
+                    },
+                    leading: section == .chat ? tile : nil)
             } else {
                 GroupHeader(detail: detail, group: group, unreadCount: unreadCount, onNewGroup: onNewGroup, toast: $toast, error: $error)
             }
@@ -128,8 +139,11 @@ private struct GroupTopBar: View {
                 Rectangle().fill(.ultraThinMaterial)
                 theme.bg.opacity(0.45)
             }
-            .mask(LinearGradient(stops: [.init(color: .black, location: 0.8), .init(color: .clear, location: 1)],
-                                 startPoint: .top, endPoint: .bottom))
+            .mask(
+                LinearGradient(
+                    stops: [.init(color: .black, location: 0.8), .init(color: .clear, location: 1)],
+                    startPoint: .top, endPoint: .bottom)
+            )
             .ignoresSafeArea(edges: .top)
         }
     }
@@ -148,7 +162,10 @@ private struct GroupHeader: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        ScreenHeader(title: group.name, subtitle: subtitle, subtitleSystemImage: detail.isMuted ? "bell.slash" : nil, titleSize: 22, backLabel: "Back to groups", onBack: { app.router.pop() }) {
+        ScreenHeader(
+            title: group.name, subtitle: subtitle, subtitleSystemImage: detail.isMuted ? "bell.slash" : nil, titleSize: 22, backLabel: "Back to groups",
+            onBack: { app.router.pop() }
+        ) {
             HStack(spacing: 8) {
                 chatButton
                 moreMenu
@@ -177,13 +194,19 @@ private struct GroupHeader: View {
 
     private var moreMenu: some View {
         Menu {
-            Button { app.router.push(.groupSection(id: group.id, section: .plans)) } label: {
+            Button {
+                app.router.push(.groupSection(id: group.id, section: .plans))
+            } label: {
                 Label("Plans", systemImage: "checkmark.circle")
             }
-            Button { app.router.push(.groupSection(id: group.id, section: .timing)) } label: {
+            Button {
+                app.router.push(.groupSection(id: group.id, section: .timing))
+            } label: {
                 Label("Timing", systemImage: "slider.horizontal.3")
             }
-            Button { app.router.push(.members(groupId: group.id)) } label: {
+            Button {
+                app.router.push(.members(groupId: group.id))
+            } label: {
                 Label(canInvite ? "Members and invites" : "Members", systemImage: canInvite ? "person.badge.plus" : "person.2")
             }
             if group.members.count > 1 {
@@ -192,7 +215,9 @@ private struct GroupHeader: View {
                 }
             }
             muteMenu
-            Button { app.router.push(.groupSection(id: group.id, section: .settings)) } label: {
+            Button {
+                app.router.push(.groupSection(id: group.id, section: .settings))
+            } label: {
                 Label("Group settings", systemImage: "gearshape")
             }
         } label: {
@@ -210,7 +235,11 @@ private struct GroupHeader: View {
     @ViewBuilder
     private var muteMenu: some View {
         if detail.isMuted {
-            Button { setMute(nil) } label: { Label("Unmute", systemImage: "bell") }
+            Button {
+                setMute(nil)
+            } label: {
+                Label("Unmute", systemImage: "bell")
+            }
         } else {
             Menu {
                 ForEach(MuteChoice.allCases) { choice in
@@ -233,7 +262,7 @@ private struct GroupHeader: View {
                     try await detail.unmute()
                     toast = "Notifications on"
                 }
-            } catch where !error.isCancellation {
+            } catch  where !error.isCancellation {
                 self.error = error.userMessage
             } catch {}
         }

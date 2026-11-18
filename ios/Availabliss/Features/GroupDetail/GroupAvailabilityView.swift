@@ -87,12 +87,15 @@ struct GroupAvailabilityView: View {
                 app.router.push(.proposal(id: proposal.id))
             }
         }
-        .sheet(isPresented: $showsPlanner, onDismiss: {
-            if let draft = plannedDraft {
-                plannedDraft = nil
-                proposalDraft = draft
+        .sheet(
+            isPresented: $showsPlanner,
+            onDismiss: {
+                if let draft = plannedDraft {
+                    plannedDraft = nil
+                    proposalDraft = draft
+                }
             }
-        }) {
+        ) {
             PlannerSheet { notes in
                 try await detail.api.send(API.Groups.planner(groupId: group.id, notes: notes))
             } propose: { slot, title, note in
@@ -134,7 +137,7 @@ struct GroupAvailabilityView: View {
             shortlist = []
             app.router.push(.groupSection(id: group.id, section: .chat))
             return true
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             model.error = error.userMessage
             return false
         } catch {
@@ -238,15 +241,23 @@ struct GroupAvailabilityView: View {
 
     private var headingRow: some View {
         HStack(spacing: 6) {
-            Button { page(by: -1) } label: { chevron("chevron.left") }
-                .accessibilityLabel("Previous")
+            Button {
+                page(by: -1)
+            } label: {
+                chevron("chevron.left")
+            }
+            .accessibilityLabel("Previous")
             Text(model.heading)
                 .displayFont(19, .semibold, relativeTo: .headline)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .accessibilityAddTraits(.isHeader)
-            Button { page(by: 1) } label: { chevron("chevron.right") }
-                .accessibilityLabel("Next")
+            Button {
+                page(by: 1)
+            } label: {
+                chevron("chevron.right")
+            }
+            .accessibilityLabel("Next")
             if model.isAwayFromToday {
                 Button("Today", action: jumpToToday)
                     .bodyFont(12, .semibold, relativeTo: .caption)
@@ -305,8 +316,10 @@ struct GroupAvailabilityView: View {
                 proposalDraft = draft
             }
             if model.mode == .month {
-                BestOptionsCard(model: model, group: group, me: app.session.user?.id, isPro: isPro, shortlist: $shortlist,
-                                onAsk: { showsAskGroup = true }) { draft in
+                BestOptionsCard(
+                    model: model, group: group, me: app.session.user?.id, isPro: isPro, shortlist: $shortlist,
+                    onAsk: { showsAskGroup = true }
+                ) { draft in
                     proposalDraft = draft
                 }
                 planWithAI

@@ -284,7 +284,9 @@ private struct WeekStrip: View {
         let isPast = day < .today()
         let summary = model.summaries[day]
         let calendarBusy = summary?.segments.contains { !$0.manual } ?? false
-        return Button { onSelect(day) } label: {
+        return Button {
+            onSelect(day)
+        } label: {
             VStack(spacing: 3) {
                 Text(Weekday.short(day.weekday()))
                     .bodyFont(11, .semibold, relativeTo: .caption2)

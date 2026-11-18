@@ -59,7 +59,9 @@ private struct AgendaDay: View {
         let allDay = (model.layout.allDay[day] ?? []).filter { !$0.isIgnored }
         let timed = (model.layout.timed[day] ?? []).filter { !$0.interval.isIgnored }.sorted { $0.from < $1.from }
         VStack(alignment: .leading, spacing: 4) {
-            Button { onOpenDay(day) } label: {
+            Button {
+                onOpenDay(day)
+            } label: {
                 HStack(spacing: 6) {
                     Text("\(Weekday.short(day.weekday())) \(day.day)")
                         .bodyFont(14, .bold)

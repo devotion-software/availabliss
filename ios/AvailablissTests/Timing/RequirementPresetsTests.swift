@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// The "How long?" presets and how a timing is described. Ported from Android `RequirementPresetsTest`.
@@ -85,7 +86,9 @@ struct RequirementPresetsTests {
     }
 
     @Test func spanDaysWrapPastSunday() {
-        #expect(TimingEditorViewModel.days(in: .init(startDay: 5, startTime: WallTime(hour: 9, minute: 0), endDay: 0, endTime: WallTime(hour: 18, minute: 0), weeksLater: 0)) == [0, 5, 6])
+        #expect(
+            TimingEditorViewModel.days(in: .init(startDay: 5, startTime: WallTime(hour: 9, minute: 0), endDay: 0, endTime: WallTime(hour: 18, minute: 0), weeksLater: 0))
+                == [0, 5, 6])
         #expect(TimingEditorViewModel.days(in: TimingPreset.weekendSpan) == [4, 5, 6])
         // "Tue → following Thu" can start any week day.
         #expect(TimingEditorViewModel.days(in: .init(startDay: 1, startTime: .midnight, endDay: 3, endTime: .endOfDay, weeksLater: 1)).isEmpty)
@@ -159,11 +162,13 @@ struct RequirementPresetsTests {
     }
 
     @Test func requirementsFromOlderServersDecode() throws {
-        let r = try Fixtures.decode(Requirement.self, """
-        {"length":{"type":"duration","minutes":120},"window":{"from":"08:00","to":"23:00"},"days":[],"bankHolidays":true,
-         "schoolHolidaysOnly":false,"schoolAuthority":null,"customSchoolHolidays":[],"range":{"from":"2026-11-01","to":"2027-01-31"},
-         "dates":[],"timezone":"Europe/London"}
-        """)
+        let r = try Fixtures.decode(
+            Requirement.self,
+            """
+            {"length":{"type":"duration","minutes":120},"window":{"from":"08:00","to":"23:00"},"days":[],"bankHolidays":true,
+             "schoolHolidaysOnly":false,"schoolAuthority":null,"customSchoolHolidays":[],"range":{"from":"2026-11-01","to":"2027-01-31"},
+             "dates":[],"timezone":"Europe/London"}
+            """)
         #expect(r.quorum == nil)
         #expect(r.optionalMemberIds == nil)
         #expect(r.length == .duration(minutes: 120))

@@ -1,5 +1,5 @@
-import Foundation
 import CoreGraphics
+import Foundation
 
 struct Message: Codable, Sendable, Identifiable, Equatable {
     enum Kind: String, Codable, Sendable { case text, poll, proposal, event, system }

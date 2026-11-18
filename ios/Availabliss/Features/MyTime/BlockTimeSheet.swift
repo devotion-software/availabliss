@@ -145,7 +145,8 @@ struct BlockTimeSheet: View {
     /// The block to save. All day runs from the first day's midnight to the midnight after the last.
     private var block: NewManualBlock {
         let calendar = Calendar.current
-        let range: (Date, Date) = allDay
+        let range: (Date, Date) =
+            allDay
             ? (calendar.startOfDay(for: start), CalendarDay(max(end, start)).adding(days: 1).startDate())
             : (start, end)
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)

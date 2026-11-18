@@ -29,7 +29,7 @@ final class GroupsHomeViewModel {
             let now = Date()
             upNext = await Array((upcoming?.events ?? []).filter { $0.end > now }.sorted { $0.start < $1.start }.prefix(Self.upNextLimit))
             loadError = nil
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             loadError = error.userMessage
         } catch {}
     }

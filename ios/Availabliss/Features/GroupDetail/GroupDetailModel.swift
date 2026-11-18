@@ -92,7 +92,7 @@ final class GroupDetailModel {
         do {
             group = try await api.send(API.Groups.get(id: groupId))
             loadError = nil
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             loadError = error.userMessage
         } catch {}
     }

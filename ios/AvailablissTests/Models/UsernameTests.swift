@@ -1,4 +1,5 @@
 import Testing
+
 @testable import Availabliss
 
 /// Ported from Android `UsernamesTest` (which mirrors web `usernames.ts`).

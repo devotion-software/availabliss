@@ -35,7 +35,8 @@ struct Endpoint<Response: Decodable & Sendable>: Sendable {
         self.method = method
         self.mount = mount
         self.path = path
-        self.query = query
+        self.query =
+            query
             .compactMap { key, value in value.map { URLQueryItem(name: key, value: $0) } }
             .sorted { $0.name < $1.name }
         self.body = body

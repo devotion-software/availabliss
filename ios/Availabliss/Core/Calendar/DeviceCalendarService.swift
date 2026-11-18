@@ -278,7 +278,8 @@ final class DeviceCalendarService {
 
     private func busy(from start: Date, to end: Date, in selected: [EKCalendar]) -> [DeviceSync.BusyRange] {
         guard !selected.isEmpty else { return [] }
-        return store
+        return
+            store
             .events(matching: store.predicateForEvents(withStart: start, end: end, calendars: selected))
             .filter { $0.availability != .free && $0.status != .canceled && !Self.isDeclined($0) }
             .map {
@@ -307,7 +308,8 @@ final class DeviceCalendarService {
 
     private static func hex(_ color: CGColor) -> String? {
         guard let rgb = color.converted(to: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(), intent: .defaultIntent, options: nil),
-              let parts = rgb.components, parts.count >= 3 else { return nil }
+            let parts = rgb.components, parts.count >= 3
+        else { return nil }
         return String(format: "#%02X%02X%02X", Int(parts[0] * 255), Int(parts[1] * 255), Int(parts[2] * 255))
     }
 
@@ -351,7 +353,8 @@ final class DeviceCalendarService {
         let defaults = UserDefaults.standard
         var added: [String: AddedEvent] = [:]
         if let data = defaults.data(forKey: Self.addedV2Key),
-           let decoded = try? JSONDecoder().decode([String: AddedEvent].self, from: data) {
+            let decoded = try? JSONDecoder().decode([String: AddedEvent].self, from: data)
+        {
             added = decoded
         }
         if let legacy = defaults.dictionary(forKey: Self.addedKey) as? [String: String] {
@@ -376,7 +379,8 @@ final class DeviceCalendarService {
     /// The calendar to offer first: the one last added to, else the phone's default.
     var preferredCalendar: EKCalendar? {
         if let id = UserDefaults.standard.string(forKey: Self.lastAddCalendarKey),
-           let calendar = writableCalendars.first(where: { $0.calendarIdentifier == id }) {
+            let calendar = writableCalendars.first(where: { $0.calendarIdentifier == id })
+        {
             return calendar
         }
         return store.defaultCalendarForNewEvents
@@ -439,8 +443,9 @@ final class DeviceCalendarService {
     /// title and place, and only if the plan itself changed, so edits made in the calendar stay).
     func updateIfPlanChanged(_ event: GroupEvent) {
         guard let record = addedEvents[event.id], let start = record.start, let end = record.end,
-              start != event.start || end != event.end,
-              let item = addedItem(record) else { return }
+            start != event.start || end != event.end,
+            let item = addedItem(record)
+        else { return }
         fill(item, from: event, includeNote: false)
         guard (try? store.save(item, span: .thisEvent, commit: true)) != nil else { return }
         self.record(item, for: event)

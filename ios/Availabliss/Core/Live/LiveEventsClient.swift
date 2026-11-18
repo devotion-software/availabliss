@@ -18,7 +18,7 @@ final class LiveEventsClient {
 
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 120   // idle time between bytes before we reconnect
+        configuration.timeoutIntervalForRequest = 120  // idle time between bytes before we reconnect
         configuration.timeoutIntervalForResource = 24 * 60 * 60
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         return URLSession(configuration: configuration)

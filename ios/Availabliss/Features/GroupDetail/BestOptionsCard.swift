@@ -72,7 +72,9 @@ struct BestOptionsCard: View {
     private func shortlistToggle(_ slot: Slot) -> some View {
         let isOn = isShortlisted(slot)
         let isFull = !isOn && shortlist.count >= Self.pollRange.upperBound
-        return Button { toggleShortlist(slot) } label: {
+        return Button {
+            toggleShortlist(slot)
+        } label: {
             HStack(spacing: 4) {
                 Image(systemName: isOn ? "checkmark.circle.fill" : "plus.circle").font(.system(size: 12, weight: .semibold))
                 Text(isOn ? "Shortlisted" : "Shortlist")

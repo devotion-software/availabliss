@@ -87,14 +87,16 @@ struct Orbs: View {
     }
 
     private func offset(for orb: OrbSpec, in size: CGSize) -> CGSize {
-        let x: CGFloat = switch orb.x {
-        case .left(let value): value
-        case .right(let value): size.width - orb.size - value
-        }
-        let y: CGFloat = switch orb.y {
-        case .top(let value): value
-        case .bottom(let value): size.height - orb.size - value
-        }
+        let x: CGFloat =
+            switch orb.x {
+            case .left(let value): value
+            case .right(let value): size.width - orb.size - value
+            }
+        let y: CGFloat =
+            switch orb.y {
+            case .top(let value): value
+            case .bottom(let value): size.height - orb.size - value
+            }
         return CGSize(width: x, height: y)
     }
 }

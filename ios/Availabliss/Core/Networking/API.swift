@@ -154,13 +154,17 @@ enum API {
         /// No one: a link anyone can use, by `maxUses` people (left out: one). Emails / usernames: one invite each, only for that person
         /// (emailed, or sent to their Activity). 404 for a username nobody has, 409 if they're in already.
         /// User ids: likewise sent to their Activity, for people you're already in a group with.
-        static func createInvite(groupId: String, emails: [String] = [], usernames: [String] = [], userIds: [String] = [], maxUses: LinkLimit? = nil) -> Endpoint<InviteLink> {
-            .init(.post, "/groups/\(groupId.pathEncoded)/invites", body: CreateInviteBody(
-                emails: emails.isEmpty ? nil : emails,
-                usernames: usernames.isEmpty ? nil : usernames,
-                userIds: userIds.isEmpty ? nil : userIds,
-                maxUses: maxUses
-            ))
+        static func createInvite(groupId: String, emails: [String] = [], usernames: [String] = [], userIds: [String] = [], maxUses: LinkLimit? = nil) -> Endpoint<
+            InviteLink
+        > {
+            .init(
+                .post, "/groups/\(groupId.pathEncoded)/invites",
+                body: CreateInviteBody(
+                    emails: emails.isEmpty ? nil : emails,
+                    usernames: usernames.isEmpty ? nil : usernames,
+                    userIds: userIds.isEmpty ? nil : userIds,
+                    maxUses: maxUses
+                ))
         }
         static func preferences(groupId: String) -> Endpoint<GroupPreferencesResponse> { .init(.get, "/groups/\(groupId.pathEncoded)/preferences") }
         static func addPreference(groupId: String, _ body: NewGroupPreference) -> Endpoint<GroupPreference> {

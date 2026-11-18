@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Availabliss
 
 /// What the home-screen widgets show and how they word it, compared with Android `WidgetSnapshotsTest`.
@@ -51,10 +52,11 @@ struct WidgetSnapshotTests {
             summary("g3", "Old flat", status: .needsReply(proposalId: "p3"), archived: true),
             summary("g4", "Five-a-side", status: .needsReply(proposalId: "p4")),
         ]
-        #expect(WidgetSnapshots.waiting(from: groups) == [
-            WidgetWaiting(groupName: "Lake District crew", proposalId: "p1", groupId: "g1"),
-            WidgetWaiting(groupName: "Five-a-side", proposalId: "p4", groupId: "g4"),
-        ])
+        #expect(
+            WidgetSnapshots.waiting(from: groups) == [
+                WidgetWaiting(groupName: "Lake District crew", proposalId: "p1", groupId: "g1"),
+                WidgetWaiting(groupName: "Five-a-side", proposalId: "p4", groupId: "g4"),
+            ])
         #expect(WidgetSnapshots.groups(from: groups).map(\.name) == ["Lake District crew", "Book club", "Five-a-side"])
     }
 
@@ -73,7 +75,7 @@ struct WidgetSnapshotTests {
     // MARK: Labels
 
     @Test func whenLabelSaysTodayTomorrowOrTheDate() {
-        let now = Fixtures.date("2026-12-02T10:00:00Z") // Wednesday
+        let now = Fixtures.date("2026-12-02T10:00:00Z")  // Wednesday
         func label(_ start: String, _ end: String) -> String {
             WidgetSnapshots.whenLabel(plan("x", start, end), now: now, calendar: london)
         }
@@ -117,12 +119,13 @@ struct WidgetSnapshotTests {
             plan("Far off", "2027-01-20T19:00:00Z", "2027-01-20T22:00:00Z"),
         ]
         let dates = WidgetSnapshots.timelineDates(plans, now: now, calendar: london, days: 2)
-        #expect(dates == [
-            Fixtures.date("2026-12-02T19:00:00Z"),
-            Fixtures.date("2026-12-02T22:00:00Z"),
-            Fixtures.date("2026-12-03T00:00:00Z"),
-            Fixtures.date("2026-12-04T00:00:00Z"),
-        ])
+        #expect(
+            dates == [
+                Fixtures.date("2026-12-02T19:00:00Z"),
+                Fixtures.date("2026-12-02T22:00:00Z"),
+                Fixtures.date("2026-12-03T00:00:00Z"),
+                Fixtures.date("2026-12-04T00:00:00Z"),
+            ])
     }
 
     // MARK: Links and storage
@@ -141,10 +144,16 @@ struct WidgetSnapshotTests {
 
         #expect(WidgetSnapshotStore.load(from: defaults) == nil)
         let plans = [plan("Dinner", "2026-12-02T19:00:00Z", "2026-12-02T22:00:00Z")]
-        #expect(WidgetSnapshotStore.update(in: defaults) { var s = $0; s.plans = plans; return s })
+        #expect(
+            WidgetSnapshotStore.update(in: defaults) {
+                var s = $0; s.plans = plans; return s
+            })
         #expect(WidgetSnapshotStore.load(from: defaults) == WidgetSnapshot(signedIn: true, plans: plans))
         // The same again isn't a change (no redraw).
-        #expect(!WidgetSnapshotStore.update(in: defaults) { var s = $0; s.plans = plans; return s })
+        #expect(
+            !WidgetSnapshotStore.update(in: defaults) {
+                var s = $0; s.plans = plans; return s
+            })
         #expect(WidgetSnapshotStore.update(in: defaults) { _ in .signedOut })
         #expect(WidgetSnapshotStore.load(from: defaults) == .signedOut)
     }
@@ -172,22 +181,26 @@ struct FreeTimeAnswerTests {
             slot("Fri 4 – Sun 6 Dec", "2026-12-04T17:00:00Z", "2026-12-06T22:00:00Z"),
             slot("Fri 18 – Sun 20 Dec", "2026-12-18T17:00:00Z", "2026-12-20T22:00:00Z", missing: ["u2"]),
         ]
-        #expect(FreeTimeAnswer.sentence(slots: slots, groupName: "Lake District crew", monthName: "December", now: now)
-            == "Fri 4 – Sun 6 Dec and Fri 11 – Sun 13 Dec work for everyone in Lake District crew.")
+        #expect(
+            FreeTimeAnswer.sentence(slots: slots, groupName: "Lake District crew", monthName: "December", now: now)
+                == "Fri 4 – Sun 6 Dec and Fri 11 – Sun 13 Dec work for everyone in Lake District crew.")
     }
 
     @Test func oneTimeWorksAndManyAreCut() {
         let one = [slot("Sat 5 Dec", "2026-12-05T09:00:00Z", "2026-12-05T22:00:00Z")]
-        #expect(FreeTimeAnswer.sentence(slots: one, groupName: "Book club", monthName: "December", now: now)
-            == "Sat 5 Dec works for everyone in Book club.")
+        #expect(
+            FreeTimeAnswer.sentence(slots: one, groupName: "Book club", monthName: "December", now: now)
+                == "Sat 5 Dec works for everyone in Book club.")
         let many = (2...6).map { slot("Day \($0)", "2026-12-0\($0)T09:00:00Z", "2026-12-0\($0)T22:00:00Z") }
-        #expect(FreeTimeAnswer.sentence(slots: many, groupName: "Book club", monthName: "December", now: now)
-            == "Day 2, Day 3, Day 4 and 2 more work for everyone in Book club.")
+        #expect(
+            FreeTimeAnswer.sentence(slots: many, groupName: "Book club", monthName: "December", now: now)
+                == "Day 2, Day 3, Day 4 and 2 more work for everyone in Book club.")
     }
 
     @Test func saysWhenNothingWorks() {
         let over = [slot("Mon 30 Nov", "2026-11-30T09:00:00Z", "2026-11-30T22:00:00Z")]
-        #expect(FreeTimeAnswer.sentence(slots: over, groupName: "Book club", monthName: "December", now: now)
-            == "Nothing works for everyone in Book club for the rest of December.")
+        #expect(
+            FreeTimeAnswer.sentence(slots: over, groupName: "Book club", monthName: "December", now: now)
+                == "Nothing works for everyone in Book club for the rest of December.")
     }
 }

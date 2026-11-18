@@ -66,7 +66,9 @@ struct MessageRow: View {
             // A confirmed proposal ("Everyone's in for …", or "It's on for …" when confirmed anyway)
             // gets a celebratory banner once its event is loaded.
             if let id = message.eventId, let event = model.events[id] {
-                ConfirmedBanner(event: event, messageId: message.id, headline: confirmedHeadline(event), isRecent: Date.now.timeIntervalSince(message.createdAt) < 24 * 3600) {
+                ConfirmedBanner(
+                    event: event, messageId: message.id, headline: confirmedHeadline(event), isRecent: Date.now.timeIntervalSince(message.createdAt) < 24 * 3600
+                ) {
                     if let proposalId = event.proposalId { openProposal(proposalId) }
                 }
             } else {
@@ -85,13 +87,16 @@ struct MessageRow: View {
                 }
             } else if isMine {
                 VStack(alignment: .trailing, spacing: 4) {
-                    MessageBubble(text: message.text ?? "", isMine: true, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files, location: message.place, openImage: openImage, openFile: openFile, openingFileId: openingFileId)
-                        .onTapGesture(perform: openInfo)
-                        .contextMenu { menu }
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityHint(tapHint)
-                        .accessibilityAction(named: "Reply", onReply)
-                        .accessibilityActions { extraActions }
+                    MessageBubble(
+                        text: message.text ?? "", isMine: true, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files,
+                        location: message.place, openImage: openImage, openFile: openFile, openingFileId: openingFileId
+                    )
+                    .onTapGesture(perform: openInfo)
+                    .contextMenu { menu }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint(tapHint)
+                    .accessibilityAction(named: "Reply", onReply)
+                    .accessibilityActions { extraActions }
                     if message.isEdited { EditedLabel() }
                     if isLatestOwn, let receipt = message.receipt {
                         ReadReceipt(receipt: receipt, group: group, action: openInfo)
@@ -101,9 +106,12 @@ struct MessageRow: View {
             } else {
                 IncomingRow(author: author, showsName: startsRun) {
                     VStack(alignment: .leading, spacing: 4) {
-                        MessageBubble(text: message.text ?? "", isMine: false, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files, location: message.place, openImage: openImage, openFile: openFile, openingFileId: openingFileId)
-                            .onTapGesture(perform: openInfo)
-                            .contextMenu { menu }
+                        MessageBubble(
+                            text: message.text ?? "", isMine: false, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files,
+                            location: message.place, openImage: openImage, openFile: openFile, openingFileId: openingFileId
+                        )
+                        .onTapGesture(perform: openInfo)
+                        .contextMenu { menu }
                         if message.isEdited { EditedLabel() }
                     }
                 }
@@ -115,10 +123,13 @@ struct MessageRow: View {
         case .poll:
             if let poll = message.poll {
                 VStack(alignment: .trailing, spacing: 4) {
-                    PollCard(poll: poll, group: group, me: me, title: isMine ? "Your poll" : "Poll by \(author?.firstName ?? "Someone")", canClose: isMine, canPropose: isMine || group.role.isAdmin, model: model)
-                        .contextMenu { menu }
-                        .accessibilityAction(named: "Reply", onReply)
-                        .accessibilityActions { extraActions }
+                    PollCard(
+                        poll: poll, group: group, me: me, title: isMine ? "Your poll" : "Poll by \(author?.firstName ?? "Someone")", canClose: isMine,
+                        canPropose: isMine || group.role.isAdmin, model: model
+                    )
+                    .contextMenu { menu }
+                    .accessibilityAction(named: "Reply", onReply)
+                    .accessibilityActions { extraActions }
                     if isMine, isLatestOwn, let receipt = message.receipt {
                         ReadReceipt(receipt: receipt, group: group, action: openInfo)
                     }
@@ -127,7 +138,9 @@ struct MessageRow: View {
             }
         case .proposal:
             if let id = message.proposalId {
-                Button { openProposal(id) } label: {
+                Button {
+                    openProposal(id)
+                } label: {
                     if let proposal = model.proposals[id] {
                         ProposalCard(proposal: proposal, group: group, me: me)
                     } else {
@@ -317,7 +330,9 @@ private struct QuoteBlock: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        Button { open(quote.preview.id) } label: {
+        Button {
+            open(quote.preview.id)
+        } label: {
             HStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 1.5)
                     .fill(isMine ? theme.onAccent.opacity(0.6) : theme.accentInk)
@@ -397,12 +412,12 @@ struct MessageBubble: View {
                     .textSelection(.enabled)
             }
         }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background {
-                if isMine { shape.fill(theme.accent) } else { Color.clear.modifier(GlassBackground(shape: shape, shadow: false)) }
-            }
-            .frame(maxWidth: 290, alignment: isMine ? .trailing : .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background {
+            if isMine { shape.fill(theme.accent) } else { Color.clear.modifier(GlassBackground(shape: shape, shadow: false)) }
+        }
+        .frame(maxWidth: 290, alignment: isMine ? .trailing : .leading)
     }
 }
 
@@ -478,8 +493,10 @@ struct PollCard: View {
             Text(poll.question).displayFont(17, .semibold, relativeTo: .headline)
             ForEach(poll.options) { option in
                 VStack(alignment: .leading, spacing: 6) {
-                    PollOptionRow(option: option, poll: poll, me: me, isLeading: isLeading(option, leading: leading),
-                                  busy: option.slot == nil ? nil : busyText(option)) {
+                    PollOptionRow(
+                        option: option, poll: poll, me: me, isLeading: isLeading(option, leading: leading),
+                        busy: option.slot == nil ? nil : busyText(option)
+                    ) {
                         Task { await model.vote(poll: poll, option: option) }
                     }
                     if canPropose, option.id == leading?.id, let slot = option.slot {
@@ -577,8 +594,9 @@ private struct PollOptionRow: View {
             }
             .background(theme.surface)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(isMine || (isLeading && option.slot != nil) ? theme.accent : theme.glassHi, lineWidth: isLeading && option.slot != nil ? 1.5 : 1))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isMine || (isLeading && option.slot != nil) ? theme.accent : theme.glassHi, lineWidth: isLeading && option.slot != nil ? 1.5 : 1))
         }
         .buttonStyle(.pressable)
         .disabled(poll.closed)
@@ -730,8 +748,8 @@ private struct ConfettiBurst: View {
     }
     private static let duration = 1.6
     private static let pieces: [Piece] = (0..<36).map { i in
-        var rng = SeededRandom(seed: UInt64(i) &* 2654435761 &+ 7)
-        let angle = Double.pi * (1.1 + 0.8 * rng.next())   // up and out
+        var rng = SeededRandom(seed: UInt64(i) &* 2_654_435_761 &+ 7)
+        let angle = Double.pi * (1.1 + 0.8 * rng.next())  // up and out
         let speed = 260 + 260 * rng.next()
         return Piece(
             vx: cos(angle) * speed, vy: sin(angle) * speed,
@@ -777,7 +795,7 @@ private struct ConfettiBurst: View {
 /// Small deterministic generator so the burst looks the same every time.
 private struct SeededRandom {
     var state: UInt64
-    init(seed: UInt64) { state = seed == 0 ? 0x9E3779B97F4A7C15 : seed }
+    init(seed: UInt64) { state = seed == 0 ? 0x9E37_79B9_7F4A_7C15 : seed }
     mutating func next() -> Double {
         state ^= state << 13
         state ^= state >> 7

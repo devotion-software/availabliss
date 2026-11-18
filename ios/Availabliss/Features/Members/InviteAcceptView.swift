@@ -24,14 +24,16 @@ struct InviteAcceptView: View {
     /// An emailed invite is only for that address; someone signed in as anyone else can't use it.
     private var invitedOtherEmail: String? {
         guard let invited = preview?.email, let mine = app.session.user?.email,
-              invited.caseInsensitiveCompare(mine) != .orderedSame else { return nil }
+            invited.caseInsensitiveCompare(mine) != .orderedSame
+        else { return nil }
         return invited
     }
 
     /// Likewise an invite sent by username is only for that account.
     private var invitedOtherUsername: String? {
         guard let invited = preview?.username, let user = app.session.user,
-              invited.caseInsensitiveCompare(user.username ?? "") != .orderedSame else { return nil }
+            invited.caseInsensitiveCompare(user.username ?? "") != .orderedSame
+        else { return nil }
         return invited
     }
 
@@ -53,13 +55,15 @@ struct InviteAcceptView: View {
                     .bodyFont(12, relativeTo: .caption)
                     .foregroundStyle(theme.muted)
                 if let invited = invitedOtherEmail {
-                    Text("This invite was sent to \(invited), but you\u{2019}re signed in as \(app.session.user?.email ?? "someone else"). Sign in with \(invited) to join.")
-                        .bodyFont(14)
-                        .foregroundStyle(theme.warnInk)
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(theme.warnBg))
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        "This invite was sent to \(invited), but you\u{2019}re signed in as \(app.session.user?.email ?? "someone else"). Sign in with \(invited) to join."
+                    )
+                    .bodyFont(14)
+                    .foregroundStyle(theme.warnInk)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(theme.warnBg))
+                    .fixedSize(horizontal: false, vertical: true)
                     Button {
                         Task { await switchAccount() }
                     } label: {
@@ -68,13 +72,15 @@ struct InviteAcceptView: View {
                     .buttonStyle(.primary)
                     .disabled(isSwitching)
                 } else if let invited = invitedOtherUsername {
-                    Text("This invite was sent to @\(invited), but you\u{2019}re signed in as \(app.session.user?.username.map { "@\($0)" } ?? "someone else"). Sign in as @\(invited) to join.")
-                        .bodyFont(14)
-                        .foregroundStyle(theme.warnInk)
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(theme.warnBg))
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        "This invite was sent to @\(invited), but you\u{2019}re signed in as \(app.session.user?.username.map { "@\($0)" } ?? "someone else"). Sign in as @\(invited) to join."
+                    )
+                    .bodyFont(14)
+                    .foregroundStyle(theme.warnInk)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(theme.warnBg))
+                    .fixedSize(horizontal: false, vertical: true)
                     Button {
                         Task { await switchAccount() }
                     } label: {

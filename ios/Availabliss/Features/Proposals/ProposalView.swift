@@ -80,7 +80,9 @@ private struct PendingProposalView: View {
                 }
                 membersList
                 if model.canConfirmAnyway(me: me) {
-                    Button { confirmsAnyway = true } label: {
+                    Button {
+                        confirmsAnyway = true
+                    } label: {
                         LoadingLabel(title: "Confirm anyway", systemImage: "checkmark.circle", isLoading: model.isResponding && model.sending == nil)
                     }
                     .buttonStyle(.secondary)
@@ -127,14 +129,19 @@ private struct PendingProposalView: View {
             ]
         }
         .confirmSheet("Confirm anyway?", isPresented: $confirmsAnyway, message: model.confirmAnywayMessage(me: me)) {
-            [ConfirmOption("Confirm the plan", systemImage: "checkmark") {
-                Task { await model.confirmAnyway() }
-            }]
+            [
+                ConfirmOption("Confirm the plan", systemImage: "checkmark") {
+                    Task { await model.confirmAnyway() }
+                }
+            ]
         }
-        .confirmSheet("Cancel this proposal?", isPresented: $confirmsCancel, message: "It'll show as cancelled for everyone in the group.", cancelTitle: "Keep proposal") {
-            [ConfirmOption("Cancel proposal", kind: .destructive) {
-                Task { if await model.cancel() { app.router.pop() } }
-            }]
+        .confirmSheet("Cancel this proposal?", isPresented: $confirmsCancel, message: "It'll show as cancelled for everyone in the group.", cancelTitle: "Keep proposal")
+        {
+            [
+                ConfirmOption("Cancel proposal", kind: .destructive) {
+                    Task { if await model.cancel() { app.router.pop() } }
+                }
+            ]
         }
     }
 
@@ -192,20 +199,25 @@ private struct PendingProposalView: View {
                 .bodyFont(13, .semibold, relativeTo: .subheadline)
                 .padding(.leading, 4)
             HStack(spacing: 8) {
-                Button { Task { await model.respond(.declined) } } label: {
+                Button {
+                    Task { await model.respond(.declined) }
+                } label: {
                     LoadingLabel(title: "Can't make it", isLoading: model.sending == .declined)
                 }
-                    .buttonStyle(.secondary)
-                    .disabled(mine == .declined || model.isResponding)
-                Button { Task { await model.respond(.maybe) } } label: {
+                .buttonStyle(.secondary)
+                .disabled(mine == .declined || model.isResponding)
+                Button {
+                    Task { await model.respond(.maybe) }
+                } label: {
                     LoadingLabel(title: "Maybe", systemImage: mine == .maybe ? "checkmark" : nil, isLoading: model.sending == .maybe)
                 }
-                    .buttonStyle(.secondary)
-                    .disabled(mine == .maybe || model.isResponding)
+                .buttonStyle(.secondary)
+                .disabled(mine == .maybe || model.isResponding)
                 Button {
                     Task { await model.respond(.accepted) }
                 } label: {
-                    LoadingLabel(title: mine == .accepted ? "Accepted" : "Accept", systemImage: mine == .accepted ? "checkmark" : nil, isLoading: model.sending == .accepted)
+                    LoadingLabel(
+                        title: mine == .accepted ? "Accepted" : "Accept", systemImage: mine == .accepted ? "checkmark" : nil, isLoading: model.sending == .accepted)
                 }
                 .buttonStyle(.primary)
                 .disabled(mine == .accepted || model.isResponding)
@@ -334,7 +346,10 @@ private struct ConfirmedView: View {
             try? await Task.sleep(for: .milliseconds(600))
             reviewing = true
         }
-        .confirmSheet(model.droppedOutHeadline(me: me), isPresented: $reviewing, message: "The plan\u{2019}s still on. Keep it with who can make it, or cancel it and find another date.", cancelTitle: "Decide later") {
+        .confirmSheet(
+            model.droppedOutHeadline(me: me), isPresented: $reviewing,
+            message: "The plan\u{2019}s still on. Keep it with who can make it, or cancel it and find another date.", cancelTitle: "Decide later"
+        ) {
             [
                 ConfirmOption("Keep the plan", systemImage: "checkmark") {
                     Task { await model.keepPlan() }
@@ -380,20 +395,23 @@ private struct ConfirmedView: View {
     private var changeReplyOptions: [ConfirmOption] {
         var options: [ConfirmOption] = []
         if myReply != .accepted {
-            options.append(ConfirmOption("I can make it", systemImage: "checkmark") {
-                Task { await model.respond(.accepted) }
-            })
+            options.append(
+                ConfirmOption("I can make it", systemImage: "checkmark") {
+                    Task { await model.respond(.accepted) }
+                })
         }
         if myReply != .maybe {
-            options.append(ConfirmOption("I might make it", systemImage: "questionmark", kind: .secondary) {
-                Task { await model.respond(.maybe) }
-            })
+            options.append(
+                ConfirmOption("I might make it", systemImage: "questionmark", kind: .secondary) {
+                    Task { await model.respond(.maybe) }
+                })
         }
         if myReply != .declined {
             // Going from a yes to a no is dropping out (the reviewers are told), so it's destructive.
-            options.append(ConfirmOption("I can\u{2019}t make it", systemImage: "xmark", kind: myReply == .accepted ? .destructive : .secondary) {
-                Task { await model.respond(.declined) }
-            })
+            options.append(
+                ConfirmOption("I can\u{2019}t make it", systemImage: "xmark", kind: myReply == .accepted ? .destructive : .secondary) {
+                    Task { await model.respond(.declined) }
+                })
         }
         return options
     }
@@ -404,7 +422,9 @@ private struct ConfirmedView: View {
     private var reviewPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             ClashPanel(headline: model.droppedOutHeadline(me: me), detail: "Keep the plan with who can make it, or cancel it and find another date.", cornerRadius: 18)
-            Button { reviewing = true } label: {
+            Button {
+                reviewing = true
+            } label: {
                 Label("Keep or cancel\u{2026}", systemImage: "arrow.triangle.branch")
             }
             .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 15))

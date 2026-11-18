@@ -215,7 +215,7 @@ final class TimingEditorViewModel {
             try await Task.sleep(for: .milliseconds(400))
             preview = try await api.send(API.Requirements.preview(draft))
             isPreviewing = false
-        } catch where error.isCancellation {
+        } catch  where error.isCancellation {
             // Superseded by a newer edit; that task will finish the job.
         } catch {
             preview = nil

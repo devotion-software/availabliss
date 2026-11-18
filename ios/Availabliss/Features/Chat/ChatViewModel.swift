@@ -85,7 +85,7 @@ final class ChatViewModel {
             hasMore = page.hasMore
             await hydrate(page.messages)
             await markSeen()
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             self.error = error.userMessage
         } catch {}
     }
@@ -217,7 +217,7 @@ final class ChatViewModel {
                     Task { @MainActor in self?.setProgress(id, fraction) }
                 }
                 self?.finishUpload(id, attachment: attachment, error: nil)
-            } catch where error.isCancellation {
+            } catch  where error.isCancellation {
             } catch {
                 self?.finishUpload(id, attachment: nil, error: error.userMessage)
             }
@@ -226,7 +226,8 @@ final class ChatViewModel {
 
     private func setProgress(_ id: UUID, _ fraction: Double) {
         guard let target = targetOf(id), let index = composer(target).uploads.firstIndex(where: { $0.id == id }),
-              composer(target).uploads[index].isUploading else { return }
+            composer(target).uploads[index].isUploading
+        else { return }
         // Held just short of done until the server has answered.
         composers[target]?.uploads[index].progress = min(fraction, 0.95)
     }
@@ -275,7 +276,7 @@ final class ChatViewModel {
             let result = try await api.send(API.Chat.thread(messageId: messageId))
             thread = result.messages
             threadTruncated = result.truncated
-        } catch where !error.isCancellation {
+        } catch  where !error.isCancellation {
             threadError = error.userMessage
         } catch {}
     }
