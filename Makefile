@@ -4,7 +4,7 @@ WEB := web
 IMAGE ?= availabliss-web
 
 .DEFAULT_GOAL := help
-.PHONY: help setup hooks env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test test-integration smoke e2e \
+.PHONY: help setup hooks env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test test-integration smoke e2e openapi \
 	seed-demo clean-demo set-plan apple-secret school-holidays \
 	docker-build docker-run ios-project ios-open ios-build ios-uitest android-build android-test android-tour clean
 
@@ -59,6 +59,9 @@ check: ## Type-check the web app
 
 test: ## Run unit tests
 	cd $(WEB) && bun run test
+
+openapi: ## Regenerate docs/openapi.json from web/src/lib/api-contract.ts (CI fails if it's stale)
+	cd $(WEB) && bun run openapi
 
 test-integration: ## Run DB integration tests against DATABASE_URL (needs `make db-up` and migrations)
 	cd $(WEB) && bun run test:integration

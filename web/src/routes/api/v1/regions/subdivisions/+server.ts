@@ -1,8 +1,8 @@
-import { z } from 'zod';
 import { handler, json, query } from '#lib/server/http';
 import { subdivisions } from '#lib/server/holidays';
+import { countryQuerySchema } from '#lib/schemas';
 
 export const GET = handler(async ({ url }) => {
-	const { country } = query(url, z.object({ country: z.string().length(2).toUpperCase() }));
+	const { country } = query(url, countryQuerySchema);
 	return json({ subdivisions: await subdivisions(country) });
 });

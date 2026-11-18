@@ -18,7 +18,8 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:push": "drizzle-kit push",
 		"db:studio": "drizzle-kit studio",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"openapi": "bun scripts/openapi.ts"
 	},
 	"imports": {
 		"#lib": "./src/lib/index.ts",
@@ -36,6 +37,7 @@
 		"drizzle-kit": "^0.31.11",
 		"svelte": "^5.58.0",
 		"svelte-check": "^4.7.8",
+		"ts-json-schema-generator": "^2.9.0",
 		"typescript": "^6.0.3",
 		"vite": "^8.3.8"
 	},

@@ -1,10 +1,8 @@
 import { authed, json, query } from '#lib/server/http';
 import { myBusy } from '#lib/server/busy';
-import { instantRangeSchema } from '#lib/schemas';
-
-const rangeSchema = instantRangeSchema('from', 'to');
+import { busyQuerySchema } from '#lib/schemas';
 
 export const GET = authed(async ({ url, userId }) => {
-	const { from, to } = query(url, rangeSchema);
+	const { from, to } = query(url, busyQuerySchema);
 	return json({ intervals: await myBusy(userId, from, to) });
 });

@@ -1,15 +1,9 @@
-import { z } from 'zod';
 import { authed, body, json, query } from '#lib/server/http';
 import { listMessages, sendLocation, sendPoll, sendText } from '#lib/server/chat';
-import { createMessageSchema } from '#lib/schemas';
-
-const pageQuery = z.object({
-	before: z.string().min(1).optional(),
-	limit: z.coerce.number().int().min(1).max(100).default(50)
-});
+import { createMessageSchema, messagesQuerySchema } from '#lib/schemas';
 
 export const GET = authed<{ id: string }>(async ({ params, url, userId }) => {
-	const { before, limit } = query(url, pageQuery);
+	const { before, limit } = query(url, messagesQuerySchema);
 	return json(await listMessages(params.id, userId, before ?? null, limit));
 });
 

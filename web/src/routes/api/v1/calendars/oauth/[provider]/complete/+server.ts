@@ -1,8 +1,8 @@
-import { z } from 'zod';
 import { ApiError, authed, badRequest, body, json, notFound } from '#lib/server/http';
 import { isOAuthProvider, takePendingLink } from '#lib/server/calendars/oauth';
 import { connectOAuth, getConnection } from '#lib/server/calendars';
 import { log } from '#lib/server/log';
+import { oauthCompleteSchema } from '#lib/schemas';
 
 /**
  * For native apps: finishes a Google / Microsoft connection after the callback
@@ -11,7 +11,7 @@ import { log } from '#lib/server/log';
  */
 export const POST = authed<{ provider: string }>(async ({ event, params, userId }) => {
 	if (!isOAuthProvider(params.provider)) throw notFound('Unknown calendar provider');
-	const { code } = await body(event, z.object({ code: z.string().min(1).max(100) }));
+	const { code } = await body(event, oauthCompleteSchema);
 	const providerCode = await takePendingLink(code, userId, params.provider);
 	let id: string;
 	try {

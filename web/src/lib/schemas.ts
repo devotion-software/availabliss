@@ -113,7 +113,7 @@ export const notificationSettingsSchema = z
 		quietHours: z.object({ from: clock, to: clock }).refine((q) => q.from !== q.to, 'Pick different start and end times').nullable()
 	})
 	.partial();
-export const muteGroupSchema = z.object({ until: z.iso.datetime().nullable() });
+export const muteGroupSchema = z.object({ until: z.iso.datetime({ offset: true }).nullable() });
 
 export const createGroupSchema = z.object({
 	name: trimmed(80),
@@ -293,7 +293,7 @@ export const createMessageSchema = z.union([
 				slots: z
 					.array(
 						z
-							.object({ start: z.iso.datetime(), end: z.iso.datetime(), allDay: z.boolean().default(false) })
+							.object({ start: z.iso.datetime({ offset: true }), end: z.iso.datetime({ offset: true }), allDay: z.boolean().default(false) })
 							.refine((s) => s.end > s.start, 'Each time must end after it starts')
 					)
 					.min(2)
@@ -335,3 +335,61 @@ export const linkAccountSchema = z.object({
 
 /** POST /me/accounts/merge-intent (web) */
 export const mergeIntentSchema = z.object({ provider: linkProviderSchema });
+
+// ── Bodies and queries that used to be declared inside their route files ──────
+// Kept here so docs/openapi.json (scripts/openapi.ts, via lib/api-contract.ts) describes exactly what
+// the routes validate.
+
+/** POST /auth/native/exchange: the one-time code from the callback and the PKCE verifier. */
+export const nativeExchangeSchema = z.object({
+	code: z.string().min(16).max(64),
+	code_verifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/)
+});
+
+/** POST /calendars/oauth/:provider/url */
+export const oauthUrlSchema = z.object({ redirect: z.string().max(200).optional() });
+/** POST /calendars/oauth/:provider/complete */
+export const oauthCompleteSchema = z.object({ code: z.string().min(1).max(100) });
+
+/** GET /me/busy?from&to */
+export const busyQuerySchema = instantRangeSchema('from', 'to');
+/** GET /groups/:id/conflicts?start&end */
+export const conflictsQuerySchema = instantRangeSchema('start', 'end');
+
+/** GET /groups/:id/events?from&to (ISO instants; both optional). */
+export const eventsQuerySchema = z.object({ from: isoDateTime.optional(), to: isoDateTime.optional() });
+/** GET /groups/:id/proposals?status */
+export const proposalsQuerySchema = z.object({ status: z.enum(['open', 'confirmed', 'cancelled']).optional() });
+/** GET /groups/:id/messages?before&limit */
+export const messagesQuerySchema = z.object({
+	before: z.string().min(1).optional(),
+	limit: z.coerce.number().int().min(1).max(100).default(50)
+});
+/** GET /groups/:id/availability/day?date */
+export const dayQuerySchema = z.object({ date: dateString });
+
+/** POST /groups/:id/planner */
+export const plannerSchema = z.object({ notes: z.string().trim().max(500).nullish() });
+/** POST /groups/:id/planner/draft */
+export const plannerDraftSchema = z
+	.object({ start: z.iso.datetime({ offset: true }), end: z.iso.datetime({ offset: true }), notes: z.string().trim().max(500).nullish() })
+	.refine((d) => d.end > d.start, 'The end must be after the start');
+
+/** POST /requirements/preview */
+export const requirementPreviewSchema = z.object({ requirement: requirementSchema });
+
+/** GET /regions/subdivisions?country, GET /regions/school-authorities?country */
+export const countryQuerySchema = z.object({ country: z.string().length(2).toUpperCase() });
+
+const MAX_HOLIDAY_DAYS = 400;
+const daysBetween = (from: string, to: string) => (Date.parse(to) - Date.parse(from)) / 86_400_000;
+/** GET /holidays?country&subdivision&from&to */
+export const holidaysQuerySchema = z
+	.object({
+		country: z.string().length(2).toUpperCase(),
+		subdivision: z.string().max(10).optional(),
+		from: dateString,
+		to: dateString
+	})
+	.refine((q) => q.from <= q.to, { message: 'Range ends before it starts' })
+	.refine((q) => daysBetween(q.from, q.to) <= MAX_HOLIDAY_DAYS, { message: `Ask for at most ${MAX_HOLIDAY_DAYS} days at a time` });

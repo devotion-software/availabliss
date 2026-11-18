@@ -32,6 +32,7 @@ jobs:
               - 'Dockerfile'
               - '.dockerignore'
               - 'docker-compose.yml'
+              - 'docs/openapi.json'
               - '.github/workflows/ci.yml'
             ios:
               - 'ios/**'
@@ -61,6 +62,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Type-check
         run: bun run check
+      - name: OpenAPI contract is up to date
+        run: bun run openapi --check
       - name: Unit tests
         run: bun test src --coverage
         env:

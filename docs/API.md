@@ -1,5 +1,11 @@
 # Availabliss API (v1)
 
+> **Machine-readable contract:** [`openapi.json`](openapi.json) (OpenAPI 3.1) is generated from
+> `web/src/lib/api-contract.ts` (bodies and queries from the routes' zod schemas, responses from
+> `web/src/lib/types.ts` and `web/src/lib/api-types.ts`) by `make openapi` / `bun run openapi`. Don't
+> edit it by hand: CI fails when it's out of date, and a unit test fails when a route under
+> `web/src/routes/api/v1` isn't in the contract. This file stays the prose guide.
+
 The SvelteKit app in `web/` serves both the web UI and this JSON API. The iOS and
 Android apps are clients of exactly the same endpoints.
 
@@ -234,6 +240,14 @@ free there, like an unsynced member.
   long inside the window, so a proposal can pick any part of it.
 
 ## Endpoints
+
+General rules (also in the generated [`openapi.json`](openapi.json)):
+
+- `POST`s that create something answer **`201`** (blocks, CalDAV connections, groups, events, proposals,
+  messages, preferences, invites, busy ignores, templates, attachments); everything else answers `200`.
+- Endpoints that take a body need a JSON one, even when every field is optional: send `{}` (e.g.
+  `POST /groups/:id/leave`, `/notifications/read`, `/groups/:id/planner`); a missing body is `400`.
+- Instants are ISO 8601 with `Z` or an offset.
 
 Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 

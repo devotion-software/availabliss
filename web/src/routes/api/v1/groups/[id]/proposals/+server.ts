@@ -1,12 +1,9 @@
-import { z } from 'zod';
 import { authed, body, json, query } from '#lib/server/http';
 import { createProposal, listProposals } from '#lib/server/proposals';
-import { createProposalSchema } from '#lib/schemas';
-
-const statusQuery = z.object({ status: z.enum(['open', 'confirmed', 'cancelled']).optional() });
+import { createProposalSchema, proposalsQuerySchema } from '#lib/schemas';
 
 export const GET = authed<{ id: string }>(async ({ params, url, userId }) => {
-	const { status } = query(url, statusQuery);
+	const { status } = query(url, proposalsQuerySchema);
 	return json({ proposals: await listProposals(params.id, userId, status) });
 });
 
