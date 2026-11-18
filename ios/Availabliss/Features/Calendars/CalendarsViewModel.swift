@@ -8,6 +8,8 @@ final class CalendarsViewModel {
     private(set) var connections: [CalendarConnection] = []
     private(set) var isLoading = false
     private(set) var connectingProvider: CalendarProvider?
+    /// Connections a "Sync now" is running for.
+    private(set) var syncingIds: Set<String> = []
     var error: String?
     var toast: String?
 
@@ -84,13 +86,22 @@ final class CalendarsViewModel {
         }
     }
 
+    /// "Sync now": the server pulls the account straight away; a failed pull comes back as its status.
     func sync(_ connection: CalendarConnection) async {
+        guard !syncingIds.contains(connection.id) else { return }
+        syncingIds.insert(connection.id)
+        defer { syncingIds.remove(connection.id) }
         do {
             let updated = try await api.send(API.Calendars.sync(connectionId: connection.id))
             replace(connection.id) { $0 = updated }
-        } catch {
+            switch updated.status {
+            case .ok: break
+            case .reauthRequired: error = "Couldn't sync \(updated.provider.displayName). It needs reconnecting."
+            case .error: error = "Couldn't sync \(updated.provider.displayName). Try again in a moment."
+            }
+        } catch where !error.isCancellation {
             self.error = error.userMessage
-        }
+        } catch {}
     }
 
     func disconnect(_ connection: CalendarConnection) async {

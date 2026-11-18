@@ -218,18 +218,60 @@ private struct DeviceSyncStatus: View {
                         .bodyFont(12)
                         .foregroundStyle(theme.muted)
                 }
-            } else if let last = service.lastSyncedAt {
-                Text("Synced \(Formatting.relative(last))")
-                    .bodyFont(12)
-                    .foregroundStyle(theme.muted)
-            } else if service.isSyncing {
-                Text("Syncing…")
-                    .bodyFont(12)
-                    .foregroundStyle(theme.muted)
+            } else {
+                // Reads this phone's calendars and uploads what changed, straight away.
+                SyncNowRow(lastSyncedAt: service.lastSyncedAt, isSyncing: service.isSyncing) {
+                    Task { await service.syncIfAuthorized() }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 6)
+    }
+}
+
+/// "Synced 5 min. ago" with Sync now (a spinner while it runs), under an account's calendars.
+private struct SyncNowRow: View {
+    let lastSyncedAt: Date?
+    let isSyncing: Bool
+    /// "Last synced" when the account has a problem.
+    var prefix = "Synced"
+    let action: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 8) {
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                Text(status(now: context.date))
+                    .bodyFont(12, relativeTo: .caption)
+                    .foregroundStyle(theme.muted)
+            }
+            Spacer(minLength: 8)
+            if isSyncing {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Syncing…").bodyFont(13, .semibold, relativeTo: .subheadline)
+                }
+                .foregroundStyle(theme.muted)
+                .frame(minHeight: 44)
+                .accessibilityElement(children: .combine)
+            } else {
+                Button(action: action) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "arrow.clockwise").font(.system(size: 12, weight: .bold)).accessibilityHidden(true)
+                        Text("Sync now")
+                    }
+                }
+                .buttonStyle(TextActionButtonStyle(fontSize: 13))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isSyncing)
+    }
+
+    private func status(now: Date) -> String {
+        guard let lastSyncedAt else { return "Not synced yet" }
+        if now.timeIntervalSince(lastSyncedAt) < 60 { return "\(prefix) just now" }
+        return "\(prefix) \(Formatting.relative(lastSyncedAt, now: now))"
     }
 }
 
@@ -279,17 +321,26 @@ private struct ConnectionSection: View {
                 Button { Task { await model.sync(connection) } } label: { Label("Sync now", systemImage: "arrow.clockwise") }
                 Button(role: .destructive) { Task { await model.disconnect(connection) } } label: { Label("Disconnect", systemImage: "trash") }
             }
-            if connection.status != .ok {
-                HStack {
-                    StatusPill(text: connection.status == .reauthRequired ? "Needs reconnecting" : "Sync problem", tone: .apricot, systemImage: "exclamationmark")
-                    Spacer()
-                    if connection.provider == .google || connection.provider == .microsoft {
-                        Button("Reconnect") { Task { await model.connectOAuth(connection.provider) } }
-                            .buttonStyle(.textAction)
+            VStack(alignment: .leading, spacing: 0) {
+                if connection.status != .ok {
+                    HStack {
+                        StatusPill(text: connection.status == .reauthRequired ? "Needs reconnecting" : "Sync problem", tone: .apricot, systemImage: "exclamationmark")
+                        Spacer()
+                        if connection.provider == .google || connection.provider == .microsoft {
+                            Button("Reconnect") { Task { await model.connectOAuth(connection.provider) } }
+                                .buttonStyle(.textAction)
+                        }
                     }
                 }
-                .padding(.horizontal, 6)
+                SyncNowRow(
+                    lastSyncedAt: connection.lastSyncedAt,
+                    isSyncing: model.syncingIds.contains(connection.id),
+                    prefix: connection.status == .ok ? "Synced" : "Last synced"
+                ) {
+                    Task { await model.sync(connection) }
+                }
             }
+            .padding(.horizontal, 6)
         }
     }
 }
