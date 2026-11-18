@@ -52,7 +52,15 @@ data class WeekColumnUi(
     val selected: Boolean = false,
     /** Today: its label sits on an accent pill. */
     val today: Boolean = false,
+    /** Works for everyone (or not known yet). Days that don't are faded so the ones that do stand out. */
+    val works: Boolean = true,
 )
+
+/** How far a week day that doesn't work for everyone fades. */
+private const val WEEK_FADE = 0.5f
+
+/** Faded unless the day works; today's date always stays at full strength. */
+private fun WeekColumnUi.dateAlpha() = if (works || today) 1f else WEEK_FADE
 
 /** Hour labels on the shared 08–24 axis. */
 val TimelineHours = listOf(8, 12, 16, 20, 24)
@@ -72,7 +80,7 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Spacer(Modifier.width(34.dp))
             columns.forEach {
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Box(Modifier.weight(1f).alpha(it.dateAlpha()), contentAlignment = Alignment.Center) {
                     Text(
                         it.label, style = type.micro, color = if (it.today) colors.onAccent else colors.muted, textAlign = TextAlign.Center,
                         modifier = Modifier.todayPill(it.today, colors.accent),
@@ -100,6 +108,8 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
                         .weight(1f)
                         .fillMaxHeight()
                         .then(if (column.selected) Modifier.border(2.dp, colors.ink, RoundedCornerShape(12.dp)) else Modifier)
+                        // After the selection border, so only the day fades, not the ring.
+                        .alpha(if (column.works) 1f else WEEK_FADE)
                         .clip(RoundedCornerShape(12.dp))
                         .then(if (onSelectColumn != null) Modifier.clickable(role = Role.Button, onClickLabel = "Show who's free") { onSelectColumn(index) } else Modifier)
                         .background(colors.line)
@@ -163,13 +173,13 @@ fun WeekCards(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSele
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
-                Box(Modifier.width(56.dp)) {
+                Box(Modifier.width(56.dp).alpha(column.dateAlpha())) {
                     Text(
                         column.label, style = type.bodySmallStrong, color = if (column.today) colors.onAccent else colors.ink,
                         modifier = Modifier.padding(start = if (column.today) 6.dp else 0.dp).todayPill(column.today, colors.accent),
                     )
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(Modifier.weight(1f).alpha(if (column.works) 1f else WEEK_FADE), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         free.firstOrNull()?.label ?: "No time when everyone's free",
                         style = type.bodySmallStrong,

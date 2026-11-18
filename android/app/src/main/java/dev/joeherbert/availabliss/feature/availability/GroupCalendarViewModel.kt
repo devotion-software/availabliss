@@ -355,6 +355,8 @@ class GroupCalendarViewModel @Inject constructor(
                 val cached = dates.mapNotNull { days[it] }
                 raw.update { it.copy(weekLoading = cached.size < dates.size, week = if (cached.size == dates.size) cached else emptyList()) }
                 val results = dates.map { date -> async { fetchDay(date) } }.awaitAll()
+                // A week running into the next (or previous) month needs that month's days too.
+                dates.map { YearMonth.from(it) }.distinct().filter { it != r.month && it !in months }.forEach { fetchMonth(it) }
                 val failure = results.firstOrNull { it is ApiResult.Failure } as? ApiResult.Failure
                 raw.update { it.copy(weekLoading = false, week = results.mapNotNull { res -> res.getOrNull() }, error = failure?.error?.message) }
                 // The next week the user is likely to swipe to.
@@ -404,7 +406,7 @@ class GroupCalendarViewModel @Inject constructor(
             syncBanner = AvailabilityUiMapper.syncBanner(r.availability, group, isAdmin),
             coverageNote = AvailabilityUiMapper.coverageNote(r.availability, group, meId),
             nudging = r.nudging,
-            weekColumns = AvailabilityUiMapper.weekColumns(r.week, group, meId, r.selected),
+            weekColumns = AvailabilityUiMapper.weekColumns(r.week, group, meId, r.selected) { date -> dayStatus(r, date) },
             weekDates = r.week.mapNotNull { DateTimes.parseDate(it.date) },
             dayFree = day?.everyoneFree?.firstOrNull()?.let { it.start to it.end },
             weekLoading = r.weekLoading,
@@ -416,6 +418,12 @@ class GroupCalendarViewModel @Inject constructor(
             error = r.error,
             message = r.message,
         )
+    }
+
+    /** A day's status: from the month on screen, or a neighbouring month already fetched. */
+    private fun dayStatus(r: RawState, date: LocalDate): DayStatus? {
+        val key = date.toString()
+        return (r.availability?.days?.firstOrNull { it.date == key } ?: months[YearMonth.from(date)]?.days?.firstOrNull { it.date == key })?.status
     }
 
     private companion object {
