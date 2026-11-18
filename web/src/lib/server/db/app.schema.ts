@@ -343,6 +343,21 @@ export const sentReminders = mysqlTable(
 	(t) => [primaryKey({ columns: [t.kind, t.targetId, t.startsAt] })]
 );
 
+/**
+ * Each user's secret calendar feed link (webcal). Looked up by a hash of its token, which is kept
+ * encrypted to show again; resetting it replaces the row, so an old link stops working.
+ */
+export const calendarFeeds = mysqlTable('calendar_feeds', {
+	userId: varchar('user_id', { length: 36 })
+		.primaryKey()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	/** For finding the feed from its link. */
+	tokenHash: varchar('token_hash', { length: 64 }).notNull().unique(),
+	/** The token itself, encrypted, so the link can be shown again. */
+	tokenSealed: text('token_sealed').notNull(),
+	createdAt: createdAt()
+});
+
 // ─── Chat ─────────────────────────────────────────────────────────────────
 export const polls = mysqlTable('polls', {
 	id: id(),

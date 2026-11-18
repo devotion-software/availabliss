@@ -228,6 +228,16 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | ------ | ---- | ---- | -------- |
 | GET | `/health` | | `{ ok: boolean; version: string; db: 'ok' \| 'down'; redis: 'ok' \| 'down' \| 'off' }` (`503` when the database doesn't answer; Redis being down still returns `200`) |
 
+### Calendar feed (webcal)
+
+| Method | Path | Body | Response |
+| ------ | ---- | ---- | -------- |
+| GET 🔒 | `/me/calendar-feed` | | `{ url, webcalUrl }`: your secret feed link (made the first time) |
+| POST 🔒 | `/me/calendar-feed/reset` | | `{ url, webcalUrl }`: a new link; the old one stops working |
+| GET | `/calendar/<token>.ics` (outside `/api/v1`; optional `?group=<id>`) | | `text/calendar`: your groups' plans (from 60 days back, leaving out ones you said you can't make), stable `UID`s and a rising `SEQUENCE`, so calendar apps that subscribe pick up edits and cancellations. `404` for an unknown or reset link |
+
+Offer `webcalUrl` to Apple Calendar / Outlook, `https://calendar.google.com/calendar/r?cid=<webcalUrl>` for Google Calendar, and `url` to copy.
+
 ### Security reports
 
 | Method | Path | Body | Response |
