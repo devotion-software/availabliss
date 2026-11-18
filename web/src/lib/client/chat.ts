@@ -1,5 +1,5 @@
 import { api, type Fetch } from './api';
-import type { Message, MessageInfo, Poll } from '#lib/types';
+import type { Message, MessageInfo, MessageThread, Poll } from '#lib/types';
 
 export interface MessagePage {
 	messages: Message[];
@@ -20,6 +20,8 @@ export const sendPoll = (groupId: string, poll: PollInput) => api.post<Message>(
 export const sendReceipt = (groupId: string, upTo: string, state: 'delivered' | 'seen') =>
 	api.post(`/groups/${groupId}/messages/receipts`, { upTo, state });
 export const getMessageInfo = (messageId: string) => api.get<MessageInfo>(`/messages/${messageId}/info`);
+/** The thread a message is part of: its first message and every reply under it, oldest first. */
+export const getMessageThread = (messageId: string) => api.get<MessageThread>(`/messages/${messageId}/thread`);
 export const votePoll = (pollId: string, optionIds: string[]) => api.post<Poll>(`/polls/${pollId}/vote`, { optionIds });
 export const closePoll = (pollId: string) => api.post<Poll>(`/polls/${pollId}/close`);
 export const editMessage = (messageId: string, body: string) => api.patch<Message>(`/messages/${messageId}`, { body });

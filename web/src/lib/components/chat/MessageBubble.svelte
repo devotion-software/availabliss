@@ -17,7 +17,7 @@
 	/**
 	 * A text message. Others' are glass with an avatar; yours are the theme accent. A tap opens message info.
 	 * A menu (Reply / Info, plus Edit / Delete on yours) opens on long-press, right-click or the ⋯ button;
-	 * hovering also shows a Reply button. A reply shows the message it quotes above its text: tapping that goes to it.
+	 * hovering also shows a Reply button. A reply shows the message it quotes above its text: tapping that opens the thread.
 	 * Deleted messages are a dashed outline with no actions.
 	 */
 	interface Props {
@@ -41,6 +41,8 @@
 		onmenu?: (message: Message, anchor: MessageMenuAnchor) => void;
 		onreply?: (message: Message) => void;
 		onquote?: (messageId: string) => void;
+		/** What tapping the quote does, for screen readers. */
+		quoteHint?: string;
 	}
 	let {
 		message,
@@ -56,7 +58,8 @@
 		oninfo,
 		onmenu,
 		onreply,
-		onquote
+		onquote,
+		quoteHint = 'Show the thread'
 	}: Props = $props();
 
 	const pending = $derived(message.id.startsWith('temp-'));
@@ -140,7 +143,7 @@
 			<span class="sr-only">Replying to </span>
 			<span class="quote-name">{quote.name}</span>
 			<span class="quote-text">{quote.snippet}</span>
-			<span class="sr-only">. Show the original message</span>
+			<span class="sr-only">. {quoteHint}</span>
 		</button>
 	{/if}
 {/snippet}

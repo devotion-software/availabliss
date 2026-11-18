@@ -13,8 +13,9 @@
 	interface Props {
 		groupId: string;
 		onsend: (body: string) => Promise<unknown> | unknown;
-		onpoll: () => void;
-		onpropose: () => void;
+		/** The + menu's actions (no + menu when `plain`). */
+		onpoll?: () => void;
+		onpropose?: () => void;
 		compact?: boolean;
 		editing?: Message | null;
 		/** Saves the edit; should throw on failure (stays in edit mode). */
@@ -23,18 +24,30 @@
 		/** The message your next one replies to. */
 		replying?: ReplyingTo | null;
 		oncancelreply?: () => void;
+		/** In a thread: no + menu, a different placeholder, ✕ on the reply strip only when `canCancelReply`. */
+		plain?: boolean;
+		placeholder?: string;
+		canCancelReply?: boolean;
+		cancelReplyLabel?: string;
+		/** Whether a new reply target puts you in the field. */
+		focusOnReply?: boolean;
 	}
 	let {
 		groupId,
 		onsend,
-		onpoll,
-		onpropose,
+		onpoll = () => {},
+		onpropose = () => {},
 		compact = false,
 		editing = null,
 		onsaveedit,
 		oncanceledit,
 		replying = null,
-		oncancelreply
+		oncancelreply,
+		plain = false,
+		placeholder = 'Message the group',
+		canCancelReply = true,
+		cancelReplyLabel = 'Cancel reply',
+		focusOnReply = true
 	}: Props = $props();
 
 	const uid = $props.id();
@@ -74,7 +87,7 @@
 		untrack(() => {
 			if (id === replyingId) return;
 			replyingId = id;
-			if (id) {
+			if (id && focusOnReply) {
 				menu = false;
 				tick().then(() => input?.focus());
 			}
@@ -120,7 +133,7 @@
 		} else if (e.key === 'Escape' && editing) {
 			e.stopPropagation();
 			oncanceledit?.();
-		} else if (e.key === 'Escape' && replying) {
+		} else if (e.key === 'Escape' && replying && canCancelReply) {
 			e.stopPropagation();
 			oncancelreply?.();
 		}
@@ -172,14 +185,16 @@
 				<span class="replying-label">Replying to {replying.name === 'You' ? 'yourself' : replying.name}</span>
 				<span class="replying-snippet">{replying.snippet}</span>
 			</span>
-			<button type="button" class="cancel-edit" aria-label="Cancel reply" title="Cancel reply" onclick={cancelReply}>
-				<Icon name="x" size={16} strokeWidth={2.4} />
-			</button>
+			{#if canCancelReply}
+				<button type="button" class="cancel-edit" aria-label={cancelReplyLabel} title={cancelReplyLabel} onclick={cancelReply}>
+					<Icon name="x" size={16} strokeWidth={2.4} />
+				</button>
+			{/if}
 		</div>
 	{/if}
 
-	<form class="bar" class:glass={!compact} onsubmit={submit}>
-		<button
+	<form class="bar" class:glass={!compact} class:plain onsubmit={submit}>
+		{#if !plain}<button
 			type="button"
 			class="plus"
 			class:open={menu}
@@ -189,13 +204,13 @@
 			onclick={() => (menu = !menu)}
 		>
 			<Icon name="plus" size={20} strokeWidth={2.4} />
-		</button>
+		</button>{/if}
 		<label for="composer-{uid}" class="sr-only">Message</label>
 		<input
 			bind:this={input}
 			id="composer-{uid}"
 			bind:value={body}
-			placeholder={editing ? 'Edit your message' : 'Message the group'}
+			placeholder={editing ? 'Edit your message' : placeholder}
 			autocomplete="off"
 			enterkeyhint={editing ? 'done' : 'send'}
 			maxlength={4000}
@@ -323,6 +338,13 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
+	}
+	.bar.plain {
+		padding-left: 16px;
+	}
+	.replying:has(.replying-text:last-child) {
+		padding-right: 12px;
+		min-height: 48px;
 	}
 	.compact .bar {
 		border-radius: 16px;

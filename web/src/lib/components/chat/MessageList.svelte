@@ -20,6 +20,7 @@
 	import MessageMenu, { type MessageMenuAnchor } from './MessageMenu.svelte';
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
+	import ThreadSheet from './ThreadSheet.svelte';
 
 	/** The scrolling message log for a thread. Reports visibility so `seen` receipts are honest. */
 	interface Props {
@@ -41,7 +42,9 @@
 	// Reply / Info, and Edit / Delete on your own messages.
 	let menuAnchor = $state<MessageMenuAnchor | null>(null);
 	let menuMessage = $state<Message | null>(null);
-	// The original of a tapped quote, flashed after scrolling to it.
+	// The thread open in its sheet, by the message it was opened from.
+	let threadFor = $state<string | null>(null);
+	// A message ("Show in chat" from a thread), flashed after scrolling to it.
 	let highlighted = $state<string | null>(null);
 	let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 	let confirmOpen = $state(false);
@@ -146,11 +149,28 @@
 		}
 	});
 
+	/** Replies, and messages that have replies, are part of a thread. */
+	const repliedTo = $derived(new Set(thread.messages.flatMap((m) => (m.replyTo ? [m.replyTo.id] : []))));
+	const inThread = (m: Message) => !m.id.startsWith('temp-') && (!!m.replyTo || repliedTo.has(m.id));
+
+	/** Closes the thread and goes to a message in the chat, loading earlier pages until it's there. */
+	async function showInChat(id: string) {
+		threadFor = null;
+		for (let pages = 0; !thread.messages.some((m) => m.id === id) && thread.hasMore && pages < 20; pages++) {
+			const before = thread.messages.length;
+			await loadOlder();
+			if (thread.messages.length === before) break;
+		}
+		await tick();
+		// After the sheet has faded away.
+		setTimeout(() => showOriginal(id), 180);
+	}
+
 	function quoteFor(r: NonNullable<Message['replyTo']>): BubbleQuote {
 		return { id: r.id, name: replyAuthorName(r, meId, members), snippet: replySnippet(r), deleted: r.deleted };
 	}
 
-	/** Scrolls to a quoted message (when it's loaded) and flashes it. */
+	/** Scrolls to a message (when it's loaded) and flashes it. */
 	function showOriginal(id: string) {
 		const el = scroller?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(id)}"]`);
 		if (!el) return;
@@ -257,7 +277,7 @@
 							oninfo={openInfo}
 							onmenu={openMenu}
 							onreply={reply}
-							onquote={showOriginal}
+							onquote={() => (threadFor = m.id)}
 						/>
 					{/if}
 					{#if item.receipt}
@@ -281,6 +301,8 @@
 	{/if}
 </div>
 
+<ThreadSheet focusId={threadFor} {group} {meId} onclose={() => (threadFor = null)} onshowinchat={showInChat} />
+
 <MessageInfoSheet bind:open={infoOpen} message={infoMessage} {members} {meId} />
 
 <MessageMenu
@@ -288,6 +310,7 @@
 	onclose={() => (menuAnchor = null)}
 	oninfo={() => menuMessage && openInfo(menuMessage)}
 	onreply={menuMessage && thread.canReply(menuMessage) ? () => menuMessage && reply(menuMessage) : undefined}
+	onthread={menuMessage && inThread(menuMessage) ? () => menuMessage && (threadFor = menuMessage.id) : undefined}
 	onedit={menuMessage && thread.canModify(menuMessage) ? () => menuMessage && thread.startEdit(menuMessage) : undefined}
 	ondelete={menuMessage && thread.canModify(menuMessage) ? () => menuMessage && confirmDelete(menuMessage) : undefined}
 />

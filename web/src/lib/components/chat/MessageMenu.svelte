@@ -13,26 +13,31 @@
 	import { portal } from '#lib/components/ui/portal';
 
 	/**
-	 * Reply / Info, and Edit / Delete on your own messages: opened by long-press, right-click or the bubble's ⋯ button.
+	 * Reply / View thread / Info, and Edit / Delete on your own messages (in a thread: Reply / Show in chat):
+	 * opened by long-press, right-click or the bubble's ⋯ button.
 	 * Floats at the pointer (or the button), kept inside the viewport. Same look as the group's More menu.
 	 */
 	interface Props {
 		/** Where to open it; null when closed. */
 		anchor: MessageMenuAnchor | null;
-		oninfo: () => void;
 		/** Each is left out of the menu when not given. */
+		oninfo?: () => void;
 		onreply?: () => void;
+		onthread?: () => void;
+		onshowinchat?: () => void;
 		onedit?: () => void;
 		ondelete?: () => void;
 		onclose: () => void;
 	}
-	let { anchor, oninfo, onreply, onedit, ondelete, onclose }: Props = $props();
+	let { anchor, oninfo, onreply, onthread, onshowinchat, onedit, ondelete, onclose }: Props = $props();
 
-	type Item = { label: string; icon: 'reply' | 'info' | 'pencil' | 'trash'; run: () => void; danger?: boolean };
+	type Item = { label: string; icon: 'reply' | 'chat' | 'arrow-right' | 'info' | 'pencil' | 'trash'; run: () => void; danger?: boolean };
 	const items = $derived(
 		[
 			onreply && { label: 'Reply', icon: 'reply', run: onreply },
-			{ label: 'Info', icon: 'info', run: oninfo },
+			onthread && { label: 'View thread', icon: 'chat', run: onthread },
+			onshowinchat && { label: 'Show in chat', icon: 'arrow-right', run: onshowinchat },
+			oninfo && { label: 'Info', icon: 'info', run: oninfo },
 			onedit && { label: 'Edit', icon: 'pencil', run: onedit },
 			ondelete && { label: 'Delete', icon: 'trash', run: ondelete, danger: true }
 		].filter(Boolean) as Item[]
@@ -128,7 +133,8 @@
 <style>
 	.menu {
 		position: fixed;
-		z-index: 90;
+		/* Above sheets too: it also opens inside the thread sheet. */
+		z-index: 110;
 		min-width: 180px;
 		border-radius: 22px;
 		padding: 8px;

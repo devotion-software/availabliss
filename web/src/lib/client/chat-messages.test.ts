@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Message } from '#lib/types';
 import type { Member } from '#lib/types';
-import { applyMessageUpdate, canModifyMessage, canReplyTo, deletedCopy, replyAuthorName, replyPreview, replySnippet, replyingTo } from './chat-messages';
+import { applyMessageUpdate, canModifyMessage, canReplyTo, deletedCopy, replyAuthorName, replyPreview, replySnippet, replyingTo, threadReplyTarget, withThreadMessage } from './chat-messages';
 
 const msg = (over: Partial<Message> = {}): Message => ({
 	id: 'm1',
@@ -102,5 +102,32 @@ describe('replies', () => {
 		expect(edited[0].replyTo).toMatchObject({ text: 'hello again', deleted: false, authorName: 'Priya Shah' });
 		const deleted = applyMessageUpdate(edited, msg({ id: 'm1', authorId: 'u2', body: null, deleted: true }));
 		expect(deleted[0].replyTo).toMatchObject({ text: null, deleted: true });
+	});
+});
+
+describe('threads', () => {
+	const quote = (id: string) => ({ id, authorId: 'u2', authorName: null, kind: 'text' as const, text: `hi ${id}`, deleted: false });
+	const thread = [
+		msg({ id: '1', authorId: 'u2' }),
+		msg({ id: '2', authorId: 'me', replyTo: quote('1') }),
+		msg({ id: '3', authorId: 'u2', replyTo: quote('2') })
+	];
+
+	test('replies to the thread join it; others stay out', () => {
+		expect(withThreadMessage(thread, msg({ id: '4', authorId: 'u3', replyTo: quote('2') })).map((m) => m.id)).toEqual(['1', '2', '3', '4']);
+		expect(withThreadMessage(thread, msg({ id: '5', authorId: 'u3' }))).toBe(thread);
+		expect(withThreadMessage(thread, msg({ id: '6', authorId: 'u3', replyTo: quote('99') }))).toBe(thread);
+		expect(withThreadMessage(thread, msg({ id: '3', authorId: 'u2', body: null, deleted: true, receipt: null }))[2].deleted).toBe(true);
+	});
+
+	test('replies go to the picked message, else the latest from someone else', () => {
+		expect(threadReplyTarget(thread, null, 'me')?.id).toBe('3');
+		expect(threadReplyTarget(thread, '2', 'me')?.id).toBe('2');
+		// Straight after you send, not to yourself.
+		expect(threadReplyTarget([...thread, msg({ id: '4', replyTo: quote('3') })], null, 'me')?.id).toBe('3');
+		// A picked message deleted since falls back.
+		expect(threadReplyTarget([msg({ id: '1', authorId: 'u2' }), msg({ id: '2', authorId: 'u3', deleted: true, body: null })], '2', 'me')?.id).toBe('1');
+		expect(threadReplyTarget([msg({ id: '1' })], null, 'me')?.id).toBe('1');
+		expect(threadReplyTarget([], null, 'me')).toBeNull();
 	});
 });

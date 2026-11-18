@@ -66,5 +66,25 @@ function withQuotesOf(messages: Message[], original: Message): Message[] {
 	return messages.map((m) => (m.replyTo?.id === original.id ? { ...m, replyTo: { ...m.replyTo, text: fresh.text, deleted: fresh.deleted } } : m));
 }
 
+/**
+ * A message arriving while a thread is open: replaces its copy if it's already in the thread,
+ * joins the end if it replies to something in it, and is otherwise left out (same array back).
+ */
+export function withThreadMessage(thread: Message[], message: Message): Message[] {
+	const i = thread.findIndex((m) => m.id === message.id);
+	if (i >= 0) return applyMessageUpdate(thread, message);
+	const parent = message.replyTo?.id;
+	return parent && thread.some((m) => m.id === parent) ? [...thread, message] : thread;
+}
+
+/**
+ * Who a reply in a thread goes to: the message you picked (while it can still be replied to),
+ * else the latest one from someone else (so it isn't to yourself straight after you send), else the latest.
+ */
+export function threadReplyTarget(thread: Message[], pickedId: string | null, meId: string): Message | null {
+	const picked = pickedId ? thread.find((m) => m.id === pickedId && canReplyTo(m)) : undefined;
+	return picked ?? thread.findLast((m) => canReplyTo(m) && m.authorId !== meId) ?? thread.findLast(canReplyTo) ?? null;
+}
+
 /** A message as it reads once deleted: no text, flagged deleted. */
 export const deletedCopy = (m: Message): Message => ({ ...m, body: null, deleted: true });
