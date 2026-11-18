@@ -53,6 +53,8 @@ data class InviteUi(
     val status: String,
     val isLink: Boolean,
     val url: String,
+    /** For a link: "3 of 5 people can still join with this link." */
+    val summary: String = "",
     /** Sent to someone's username (to their Activity), not emailed. */
     val byUsername: Boolean = false,
 )
@@ -78,6 +80,9 @@ data class MembersUiState(
     val message: UserMessage? = null,
 ) {
     val isAdmin: Boolean get() = myRole?.isAdmin == true
+
+    /** The newest link anyone can use. */
+    val link: InviteUi? get() = invites.firstOrNull { it.isLink }
 }
 
 @HiltViewModel
@@ -133,16 +138,21 @@ class MembersViewModel @Inject constructor(
         groups.invites(groupId).getOrNull()?.let { list -> _state.update { it.copy(invites = list.map(::inviteUi)) } }
     }
 
-    /** Shares the newest link anyone can use, making one first if there isn't one. */
+    /** Shares the newest link anyone can use, making one (for one person) first if there isn't one. */
     fun shareInviteLink() {
-        _state.value.invites.firstOrNull { it.isLink }?.let { link ->
+        _state.value.link?.let { link ->
             _state.update { it.copy(pendingShareUrl = link.url) }
             return
         }
+        createInviteLink(1)
+    }
+
+    /** Makes a link [maxUses] people can join with (null: no limit), then shares it. */
+    fun createInviteLink(maxUses: Int?) {
         if (_state.value.creatingLink) return
         _state.update { it.copy(creatingLink = true) }
         viewModelScope.launch {
-            when (val result = groups.createInvite(groupId)) {
+            when (val result = groups.createInvite(groupId, maxUses = maxUses)) {
                 is ApiResult.Success -> _state.update {
                     it.copy(creatingLink = false, pendingShareUrl = result.value.url, invites = result.value.invites.map(::inviteUi) + it.invites)
                 }
@@ -205,9 +215,10 @@ class MembersViewModel @Inject constructor(
         return InviteUi(
             id = invite.id,
             title = invite.email ?: invite.username?.let { "@$it" } ?: invite.name ?: invite.url,
-            status = if (invite.isLink) "Link for one person · expires $expires" else "Invited · invite expires $expires",
+            status = if (invite.isLink) "${invite.linkUsage} · expires $expires" else "Invited · invite expires $expires",
             isLink = invite.isLink,
             url = invite.url,
+            summary = invite.linkSummary,
             byUsername = invite.email == null && (invite.username != null || invite.name != null),
         )
     }

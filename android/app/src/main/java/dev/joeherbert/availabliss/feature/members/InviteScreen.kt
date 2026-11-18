@@ -124,9 +124,13 @@ fun InviteContent(
             when {
                 state.loading -> LoadingIndicator()
                 state.invalid -> GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.cardLarge, contentPadding = PaddingValues(20.dp)) {
-                    Text("This invite has expired", style = type.headlineSmall, color = colors.ink)
+                    Text(if (state.usedUp) "This invite link has been used up" else "This invite has expired", style = type.headlineSmall, color = colors.ink)
                     Text(
-                        "Invite links stop working after a while or once they've been used. Ask whoever invited you for a fresh link.",
+                        if (state.usedUp) {
+                            "As many people have joined with it as it allows. Ask whoever invited you for a fresh link."
+                        } else {
+                            "Invite links stop working after a while or once they've been used. Ask whoever invited you for a fresh link."
+                        },
                         style = type.body,
                         color = colors.muted,
                     )

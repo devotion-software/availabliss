@@ -24,6 +24,8 @@ import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.core.network.model.UpdateGroupRequest
 import dev.joeherbert.availabliss.core.network.onSuccess
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,7 +114,7 @@ class GroupsRepository @Inject constructor(
     suspend fun nudge(groupId: String): ApiResult<Int> = call { api.nudge(groupId) }.map { it.nudged }
 
     /**
-     * Neither: a link anyone can use. Emails: one invite each, emailed, only for that person.
+     * Neither: a link anyone can use, by [maxUses] people (null: no limit). Emails: one invite each, emailed, only for that person.
      * Usernames / user ids: one invite each, to the person's Activity, only for them (by id: only
      * people already in a group with you).
      */
@@ -121,11 +123,18 @@ class GroupsRepository @Inject constructor(
         emails: List<String> = emptyList(),
         usernames: List<String> = emptyList(),
         userIds: List<String> = emptyList(),
+        maxUses: Int? = 1,
     ): ApiResult<InviteLink> =
         call {
+            val isLink = emails.isEmpty() && usernames.isEmpty() && userIds.isEmpty()
             api.createInvite(
                 groupId,
-                CreateInviteRequest(emails.takeIf { it.isNotEmpty() }, usernames.takeIf { it.isNotEmpty() }, userIds.takeIf { it.isNotEmpty() }),
+                CreateInviteRequest(
+                    emails.takeIf { it.isNotEmpty() },
+                    usernames.takeIf { it.isNotEmpty() },
+                    userIds.takeIf { it.isNotEmpty() },
+                    maxUses = if (isLink) maxUses?.let(::JsonPrimitive) ?: JsonNull else null,
+                ),
             )
         }
 

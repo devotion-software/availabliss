@@ -46,6 +46,8 @@ data class OnboardingUiState(
     val createdGroupId: String? = null,
     // Invite people
     val inviteLink: String? = null,
+    /** "5 people can join with this link." */
+    val inviteLinkSummary: String? = null,
     val creatingLink: Boolean = false,
     val sendingInvites: Boolean = false,
     val invited: List<String> = emptyList(),
@@ -123,14 +125,27 @@ class OnboardingViewModel @Inject constructor(
     // endregion
 
     // region Invite people
+    /** Shares the link made here, making one (for one person) first if there isn't one. */
     fun shareLink() {
-        val id = _state.value.createdGroupId ?: return
         _state.value.inviteLink?.let { link -> return _state.update { it.copy(pendingShareUrl = link) } }
+        createLink(1)
+    }
+
+    /** Makes a link [maxUses] people can join with (null: no limit), then shares it. */
+    fun createLink(maxUses: Int?) {
+        val id = _state.value.createdGroupId ?: return
         if (_state.value.creatingLink) return
         _state.update { it.copy(creatingLink = true) }
         viewModelScope.launch {
-            when (val result = groups.createInvite(id)) {
-                is ApiResult.Success -> _state.update { it.copy(creatingLink = false, inviteLink = result.value.url, pendingShareUrl = result.value.url) }
+            when (val result = groups.createInvite(id, maxUses = maxUses)) {
+                is ApiResult.Success -> _state.update {
+                    it.copy(
+                        creatingLink = false,
+                        inviteLink = result.value.url,
+                        inviteLinkSummary = result.value.invites.firstOrNull()?.linkSummary,
+                        pendingShareUrl = result.value.url,
+                    )
+                }
                 is ApiResult.Failure -> _state.update { it.copy(creatingLink = false, message = UserMessage(result.error.message)) }
             }
         }

@@ -136,7 +136,14 @@ data class CreateInviteRequest(
     val emails: List<String>? = null,
     val usernames: List<String>? = null,
     val userIds: List<String>? = null,
+    /** For a link: how many people can join with it, or [kotlinx.serialization.json.JsonNull] for no limit. Left out: one. */
+    val maxUses: JsonElement? = null,
 )
+
+/** How many people can join with an invite link, as offered when making one (null: no limit; one is what links always were). */
+val LinkLimitChoices: List<Int?> = listOf(1, 5, 10, 25, null)
+
+fun linkLimitLabel(limit: Int?): String = limit?.toString() ?: "Unlimited"
 
 @Serializable
 data class InviteLink(
@@ -157,9 +164,36 @@ data class GroupInvite(
     /** The account name of the person it was sent to in Activity (older servers omit it). */
     val name: String? = null,
     val url: String,
+    /** How many people can join with it (null: no limit). Older servers omit it and [uses]: single-use. */
+    val maxUses: Int? = null,
+    /** How many people have joined with it so far. */
+    val uses: Int? = null,
     val expiresAt: String,
 ) {
     val isLink: Boolean get() = email == null && username == null && name == null
+
+    /** How many people can still join with it (null: no limit). */
+    val usesLeft: Int? get() = if (uses == null) 1 else maxUses?.let { (it - uses).coerceAtLeast(0) }
+
+    /** "One person can join with this link." / "5 people can…" / "3 of 5 people can still…" / "Anyone with this link can join." */
+    val linkSummary: String
+        get() {
+            val left = usesLeft ?: return "Anyone with this link can join."
+            val total = maxUses ?: 1
+            return when {
+                total == 1 -> "One person can join with this link."
+                left == total -> "$total people can join with this link."
+                else -> "$left of $total people can still join with this link."
+            }
+        }
+
+    /** For the invites list: "Link for one person" / "3 of 5 left" / "Unlimited · 4 joined". */
+    val linkUsage: String
+        get() {
+            val left = usesLeft ?: return if ((uses ?: 0) > 0) "Unlimited · $uses joined" else "Unlimited"
+            val total = maxUses ?: 1
+            return if (total == 1) "Link for one person" else "$left of $total left"
+        }
 }
 
 @Serializable

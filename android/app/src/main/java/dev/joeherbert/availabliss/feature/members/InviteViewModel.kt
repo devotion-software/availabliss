@@ -32,6 +32,8 @@ data class InviteUiState(
     val preview: InvitePreviewUi? = null,
     /** Invite can't be used (expired, already used, not found). */
     val invalid: Boolean = false,
+    /** A link that as many people have joined with as it allows ("This invite link has been used up"). */
+    val usedUp: Boolean = false,
     val error: String? = null,
     val joining: Boolean = false,
     /** Sent to you in Activity (by username, or as one of a group's people): you can decline it. */
@@ -102,7 +104,8 @@ class InviteViewModel @Inject constructor(
                 }
                 is ApiResult.Failure -> _state.update {
                     when (result.error) {
-                        is ApiError.NotFound, is ApiError.Forbidden, is ApiError.Conflict -> it.copy(loading = false, invalid = true)
+                        is ApiError.NotFound -> it.copy(loading = false, invalid = true, usedUp = "used up" in result.error.message)
+                        is ApiError.Forbidden, is ApiError.Conflict -> it.copy(loading = false, invalid = true)
                         else -> it.copy(loading = false, error = result.error.message)
                     }
                 }

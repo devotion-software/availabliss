@@ -67,6 +67,7 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import dev.joeherbert.availabliss.feature.common.InviteRecipient
+import dev.joeherbert.availabliss.feature.common.InviteLinkSection
 import dev.joeherbert.availabliss.feature.common.InviteRecipientsField
 
 /** Members & invites for one group. (The group's photo, Leave group and Delete group are in Group settings.) */
@@ -95,6 +96,7 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
         MembersActions(
             onBack = { currentOnBack() },
             onShareLink = viewModel::shareInviteLink,
+            onCreateLink = viewModel::createInviteLink,
             onInviteDraftChange = viewModel::onInviteDraftChange,
             onAddRecipient = viewModel::addInviteRecipient,
             onRemoveRecipient = viewModel::removeInviteRecipient,
@@ -122,6 +124,7 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
 data class MembersActions(
     val onBack: () -> Unit = {},
     val onShareLink: () -> Unit = {},
+    val onCreateLink: (maxUses: Int?) -> Unit = {},
     val onInviteDraftChange: (String) -> Unit = {},
     val onAddRecipient: () -> Unit = {},
     val onRemoveRecipient: (InviteRecipient) -> Unit = {},
@@ -283,17 +286,12 @@ private fun InviteCard(state: MembersUiState, actions: MembersActions) {
     val type = AvailablissTheme.type
     GlassPanel(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
         Text("Invite people", style = type.cardTitle, color = colors.ink)
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Share a link", style = type.bodySmallStrong, color = colors.ink)
-            Text("One person can join with each link.", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
-        }
-        PrimaryButton(
-            text = "Share invite link",
-            onClick = actions.onShareLink,
-            icon = AvIcons.Share,
-            height = 50.dp,
-            shape = Shapes.control,
-            loading = state.creatingLink,
+        InviteLinkSection(
+            linkUrl = state.link?.url,
+            linkSummary = state.link?.summary,
+            creating = state.creatingLink,
+            onShare = actions.onShareLink,
+            onCreate = actions.onCreateLink,
             modifier = Modifier.fillMaxWidth(),
         )
         RowDivider()

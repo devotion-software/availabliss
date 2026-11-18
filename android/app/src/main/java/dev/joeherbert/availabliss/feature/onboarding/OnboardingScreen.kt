@@ -62,6 +62,7 @@ import dev.joeherbert.availabliss.feature.calendars.CalendarSourcesViewModel
 import dev.joeherbert.availabliss.feature.calendars.ConnectCalendarSheet
 import dev.joeherbert.availabliss.feature.calendars.PendingUrlEffect
 import dev.joeherbert.availabliss.feature.calendars.rememberCalendarPermissionRequest
+import dev.joeherbert.availabliss.feature.common.InviteLinkSection
 import dev.joeherbert.availabliss.feature.common.InviteRecipientsField
 import dev.joeherbert.availabliss.feature.common.UsernameField
 
@@ -250,9 +251,15 @@ fun OnboardingScreen(
                     },
                 ) {
                     GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Share a link", style = AvailablissTheme.type.bodySmallStrong, color = AvailablissTheme.colors.ink)
-                        Text("One person can join with each link.", style = AvailablissTheme.type.caption, color = AvailablissTheme.colors.muted)
-                        PrimaryButton("Share invite link", viewModel::shareLink, icon = AvIcons.Share, loading = state.creatingLink, modifier = Modifier.fillMaxWidth())
+                        InviteLinkSection(
+                            linkUrl = state.inviteLink,
+                            linkSummary = state.inviteLinkSummary,
+                            creating = state.creatingLink,
+                            onShare = viewModel::shareLink,
+                            onCreate = viewModel::createLink,
+                            modifier = Modifier.fillMaxWidth(),
+                            buttonHeight = 54.dp,
+                        )
                     }
                     GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Or invite particular people", style = AvailablissTheme.type.bodySmallStrong, color = AvailablissTheme.colors.ink)
