@@ -56,7 +56,9 @@
 					aria-label="Show plan {i + 1} of {events.length}"
 					aria-current={i === current ? 'true' : undefined}
 					onclick={() => show(i)}
-				><span></span></button>
+				>
+					<span></span>
+				</button>
 			{/each}
 		</div>
 	</div>

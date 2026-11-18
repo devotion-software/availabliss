@@ -25,8 +25,10 @@
 					onclick={() => {
 						toasts.dismiss(toast.id);
 						action.run();
-					}}>{action.label}</button
+					}}
 				>
+					{action.label}
+				</button>
 			{/if}
 			<button class="close" aria-label="Dismiss" onclick={() => toasts.dismiss(toast.id)}>
 				<Icon name="x" size={14} strokeWidth={2.6} />

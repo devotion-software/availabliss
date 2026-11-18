@@ -84,7 +84,10 @@ describe('the name you go by in a group', () => {
 
 		await respond(p.id, owner, 'accepted'); // everyone's in: confirmed
 		await respond(p.id, sam, 'declined'); // drops out
-		const system = await db.select().from(messages).where(and(eq(messages.groupId, groupId), eq(messages.kind, 'system')));
+		const system = await db
+			.select()
+			.from(messages)
+			.where(and(eq(messages.groupId, groupId), eq(messages.kind, 'system')));
 		expect(system.map((m) => m.body)).toContain("Sammy can't make it any more");
 	});
 });

@@ -78,7 +78,11 @@
 	}
 
 	const PERKS = [
-		{ icon: 'groups', title: 'Unlimited groups', text: `Free accounts can create ${FREE_GROUP_LIMIT}. Joining other people's groups is always free.` },
+		{
+			icon: 'groups',
+			title: 'Unlimited groups',
+			text: `Free accounts can create ${FREE_GROUP_LIMIT}. Joining other people's groups is always free.`
+		},
 		{ icon: 'sparkle', title: 'Supports Availabliss', text: 'Everything else stays free for everyone in your groups.' }
 	] as const;
 </script>
@@ -117,7 +121,9 @@
 				<Button variant="secondary" block loading={managing} onclick={manage}>Manage subscription</Button>
 			{/if}
 		{:else if !plan.purchase.web}
-			<p class="note">Upgrading on the web isn't available yet. Upgrade from the Availabliss app on iPhone or Android: Pro follows your account everywhere.</p>
+			<p class="note">
+				Upgrading on the web isn't available yet. Upgrade from the Availabliss app on iPhone or Android: Pro follows your account everywhere.
+			</p>
 		{:else if packages === null}
 			<div class="loading"><Spinner /></div>
 		{:else if packages.length === 0}
@@ -125,7 +131,14 @@
 		{:else}
 			<div class="packages">
 				{#each packages as pkg (pkg.id)}
-					<Button variant={pkg.id === '$rc_annual' ? 'accent' : 'secondary'} size="lg" block loading={buying === pkg.id} disabled={buying !== null} onclick={() => buy(pkg)}>
+					<Button
+						variant={pkg.id === '$rc_annual' ? 'accent' : 'secondary'}
+						size="lg"
+						block
+						loading={buying === pkg.id}
+						disabled={buying !== null}
+						onclick={() => buy(pkg)}
+					>
 						<span class="pkg"><span>{pkg.label}</span><span class="price">{pkg.price}<small>{pkg.per}</small></span></span>
 					</Button>
 				{/each}

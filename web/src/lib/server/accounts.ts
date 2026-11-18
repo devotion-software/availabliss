@@ -115,18 +115,23 @@ export async function mergeUsers(fromId: string, intoId: string): Promise<void> 
 		if (!from || !into) throw new ApiError('not_found', 'Account not found');
 
 		// Shared groups: keep the stronger role (an owner stays owner).
-		const fromRoles = await tx.select({ groupId: groupMembers.groupId, role: groupMembers.role }).from(groupMembers).where(eq(groupMembers.userId, fromId));
+		const fromRoles = await tx
+			.select({ groupId: groupMembers.groupId, role: groupMembers.role })
+			.from(groupMembers)
+			.where(eq(groupMembers.userId, fromId));
 		if (fromRoles.length) {
 			const intoRoles = new Map(
-				(await tx.select({ groupId: groupMembers.groupId, role: groupMembers.role }).from(groupMembers).where(eq(groupMembers.userId, intoId))).map((r) => [
-					r.groupId,
-					r.role
-				])
+				(await tx.select({ groupId: groupMembers.groupId, role: groupMembers.role }).from(groupMembers).where(eq(groupMembers.userId, intoId))).map(
+					(r) => [r.groupId, r.role]
+				)
 			);
 			for (const { groupId, role } of fromRoles) {
 				const mine = intoRoles.get(groupId);
 				if (mine && roleRank(role) < roleRank(mine)) {
-					await tx.update(groupMembers).set({ role }).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, intoId)));
+					await tx
+						.update(groupMembers)
+						.set({ role })
+						.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, intoId)));
 				}
 			}
 		}
@@ -138,7 +143,10 @@ export async function mergeUsers(fromId: string, intoId: string): Promise<void> 
 		]);
 		if (fromPlan && betterPlan(fromPlan, intoPlan)) {
 			const { userId: _, updatedAt: __, ...values } = fromPlan;
-			await tx.insert(userPlans).values({ userId: intoId, ...values }).onDuplicateKeyUpdate({ set: values });
+			await tx
+				.insert(userPlans)
+				.values({ userId: intoId, ...values })
+				.onDuplicateKeyUpdate({ set: values });
 		}
 
 		for (const [table, column] of USER_COLUMNS) {
@@ -159,7 +167,10 @@ export async function mergeUsers(fromId: string, intoId: string): Promise<void> 
 
 		// Earlier merges into `fromId` now resolve to `intoId` too.
 		await tx.update(userAliases).set({ userId: intoId }).where(eq(userAliases.userId, fromId));
-		await tx.insert(userAliases).values({ oldUserId: fromId, userId: intoId }).onDuplicateKeyUpdate({ set: { userId: intoId } });
+		await tx
+			.insert(userAliases)
+			.values({ oldUserId: fromId, userId: intoId })
+			.onDuplicateKeyUpdate({ set: { userId: intoId } });
 		await tx.delete(user).where(eq(user.id, fromId));
 	});
 }
@@ -243,7 +254,13 @@ export async function createMergeIntent(intoUserId: string, provider: LinkProvid
 	return code;
 }
 
-export const mergeCookieOptions = { path: '/', httpOnly: true, sameSite: 'lax' as const, secure: env.baseUrl.startsWith('https:'), maxAge: MERGE_TTL_SECONDS };
+export const mergeCookieOptions = {
+	path: '/',
+	httpOnly: true,
+	sameSite: 'lax' as const,
+	secure: env.baseUrl.startsWith('https:'),
+	maxAge: MERGE_TTL_SECONDS
+};
 
 /**
  * Finishes a web merge: `current` is who the browser is signed in as now (the

@@ -84,7 +84,13 @@
 	const tabs = $derived([
 		{ href: '/app', label: 'Groups', icon: 'groups' as const, current: path === '/app' || /^\/app\/(groups|proposals)\//.test(path) },
 		{ href: '/app/my-time', label: 'My time', icon: 'calendar' as const, current: path.startsWith('/app/my-time') },
-		{ href: '/app/activity', label: 'Activity', icon: 'bell' as const, current: path.startsWith('/app/activity'), badge: (activity.seeded ? activity.unread : data.notifications.unread) > 0 },
+		{
+			href: '/app/activity',
+			label: 'Activity',
+			icon: 'bell' as const,
+			current: path.startsWith('/app/activity'),
+			badge: (activity.seeded ? activity.unread : data.notifications.unread) > 0
+		},
 		{
 			href: '/app/settings',
 			label: 'You',

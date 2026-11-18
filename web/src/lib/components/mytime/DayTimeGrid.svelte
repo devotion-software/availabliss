@@ -209,7 +209,12 @@
 		/* Hour lines, with a fainter half-hour line. */
 		background:
 			repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px var(--hour)),
-			repeating-linear-gradient(to bottom, transparent 0 calc(var(--hour) / 2), color-mix(in srgb, var(--line) 50%, transparent) calc(var(--hour) / 2) calc(var(--hour) / 2 + 1px), transparent calc(var(--hour) / 2 + 1px) var(--hour));
+			repeating-linear-gradient(
+				to bottom,
+				transparent 0 calc(var(--hour) / 2),
+				color-mix(in srgb, var(--line) 50%, transparent) calc(var(--hour) / 2) calc(var(--hour) / 2 + 1px),
+				transparent calc(var(--hour) / 2 + 1px) var(--hour)
+			);
 		cursor: cell;
 		touch-action: pan-y;
 	}

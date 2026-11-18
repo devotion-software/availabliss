@@ -34,9 +34,7 @@
 			.map((m) => ({
 				...m,
 				name: memberLabel(members, m.userId, meId, { first: true }),
-				bars: m.busy
-					.map((b) => ({ span: clampToAxis(b, day.date, axis, tz) }))
-					.filter((b) => b.span !== null)
+				bars: m.busy.map((b) => ({ span: clampToAxis(b, day.date, axis, tz) })).filter((b) => b.span !== null)
 			}))
 	);
 
@@ -64,7 +62,9 @@
 			<div
 				class="track shared"
 				role="img"
-				aria-label={most.length ? `Most of the group free ${most.map((f) => spanText(f.from, f.to)).join(', ')}` : 'No time when most of the group is free'}
+				aria-label={most.length
+					? `Most of the group free ${most.map((f) => spanText(f.from, f.to)).join(', ')}`
+					: 'No time when most of the group is free'}
 			>
 				{#each most as f (f.from)}
 					<div class="free most" style={style(f.from, f.to)}><span>{spanText(f.from, f.to)}</span></div>

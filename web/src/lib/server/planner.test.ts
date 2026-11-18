@@ -53,7 +53,13 @@ test('buildPrompt numbers the slots and never needs member names', () => {
 describe('buildDraftPrompt', () => {
 	test('names the group, the time and the notes, never members', async () => {
 		const { buildDraftPrompt } = await import('./planner');
-		const prompt = buildDraftPrompt({ groupName: 'Uni lot', timing: 'An evening from 18:00', when: 'Fri 13 Nov · 19:00–22:00', members: 5, notes: 'curry?' });
+		const prompt = buildDraftPrompt({
+			groupName: 'Uni lot',
+			timing: 'An evening from 18:00',
+			when: 'Fri 13 Nov · 19:00–22:00',
+			members: 5,
+			notes: 'curry?'
+		});
 		expect(prompt).toContain('Uni lot (5 people)');
 		expect(prompt).toContain('Proposed time: Fri 13 Nov · 19:00–22:00');
 		expect(prompt).toContain('curry?');

@@ -15,7 +15,12 @@ describe('nextTarget', () => {
 });
 
 describe('nearest', () => {
-	const slot = (day: string, missing: string[] = []) => ({ start: `${day}T18:00:00Z`, end: `${day}T21:00:00Z`, label: day, missingMemberIds: missing });
+	const slot = (day: string, missing: string[] = []) => ({
+		start: `${day}T18:00:00Z`,
+		end: `${day}T21:00:00Z`,
+		label: day,
+		missingMemberIds: missing
+	});
 	test('picks the free time closest to the target, everyone-free first', () => {
 		expect(nearest([slot('2032-04-01'), slot('2032-04-05')], '2032-04-02', 'UTC')?.label).toBe('2032-04-01');
 		expect(nearest([slot('2032-04-02', ['ana']), slot('2032-04-06')], '2032-04-02', 'UTC')?.label).toBe('2032-04-06');

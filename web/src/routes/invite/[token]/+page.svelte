@@ -19,9 +19,7 @@
 
 	let joining = $state(false);
 	// An emailed invite is only for that address: say so before they try, and offer to switch.
-	const wrongAccount = $derived(
-		!!data.user && !!data.invite?.email && data.user.email.toLowerCase() !== data.invite.email.toLowerCase()
-	);
+	const wrongAccount = $derived(!!data.user && !!data.invite?.email && data.user.email.toLowerCase() !== data.invite.email.toLowerCase());
 	// An invite sent by username is only for that account.
 	const wrongUsername = $derived(!!data.user && !!data.invite?.username && data.user.username !== data.invite.username);
 	const signInHref = $derived(
@@ -97,8 +95,8 @@
 			<p class="explain">Availabliss finds the times everyone's free. The group only sees when you're busy, never what you're doing.</p>
 			{#if wrongAccount}
 				<p class="wrong" role="alert">
-					This invite was sent to <strong>{data.invite.email}</strong>, but you're signed in as <strong>{data.user?.email}</strong>. Sign in
-					with {data.invite.email} to join.
+					This invite was sent to <strong>{data.invite.email}</strong>, but you're signed in as <strong>{data.user?.email}</strong>. Sign in with {data
+						.invite.email} to join.
 				</p>
 				<Button variant="accent" size="lg" block loading={switching} onclick={switchAccount}>Sign in as {data.invite.email}</Button>
 			{:else if wrongUsername}

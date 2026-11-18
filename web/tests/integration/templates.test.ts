@@ -13,7 +13,10 @@ describe('templates', () => {
 	test('create, list by name, update and delete', async () => {
 		const me = await fx.user();
 		const weekends = await createTemplate(me, { name: 'Weekends', requirement: everyDay() });
-		const autumn = await createTemplate(me, { name: 'Autumn evenings', requirement: { ...everyDay('2031-09-01', '2031-11-30'), window: { from: '18:00', to: '22:00' } } });
+		const autumn = await createTemplate(me, {
+			name: 'Autumn evenings',
+			requirement: { ...everyDay('2031-09-01', '2031-11-30'), window: { from: '18:00', to: '22:00' } }
+		});
 		expect(weekends).toMatchObject({ name: 'Weekends', requirement: everyDay() });
 		expect(Date.parse(weekends.createdAt)).not.toBeNaN();
 
@@ -29,7 +32,7 @@ describe('templates', () => {
 		expect((await listTemplates(me)).map((t) => t.id)).toEqual([weekends.id]);
 	});
 
-	test("templates are private to their owner", async () => {
+	test('templates are private to their owner', async () => {
 		const [me, other] = await fx.users(2);
 		const t = await createTemplate(me, { name: 'Mine', requirement: everyDay() });
 		expect(await listTemplates(other)).toEqual([]);
@@ -40,9 +43,9 @@ describe('templates', () => {
 
 	test(`at most ${MAX_TEMPLATES} per user`, async () => {
 		const [me, other] = await fx.users(2);
-		await db.insert(requirementTemplates).values(
-			Array.from({ length: MAX_TEMPLATES - 1 }, (_, i) => ({ id: newId(), userId: me, name: `T${i}`, requirement: everyDay() }))
-		);
+		await db
+			.insert(requirementTemplates)
+			.values(Array.from({ length: MAX_TEMPLATES - 1 }, (_, i) => ({ id: newId(), userId: me, name: `T${i}`, requirement: everyDay() })));
 		const last = await createTemplate(me, { name: 'Last one', requirement: everyDay() });
 		const err = await apiError(createTemplate(me, { name: 'Too many', requirement: everyDay() }));
 		expect(err.code).toBe('validation_error');

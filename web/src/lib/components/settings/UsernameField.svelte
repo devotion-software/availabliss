@@ -28,9 +28,7 @@
 			checkUsername(u)
 				.then((c) => {
 					if (normalized !== u) return;
-					status = c.available
-						? { for: u, ok: true, message: `@${u} is free` }
-						: { for: u, ok: false, message: c.problem ?? 'Taken. Try another.' };
+					status = c.available ? { for: u, ok: true, message: `@${u} is free` } : { for: u, ok: false, message: c.problem ?? 'Taken. Try another.' };
 				})
 				// Can't check right now: let the save decide.
 				.catch(() => normalized === u && (status = { for: u, ok: true, message: '' }));
@@ -45,7 +43,13 @@
 
 	const shownError = $derived(error ?? (normalized && problem ? problem : checked && !checked.ok ? checked.message : null));
 	const hint = $derived(
-		normalized === current ? 'People can invite you by this instead of your email' : checked?.ok ? checked.message : normalized && !problem ? 'Checking…' : undefined
+		normalized === current
+			? 'People can invite you by this instead of your email'
+			: checked?.ok
+				? checked.message
+				: normalized && !problem
+					? 'Checking…'
+					: undefined
 	);
 </script>
 

@@ -1,6 +1,16 @@
 <script lang="ts">
 	import type { Attachment } from '#lib/types';
-	import { attachmentLabel, bubbleSrc, fitImage, formatBytes, gridTiles, isVisual, middleTruncate, opensWallet, passCard } from '#lib/client/attachments';
+	import {
+		attachmentLabel,
+		bubbleSrc,
+		fitImage,
+		formatBytes,
+		gridTiles,
+		isVisual,
+		middleTruncate,
+		opensWallet,
+		passCard
+	} from '#lib/client/attachments';
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import FileIcon from './FileIcon.svelte';
 
@@ -36,7 +46,9 @@
 		class="pic single"
 		style:width="{single.width}px"
 		style:aspect-ratio="{single.width} / {single.height}"
-		aria-label="{attachmentLabel(a)}. Open" onclick={() => onopen?.(0)}>
+		aria-label="{attachmentLabel(a)}. Open"
+		onclick={() => onopen?.(0)}
+	>
 		<img src={bubbleSrc(a)} alt="" width={single.width} height={single.height} loading="lazy" decoding="async" draggable="false" />
 		{#if a.kind === 'gif'}<span class="badge" aria-hidden="true">GIF</span>{/if}
 	</button>
@@ -106,13 +118,13 @@
 			{/if}
 		</div>
 	{:else}
-	<a class="file" class:mine href={f.url} download={f.name} aria-label="{attachmentLabel(f)}. Download" title={f.name}>
-		<span class="file-icon"><FileIcon name={f.name} mime={f.mime} /></span>
-		<span class="file-text">
-			<span class="file-name">{middleTruncate(f.name, compact ? 40 : 48)}</span>
-			<span class="file-size">{formatBytes(f.size)}</span>
-		</span>
-	</a>
+		<a class="file" class:mine href={f.url} download={f.name} aria-label="{attachmentLabel(f)}. Download" title={f.name}>
+			<span class="file-icon"><FileIcon name={f.name} mime={f.mime} /></span>
+			<span class="file-text">
+				<span class="file-name">{middleTruncate(f.name, compact ? 40 : 48)}</span>
+				<span class="file-size">{formatBytes(f.size)}</span>
+			</span>
+		</a>
 	{/if}
 {/each}
 

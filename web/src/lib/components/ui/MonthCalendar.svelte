@@ -35,7 +35,14 @@
 
 <div class="cal" role="group" aria-label={label}>
 	<div class="head">
-		<IconButton icon="chevron-left" label="Previous month" variant="plain" size={40} disabled={!canPrev} onclick={() => (month = addMonths(month, -1))} />
+		<IconButton
+			icon="chevron-left"
+			label="Previous month"
+			variant="plain"
+			size={40}
+			disabled={!canPrev}
+			onclick={() => (month = addMonths(month, -1))}
+		/>
 		<span class="title" aria-live="polite">{monthTitle(month)}</span>
 		<IconButton icon="chevron-right" label="Next month" variant="plain" size={40} disabled={!canNext} onclick={() => (month = addMonths(month, 1))} />
 	</div>
@@ -51,8 +58,10 @@
 					disabled={disabled(d)}
 					aria-pressed={d === value}
 					aria-label={spokenDate(d)}
-					onclick={() => onpick(d)}>{dayNum(d)}</button
+					onclick={() => onpick(d)}
 				>
+					{dayNum(d)}
+				</button>
 			{:else}
 				<span></span>
 			{/if}

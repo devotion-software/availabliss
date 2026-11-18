@@ -12,7 +12,12 @@
 	const byStart = (a: { start: string }, b: { start: string }) => a.start.localeCompare(b.start);
 	const open = $derived(data.proposals.filter((p) => p.status === 'open').sort(byStart));
 	const confirmed = $derived(data.proposals.filter((p) => p.status === 'confirmed').sort(byStart));
-	const withdrawn = $derived(data.proposals.filter((p) => p.status === 'cancelled').sort(byStart).reverse());
+	const withdrawn = $derived(
+		data.proposals
+			.filter((p) => p.status === 'cancelled')
+			.sort(byStart)
+			.reverse()
+	);
 
 	let proposing = $state(false);
 
@@ -33,12 +38,12 @@
 
 <div class="page">
 	<PageHeader
-	title="Proposals"
-	backHref="/app/groups/{data.group.id}"
-	backLabel="Back to calendar"
-	backOnPhoneOnly
-	crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Proposals' }]}
->
+		title="Proposals"
+		backHref="/app/groups/{data.group.id}"
+		backLabel="Back to calendar"
+		backOnPhoneOnly
+		crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Proposals' }]}
+	>
 		{#snippet actions()}
 			<Button variant="accent" size="sm" icon="plus" onclick={() => (proposing = true)}>Propose</Button>
 		{/snippet}

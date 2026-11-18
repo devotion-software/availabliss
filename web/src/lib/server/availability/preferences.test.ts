@@ -4,7 +4,14 @@ import { applyPreferences, fits, preferenceLabel } from './preferences';
 
 const TZ = 'Europe/London';
 const at = (iso: string) => Date.parse(iso);
-const weekendsAfter4 = { userId: 'sam', kind: 'weekly' as const, from: null, to: null, days: [5, 6] as (5 | 6)[], window: { from: '16:00', to: '23:59' } };
+const weekendsAfter4 = {
+	userId: 'sam',
+	kind: 'weekly' as const,
+	from: null,
+	to: null,
+	days: [5, 6] as (5 | 6)[],
+	window: { from: '16:00', to: '23:59' }
+};
 const christmas = { userId: 'priya', kind: 'dates' as const, from: '2026-12-19', to: '2026-12-21', days: [], window: null };
 
 describe('preferences', () => {

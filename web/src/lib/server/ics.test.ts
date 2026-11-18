@@ -38,12 +38,7 @@ describe('buildIcs', () => {
 
 	test('all-day events are dates in the group timezone', () => {
 		// Midnight BST on 1 July is 23:00 UTC on 30 June.
-		const ics = buildIcs(
-			event({ allDay: true, start: '2026-06-30T23:00:00.000Z', end: '2026-07-02T23:00:00.000Z' }),
-			'G',
-			'h',
-			'Europe/London'
-		);
+		const ics = buildIcs(event({ allDay: true, start: '2026-06-30T23:00:00.000Z', end: '2026-07-02T23:00:00.000Z' }), 'G', 'h', 'Europe/London');
 		expect(lines(ics)).toContain('DTSTART;VALUE=DATE:20260701');
 		expect(lines(ics)).toContain('DTEND;VALUE=DATE:20260703');
 	});

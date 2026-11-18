@@ -28,7 +28,16 @@ describe('getPlan', () => {
 	test('a new account is free with the purchase config exposed', async () => {
 		const me = await fx.user();
 		const plan = await getPlan(me);
-		expect(plan).toMatchObject({ tier: 'free', proUntil: null, lifetime: false, willRenew: false, store: null, groupLimit: 3, groupsOwned: 0, canCreateGroup: true });
+		expect(plan).toMatchObject({
+			tier: 'free',
+			proUntil: null,
+			lifetime: false,
+			willRenew: false,
+			store: null,
+			groupLimit: 3,
+			groupsOwned: 0,
+			canCreateGroup: true
+		});
 		// setup.ts blanks ANTHROPIC_API_KEY.
 		expect(plan.aiPlanner).toEqual({ available: false, included: false });
 		expect(plan.purchase.entitlement).toBeTruthy();
@@ -40,9 +49,24 @@ describe('getPlan', () => {
 		const [sub, lapsed] = await fx.users(2);
 		const until = new Date(Math.floor((Date.now() + 10 * DAY) / 1000) * 1000);
 		await saveEntitlement(sub, { proUntil: until, lifetime: false, store: 'play_store', productId: 'pro_annual', willRenew: false });
-		expect(await getPlan(sub)).toMatchObject({ tier: 'pro', proUntil: until.toISOString(), lifetime: false, willRenew: false, store: 'play_store', groupLimit: null, canCreateGroup: true, aiPlanner: { available: false, included: true } });
+		expect(await getPlan(sub)).toMatchObject({
+			tier: 'pro',
+			proUntil: until.toISOString(),
+			lifetime: false,
+			willRenew: false,
+			store: 'play_store',
+			groupLimit: null,
+			canCreateGroup: true,
+			aiPlanner: { available: false, included: true }
+		});
 
-		await saveEntitlement(lapsed, { proUntil: new Date(Date.now() - DAY), lifetime: false, store: 'app_store', productId: 'pro_monthly', willRenew: true });
+		await saveEntitlement(lapsed, {
+			proUntil: new Date(Date.now() - DAY),
+			lifetime: false,
+			store: 'app_store',
+			productId: 'pro_monthly',
+			willRenew: true
+		});
 		expect(await getPlan(lapsed)).toMatchObject({ tier: 'free', store: null, willRenew: false, groupLimit: 3 });
 		expect(await isPro(lapsed)).toBe(false);
 	});
@@ -86,7 +110,9 @@ describe('handleRevenueCatEvent without a REST key', () => {
 	// BUG: see 'lifetime Pro' above; the webhook throws for lifetime purchases.
 	test('a lifetime (non-expiring) purchase', async () => {
 		const me = await fx.user();
-		await handleRevenueCatEvent(purchase(me, { type: 'NON_RENEWING_PURCHASE', expiration_at_ms: null, product_id: 'pro_lifetime', store: 'PLAY_STORE' }));
+		await handleRevenueCatEvent(
+			purchase(me, { type: 'NON_RENEWING_PURCHASE', expiration_at_ms: null, product_id: 'pro_lifetime', store: 'PLAY_STORE' })
+		);
 		expect(await getPlan(me)).toMatchObject({ tier: 'pro', lifetime: true, willRenew: false, store: 'play_store' });
 	});
 
@@ -204,7 +230,6 @@ describe('accounts merged into another', () => {
 		expect((await getPlan(c)).tier).toBe('pro');
 	});
 });
-
 
 describe('RevenueCat webhook route', () => {
 	const SECRET = 'Bearer webhook-secret-for-tests';

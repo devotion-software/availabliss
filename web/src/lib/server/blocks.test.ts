@@ -9,8 +9,7 @@ const block = (start: string, end: string, repeat: Repeat = 'none', until: strin
 	until
 });
 const at = (s: string) => Date.parse(s);
-const isoSpans = (spans: { start: number; end: number }[]) =>
-	spans.map((s) => [new Date(s.start).toISOString(), new Date(s.end).toISOString()]);
+const isoSpans = (spans: { start: number; end: number }[]) => spans.map((s) => [new Date(s.start).toISOString(), new Date(s.end).toISOString()]);
 
 const TZ = 'Europe/London';
 

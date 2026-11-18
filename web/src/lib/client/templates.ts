@@ -3,10 +3,8 @@ import { api, type Fetch } from './api';
 import type { Requirement, RequirementTemplate } from '#lib/types';
 import { addDays, daysBetween } from './dates';
 
-export const listTemplates = (fetch?: Fetch) =>
-	api.get<{ templates: RequirementTemplate[] }>('/me/templates', { fetch }).then((r) => r.templates);
-export const createTemplate = (name: string, requirement: Requirement) =>
-	api.post<RequirementTemplate>('/me/templates', { name, requirement });
+export const listTemplates = (fetch?: Fetch) => api.get<{ templates: RequirementTemplate[] }>('/me/templates', { fetch }).then((r) => r.templates);
+export const createTemplate = (name: string, requirement: Requirement) => api.post<RequirementTemplate>('/me/templates', { name, requirement });
 export const renameTemplate = (id: string, name: string) => api.patch<RequirementTemplate>(`/me/templates/${id}`, { name });
 export const deleteTemplate = (id: string) => api.del(`/me/templates/${id}`);
 

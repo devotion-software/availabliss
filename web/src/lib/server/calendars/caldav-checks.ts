@@ -32,13 +32,16 @@ export async function checkConnection(connectionId: string): Promise<boolean> {
 		const refreshed = await adapter.refresh?.(creds);
 		if (refreshed) {
 			creds = refreshed as CaldavCredentials;
-			await db.update(calendarConnections).set({ credentials: encryptJson(creds, context) }).where(eq(calendarConnections.id, row.id));
+			await db
+				.update(calendarConnections)
+				.set({ credentials: encryptJson(creds, context) })
+				.where(eq(calendarConnections.id, row.id));
 		}
 		const remote = await adapter.listCalendars(creds);
 		const stored = new Map(
-			(await db.select({ externalId: calendars.externalId, cursor: calendars.syncCursor }).from(calendars).where(eq(calendars.connectionId, row.id))).map(
-				(c) => [c.externalId, c.cursor]
-			)
+			(
+				await db.select({ externalId: calendars.externalId, cursor: calendars.syncCursor }).from(calendars).where(eq(calendars.connectionId, row.id))
+			).map((c) => [c.externalId, c.cursor])
 		);
 		changed =
 			remote.length !== stored.size ||
@@ -62,7 +65,13 @@ export async function checkCaldavConnections(deadline = Infinity): Promise<numbe
 		.orderBy(asc(calendarConnections.checkedAt))
 		.limit(1000);
 	const stats = { started: 0 };
-	const synced = await pool(rows.map((r) => r.id), CHECK_CONCURRENCY, deadline, checkConnection, stats);
+	const synced = await pool(
+		rows.map((r) => r.id),
+		CHECK_CONCURRENCY,
+		deadline,
+		checkConnection,
+		stats
+	);
 	// The numbers to decide on when to check less often (see the "iCloud change-check load" task):
 	// how long a run takes against its budget, and whether connections start being left unchecked.
 	const oldest = rows[0]?.checkedAt;

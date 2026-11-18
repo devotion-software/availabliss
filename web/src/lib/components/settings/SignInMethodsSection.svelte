@@ -98,7 +98,11 @@
 		try {
 			await api.post('/me/accounts/merge-intent', { provider });
 			// Signing in to the other account proves it's yours; /link/complete merges it into this one.
-			const res = await authClient.signIn.social({ provider, callbackURL: '/link/complete', errorCallbackURL: `${HERE}?link_error=merge_not_signed_in&link_provider=${provider}` });
+			const res = await authClient.signIn.social({
+				provider,
+				callbackURL: '/link/complete',
+				errorCallbackURL: `${HERE}?link_error=merge_not_signed_in&link_provider=${provider}`
+			});
 			if (res?.error) throw new Error(res.error.message ?? `Couldn't start ${LABEL[provider]} sign-in.`);
 		} catch (err) {
 			toasts.error(err);
@@ -109,7 +113,9 @@
 
 <GlassPanel as="section" padding="16px" gap={10} aria-labelledby="signin-methods-title">
 	<h2 class="eyebrow" id="signin-methods-title">Sign-in methods</h2>
-	<p class="muted small">Link Apple or Google to sign in with them. If one already has its own Availabliss account, you can merge it into this one.</p>
+	<p class="muted small">
+		Link Apple or Google to sign in with them. If one already has its own Availabliss account, you can merge it into this one.
+	</p>
 	<div class="row first">
 		<span class="tile"><Icon name="mail" size={18} /></span>
 		<span class="text">
@@ -141,7 +147,9 @@
 <ConfirmSheet
 	bind:open={confirmMerge}
 	title="Merge accounts?"
-	message="That {mergeProvider ? LABEL[mergeProvider] : ''} sign-in already has its own Availabliss account. Merging moves its groups, busy times, chats and Pro into this account, then deletes the other one. You'll sign in with {mergeProvider
+	message="That {mergeProvider
+		? LABEL[mergeProvider]
+		: ''} sign-in already has its own Availabliss account. Merging moves its groups, busy times, chats and Pro into this account, then deletes the other one. You'll sign in with {mergeProvider
 		? LABEL[mergeProvider]
 		: 'it'} once more to confirm. This can't be undone."
 	confirmLabel="Merge into this account"

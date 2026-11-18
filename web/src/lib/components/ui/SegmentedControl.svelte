@@ -38,14 +38,7 @@
 	}
 </script>
 
-<div
-	class="seg {variant} {size}"
-	class:glass={variant === 'solid'}
-	class:block
-	role="radiogroup"
-	aria-label={label}
-	style:--n={options.length}
->
+<div class="seg {variant} {size}" class:glass={variant === 'solid'} class:block role="radiogroup" aria-label={label} style:--n={options.length}>
 	{#each options as option, i (option.value)}
 		{@const on = option.value === value}
 		<button

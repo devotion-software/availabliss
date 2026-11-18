@@ -1,13 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { Member, Requirement, Weekday } from '#lib/types';
-	import {
-		PRESETS,
-		WEEKDAY_NAMES,
-		applyPreset,
-		presetOf,
-		type PresetId
-	} from '#lib/client/requirements';
+	import { PRESETS, WEEKDAY_NAMES, applyPreset, presetOf, type PresetId } from '#lib/client/requirements';
 	import { listSchoolAuthorities } from '#lib/client/regions';
 	import Chip from '#lib/components/ui/Chip.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';
@@ -83,7 +77,6 @@
 			.catch(() => (authorities = []));
 	});
 	const authorityName = $derived(authorities.find((a) => a.value === requirement.schoolAuthority)?.label);
-
 </script>
 
 <fieldset class="editor" disabled={readonly}>
@@ -218,7 +211,6 @@
 		<Button type="submit" variant="solid" block disabled={!rangeFrom}>Done</Button>
 	</form>
 </Sheet>
-
 
 <style>
 	.editor {

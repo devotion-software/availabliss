@@ -73,18 +73,18 @@
 				<Button block loading={working === 'undo'} disabled={!!working} onclick={undo}>Count as busy again</Button>
 			{:else}
 				<p class="note">Doesn't really make you busy? Your groups will see you as free then.</p>
-				<Button block loading={working === 'one'} disabled={!!working} onclick={() => ignore(false)}
-					>{interval.recurring ? 'Not busy: just this one' : 'Mark as not busy'}</Button
-				>
+				<Button block loading={working === 'one'} disabled={!!working} onclick={() => ignore(false)}>
+					{interval.recurring ? 'Not busy: just this one' : 'Mark as not busy'}
+				</Button>
 				{#if interval.recurring}
-					<Button variant="secondary" block loading={working === 'all'} disabled={!!working} onclick={() => ignore(true)}
-						>Not busy: every time it repeats</Button
-					>
+					<Button variant="secondary" block loading={working === 'all'} disabled={!!working} onclick={() => ignore(true)}>
+						Not busy: every time it repeats
+					</Button>
 				{/if}
 			{/if}
 			<p class="note">
-				Availabliss only reads when you're busy, never what the event is, so it can't be edited here. Change it in your calendar and it updates
-				here automatically, or choose which calendars count as busy.
+				Availabliss only reads when you're busy, never what the event is, so it can't be edited here. Change it in your calendar and it updates here
+				automatically, or choose which calendars count as busy.
 			</p>
 			<Button href="/app/calendars" variant="secondary" block icon="calendar-sync" onclick={() => (open = false)}>Calendar settings</Button>
 		</div>

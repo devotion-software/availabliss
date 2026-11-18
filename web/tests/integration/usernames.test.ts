@@ -59,7 +59,10 @@ describe('checkUsername', () => {
 describe('invites by username', () => {
 	test('only the invited person can join, and the invite is used up', async () => {
 		const [owner, invitee, other] = await fx.users(3);
-		await db.update(user).set({ username: `inv_${tag}` }).where(eq(user.id, invitee));
+		await db
+			.update(user)
+			.set({ username: `inv_${tag}` })
+			.where(eq(user.id, invitee));
 		const group = await createGroup(owner, { name: 'Username invites' }, 'UTC');
 		const { token } = await createInvite(group.id, owner, null, invitee);
 

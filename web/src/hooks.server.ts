@@ -154,8 +154,7 @@ const handleRequest: Handle = async ({ event, resolve }) => {
 	const mode: ThemeMode = THEME_MODES.find((m) => m === event.locals.user?.themeMode) ?? 'system';
 	const theme: ColorTheme = COLOR_THEMES.find((t) => t === event.locals.user?.colorTheme) ?? 'dawn';
 	const response = await resolve(event, {
-		transformPageChunk: ({ html }) =>
-			html.replace('data-mode="system" data-theme="dawn"', `data-mode="${mode}" data-theme="${theme}"`)
+		transformPageChunk: ({ html }) => html.replace('data-mode="system" data-theme="dawn"', `data-mode="${mode}" data-theme="${theme}"`)
 	});
 	setSecurityHeaders(response.headers);
 	return response;

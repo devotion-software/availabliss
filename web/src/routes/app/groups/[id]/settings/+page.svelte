@@ -236,9 +236,7 @@
 			<div class="text">
 				<h2 id="rhythm-title">How often do you meet?</h2>
 				<p class="small">
-					{canEdit
-						? 'The calendar suggests the next one, near the same day each time.'
-						: "Only the group's owner and admins can change this."}
+					{canEdit ? 'The calendar suggests the next one, near the same day each time.' : "Only the group's owner and admins can change this."}
 				</p>
 			</div>
 			<Select label="How often" hideLabel bind:value={every} options={RHYTHM_OPTIONS} disabled={!canEdit || savingRhythm} onchange={setEvery} />
@@ -290,9 +288,7 @@
 			<div class="text">
 				<h2 id="leave-title">Leave group</h2>
 				<p class="small">
-					{isOwner
-						? "You'll choose an admin to become the owner. You'll need a new invite to come back."
-						: "You'll need a new invite to come back."}
+					{isOwner ? "You'll choose an admin to become the owner. You'll need a new invite to come back." : "You'll need a new invite to come back."}
 				</p>
 			</div>
 			<Button variant="danger" icon="logout" onclick={() => (leaveOpen = true)}>Leave group</Button>

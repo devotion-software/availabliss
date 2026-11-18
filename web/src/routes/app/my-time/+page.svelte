@@ -505,7 +505,6 @@
 		margin: 0 auto;
 	}
 
-
 	/* Wide screens: the month or agenda in the main column, blocking and repeats beside it. */
 	@media (min-width: 900px) {
 		.layout {

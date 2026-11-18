@@ -140,7 +140,9 @@
 					<div class="photo">
 						<label class="photo-pick" aria-label={data.user.image ? 'Change your photo' : 'Add a photo'}>
 							<Avatar name={name || data.user.email} id={data.user.id} image={data.user.image} size={52} />
-							<span class="badge" aria-hidden="true">{#if uploading}…{:else}<Icon name="pencil" size={11} />{/if}</span>
+							<span class="badge" aria-hidden="true">
+								{#if uploading}…{:else}<Icon name="pencil" size={11} />{/if}
+							</span>
 							<input class="sr-only" type="file" accept="image/*" disabled={uploading} onchange={pickPhoto} />
 						</label>
 						{#if data.user.image}<button type="button" class="link small" disabled={uploading} onclick={removePhoto}>Remove</button>{/if}

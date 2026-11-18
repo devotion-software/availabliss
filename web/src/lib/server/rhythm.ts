@@ -20,7 +20,8 @@ export function nextTarget(last: string, every: Rhythm['every']): string {
 	const [y, m, d] = last.split('-').map(Number);
 	const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 	const nth = Math.ceil(d / 7);
-	const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+	const ny = m === 12 ? y + 1 : y,
+		nm = m === 12 ? 1 : m + 1;
 	const firstWeekday = new Date(Date.UTC(ny, nm - 1, 1)).getUTCDay();
 	let day = 1 + ((weekday - firstWeekday + 7) % 7) + (nth - 1) * 7;
 	const daysInMonth = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
@@ -45,7 +46,8 @@ export interface NextSuggestion {
 }
 
 /** How far either side of the target to look. */
-const BEFORE_DAYS = 6, AFTER_DAYS = 10;
+const BEFORE_DAYS = 6,
+	AFTER_DAYS = 10;
 
 async function suggestFor(group: GroupRow, now: number): Promise<NextSuggestion | null> {
 	if (!group.rhythm) return null;
@@ -81,7 +83,11 @@ export async function promptNextPlans(now = Date.now()): Promise<number> {
 	for (const { event, group } of ended) {
 		if (!group.rhythm?.prompt || group.archivedAt) continue;
 		// Something newer already planned or proposed: nothing to prompt.
-		const [later] = await db.select({ id: events.id }).from(events).where(and(eq(events.groupId, group.id), gt(events.start, event.start))).limit(1);
+		const [later] = await db
+			.select({ id: events.id })
+			.from(events)
+			.where(and(eq(events.groupId, group.id), gt(events.start, event.start)))
+			.limit(1);
 		const [open] = await db
 			.select({ id: proposals.id })
 			.from(proposals)

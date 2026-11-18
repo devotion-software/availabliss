@@ -1,8 +1,7 @@
 import { api, type Fetch } from './api';
 import type { AppNotification } from '#lib/types';
 
-export const listNotifications = (fetch?: Fetch) =>
-	api.get<{ notifications: AppNotification[]; unread: number }>('/notifications', { fetch });
+export const listNotifications = (fetch?: Fetch) => api.get<{ notifications: AppNotification[]; unread: number }>('/notifications', { fetch });
 /** Marks the given notifications read, or all of them when `ids` is omitted. */
 export const markNotificationsRead = (ids?: string[]) => api.post('/notifications/read', ids ? { ids } : {});
 

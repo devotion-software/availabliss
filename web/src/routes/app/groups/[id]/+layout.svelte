@@ -90,7 +90,8 @@
 				<div class="titles">
 					<h1>{data.group.name}</h1>
 					<span class="sub">
-						{#if mute}<span class="muted-tag"><Icon name="bell-off" size={12} /> Muted</span> · {/if}{groupSubtitle(data.group)}
+						{#if mute}<span class="muted-tag"><Icon name="bell-off" size={12} /> Muted</span> ·
+						{/if}{groupSubtitle(data.group)}
 					</span>
 				</div>
 				<IconButton href="{base}/chat" icon="chat" label={unreadChat ? `Chat, ${unreadChat} unread` : 'Chat'} badge={unreadChat} />

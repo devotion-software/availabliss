@@ -54,13 +54,25 @@ describe('createProposal', () => {
 
 	test('the proposer accepts automatically; everyone else is pending and notified', async () => {
 		const p = await createProposal(g.groupId, g.member, slot(4, { title: 'Pizza', location: 'Luigi’s', note: 'Bring cash' }));
-		expect(p).toMatchObject({ groupId: g.groupId, status: 'open', createdBy: g.member, title: 'Pizza', location: 'Luigi’s', note: 'Bring cash', eventId: null, allDay: false });
+		expect(p).toMatchObject({
+			groupId: g.groupId,
+			status: 'open',
+			createdBy: g.member,
+			title: 'Pizza',
+			location: 'Luigi’s',
+			note: 'Bring cash',
+			eventId: null,
+			allDay: false
+		});
 		expect(p.start).toBe('2031-03-04T18:00:00.000Z');
 		const byUser = Object.fromEntries(p.responses.map((r) => [r.userId, r.response]));
 		expect(byUser).toEqual({ [g.owner]: 'pending', [g.admin]: 'pending', [g.member]: 'accepted' });
 		expect(p.busyMemberIds).toEqual([]);
 
-		const notified = await db.select().from(notifications).where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.created')));
+		const notified = await db
+			.select()
+			.from(notifications)
+			.where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.created')));
 		const others = notified.filter((n) => n.userId !== g.member);
 		expect(others.map((n) => n.userId).sort()).toEqual([g.owner, g.admin].sort());
 		expect(others[0].data).toMatchObject({ proposalId: p.id, kind: 'proposal.created', groupId: g.groupId });
@@ -133,7 +145,10 @@ describe('responding', () => {
 
 		const kinds = (await db.select().from(notifications).where(eq(notifications.groupId, g.groupId))).map((n) => n.kind);
 		expect(kinds.filter((k) => k === 'proposal.confirmed').length).toBe(3);
-		const system = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		const system = await db
+			.select()
+			.from(messages)
+			.where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
 		expect(system.length).toBe(1);
 
 		// Confirmed proposals take no more admin overrides (replies can still change: see below).
@@ -151,9 +166,15 @@ describe('responding', () => {
 		const made = await db.select().from(events).where(eq(events.proposalId, p.id));
 		expect(made.length).toBe(1);
 		expect(results.every((r) => r.eventId === made[0].id)).toBe(true);
-		const system = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		const system = await db
+			.select()
+			.from(messages)
+			.where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
 		expect(system.length).toBe(1);
-		const confirmedPushes = await db.select().from(notifications).where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.confirmed')));
+		const confirmedPushes = await db
+			.select()
+			.from(notifications)
+			.where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.confirmed')));
 		expect(confirmedPushes.length).toBe(3);
 	});
 
@@ -186,7 +207,10 @@ describe('responding', () => {
 		expect(open.responses.find((r) => r.userId === g.member)?.response).toBe('maybe');
 		const confirmed = await confirmAnyway(p.id, g.owner);
 		expect(confirmed).toMatchObject({ status: 'confirmed', confirmedBy: g.owner });
-		const [note] = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		const [note] = await db
+			.select()
+			.from(messages)
+			.where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
 		expect(note.body).toContain('2 of 3 can make it, 1 maybe');
 		// A maybe changing to a firm yes later just updates; to no isn't dropping out (they never said yes).
 		expect((await respond(p.id, g.member, 'declined')).needsReview).toBe(false);
@@ -255,10 +279,16 @@ describe('confirmAnyway', () => {
 
 		const made = await db.select().from(events).where(eq(events.proposalId, p.id));
 		expect(made.length).toBe(1);
-		const system = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		const system = await db
+			.select()
+			.from(messages)
+			.where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
 		expect(system.map((m) => m.body)).toEqual([expect.stringContaining('(2 of 3 can make it)')]);
 		expect(system[0].body!.startsWith("It's on for")).toBe(true);
-		const pushed = await db.select().from(notifications).where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.confirmed')));
+		const pushed = await db
+			.select()
+			.from(notifications)
+			.where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.confirmed')));
 		expect(pushed.map((n) => n.userId).sort()).toEqual([g.owner, g.admin, g.member].sort());
 		expect(pushed[0].title).toBe("It's on");
 
@@ -309,11 +339,17 @@ describe('changing a reply once confirmed', () => {
 		expect(await db.query.events.findFirst({ where: eq(events.id, p.eventId!) })).toBeTruthy();
 
 		// The proposer (and the owner, an admin) hear about it; the one who dropped out doesn't.
-		const told = await db.select().from(notifications).where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.changed')));
+		const told = await db
+			.select()
+			.from(notifications)
+			.where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.changed')));
 		expect(told.map((n) => n.userId).sort()).toEqual([g.owner, g.member].sort());
 		expect(told[0].data).toMatchObject({ proposalId: p.id });
 		expect(told[0].body).toContain('any more');
-		const system = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		const system = await db
+			.select()
+			.from(messages)
+			.where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
 		expect(system.some((m) => m.body?.endsWith("can't make it any more"))).toBe(true);
 
 		// Changing back just updates, and clears the review.
@@ -348,10 +384,21 @@ describe('changing a reply once confirmed', () => {
 		const after = await getProposal(p.id, g.member);
 		expect(after).toMatchObject({ status: 'cancelled', needsReview: false });
 		expect(await db.query.events.findFirst({ where: eq(events.id, p.eventId!) })).toBeUndefined();
-		const system = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		const system = await db
+			.select()
+			.from(messages)
+			.where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
 		expect(system.some((m) => m.body?.includes('cancelled the plan for'))).toBe(true);
-		const told = await db.select().from(notifications).where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.changed')));
-		expect(told.filter((n) => n.body.includes('cancelled')).map((n) => n.userId).sort()).toEqual([g.admin, g.member, plain].sort());
+		const told = await db
+			.select()
+			.from(notifications)
+			.where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.changed')));
+		expect(
+			told
+				.filter((n) => n.body.includes('cancelled'))
+				.map((n) => n.userId)
+				.sort()
+		).toEqual([g.admin, g.member, plain].sort());
 
 		expect((await apiError(respond(p.id, g.member, 'declined'))).code).toBe('conflict');
 		expect((await apiError(keepPlan(p.id, g.owner))).code).toBe('conflict');
@@ -372,9 +419,23 @@ describe('changing a reply once confirmed', () => {
 describe('busy members', () => {
 	test('busyMemberIds lists members with a clashing block, only while open', async () => {
 		const g = await setup();
-		await createBlock(g.member, { start: '2031-03-11T17:00:00Z', end: '2031-03-11T19:00:00Z', allDay: false, repeat: 'none', until: null, note: 'Gym' });
+		await createBlock(g.member, {
+			start: '2031-03-11T17:00:00Z',
+			end: '2031-03-11T19:00:00Z',
+			allDay: false,
+			repeat: 'none',
+			until: null,
+			note: 'Gym'
+		});
 		// A weekly repeat that started weeks earlier still clashes.
-		await createBlock(g.admin, { start: '2031-02-18T20:00:00Z', end: '2031-02-18T22:00:00Z', allDay: false, repeat: 'weekly', until: null, note: null });
+		await createBlock(g.admin, {
+			start: '2031-02-18T20:00:00Z',
+			end: '2031-02-18T22:00:00Z',
+			allDay: false,
+			repeat: 'weekly',
+			until: null,
+			note: null
+		});
 
 		const p = await createProposal(g.groupId, g.owner, slot(11));
 		expect(p.busyMemberIds.sort()).toEqual([g.admin, g.member].sort());

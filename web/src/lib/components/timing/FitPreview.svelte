@@ -12,7 +12,10 @@
 	}
 	let { requirement, timeZone }: Props = $props();
 
-	const live = createPreview(() => requirement, () => timeZone);
+	const live = createPreview(
+		() => requirement,
+		() => timeZone
+	);
 	const preview = $derived(live.preview);
 
 	const short = (key: string) => formatDayKey(key).replace(/^\w+ /, '');

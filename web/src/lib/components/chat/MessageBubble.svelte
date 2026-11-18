@@ -197,8 +197,10 @@
 		onpointerup={cancelPress}
 		onpointercancel={cancelPress}
 		onpointerleave={cancelPress}
-		{oncontextmenu}>{text}</button
+		{oncontextmenu}
 	>
+		{text}
+	</button>
 {/snippet}
 
 {#snippet media()}
@@ -245,7 +247,7 @@
 {:else}
 	<div class="row" class:compact>
 		<span class="avatar" class:hidden={!last}>
-			<Avatar name={name} id={message.authorId ?? undefined} image={author?.image} size={compact ? 26 : 28} />
+			<Avatar {name} id={message.authorId ?? undefined} image={author?.image} size={compact ? 26 : 28} />
 		</span>
 		<div class="col">
 			{#if first}<span class="name">{name.split(' ')[0]}</span>{/if}

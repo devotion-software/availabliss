@@ -36,11 +36,7 @@ export async function roleIn(groupId: string, userId: string): Promise<Role | nu
  * Ensures `userId` belongs to the group (404 otherwise, so group ids aren't
  * leaked) and optionally holds an admin or owner role.
  */
-export async function requireMember(
-	groupId: string,
-	userId: string,
-	need: 'member' | 'admin' | 'owner' = 'member'
-): Promise<Role> {
+export async function requireMember(groupId: string, userId: string, need: 'member' | 'admin' | 'owner' = 'member'): Promise<Role> {
 	const role = await roleIn(groupId, userId);
 	if (!role) throw notFound('Group not found');
 	if (need === 'admin' && !isAdmin(role)) throw forbidden('Only group admins can do that');

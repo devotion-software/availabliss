@@ -42,7 +42,16 @@ export async function getMe(userId: string): Promise<User> {
 export type UserPatch = Partial<
 	Pick<
 		User,
-		'name' | 'themeMode' | 'colorTheme' | 'country' | 'subdivision' | 'schoolAuthority' | 'timezone' | 'onboarded' | 'busyBufferMinutes' | 'eventReminders'
+		| 'name'
+		| 'themeMode'
+		| 'colorTheme'
+		| 'country'
+		| 'subdivision'
+		| 'schoolAuthority'
+		| 'timezone'
+		| 'onboarded'
+		| 'busyBufferMinutes'
+		| 'eventReminders'
 	> & {
 		username: string;
 	}
@@ -103,9 +112,7 @@ export async function deleteAccount(userId: string): Promise<void> {
 
 	// As if they'd left each group that still exists: the others see them go, and
 	// proposals that were only waiting on them can confirm.
-	const remaining = memberOf.length
-		? (await db.select({ id: groups.id }).from(groups).where(inArray(groups.id, memberOf))).map((g) => g.id)
-		: [];
+	const remaining = memberOf.length ? (await db.select({ id: groups.id }).from(groups).where(inArray(groups.id, memberOf))).map((g) => g.id) : [];
 	for (const groupId of remaining) {
 		await publishToGroup(groupId, 'member.changed', { userId, removed: true });
 		await onMemberLeft(groupId, userId);

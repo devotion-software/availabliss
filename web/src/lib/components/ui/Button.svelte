@@ -17,20 +17,9 @@
 		block?: boolean;
 		children?: Snippet;
 	};
-	type Props = Common &
-		(({ href: string } & Omit<HTMLAnchorAttributes, 'href'>) | ({ href?: undefined } & HTMLButtonAttributes));
+	type Props = Common & (({ href: string } & Omit<HTMLAnchorAttributes, 'href'>) | ({ href?: undefined } & HTMLButtonAttributes));
 
-	let {
-		variant = 'solid',
-		size = 'md',
-		icon,
-		iconAfter,
-		loading = false,
-		block = false,
-		children,
-		class: className = '',
-		...rest
-	}: Props = $props();
+	let { variant = 'solid', size = 'md', icon, iconAfter, loading = false, block = false, children, class: className = '', ...rest }: Props = $props();
 
 	const iconSize = $derived(size === 'sm' ? 15 : 18);
 	const classes = $derived(['btn', variant, size, block && 'block', className].filter(Boolean).join(' '));
@@ -50,13 +39,7 @@
 	<a class={classes} {...rest as HTMLAnchorAttributes}>{@render content()}</a>
 {:else}
 	{@const buttonProps = rest as HTMLButtonAttributes}
-	<button
-		type="button"
-		{...buttonProps}
-		class={classes}
-		disabled={buttonProps.disabled || loading}
-		aria-busy={loading || undefined}
-	>
+	<button type="button" {...buttonProps} class={classes} disabled={buttonProps.disabled || loading} aria-busy={loading || undefined}>
 		{@render content()}
 	</button>
 {/if}

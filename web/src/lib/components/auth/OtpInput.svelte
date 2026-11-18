@@ -22,7 +22,10 @@
 	}
 
 	function fill(from: number, text: string) {
-		const chars = text.replace(/\D/g, '').slice(0, length - from).split('');
+		const chars = text
+			.replace(/\D/g, '')
+			.slice(0, length - from)
+			.split('');
 		chars.forEach((c, i) => (digits[from + i] = c));
 		const next = Math.min(from + chars.length, length - 1);
 		inputs[next]?.focus();

@@ -65,7 +65,10 @@
 	const regionLabel = $derived(subdivisionName ?? countryName);
 
 	// Live "13 weekends fit this timing", recomputed (debounced) as the form changes.
-	const live = createPreview(() => draft, () => data.user.timezone);
+	const live = createPreview(
+		() => draft,
+		() => data.user.timezone
+	);
 	const preview = $derived(live.preview);
 	const previewing = $derived(live.loading);
 	const fitBig = $derived(preview ? fitCountLabel(draft, preview.count) : summarize(draft).split(' · ')[0]);
@@ -128,13 +131,13 @@
 
 <div class="page">
 	<PageHeader
-	title="Timing"
-	backHref="/app/groups/{data.group.id}"
-	backLabel="Back to calendar"
-	backOnPhoneOnly
-	size="lg"
-	crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Timing' }]}
->
+		title="Timing"
+		backHref="/app/groups/{data.group.id}"
+		backLabel="Back to calendar"
+		backOnPhoneOnly
+		size="lg"
+		crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Timing' }]}
+	>
 		{#snippet actions()}
 			<StatusPill tone="indigo" icon="shield" size="md">Admins only</StatusPill>
 		{/snippet}
@@ -155,7 +158,14 @@
 		</p>
 	{/if}
 
-	<RequirementsEditor bind:requirement={draft} readonly={!admin} country={data.user.country} {regionLabel} members={data.group.members} meId={data.user.id} />
+	<RequirementsEditor
+		bind:requirement={draft}
+		readonly={!admin}
+		country={data.user.country}
+		{regionLabel}
+		members={data.group.members}
+		meId={data.user.id}
+	/>
 	<!-- Anyone can keep a copy of a group's timing to reuse, admin or not. -->
 	<SaveTemplate requirement={draft} suggestion={data.group.name} />
 

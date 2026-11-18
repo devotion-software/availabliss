@@ -6,8 +6,7 @@ import { locationSummary } from './location';
 export const isTempMessage = (m: Message) => m.id.startsWith('temp-');
 
 /** Only your own, sent, non-deleted text messages can be edited or deleted. */
-export const canModifyMessage = (m: Message, meId: string) =>
-	m.kind === 'text' && m.authorId === meId && !m.deleted && !isTempMessage(m);
+export const canModifyMessage = (m: Message, meId: string) => m.kind === 'text' && m.authorId === meId && !m.deleted && !isTempMessage(m);
 
 /** …and of those, all but shared places can be edited (they can only be deleted). */
 export const canEditMessage = (m: Message, meId: string) => canModifyMessage(m, meId) && !m.location;

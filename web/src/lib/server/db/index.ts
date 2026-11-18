@@ -42,7 +42,10 @@ export async function dbHealth(timeoutMs = 2000): Promise<'ok' | 'down'> {
 	const timeout = new Promise<'down'>((resolve) => (timer = setTimeout(() => resolve('down'), timeoutMs)));
 	try {
 		return await Promise.race([
-			pool.query('SELECT 1').then(() => 'ok' as const, () => 'down' as const),
+			pool.query('SELECT 1').then(
+				() => 'ok' as const,
+				() => 'down' as const
+			),
 			timeout
 		]);
 	} finally {

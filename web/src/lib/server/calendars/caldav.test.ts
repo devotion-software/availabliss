@@ -86,10 +86,7 @@ describe('parseBusyEvents edge cases', () => {
 			'BEGIN:VEVENT\r\nDTSTART:20261115T100000Z\r\nDTEND:20261115T110000Z\r\nEND:VEVENT',
 			'END:VCALENDAR'
 		].join('\r\n');
-		expect(parseBusyEvents(doc, 'UTC').map((s) => new Date(s.start).toISOString())).toEqual([
-			'2026-11-14T10:00:00.000Z',
-			'2026-11-15T10:00:00.000Z'
-		]);
+		expect(parseBusyEvents(doc, 'UTC').map((s) => new Date(s.start).toISOString())).toEqual(['2026-11-14T10:00:00.000Z', '2026-11-15T10:00:00.000Z']);
 	});
 });
 
@@ -117,7 +114,13 @@ describe('caldav adapter (stubbed fetch)', () => {
 		const calls: Call[] = [];
 		globalThis.fetch = (async (input: URL | string, init?: RequestInit) => {
 			const headers = new Headers(init?.headers);
-			const call = { url: String(input), method: init?.method ?? 'GET', depth: headers.get('depth'), auth: headers.get('authorization'), body: String(init?.body ?? '') };
+			const call = {
+				url: String(input),
+				method: init?.method ?? 'GET',
+				depth: headers.get('depth'),
+				auth: headers.get('authorization'),
+				body: String(init?.body ?? '')
+			};
 			calls.push(call);
 			const r = routes(call);
 			const res = new Response(r.body, { status: r.status ?? 207 });
@@ -132,9 +135,13 @@ describe('caldav adapter (stubbed fetch)', () => {
 	test('discovers the calendar home and lists event calendars', async () => {
 		const calls = stub((c) => {
 			if (c.body.includes('current-user-principal'))
-				return { body: '<d:multistatus><d:response><d:propstat><d:prop><d:current-user-principal><d:href>/123/principal/</d:href></d:current-user-principal></d:prop></d:propstat></d:response></d:multistatus>' };
+				return {
+					body: '<d:multistatus><d:response><d:propstat><d:prop><d:current-user-principal><d:href>/123/principal/</d:href></d:current-user-principal></d:prop></d:propstat></d:response></d:multistatus>'
+				};
 			if (c.body.includes('calendar-home-set'))
-				return { body: '<multistatus><response><propstat><prop><C:calendar-home-set><href>/123/calendars/</href></C:calendar-home-set></prop></propstat></response></multistatus>' };
+				return {
+					body: '<multistatus><response><propstat><prop><C:calendar-home-set><href>/123/calendars/</href></C:calendar-home-set></prop></propstat></response></multistatus>'
+				};
 			return {
 				body: `<d:multistatus>
 <d:response><d:href>/123/calendars/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>
@@ -161,17 +168,19 @@ describe('caldav adapter (stubbed fetch)', () => {
 		const listing = `<d:multistatus><d:response><d:href>/123/calendars/home/</d:href><d:propstat><d:prop><d:resourcetype><c:calendar/></d:resourcetype><d:displayname>Home</d:displayname><cs:getctag>v1</cs:getctag></d:prop></d:propstat></d:response></d:multistatus>`;
 		const discovery = (c: Call) => {
 			if (c.body.includes('current-user-principal'))
-				return { body: '<d:multistatus><d:response><d:current-user-principal><d:href>/123/principal/</d:href></d:current-user-principal></d:response></d:multistatus>' };
+				return {
+					body: '<d:multistatus><d:response><d:current-user-principal><d:href>/123/principal/</d:href></d:current-user-principal></d:response></d:multistatus>'
+				};
 			if (c.body.includes('calendar-home-set'))
 				return { body: '<multistatus><response><C:calendar-home-set><href>/123/calendars/</href></C:calendar-home-set></response></multistatus>' };
 			return null;
 		};
-		let calls = stub((c) => discovery(c) ?? { body: listing });
+		stub((c) => discovery(c) ?? { body: listing });
 		const refreshed = await caldav.refresh!(creds);
 		expect(refreshed).toEqual({ ...creds, homeUrl: 'https://dav.example.com/123/calendars/' });
 		expect(await caldav.refresh!(refreshed!)).toBeNull();
 
-		calls = stub((c) => discovery(c) ?? { body: listing });
+		let calls = stub((c) => discovery(c) ?? { body: listing });
 		expect((await caldav.listCalendars(refreshed!)).map((c) => c.version)).toEqual(['v1']);
 		expect(calls).toHaveLength(1);
 
@@ -202,7 +211,9 @@ describe('caldav adapter (stubbed fetch)', () => {
 
 	test('busy runs a time-range REPORT per calendar and parses the data', async () => {
 		const event = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART:20261113T180000Z\r\nDTEND:20261113T200000Z\r\nEND:VEVENT\r\nEND:VCALENDAR';
-		const calls = stub(() => ({ body: `<d:multistatus><d:response><c:calendar-data>${event.replace(/&/g, '&amp;')}</c:calendar-data></d:response></d:multistatus>` }));
+		const calls = stub(() => ({
+			body: `<d:multistatus><d:response><c:calendar-data>${event.replace(/&/g, '&amp;')}</c:calendar-data></d:response></d:multistatus>`
+		}));
 		const cal = { externalId: 'https://dav.example.com/123/calendars/home/', name: 'Home', color: null, changes: 'none' as const };
 		const busy = await caldav.busy(creds, [cal], new Date('2026-11-01T00:00:00Z'), new Date('2026-12-01T00:00:00Z'), 'UTC');
 		expect(busy).toEqual([{ calendarExternalId: cal.externalId, start: new Date('2026-11-13T18:00:00Z'), end: new Date('2026-11-13T20:00:00Z') }]);
@@ -213,7 +224,9 @@ describe('caldav adapter (stubbed fetch)', () => {
 	test('refuses discovery hrefs that point at internal hosts', async () => {
 		const calls = stub((c) => {
 			if (c.body.includes('current-user-principal'))
-				return { body: '<multistatus><response><propstat><prop><current-user-principal><href>https://169.254.169.254/latest/</href></current-user-principal></prop></propstat></response></multistatus>' };
+				return {
+					body: '<multistatus><response><propstat><prop><current-user-principal><href>https://169.254.169.254/latest/</href></current-user-principal></prop></propstat></response></multistatus>'
+				};
 			return { body: '' };
 		});
 		await expect(caldav.listCalendars(creds)).rejects.toThrow("isn't allowed");
@@ -238,7 +251,16 @@ describe('caldav adapter (stubbed fetch)', () => {
 
 describe('parseBusyEvents titles', () => {
 	test('reads SUMMARY, unescaping commas, semicolons and newlines', () => {
-		const ics = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:a', 'DTSTART:20261113T180000Z', 'DTEND:20261113T190000Z', 'SUMMARY:Tea\\, cake\; chat\\nlater', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+		const ics = [
+			'BEGIN:VCALENDAR',
+			'BEGIN:VEVENT',
+			'UID:a',
+			'DTSTART:20261113T180000Z',
+			'DTEND:20261113T190000Z',
+			'SUMMARY:Tea\\, cake\\; chat\\nlater',
+			'END:VEVENT',
+			'END:VCALENDAR'
+		].join('\r\n');
 		expect(parseBusyEvents(ics, 'UTC')[0].title).toBe('Tea, cake; chat later');
 	});
 });

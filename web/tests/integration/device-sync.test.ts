@@ -29,7 +29,8 @@ describe('event titles', () => {
 			busy: [{ calendarExternalId: 'home', start: '2031-07-10T09:00:00.000Z', end: '2031-07-10T10:00:00.000Z', title: 'Dentist' }]
 		};
 		await syncDevice(me, input);
-		const from = Date.parse('2031-07-01T00:00:00Z'), to = Date.parse('2031-08-01T00:00:00Z');
+		const from = Date.parse('2031-07-01T00:00:00Z'),
+			to = Date.parse('2031-08-01T00:00:00Z');
 
 		// Not readable in the database.
 		const [row] = await db.select({ title: busyIntervals.title }).from(busyIntervals).where(eq(busyIntervals.userId, me));
@@ -73,12 +74,20 @@ describe('syncDevice', () => {
 			expect(seen.length).toBe(1);
 
 			// A new busy interval.
-			const busier = { ...input, busy: [...input.busy, { calendarExternalId: 'home', start: '2031-05-11T09:00:00.000Z', end: '2031-05-11T10:00:00.000Z' }] };
+			const busier = {
+				...input,
+				busy: [...input.busy, { calendarExternalId: 'home', start: '2031-05-11T09:00:00.000Z', end: '2031-05-11T10:00:00.000Z' }]
+			};
 			await syncDevice(me, busier);
 			await settle();
 			expect(seen.length).toBe(2);
 			const stored = await loadBusy([me], Date.parse(input.rangeStart), Date.parse(input.rangeEnd));
-			expect(stored.get(me)!.map((b) => new Date(b.start).toISOString()).sort()).toEqual(['2031-05-10T09:00:00.500Z', '2031-05-11T09:00:00.000Z']);
+			expect(
+				stored
+					.get(me)!
+					.map((b) => new Date(b.start).toISOString())
+					.sort()
+			).toEqual(['2031-05-10T09:00:00.500Z', '2031-05-11T09:00:00.000Z']);
 
 			// A renamed calendar counts as a change; then unchanged again.
 			await syncDevice(me, { ...busier, calendars: [{ ...input.calendars[0], name: 'Family' }] });
@@ -170,7 +179,13 @@ describe('connection uniqueness', () => {
 		await syncDevice(me, input('phone-b'));
 		const caldav = { userId: me, provider: 'caldav' as const, label: 'iCloud · me@example.com' };
 		await db.insert(calendarConnections).values({ id: newId(), ...caldav });
-		const dup = await db.insert(calendarConnections).values({ id: newId(), ...caldav }).then(() => null, (err) => err);
+		const dup = await db
+			.insert(calendarConnections)
+			.values({ id: newId(), ...caldav })
+			.then(
+				() => null,
+				(err) => err
+			);
 		expect(isDuplicateKey(dup)).toBe(true);
 		expect(await db.select().from(calendarConnections).where(eq(calendarConnections.userId, me))).toHaveLength(3);
 	});

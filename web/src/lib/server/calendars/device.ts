@@ -49,7 +49,13 @@ export async function syncDevice(userId: string, input: DeviceSyncInput): Promis
 	const saved = await saveCalendars(id, input.calendars);
 	// The app sends everything in its range each time; only the difference is written.
 	const ids = [...saved.ids.values()];
-	const busy = input.busy.map((b) => ({ calendarExternalId: b.calendarExternalId, eventKey: b.eventKey, start: new Date(b.start), end: new Date(b.end), title: b.title ?? null }));
+	const busy = input.busy.map((b) => ({
+		calendarExternalId: b.calendarExternalId,
+		eventKey: b.eventKey,
+		start: new Date(b.start),
+		end: new Date(b.end),
+		title: b.title ?? null
+	}));
 	const busyChanged = ids.length > 0 && (await writeBusy(userId, and(inCalendars(ids), overlapping(from, to)), toRows(saved.ids, busy, from, to)));
 	// The apps upload on every foreground: only make every group refresh when something
 	// changed, and once per multi-range sync rather than once per range.

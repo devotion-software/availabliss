@@ -32,7 +32,14 @@ const piece = (from: number, to: number, over: Partial<BusyInterval> = {}): DayP
 
 describe('ranges', () => {
 	test('mergeRanges joins overlapping and touching ranges', () => {
-		expect(mergeRanges([{ from: h(10), to: h(12) }, { from: h(9), to: h(10) }, { from: h(14), to: h(15) }, { from: h(11), to: h(13) }])).toEqual([
+		expect(
+			mergeRanges([
+				{ from: h(10), to: h(12) },
+				{ from: h(9), to: h(10) },
+				{ from: h(14), to: h(15) },
+				{ from: h(11), to: h(13) }
+			])
+		).toEqual([
 			{ from: h(9), to: h(13) },
 			{ from: h(14), to: h(15) }
 		]);
@@ -45,7 +52,12 @@ describe('ranges', () => {
 	});
 
 	test('freeGaps only looks at 06:00 – 24:00', () => {
-		expect(freeGaps([{ from: h(0), to: h(7) }, { from: h(20), to: h(22) }])).toEqual([
+		expect(
+			freeGaps([
+				{ from: h(0), to: h(7) },
+				{ from: h(20), to: h(22) }
+			])
+		).toEqual([
 			{ from: h(7), to: h(20) },
 			{ from: h(22), to: h(24) }
 		]);
@@ -59,13 +71,23 @@ describe('freeSummary', () => {
 		expect(freeSummary([{ from: h(1), to: h(5) }])).toBe('Free all day');
 		expect(freeSummary([{ from: 0, to: 1440 }])).toBe('Busy all day');
 		// Nothing free for at least half an hour.
-		expect(freeSummary([{ from: h(6), to: h(12) }, { from: h(12, 20), to: h(24) }])).toBe('Busy all day');
+		expect(
+			freeSummary([
+				{ from: h(6), to: h(12) },
+				{ from: h(12, 20), to: h(24) }
+			])
+		).toBe('Busy all day');
 	});
 
 	test('the longest free stretch, said the simplest way', () => {
 		expect(freeSummary([{ from: h(9), to: h(18) }])).toBe('Free from 18:00');
 		expect(freeSummary([{ from: h(9), to: h(24) }])).toBe('Free until 09:00');
-		expect(freeSummary([{ from: h(6), to: h(12) }, { from: h(14), to: h(24) }])).toBe('Free 12:00 – 14:00');
+		expect(
+			freeSummary([
+				{ from: h(6), to: h(12) },
+				{ from: h(14), to: h(24) }
+			])
+		).toBe('Free 12:00 – 14:00');
 		expect(freeSummary([{ from: h(19), to: h(21, 30) }])).toBe('Free until 19:00');
 	});
 });
@@ -85,7 +107,12 @@ describe('describeDay', () => {
 
 describe('dayNames', () => {
 	test('your own block notes, once each, in time order', () => {
-		const timed = [piece(h(19), h(21), { label: 'Choir' }), piece(h(9), h(10), { label: 'Gym' }), piece(h(12), h(13), { source: 'calendar', label: 'Work calendar' }), piece(h(22), h(23), { label: 'Choir' })];
+		const timed = [
+			piece(h(19), h(21), { label: 'Choir' }),
+			piece(h(9), h(10), { label: 'Gym' }),
+			piece(h(12), h(13), { source: 'calendar', label: 'Work calendar' }),
+			piece(h(22), h(23), { label: 'Choir' })
+		];
 		expect(dayNames(timed, [])).toEqual(['Gym', 'Choir']);
 	});
 });
@@ -115,7 +142,12 @@ describe('how free a day is', () => {
 		expect(freeMinutes([{ from: 0, to: 1440 }])).toBe(0);
 		expect(freeMinutes([{ from: h(1), to: h(7) }])).toBe(1080 - 60);
 		// Overlaps aren't counted twice.
-		expect(freeMinutes([{ from: h(9), to: h(12) }, { from: h(10), to: h(13) }])).toBe(1080 - 240);
+		expect(
+			freeMinutes([
+				{ from: h(9), to: h(12) },
+				{ from: h(10), to: h(13) }
+			])
+		).toBe(1080 - 240);
 	});
 
 	test('freeLevel thresholds: 12h, 6h, 30m', () => {
@@ -139,7 +171,12 @@ describe('how free a day is', () => {
 describe('labels', () => {
 	test('dayCellLabel says the date, today and the free summary', () => {
 		expect(dayCellLabel('2026-11-23', '2026-11-16', [{ from: h(9), to: h(17, 30) }])).toBe('Monday 23 November, free from 17:30');
-		expect(dayCellLabel('2026-11-16', '2026-11-16', [{ from: h(6), to: h(12) }, { from: h(14), to: h(24) }])).toBe('Monday 16 November, today, free 12:00 to 14:00');
+		expect(
+			dayCellLabel('2026-11-16', '2026-11-16', [
+				{ from: h(6), to: h(12) },
+				{ from: h(14), to: h(24) }
+			])
+		).toBe('Monday 16 November, today, free 12:00 to 14:00');
 		expect(dayCellLabel('2026-11-16', '2026-11-17', null)).toBe('Monday 16 November');
 	});
 
@@ -166,7 +203,15 @@ test('monthCells starts on Monday', () => {
 });
 
 describe('agenda', () => {
-	const block = (id: string, repeat: ManualBlock['repeat']): ManualBlock => ({ id, start: '', end: '', allDay: false, repeat, until: null, note: null });
+	const block = (id: string, repeat: ManualBlock['repeat']): ManualBlock => ({
+		id,
+		start: '',
+		end: '',
+		allDay: false,
+		repeat,
+		until: null,
+		note: null
+	});
 	const blocks = [
 		block('w', 'weekly'),
 		block('f', 'fortnightly'),
@@ -196,7 +241,11 @@ describe('agenda', () => {
 
 	test('agendaItems: all day first, then by time, not-busy events left out', () => {
 		const items = agendaItems(
-			[piece(h(19), h(21), { label: 'Choir', blockId: 'w' }), piece(h(9), h(17), { source: 'calendar', label: 'Work calendar', blockId: null }), piece(h(12), h(13), { source: 'calendar', ignoreId: 'x' })],
+			[
+				piece(h(19), h(21), { label: 'Choir', blockId: 'w' }),
+				piece(h(9), h(17), { source: 'calendar', label: 'Work calendar', blockId: null }),
+				piece(h(12), h(13), { source: 'calendar', ignoreId: 'x' })
+			],
 			[interval({ label: 'Holiday', blockId: 'o' })],
 			blocks
 		);

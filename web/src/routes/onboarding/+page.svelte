@@ -69,7 +69,10 @@
 
 <div class="intro">
 	<h1>About you</h1>
-	<p>Your name is how your groups see you, and your username lets people invite you without your email. Your region sets bank holidays, school holidays and the time zone we show times in.</p>
+	<p>
+		Your name is how your groups see you, and your username lets people invite you without your email. Your region sets bank holidays, school holidays
+		and the time zone we show times in.
+	</p>
 </div>
 
 <form class="form" onsubmit={next}>

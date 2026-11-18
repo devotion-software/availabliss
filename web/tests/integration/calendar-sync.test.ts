@@ -65,8 +65,7 @@ async function connection(userId: string): Promise<string> {
 }
 
 const conn = async (id: string) => (await db.query.calendarConnections.findFirst({ where: eq(calendarConnections.id, id) }))!;
-const rows = async (userId: string) =>
-	db.select().from(busyIntervals).where(eq(busyIntervals.userId, userId)).orderBy(asc(busyIntervals.start));
+const rows = async (userId: string) => db.select().from(busyIntervals).where(eq(busyIntervals.userId, userId)).orderBy(asc(busyIntervals.start));
 const busy = (calendar: string, start: string, hours = 1, eventKey?: string): RemoteBusy => ({
 	calendarExternalId: calendar,
 	eventKey,
@@ -131,7 +130,9 @@ describe('syncConnection', () => {
 		fake.calendars = [{ externalId: 'home', name: 'Home', color: null, changes: 'version', version: 'v1' }];
 		fake.events = [busy('home', yearsAhead(0.1)), busy('home', yearsAhead(0.2))];
 		// Slow listings, so the second request lands while the first sync is still running.
-		let running = 0, overlapped = false, listings = 0;
+		let running = 0,
+			overlapped = false,
+			listings = 0;
 		const list = adapter.listCalendars;
 		adapter.listCalendars = async (creds) => {
 			running++;
@@ -204,7 +205,11 @@ describe('syncConnection', () => {
 		const me = await fx.user();
 		const id = await connection(me);
 		fake.calendars = [{ externalId: 'work', name: 'Work', color: null, changes: 'cursor' }];
-		fake.events = [busy('work', yearsAhead(0.2), 1, 'standup'), busy('work', yearsAhead(0.3), 1, 'standup'), busy('work', yearsAhead(2), 2, 'offsite')];
+		fake.events = [
+			busy('work', yearsAhead(0.2), 1, 'standup'),
+			busy('work', yearsAhead(0.3), 1, 'standup'),
+			busy('work', yearsAhead(2), 2, 'offsite')
+		];
 		await syncConnection(id);
 		expect(fake.changeCalls).toEqual([]);
 		const [cal] = await db.select().from(calendars).where(eq(calendars.connectionId, id));
@@ -248,7 +253,10 @@ describe('syncConnection', () => {
 
 		// A day later the far tier is read again and the cancelled event goes.
 		fake.reads = [];
-		await db.update(calendarConnections).set({ farSyncedAt: new Date(Date.now() - 2 * DAY) }).where(eq(calendarConnections.id, id));
+		await db
+			.update(calendarConnections)
+			.set({ farSyncedAt: new Date(Date.now() - 2 * DAY) })
+			.where(eq(calendarConnections.id, id));
 		await syncConnection(id);
 		expect(fake.reads).toHaveLength(2);
 		expect(await rows(me)).toHaveLength(1);

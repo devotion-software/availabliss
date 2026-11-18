@@ -23,7 +23,11 @@ describe('microsoft change notifications (stubbed fetch)', () => {
 			body = JSON.parse(String(init?.body));
 			return Response.json({ id: 'sub-1', expirationDateTime: '2026-11-06T10:00:00Z' });
 		});
-		const channel = await microsoft.watch!(creds, { externalId: 'AAMk', name: 'Calendar', color: null, changes: 'none' }, { id: 'ignored', address: 'https://app.example/api/v1/calendars/push/microsoft', token: 'secret' });
+		const channel = await microsoft.watch!(
+			creds,
+			{ externalId: 'AAMk', name: 'Calendar', color: null, changes: 'none' },
+			{ id: 'ignored', address: 'https://app.example/api/v1/calendars/push/microsoft', token: 'secret' }
+		);
 		expect(channel).toEqual({ id: 'sub-1', resourceId: null, expiresAt: new Date('2026-11-06T10:00:00Z') });
 		expect(body).toMatchObject({ changeType: 'created,updated,deleted', resource: 'me/calendars/AAMk/events', clientState: 'secret' });
 		expect(Date.parse(body.expirationDateTime) - Date.now()).toBeLessThan(4230 * 60 * 1000);

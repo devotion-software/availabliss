@@ -82,15 +82,11 @@
 	const columns = $derived(visibleColumns(availability));
 	const selectedSlot = $derived(slotOn(availability.slots, selected, fmt.current.dayKey));
 	const week = $derived(weekDates(selected, columns));
-	const heading = $derived(
-		view === 'month' ? monthTitle(month) : formatDayRange(week[0], week[week.length - 1], false)
-	);
+	const heading = $derived(view === 'month' ? monthTitle(month) : formatDayRange(week[0], week[week.length - 1], false));
 
 	// Phones have room for a terse heading only: "Nov 2026", "27–29 Nov".
 	const shortHeading = $derived(
-		view === 'month'
-			? monthTitle(month).replace(/^(\w{3})\w*/, '$1')
-			: formatDayRange(week[0], week[week.length - 1], false).replace(' – ', '–')
+		view === 'month' ? monthTitle(month).replace(/^(\w{3})\w*/, '$1') : formatDayRange(week[0], week[week.length - 1], false).replace(' – ', '–')
 	);
 
 	/** First day that works this month, else today if it's in the month, else the 1st. */
@@ -139,14 +135,10 @@
 		const id = ++weekRequest;
 		const wanted = (d: string) => days.get(d)?.status !== 'hidden';
 		// Cached (usually: the next week is prefetched): show it at once.
-		weekDays = dates.every((d) => !wanted(d) || cache.daysReady.has(d))
-			? new Map(dates.map((d) => [d, cache.daysReady.get(d) ?? null]))
-			: new Map();
+		weekDays = dates.every((d) => !wanted(d) || cache.daysReady.has(d)) ? new Map(dates.map((d) => [d, cache.daysReady.get(d) ?? null])) : new Map();
 		const results = await Promise.all(dates.map((d) => (wanted(d) ? cache.day(d).catch(() => null) : null)));
 		// A week running into the next (or previous) month needs that month's days too, to fade the ones that don't work.
-		await Promise.all(
-			[...new Set(dates.map(startOfMonth))].filter((m) => m !== month).map((m) => cache.month(m).catch(() => null))
-		);
+		await Promise.all([...new Set(dates.map(startOfMonth))].filter((m) => m !== month).map((m) => cache.month(m).catch(() => null)));
 		if (id === weekRequest) weekDays = new Map(dates.map((d, i) => [d, results[i]]));
 		// The next week the user is likely to swipe to.
 		for (const d of dates) cache.day(addDays(d, 7 * lastStep)).catch(() => {});
@@ -215,9 +207,7 @@
 
 	// The month or week on screen doesn't include today, so "Today" is offered.
 	const todayKey = $derived(fmt.current.today());
-	const awayFromToday = $derived(
-		view === 'month' ? month !== startOfMonth(todayKey) : startOfWeek(selected) !== startOfWeek(todayKey)
-	);
+	const awayFromToday = $derived(view === 'month' ? month !== startOfMonth(todayKey) : startOfWeek(selected) !== startOfWeek(todayKey));
 	/** Back to today's month or week, with today selected. */
 	function jumpToToday() {
 		const today = todayKey;
@@ -295,22 +285,21 @@
 
 <div class="page" class:with-bar={shortlist.slots.length > 0}>
 	<div class="main">
-
 		{#if desk}
-		<GroupHeader {group} {isAdmin} bind:view />
+			<GroupHeader {group} {isAdmin} bind:view />
 		{/if}
 
 		{#if phone}
-		<div class="phone-only stack">
-			<SyncBanner groupId={group.id} members={group.members} canNudge={isAdmin} />
-			<a class="timing glass" href="{base}/timing">
-				<Icon name="clock" size={16} />
-				<span class="timing-text"><strong>{lengthLabel(group.requirement)}</strong> · {detailLabel(group.requirement)}</span>
-				<Icon name="pencil" size={15} class="muted" />
-			</a>
-			<PlansCard {group} meId={data.user.id} />
-			<NextCard {group} onpropose={propose} />
-		</div>
+			<div class="phone-only stack">
+				<SyncBanner groupId={group.id} members={group.members} canNudge={isAdmin} />
+				<a class="timing glass" href="{base}/timing">
+					<Icon name="clock" size={16} />
+					<span class="timing-text"><strong>{lengthLabel(group.requirement)}</strong> · {detailLabel(group.requirement)}</span>
+					<Icon name="pencil" size={15} class="muted" />
+				</a>
+				<PlansCard {group} meId={data.user.id} />
+				<NextCard {group} onpropose={propose} />
+			</div>
 		{/if}
 
 		<section class="cal" aria-labelledby="cal-heading">

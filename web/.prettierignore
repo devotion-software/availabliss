@@ -1,0 +1,16 @@
+# Build output, dependencies and generated files: never formatted.
+build/
+.svelte-kit/
+node_modules/
+coverage/
+drizzle/
+test-results/
+playwright-report/
+static/
+bun.lock
+# Local-only files (git-ignored).
+.uploads/
+.tmp-*
+.demo.json
+.env
+.env.*

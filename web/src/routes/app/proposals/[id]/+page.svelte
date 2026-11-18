@@ -238,14 +238,7 @@
 							{#if proposal.title}<span class="sub">{fmt.current.when(proposal.start, proposal.end, proposal.allDay)}</span>{/if}
 							{#if sub}<span class="sub">{sub}</span>{/if}
 						</div>
-						<SyncRing
-							value={yes}
-							total={total}
-							size={76}
-							stroke={7}
-							tone="ok"
-							label="{yes} of {total} accepted{maybes ? `, ${maybes} maybe` : ''}"
-						>
+						<SyncRing value={yes} {total} size={76} stroke={7} tone="ok" label="{yes} of {total} accepted{maybes ? `, ${maybes} maybe` : ''}">
 							<span class="ring-num">{yes}/{total}</span>
 							<span class="ring-label">accepted</span>
 							{#if maybes}<span class="ring-label">+{maybes} maybe</span>{/if}
@@ -281,8 +274,10 @@
 									<button
 										class="override"
 										aria-label="Override {row.member.name}'s reply"
-										onclick={() => openOverride(row.member.userId, row.response)}>Override</button
+										onclick={() => openOverride(row.member.userId, row.response)}
 									>
+										Override
+									</button>
 								{/if}
 								<StatusPill tone={pill.tone}>{pill.text}</StatusPill>
 							</div>
@@ -314,10 +309,10 @@
 						: mine === 'maybe'
 							? "You're a maybe. Know for sure?"
 							: mine === 'declined'
-							? "You said you can't make it"
-							: iAmBusy
-								? "You're busy then. Can you still make it?"
-								: 'Can you make it?'}
+								? "You said you can't make it"
+								: iAmBusy
+									? "You're busy then. Can you still make it?"
+									: 'Can you make it?'}
 				</span>
 				<div class="buttons">
 					<Button
@@ -325,24 +320,30 @@
 						loading={busy === 'declined'}
 						disabled={busy !== null || mine === 'declined'}
 						aria-pressed={mine === 'declined'}
-						onclick={() => respond('declined')}>Can't make it</Button
+						onclick={() => respond('declined')}
 					>
+						Can't make it
+					</Button>
 					<Button
 						variant="secondary"
 						icon={mine === 'maybe' ? 'check' : undefined}
 						loading={busy === 'maybe'}
 						disabled={busy !== null || mine === 'maybe'}
 						aria-pressed={mine === 'maybe'}
-						onclick={() => respond('maybe')}>Maybe</Button
+						onclick={() => respond('maybe')}
 					>
+						Maybe
+					</Button>
 					<Button
 						variant="solid"
 						icon={mine === 'accepted' ? 'check' : undefined}
 						loading={busy === 'accepted'}
 						disabled={busy !== null || mine === 'accepted'}
 						aria-pressed={mine === 'accepted'}
-						onclick={() => respond('accepted')}>{mine === 'accepted' ? 'Accepted' : 'Accept'}</Button
+						onclick={() => respond('accepted')}
 					>
+						{mine === 'accepted' ? 'Accepted' : 'Accept'}
+					</Button>
 				</div>
 			</div>
 		{/if}
@@ -352,13 +353,7 @@
 {#if overrideFor}
 	<OverrideSheet bind:open={overrideOpen} name={overrideFor.name} current={overrideFor.current} onpick={applyOverride} />
 {/if}
-<ConfirmSheet
-	bind:open={confirmOpen}
-	title="Confirm anyway?"
-	message={confirmMessage}
-	confirmLabel="Confirm the plan"
-	onconfirm={confirmAnyway}
-/>
+<ConfirmSheet bind:open={confirmOpen} title="Confirm anyway?" message={confirmMessage} confirmLabel="Confirm the plan" onconfirm={confirmAnyway} />
 <ConfirmSheet
 	bind:open={withdrawOpen}
 	title="Withdraw this proposal?"

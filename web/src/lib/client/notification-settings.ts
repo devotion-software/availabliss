@@ -5,8 +5,7 @@ import type { NotificationCategory, NotificationSettings } from '#lib/types';
 export type NotificationSettingsPatch = Partial<Pick<NotificationSettings, 'off' | 'quietHours'>>;
 
 export const getNotificationSettings = (fetch?: Fetch) => api.get<NotificationSettings>('/me/notification-settings', { fetch });
-export const updateNotificationSettings = (patch: NotificationSettingsPatch) =>
-	api.patch<NotificationSettings>('/me/notification-settings', patch);
+export const updateNotificationSettings = (patch: NotificationSettingsPatch) => api.patch<NotificationSettings>('/me/notification-settings', patch);
 
 /** Mutes a group's pushes until an ISO instant, or until you unmute it (`null`). */
 export const muteGroup = (groupId: string, until: string | null) =>

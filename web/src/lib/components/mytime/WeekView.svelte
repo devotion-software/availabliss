@@ -152,7 +152,9 @@
 			</div>
 		{/key}
 	</div>
-	<p class="hint" class:gone={busyAllDay}><span class="touch">Tap a time to block it</span><span class="mouse">Click a time to block it, or drag to choose a range</span></p>
+	<p class="hint" class:gone={busyAllDay}>
+		<span class="touch">Tap a time to block it</span><span class="mouse">Click a time to block it, or drag to choose a range</span>
+	</p>
 </section>
 
 <style>

@@ -67,9 +67,7 @@
 
 	const near = $derived(here ? { lat: here.coords.latitude, lng: here.coords.longitude } : null);
 	const myLocation = $derived<MessageLocation | null>(
-		here
-			? { lat: here.coords.latitude, lng: here.coords.longitude, name: null, address: null, accuracy: Math.round(here.coords.accuracy) }
-			: null
+		here ? { lat: here.coords.latitude, lng: here.coords.longitude, name: null, address: null, accuracy: Math.round(here.coords.accuracy) } : null
 	);
 	const shown = $derived(picked ? { lat: picked.lat, lng: picked.lng } : near);
 
@@ -117,7 +115,15 @@
 		<form class="search" role="search" onsubmit={search}>
 			<Icon name="search" size={18} />
 			<label for="place-{uid}" class="sr-only">Search for a place</label>
-			<input id="place-{uid}" type="search" bind:value={query} placeholder="Search for a place" autocomplete="off" enterkeyhint="search" maxlength={200} />
+			<input
+				id="place-{uid}"
+				type="search"
+				bind:value={query}
+				placeholder="Search for a place"
+				autocomplete="off"
+				enterkeyhint="search"
+				maxlength={200}
+			/>
 			{#if searching}
 				<Spinner size={16} />
 			{:else if query}
@@ -155,11 +161,24 @@
 		{#if locateError && shown}<p class="note">{locateError}</p>{/if}
 
 		{#if picked}
-			<Button variant="accent" icon="map-pin" block loading={sending} onclick={() => picked && send({ lat: picked.lat, lng: picked.lng, name: picked.name, address: picked.address, accuracy: null })}>
+			<Button
+				variant="accent"
+				icon="map-pin"
+				block
+				loading={sending}
+				onclick={() => picked && send({ lat: picked.lat, lng: picked.lng, name: picked.name, address: picked.address, accuracy: null })}
+			>
 				Send {picked.name}
 			</Button>
 		{/if}
-		<Button variant={picked ? 'secondary' : 'solid'} icon="navigation" block disabled={!myLocation || sending} loading={sending && !picked} onclick={() => myLocation && send(myLocation)}>
+		<Button
+			variant={picked ? 'secondary' : 'solid'}
+			icon="navigation"
+			block
+			disabled={!myLocation || sending}
+			loading={sending && !picked}
+			onclick={() => myLocation && send(myLocation)}
+		>
 			Send my current location
 		</Button>
 		{#if myLocation?.accuracy != null}

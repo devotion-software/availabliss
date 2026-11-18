@@ -62,11 +62,12 @@
 			<button type="button" class="when" onclick={() => onselect?.(slot)}>
 				{#if best}<span class="badge"><Icon name="sparkle" size={12} /> Best for the group</span>{/if}
 				<span class="label">{slot.label}</span>
-				<span class="note"
-					>{fmt.current.startsAt(slot.start) || (missing ? 'Most of the group is free' : note)}{#if slot.preferredBy?.length}<span class="prefers">
-							· {slot.preferredBy.length} {slot.preferredBy.length === 1 ? 'prefers' : 'prefer'}</span
-						>{/if}</span
-				>
+				<span class="note">
+					{fmt.current.startsAt(slot.start) || (missing ? 'Most of the group is free' : note)}{#if slot.preferredBy?.length}<span class="prefers">
+							· {slot.preferredBy.length}
+							{slot.preferredBy.length === 1 ? 'prefers' : 'prefer'}
+						</span>{/if}
+				</span>
 				{#if missing}<span class="missing">{missing}</span>{/if}
 				{#if fair}<span class="fair">{fair}</span>{/if}
 			</button>

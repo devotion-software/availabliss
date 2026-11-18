@@ -40,9 +40,7 @@
 	const canPrev = $derived(!min || addDays(month, -1) >= min);
 	const dayNum = (d: string) => parseKey(d).getUTCDate();
 	const inRange = (d: string) => !!from && !!to && from <= d && d <= to;
-	const hint = $derived(
-		anchor ? 'Now pick the last day.' : from && to ? formatDayRange(from, to) : 'Pick the first day, then the last.'
-	);
+	const hint = $derived(anchor ? 'Now pick the last day.' : from && to ? formatDayRange(from, to) : 'Pick the first day, then the last.');
 
 	function pick(d: string) {
 		if (anchor) {
@@ -57,7 +55,14 @@
 
 <div class="cal" role="group" aria-label={label}>
 	<div class="head">
-		<IconButton icon="chevron-left" label="Previous month" variant="plain" size={40} disabled={!canPrev} onclick={() => (month = addMonths(month, -1))} />
+		<IconButton
+			icon="chevron-left"
+			label="Previous month"
+			variant="plain"
+			size={40}
+			disabled={!canPrev}
+			onclick={() => (month = addMonths(month, -1))}
+		/>
 		<span class="title" aria-live="polite">{monthTitle(month)}</span>
 		<IconButton icon="chevron-right" label="Next month" variant="plain" size={40} onclick={() => (month = addMonths(month, 1))} />
 	</div>
@@ -84,8 +89,10 @@
 						disabled={!!min && d < min}
 						aria-pressed={inRange(d)}
 						aria-label={spokenDate(d) + (start && end ? '' : start ? ', first day' : end ? ', last day' : '')}
-						onclick={() => pick(d)}>{dayNum(d)}</button
+						onclick={() => pick(d)}
 					>
+						{dayNum(d)}
+					</button>
 				</div>
 			{:else}
 				<span class="cell"></span>

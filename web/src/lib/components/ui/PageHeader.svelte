@@ -20,7 +20,18 @@
 		actions?: Snippet;
 		after?: Snippet;
 	}
-	let { title, subtitle, backHref, backLabel = 'Back', backIcon = 'chevron-left', backOnPhoneOnly = false, size = 'md', crumbs = [], actions, after }: Props = $props();
+	let {
+		title,
+		subtitle,
+		backHref,
+		backLabel = 'Back',
+		backIcon = 'chevron-left',
+		backOnPhoneOnly = false,
+		size = 'md',
+		crumbs = [],
+		actions,
+		after
+	}: Props = $props();
 </script>
 
 {#if crumbs.length}

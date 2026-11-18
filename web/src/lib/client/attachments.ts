@@ -9,8 +9,34 @@ export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 /** File extensions the server accepts as files (anything else is a 400). */
 export const FILE_EXTENSIONS = [
-	'pdf', 'txt', 'md', 'csv', 'rtf', 'ics', 'vcf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
-	'pages', 'numbers', 'key', 'epub', 'zip', 'mp3', 'm4a', 'wav', 'mp4', 'mov', 'pkpass', 'pkpasses'
+	'pdf',
+	'txt',
+	'md',
+	'csv',
+	'rtf',
+	'ics',
+	'vcf',
+	'doc',
+	'docx',
+	'xls',
+	'xlsx',
+	'ppt',
+	'pptx',
+	'odt',
+	'ods',
+	'odp',
+	'pages',
+	'numbers',
+	'key',
+	'epub',
+	'zip',
+	'mp3',
+	'm4a',
+	'wav',
+	'mp4',
+	'mov',
+	'pkpass',
+	'pkpasses'
 ] as const;
 
 /** "1.2 MB", "340 KB", "12 bytes". */
@@ -97,12 +123,19 @@ export function attachmentSummary(attachments: (Pick<Attachment, 'kind' | 'name'
 
 // ─── Wallet passes ────────────────────────────────────────────────────────
 
-const PASS_STYLE_NAMES: Record<string, string> = { boardingPass: 'Boarding pass', eventTicket: 'Ticket', coupon: 'Coupon', storeCard: 'Card', generic: 'Pass' };
+const PASS_STYLE_NAMES: Record<string, string> = {
+	boardingPass: 'Boarding pass',
+	eventTicket: 'Ticket',
+	coupon: 'Coupon',
+	storeCard: 'Card',
+	generic: 'Pass'
+};
 
 /** What a pass is: its description, else "Ticket", "Boarding pass"…; "2 tickets" for a bundle. */
 export function passTitle(pass: Pick<WalletPass, 'description' | 'style' | 'count'> | null): string {
 	if (!pass) return 'Ticket';
-	if (pass.count > 1) return `${pass.count} ${pass.style === 'boardingPass' ? 'boarding passes' : pass.style === 'eventTicket' ? 'tickets' : 'passes'}`;
+	if (pass.count > 1)
+		return `${pass.count} ${pass.style === 'boardingPass' ? 'boarding passes' : pass.style === 'eventTicket' ? 'tickets' : 'passes'}`;
 	return pass.description || PASS_STYLE_NAMES[pass.style] || 'Ticket';
 }
 

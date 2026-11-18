@@ -33,7 +33,15 @@
 		mergeAxes(
 			dates.flatMap((d) => {
 				const day = days.get(d);
-				return day ? [axisFor(d, day.members.flatMap((m) => m.busy), tz)] : [];
+				return day
+					? [
+							axisFor(
+								d,
+								day.members.flatMap((m) => m.busy),
+								tz
+							)
+						]
+					: [];
 			})
 		)
 	);
@@ -63,10 +71,12 @@
 		let cursor = range.from;
 		const busyIds = (from: number, to: number) =>
 			day.members
-				.filter((m) => m.busy.some((b) => {
-					const s = clampToAxis(b, date, axis, tz);
-					return s && s.from < to && s.to > from;
-				}))
+				.filter((m) =>
+					m.busy.some((b) => {
+						const s = clampToAxis(b, date, axis, tz);
+						return s && s.from < to && s.to > from;
+					})
+				)
 				.map((m) => m.userId);
 		const pushBusy = (from: number, to: number) => {
 			if (to - from < 15) return;
@@ -106,11 +116,19 @@
 			{@const most = parts.filter((b) => b.most)}
 			{@const busy = parts.filter((b) => !b.free)}
 			<li>
-				<button type="button" class="card glass" class:on={d === selected} class:faded={!works(d)} aria-pressed={d === selected} onclick={() => onselect?.(d)}>
+				<button
+					type="button"
+					class="card glass"
+					class:on={d === selected}
+					class:faded={!works(d)}
+					aria-pressed={d === selected}
+					onclick={() => onselect?.(d)}
+				>
 					<span class="date" class:keep={d === today}><span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span></span>
 					<span class="info">
 						<span class="what" class:free={free.length > 0 || most.length > 0}>
-							{#if day === undefined}Loading…{:else if day === null}Outside the timing{:else}{free[0]?.label ?? (most[0] ? `Most free · ${most[0].label}` : "No time when everyone's free")}{/if}
+							{#if day === undefined}Loading…{:else if day === null}Outside the timing{:else}{free[0]?.label ??
+									(most[0] ? `Most free · ${most[0].label}` : "No time when everyone's free")}{/if}
 						</span>
 						{#if busy.length}<span class="who">{busy[0].label} busy</span>{/if}
 						<span class="strip" aria-hidden="true">
@@ -124,56 +142,56 @@
 		{/each}
 	</ul>
 {:else}
-<div class="week" style:--cols={dates.length}>
-	<div class="row heads">
-		<span></span>
-		{#each dates as d (d)}
-			<button
-				type="button"
-				class="head"
-				class:on={d === selected}
-				class:faded={!works(d) && d !== today}
-				aria-pressed={d === selected}
-				onclick={() => onselect?.(d)}
-				aria-label="See who's free on {d === today ? 'today, ' : ''}{formatDayKey(d)}"
-				aria-current={d === today ? 'date' : undefined}
-			>
-				<span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span>
-			</button>
-		{/each}
-	</div>
-	<div class="row body">
-		<div class="hours" aria-hidden="true">
-			{#each ticks as t (t.label)}<span style:top="{t.at}%">{t.label}</span>{/each}
+	<div class="week" style:--cols={dates.length}>
+		<div class="row heads">
+			<span></span>
+			{#each dates as d (d)}
+				<button
+					type="button"
+					class="head"
+					class:on={d === selected}
+					class:faded={!works(d) && d !== today}
+					aria-pressed={d === selected}
+					onclick={() => onselect?.(d)}
+					aria-label="See who's free on {d === today ? 'today, ' : ''}{formatDayKey(d)}"
+					aria-current={d === today ? 'date' : undefined}
+				>
+					<span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span>
+				</button>
+			{/each}
 		</div>
-		{#each dates as d (d)}
-			{@const day = days.get(d)}
-			<!-- Tapping a column picks the day too; the header button above is the keyboard route. -->
-			<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-			<div class="col" class:on={d === selected} class:faded={!works(d)} role="list" aria-label={formatDayKey(d)} onclick={() => onselect?.(d)}>
-				{#if day === undefined}
-					<span class="state"><Spinner size={16} /></span>
-				{:else if day === null}
-					<span class="state">Not in timing</span>
-				{:else}
-					{#each blocks(d, day) as b (b.from)}
-						<div
-							role="listitem"
-							class="block"
-							class:free={b.free}
-							class:most={b.most}
-							style:top="{pct(b.from, axis)}%"
-							style:height="{pct(b.to, axis) - pct(b.from, axis)}%"
-						>
-							<span>{b.label}</span>
-							<span class="sr-only">{spanText(b.from, b.to)}</span>
-						</div>
-					{/each}
-				{/if}
+		<div class="row body">
+			<div class="hours" aria-hidden="true">
+				{#each ticks as t (t.label)}<span style:top="{t.at}%">{t.label}</span>{/each}
 			</div>
-		{/each}
+			{#each dates as d (d)}
+				{@const day = days.get(d)}
+				<!-- Tapping a column picks the day too; the header button above is the keyboard route. -->
+				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+				<div class="col" class:on={d === selected} class:faded={!works(d)} role="list" aria-label={formatDayKey(d)} onclick={() => onselect?.(d)}>
+					{#if day === undefined}
+						<span class="state"><Spinner size={16} /></span>
+					{:else if day === null}
+						<span class="state">Not in timing</span>
+					{:else}
+						{#each blocks(d, day) as b (b.from)}
+							<div
+								role="listitem"
+								class="block"
+								class:free={b.free}
+								class:most={b.most}
+								style:top="{pct(b.from, axis)}%"
+								style:height="{pct(b.to, axis) - pct(b.from, axis)}%"
+							>
+								<span>{b.label}</span>
+								<span class="sr-only">{spanText(b.from, b.to)}</span>
+							</div>
+						{/each}
+					{/if}
+				</div>
+			{/each}
+		</div>
 	</div>
-</div>
 {/if}
 
 <style>

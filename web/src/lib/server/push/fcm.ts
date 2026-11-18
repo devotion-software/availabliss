@@ -12,9 +12,7 @@ interface ServiceAccount {
 let account: ServiceAccount | null | undefined;
 function serviceAccount(): ServiceAccount | null {
 	if (account === undefined) {
-		account = env.fcmServiceAccount
-			? (JSON.parse(Buffer.from(env.fcmServiceAccount, 'base64').toString('utf8')) as ServiceAccount)
-			: null;
+		account = env.fcmServiceAccount ? (JSON.parse(Buffer.from(env.fcmServiceAccount, 'base64').toString('utf8')) as ServiceAccount) : null;
 	}
 	return account;
 }

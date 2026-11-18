@@ -21,7 +21,8 @@ describe('picture links', () => {
 	test('a signature is only good for its key and until it expires', () => {
 		const now = Date.parse('2031-01-08T08:00:00Z');
 		const link = new URL(mediaUrl(storedUrlOf(KEY), now)!);
-		const e = link.searchParams.get('e'), s = link.searchParams.get('s');
+		const e = link.searchParams.get('e'),
+			s = link.searchParams.get('s');
 		expect(verifyMediaSignature(KEY, e, s, now)).toBe(true);
 		expect(verifyMediaSignature('avatars/user-2/abcDEF123.jpg', e, s, now)).toBe(false);
 		expect(verifyMediaSignature(KEY, e, s, now + 9 * 86_400_000)).toBe(false);

@@ -23,7 +23,10 @@
 
 	$effect(() => {
 		// Newly connected calendars may take a moment to list; refetch after the round trip.
-		if (reportOAuthResult(page.url)) listConnections().then((c) => (connections = c)).catch(() => {});
+		if (reportOAuthResult(page.url))
+			listConnections()
+				.then((c) => (connections = c))
+				.catch(() => {});
 	});
 
 	function replace(updated: CalendarConnection) {

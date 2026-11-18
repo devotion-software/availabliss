@@ -44,7 +44,17 @@
 		{#if pill}<StatusPill tone={pill.tone}>{pillText}</StatusPill>{/if}
 		{#if inCalendar}
 			<span class="in-cal" title="In your calendar">
-				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<svg
+					width="18"
+					height="18"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+				>
 					<rect x="3" y="5" width="18" height="16" rx="3" />
 					<path d="M3 10h18M8 3v4M16 3v4M9 15.5l2 2 4-4" />
 				</svg>

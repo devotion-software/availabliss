@@ -31,7 +31,13 @@ describe('marking calendar events not busy', () => {
 		expect(mine.find((b) => b.eventKey === 'dentist')!.recurring).toBe(false);
 
 		// Someone else can't touch your calendar.
-		expect((await apiError(ignoreBusy(someoneElse, { calendarId: choir.calendarId!, eventKey: 'choir', start: choir.start, end: choir.end, series: false }))).code).toBe('not_found');
+		expect(
+			(
+				await apiError(
+					ignoreBusy(someoneElse, { calendarId: choir.calendarId!, eventKey: 'choir', start: choir.start, end: choir.end, series: false })
+				)
+			).code
+		).toBe('not_found');
 
 		// One occurrence: that evening is free, the next week's still busy.
 		const one = await ignoreBusy(me, { calendarId: choir.calendarId!, eventKey: 'choir', start: choir.start, end: choir.end, series: false });

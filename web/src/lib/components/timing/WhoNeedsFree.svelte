@@ -55,15 +55,7 @@
 
 <section class="glass card">
 	<h2 class="eyebrow">Who needs to be free</h2>
-	<SegmentedControl
-		options={modes}
-		value={mode}
-		label="Who needs to be free"
-		variant="soft"
-		size="sm"
-		block
-		onchange={setMode}
-	/>
+	<SegmentedControl options={modes} value={mode} label="Who needs to be free" variant="soft" size="sm" block onchange={setMode} />
 	{#if mode === 'most'}
 		<div class="stepper" role="group" aria-labelledby="q-{uid}">
 			<span id="q-{uid}" class="q-label">
@@ -74,7 +66,10 @@
 				<IconButton icon="plus" label="More people" variant="line" size={36} disabled={readonly || quorum >= required} onclick={() => step(1)} />
 			</div>
 		</div>
-		<p class="plain">A time works when at least {quorum} of the {required} {required === 1 ? 'person' : 'people'} who aren't optional {quorum === 1 ? 'is' : 'are'} free.</p>
+		<p class="plain">
+			A time works when at least {quorum} of the {required}
+			{required === 1 ? 'person' : 'people'} who aren't optional {quorum === 1 ? 'is' : 'are'} free.
+		</p>
 	{:else}
 		<p class="plain">A time only works when everyone who isn't optional is free.</p>
 	{/if}
@@ -85,12 +80,7 @@
 				<Avatar name={m.name} id={m.userId} image={m.image} size={32} />
 				<span class="name" id="opt-{uid}-{m.userId}">{m.name}{m.userId === meId ? ' (you)' : ''}</span>
 				<span class="tag" class:on={optional.has(m.userId)}>Optional</span>
-				<Toggle
-					checked={optional.has(m.userId)}
-					label="{m.name} is optional"
-					disabled={readonly}
-					onchange={(on) => setOptional(m.userId, on)}
-				/>
+				<Toggle checked={optional.has(m.userId)} label="{m.name} is optional" disabled={readonly} onchange={(on) => setOptional(m.userId, on)} />
 			</li>
 		{/each}
 	</ul>

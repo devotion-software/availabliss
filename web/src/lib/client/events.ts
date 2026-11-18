@@ -21,8 +21,7 @@ export const deleteEvent = (id: string) => api.del(`/events/${id}`);
 export const setEventImage = (id: string, file: Blob) => api.put<GroupEvent>(`/events/${id}/image`, file);
 /** Removes the event's cover photo. */
 export const removeEventImage = (id: string) => api.del<GroupEvent>(`/events/${id}/image`);
-export const listUpcoming = (fetch?: Fetch) =>
-	api.get<{ events: UpcomingEvent[] }>('/me/upcoming', { fetch }).then((r) => r.events);
+export const listUpcoming = (fetch?: Fetch) => api.get<{ events: UpcomingEvent[] }>('/me/upcoming', { fetch }).then((r) => r.events);
 
 /** Download link for the event's .ics file ("Add to calendar" on the web). */
 export const eventIcsUrl = (id: string) => apiUrl(`/events/${id}/ics`);

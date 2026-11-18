@@ -1,12 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { eventIcsUrl } from '#lib/client/events';
-	import {
-		googleCalendarUrl,
-		rememberAddedToCalendar,
-		wasAddedToCalendar,
-		type CalendarItem,
-	} from '#lib/client/calendar-links';
+	import { googleCalendarUrl, rememberAddedToCalendar, wasAddedToCalendar, type CalendarItem } from '#lib/client/calendar-links';
 	import { useFormat } from '#lib/client/format';
 	import Button from '#lib/components/ui/Button.svelte';
 	import BrandIcon from '#lib/components/ui/BrandIcon.svelte';

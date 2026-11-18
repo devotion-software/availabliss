@@ -35,7 +35,11 @@
 		const parsed = createMessageSchema.safeParse({ poll });
 		if (!parsed.success) {
 			const issue = parsed.error.issues.find((i) => i.path.includes('poll')) ?? parsed.error.issues[0];
-			error = issue?.path.includes('options') ? 'Add at least two options' : poll.question.trim() ? (issue?.message ?? 'Check the poll') : 'Ask a question';
+			error = issue?.path.includes('options')
+				? 'Add at least two options'
+				: poll.question.trim()
+					? (issue?.message ?? 'Check the poll')
+					: 'Ask a question';
 			return;
 		}
 		busy = true;

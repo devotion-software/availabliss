@@ -20,7 +20,9 @@ describe('eventSpan', () => {
 		const times = { start: { dateTime: '2029-03-01T09:00:00Z' }, end: { dateTime: '2029-03-01T10:00:00Z' } };
 		expect(eventSpan({ id: 'a', ...times, transparency: 'transparent' }, 'UTC')).toBeNull();
 		expect(eventSpan({ id: 'a', ...times, status: 'cancelled' }, 'UTC')).toBeNull();
-		expect(eventSpan({ id: 'a', ...times, attendees: [{ responseStatus: 'accepted' }, { self: true, responseStatus: 'declined' }] }, 'UTC')).toBeNull();
+		expect(
+			eventSpan({ id: 'a', ...times, attendees: [{ responseStatus: 'accepted' }, { self: true, responseStatus: 'declined' }] }, 'UTC')
+		).toBeNull();
 		expect(eventSpan({ id: 'a', ...times, attendees: [{ self: true, responseStatus: 'tentative' }] }, 'UTC')).not.toBeNull();
 	});
 });
@@ -65,14 +67,24 @@ describe('google adapter (stubbed fetch)', () => {
 		const calls = stub((c) =>
 			c.url.pathname.endsWith('/freeBusy')
 				? { body: { calendars: { 'boss@example.com': { busy: [{ start: '2026-11-02T09:00:00Z', end: '2026-11-02T10:00:00Z' }] } } } }
-				: { body: { timeZone: 'UTC', items: [{ id: 'standup_20261103', recurringEventId: 'standup', start: at('2026-11-03T09:00:00Z'), end: at('2026-11-03T09:15:00Z') }] } }
+				: {
+						body: {
+							timeZone: 'UTC',
+							items: [{ id: 'standup_20261103', recurringEventId: 'standup', start: at('2026-11-03T09:00:00Z'), end: at('2026-11-03T09:15:00Z') }]
+						}
+					}
 		);
 		const boss: RemoteCalendar = { externalId: 'boss@example.com', name: 'Boss', color: null, changes: 'none' };
 		const busy = await google.busy(creds, [home, boss], from, new Date('2026-12-01T00:00:00Z'), 'UTC');
 		expect(busy).toEqual([
 			{ calendarExternalId: 'boss@example.com', start: new Date('2026-11-02T09:00:00Z'), end: new Date('2026-11-02T10:00:00Z') },
 			// Keyed by the series, so a change to it replaces every occurrence.
-			{ calendarExternalId: 'me@example.com', eventKey: eventKey('standup'), start: new Date('2026-11-03T09:00:00Z'), end: new Date('2026-11-03T09:15:00Z') }
+			{
+				calendarExternalId: 'me@example.com',
+				eventKey: eventKey('standup'),
+				start: new Date('2026-11-03T09:00:00Z'),
+				end: new Date('2026-11-03T09:15:00Z')
+			}
 		]);
 		const list = calls.find((c) => c.url.pathname.endsWith('/events'))!;
 		expect(list.url.searchParams.get('singleEvents')).toBe('true');
@@ -82,7 +94,9 @@ describe('google adapter (stubbed fetch)', () => {
 	test('changes: single events directly, recurring series by re-reading their occurrences', async () => {
 		const calls = stub((c) => {
 			if (c.url.pathname.endsWith('/events/weekly/instances'))
-				return { body: { items: [{ id: 'weekly_1', recurringEventId: 'weekly', start: at('2028-01-05T18:00:00Z'), end: at('2028-01-05T19:00:00Z') }] } };
+				return {
+					body: { items: [{ id: 'weekly_1', recurringEventId: 'weekly', start: at('2028-01-05T18:00:00Z'), end: at('2028-01-05T19:00:00Z') }] }
+				};
 			if (c.url.pathname.endsWith('/events/gone-series/instances')) return { status: 410, body: {} };
 			return {
 				body: {
@@ -105,9 +119,16 @@ describe('google adapter (stubbed fetch)', () => {
 		expect(list.searchParams.get('showDeleted')).toBe('true');
 		expect(list.searchParams.get('timeMin')).toBeNull();
 
-		expect([...changes.keys()].sort()).toEqual([eventKey('cancelled-lunch'), eventKey('dentist'), eventKey('gone-series'), eventKey('weekly')].sort());
+		expect([...changes.keys()].sort()).toEqual(
+			[eventKey('cancelled-lunch'), eventKey('dentist'), eventKey('gone-series'), eventKey('weekly')].sort()
+		);
 		expect(changes.get(eventKey('dentist'))).toEqual([
-			{ calendarExternalId: home.externalId, eventKey: eventKey('dentist'), start: new Date('2028-06-01T10:00:00Z'), end: new Date('2028-06-01T11:00:00Z') }
+			{
+				calendarExternalId: home.externalId,
+				eventKey: eventKey('dentist'),
+				start: new Date('2028-06-01T10:00:00Z'),
+				end: new Date('2028-06-01T11:00:00Z')
+			}
 		]);
 		expect(changes.get(eventKey('cancelled-lunch'))).toEqual([]);
 		expect(changes.get(eventKey('gone-series'))).toEqual([]);
@@ -150,7 +171,12 @@ describe('google change notifications (stubbed fetch)', () => {
 		const channel = await google.watch!(creds, cal, { id: 'chan-1', address: 'https://app.example/api/v1/calendars/push/google', token: 'secret' });
 		expect(channel).toEqual({ id: 'chan-1', resourceId: 'res-1', expiresAt: new Date('2026-11-10T00:00:00Z') });
 		expect(sent!.url).toBe('https://www.googleapis.com/calendar/v3/calendars/me%40example.com/events/watch');
-		expect(sent!.body).toMatchObject({ id: 'chan-1', type: 'web_hook', address: 'https://app.example/api/v1/calendars/push/google', token: 'secret' });
+		expect(sent!.body).toMatchObject({
+			id: 'chan-1',
+			type: 'web_hook',
+			address: 'https://app.example/api/v1/calendars/push/google',
+			token: 'secret'
+		});
 	});
 
 	test("calendars that can't be watched answer null", async () => {

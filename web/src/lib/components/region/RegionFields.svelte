@@ -56,7 +56,13 @@
 </script>
 
 <div class="region">
-	<Select label="Country" bind:value={value.country} options={withCurrent(opts(countries), value.country)} placeholder="Choose a country" onchange={onCountry} />
+	<Select
+		label="Country"
+		bind:value={value.country}
+		options={withCurrent(opts(countries), value.country)}
+		placeholder="Choose a country"
+		onchange={onCountry}
+	/>
 	{#if subdivisions.length}
 		<Select label="Region" bind:value={value.subdivision} options={withCurrent(opts(subdivisions), value.subdivision)} placeholder="Whole country" />
 	{/if}

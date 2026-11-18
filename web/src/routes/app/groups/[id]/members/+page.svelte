@@ -19,9 +19,7 @@
 	const admin = $derived(isAdminRole(group.role));
 	const members = $derived(memberMap(group));
 	const ROLE_ORDER = { owner: 0, admin: 1, member: 2 };
-	const sorted = $derived(
-		[...group.members].sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.name.localeCompare(b.name))
-	);
+	const sorted = $derived([...group.members].sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.name.localeCompare(b.name)));
 
 	let actionsFor = $state<Member | null>(null);
 	let actionsOpen = $state(false);
@@ -57,12 +55,12 @@
 
 <div class="page">
 	<PageHeader
-	title="Members"
-	subtitle={groupSubtitle(group)}
-	backHref="/app/groups/{group.id}"
-	backLabel="Back to calendar"
-	crumbs={[{ label: 'Groups', href: '/app' }, { label: group.name, href: `/app/groups/${group.id}` }, { label: 'Members' }]}
-/>
+		title="Members"
+		subtitle={groupSubtitle(group)}
+		backHref="/app/groups/{group.id}"
+		backLabel="Back to calendar"
+		crumbs={[{ label: 'Groups', href: '/app' }, { label: group.name, href: `/app/groups/${group.id}` }, { label: 'Members' }]}
+	/>
 
 	<div class="columns">
 		<section class="people glass" aria-label="Members">

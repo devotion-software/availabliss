@@ -89,14 +89,7 @@
 
 <form class="glass form" onsubmit={sendCode} novalidate>
 	{#if step === 'email'}
-		<TextField
-			label="Email"
-			type="email"
-			autocomplete="email webauthn"
-			placeholder="you@example.com"
-			bind:value={email}
-			{error}
-		/>
+		<TextField label="Email" type="email" autocomplete="email webauthn" placeholder="you@example.com" bind:value={email} {error} />
 		<Button type="submit" size="md" block loading={sending}>Email me a code</Button>
 	{:else}
 		<div class="check">

@@ -7,7 +7,19 @@ const TZ = 'Europe/London';
 
 describe('repeat labels', () => {
 	test('ordinal', () => {
-		expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31].map(ordinal)).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '31st']);
+		expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31].map(ordinal)).toEqual([
+			'1st',
+			'2nd',
+			'3rd',
+			'4th',
+			'11th',
+			'12th',
+			'13th',
+			'21st',
+			'22nd',
+			'23rd',
+			'31st'
+		]);
 	});
 
 	test('weekdayOfMonth: nth, or last in the final 7 days', () => {
@@ -33,7 +45,16 @@ describe('repeat labels', () => {
 			'Every year on 16 November'
 		]);
 		expect(repeatChoices('2026-11-30').find((c) => c.value === 'monthlyWeekday')!.label).toBe('Every month on the last Monday');
-		expect(repeatChoices('2026-11-16').map((c) => c.value)).toEqual(['none', 'daily', 'weekdays', 'weekly', 'fortnightly', 'monthly', 'monthlyWeekday', 'yearly']);
+		expect(repeatChoices('2026-11-16').map((c) => c.value)).toEqual([
+			'none',
+			'daily',
+			'weekdays',
+			'weekly',
+			'fortnightly',
+			'monthly',
+			'monthlyWeekday',
+			'yearly'
+		]);
 	});
 
 	test('repeatLabel: unknown values read "Repeats"', () => {
@@ -73,8 +94,14 @@ describe('blockSummary', () => {
 
 	test('repeats lead with the schedule, then the time and any end', () => {
 		expect(blockSummary(block({ repeat: 'weekly' }), TZ)).toBe('Every Tuesday · 19:00 – 21:30');
-		expect(blockSummary(block({ repeat: 'daily', start: '2026-11-17T07:00:00Z', end: '2026-11-17T08:00:00Z' }), TZ)).toBe('Every day · 07:00 – 08:00');
-		expect(blockSummary(block({ repeat: 'monthlyWeekday', until: '2026-12-20' }), TZ)).toBe('Monthly on the 3rd Tuesday · 19:00 – 21:30 · until Sun 20 Dec');
-		expect(blockSummary(block({ repeat: 'yearly', allDay: true, start: '2026-11-17T00:00:00Z', end: '2026-11-18T00:00:00Z' }), TZ)).toBe('Yearly on 17 Nov · All day');
+		expect(blockSummary(block({ repeat: 'daily', start: '2026-11-17T07:00:00Z', end: '2026-11-17T08:00:00Z' }), TZ)).toBe(
+			'Every day · 07:00 – 08:00'
+		);
+		expect(blockSummary(block({ repeat: 'monthlyWeekday', until: '2026-12-20' }), TZ)).toBe(
+			'Monthly on the 3rd Tuesday · 19:00 – 21:30 · until Sun 20 Dec'
+		);
+		expect(blockSummary(block({ repeat: 'yearly', allDay: true, start: '2026-11-17T00:00:00Z', end: '2026-11-18T00:00:00Z' }), TZ)).toBe(
+			'Yearly on 17 Nov · All day'
+		);
 	});
 });

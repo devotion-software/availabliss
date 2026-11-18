@@ -59,7 +59,12 @@ export async function putImage(kind: keyof typeof FOLDERS, ownerId: string, byte
 }
 
 /** Writes bytes under `key` (R2, or `.uploads/` without it). */
-export async function putObject(key: string, bytes: Uint8Array, contentType: string, cacheControl = 'private, max-age=31536000, immutable'): Promise<void> {
+export async function putObject(
+	key: string,
+	bytes: Uint8Array,
+	contentType: string,
+	cacheControl = 'private, max-age=31536000, immutable'
+): Promise<void> {
 	if (r2) {
 		const res = await r2.client.fetch(r2.objectUrl(key), {
 			method: 'PUT',
@@ -78,7 +83,10 @@ export async function putObject(key: string, bytes: Uint8Array, contentType: str
  * Reads a stored object for serving it ourselves (private files such as chat attachments).
  * `range` is passed on to R2 (a 206 comes back); the local fallback always returns the whole file.
  */
-export async function getObject(key: string, range: string | null = null): Promise<{ body: ReadableStream | Uint8Array; status: number; headers: Headers } | null> {
+export async function getObject(
+	key: string,
+	range: string | null = null
+): Promise<{ body: ReadableStream | Uint8Array; status: number; headers: Headers } | null> {
 	if (r2) {
 		const res = await r2.client.fetch(r2.objectUrl(key), { headers: range ? { range } : {} });
 		if (res.status !== 200 && res.status !== 206) {

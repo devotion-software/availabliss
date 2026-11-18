@@ -44,8 +44,7 @@
 			placeholder={rest.placeholder}
 			maxlength={rest.maxlength}
 			required={rest.required}
-			disabled={rest.disabled}
-		></textarea>
+			disabled={rest.disabled}></textarea>
 	{:else if prefix}
 		<div class="prefixed">
 			<span class="prefix" aria-hidden="true">{prefix}</span>

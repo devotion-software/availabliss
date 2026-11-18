@@ -35,10 +35,8 @@ export const createGroup = (body: GroupInput) => api.post<Group>('/groups', body
  * `archived` moves the group to (true) or out of (false) the Archived section of everyone's groups list;
  * `autoArchive` has it archive itself once its event has passed; `rhythm` is how often it meets (null for none).
  */
-export const updateGroup = (
-	id: string,
-	patch: Partial<GroupInput> & { archived?: boolean; autoArchive?: boolean; rhythm?: Rhythm | null }
-) => api.patch<Group>(`/groups/${id}`, patch);
+export const updateGroup = (id: string, patch: Partial<GroupInput> & { archived?: boolean; autoArchive?: boolean; rhythm?: Rhythm | null }) =>
+	api.patch<Group>(`/groups/${id}`, patch);
 
 /** The next time near the group's rhythm: the date it points at, and the free time nearest it (null if none). */
 export interface NextSuggestion {
@@ -74,8 +72,7 @@ export const removeGroupImage = (id: string) => api.del<Group>(`/groups/${id}/im
 export const setMemberRole = (groupId: string, userId: string, role: 'admin' | 'member') =>
 	api.patch<Member>(`/groups/${groupId}/members/${userId}`, { role });
 /** Sets (or with null, clears) the name you go by in the group. */
-export const setMyName = (groupId: string, displayName: string | null) =>
-	api.patch<Member>(`/groups/${groupId}/members/me`, { displayName });
+export const setMyName = (groupId: string, displayName: string | null) => api.patch<Member>(`/groups/${groupId}/members/me`, { displayName });
 /** Removes someone (an admin removing another member). */
 export const removeMember = (groupId: string, userId: string) => api.del(`/groups/${groupId}/members/${userId}`);
 /** Leaves the group. The owner names the admin who becomes the owner. */

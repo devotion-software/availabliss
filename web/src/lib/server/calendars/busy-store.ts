@@ -42,7 +42,18 @@ export async function saveCalendars(
 			changed = true;
 			const id = newId();
 			const busy = cal.busy ?? !NOT_BUSY_BY_DEFAULT.test(cal.name);
-			byExternal.set(cal.externalId, { id, connectionId, externalId: cal.externalId, name: cal.name, color: cal.color, busy, syncCursor: null, pushId: null, pushResourceId: null, pushExpiresAt: null });
+			byExternal.set(cal.externalId, {
+				id,
+				connectionId,
+				externalId: cal.externalId,
+				name: cal.name,
+				color: cal.color,
+				busy,
+				syncCursor: null,
+				pushId: null,
+				pushResourceId: null,
+				pushExpiresAt: null
+			});
 			await db.insert(calendars).values({ id, connectionId, externalId: cal.externalId, name: cal.name, color: cal.color, busy });
 		}
 	}
@@ -50,9 +61,7 @@ export async function saveCalendars(
 	const keep = remote.map((c) => c.externalId);
 	if (existing.some((c) => !keep.includes(c.externalId))) {
 		changed = true;
-		await db
-			.delete(calendars)
-			.where(and(eq(calendars.connectionId, connectionId), keep.length ? notInArray(calendars.externalId, keep) : undefined));
+		await db.delete(calendars).where(and(eq(calendars.connectionId, connectionId), keep.length ? notInArray(calendars.externalId, keep) : undefined));
 	}
 
 	const kept = [...byExternal].filter(([ext]) => keep.includes(ext));
@@ -111,7 +120,14 @@ export async function writeBusy(userId: string, scope: SQL | undefined, rows: Bu
 	const wanted = new Map(rows.map((r) => [rowKey(r), r]));
 	return db.transaction(async (tx) => {
 		const stored = await tx
-			.select({ id: busyIntervals.id, calendarId: busyIntervals.calendarId, eventKey: busyIntervals.eventKey, start: busyIntervals.start, end: busyIntervals.end, title: busyIntervals.title })
+			.select({
+				id: busyIntervals.id,
+				calendarId: busyIntervals.calendarId,
+				eventKey: busyIntervals.eventKey,
+				start: busyIntervals.start,
+				end: busyIntervals.end,
+				title: busyIntervals.title
+			})
 			.from(busyIntervals)
 			.where(scope);
 		// Whatever is stored and still wanted (renames included) stays; the rest of `stored` goes.

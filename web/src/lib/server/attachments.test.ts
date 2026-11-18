@@ -6,9 +6,24 @@ describe('attachmentSummary', () => {
 		expect(attachmentSummary([{ kind: 'image', name: 'a.jpg' }])).toBe('📷 Photo');
 		expect(attachmentSummary([{ kind: 'gif', name: 'a.gif' }])).toBe('GIF');
 		expect(attachmentSummary([{ kind: 'file', name: 'Plan.pdf' }])).toBe('📎 Plan.pdf');
-		expect(attachmentSummary([{ kind: 'image', name: 'a' }, { kind: 'gif', name: 'b' }])).toBe('📷 2 photos');
-		expect(attachmentSummary([{ kind: 'file', name: 'a' }, { kind: 'file', name: 'b' }])).toBe('📎 2 files');
-		expect(attachmentSummary([{ kind: 'image', name: 'a' }, { kind: 'file', name: 'b' }])).toBe('📎 2 attachments');
+		expect(
+			attachmentSummary([
+				{ kind: 'image', name: 'a' },
+				{ kind: 'gif', name: 'b' }
+			])
+		).toBe('📷 2 photos');
+		expect(
+			attachmentSummary([
+				{ kind: 'file', name: 'a' },
+				{ kind: 'file', name: 'b' }
+			])
+		).toBe('📎 2 files');
+		expect(
+			attachmentSummary([
+				{ kind: 'image', name: 'a' },
+				{ kind: 'file', name: 'b' }
+			])
+		).toBe('📎 2 attachments');
 		expect(attachmentSummary([])).toBe('');
 	});
 });

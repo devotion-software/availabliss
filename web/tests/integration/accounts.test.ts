@@ -88,7 +88,10 @@ describe('web merge (completeMerge)', () => {
 		const from = await fx.user();
 		await addAccount(from, 'apple');
 		const code = await createMergeIntent(into, 'apple');
-		expect(await completeMerge(code, { userId: from, sessionCreatedAt: new Date(Date.now() - 60_000) })).toEqual({ ok: false, reason: 'merge_not_signed_in' });
+		expect(await completeMerge(code, { userId: from, sessionCreatedAt: new Date(Date.now() - 60_000) })).toEqual({
+			ok: false,
+			reason: 'merge_not_signed_in'
+		});
 		expect(await completeMerge(code, { userId: from, sessionCreatedAt: new Date() })).toEqual({ ok: false, reason: 'merge_expired' });
 		expect(await completeMerge(undefined, { userId: from, sessionCreatedAt: new Date() })).toEqual({ ok: false, reason: 'merge_expired' });
 		expect(await db.query.user.findFirst({ where: eq(user.id, from) })).toBeDefined();
@@ -129,14 +132,19 @@ describe('linkWithIdToken conflicts', () => {
 		const me = await fx.user();
 		const other = await fx.user();
 		const sub = `google-sub-${newId()}`;
-		await db.insert(account).values({ id: newId(), userId: other, providerId: 'google', accountId: sub, createdAt: new Date(), updatedAt: new Date() });
+		await db
+			.insert(account)
+			.values({ id: newId(), userId: other, providerId: 'google', accountId: sub, createdAt: new Date(), updatedAt: new Date() });
 
 		await withGoogleLink(alreadyLinked, async () => {
 			const offer = await linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor(sub) });
 			expect(offer).toMatchObject({ linked: false, candidate: expect.anything() });
 			expect(await db.query.user.findFirst({ where: eq(user.id, other) })).toBeDefined();
 
-			expect(await linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor(sub), merge: true })).toEqual({ linked: true, merged: true });
+			expect(await linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor(sub), merge: true })).toEqual({
+				linked: true,
+				merged: true
+			});
 			expect(await db.query.user.findFirst({ where: eq(user.id, other) })).toBeUndefined();
 			const moved = await db.query.account.findFirst({ where: and(eq(account.providerId, 'google'), eq(account.accountId, sub)) });
 			expect(moved?.userId).toBe(me);
@@ -150,20 +158,28 @@ describe('linkWithIdToken conflicts', () => {
 		await withGoogleLink(alreadyLinked, async () => {
 			expect(await linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor(sub) })).toEqual({ linked: true, merged: false });
 			await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: 'not-a-jwt' })).rejects.toMatchObject({ code: 'conflict' });
-			await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor('nobody-has-this') })).rejects.toMatchObject({ code: 'conflict' });
+			await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor('nobody-has-this') })).rejects.toMatchObject({
+				code: 'conflict'
+			});
 		});
 	});
 
 	test('a fresh sign-in links straight away; other Better Auth errors pass through', async () => {
 		const me = await fx.user();
-		await withGoogleLink(async () => ({ status: true }), async () => {
-			expect(await linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor('new') })).toEqual({ linked: true, merged: false });
-		});
-		await withGoogleLink(async () => {
-			throw new APIError('INTERNAL_SERVER_ERROR', { message: 'boom' });
-		}, async () => {
-			await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor('x') })).rejects.toBeInstanceOf(APIError);
-		});
+		await withGoogleLink(
+			async () => ({ status: true }),
+			async () => {
+				expect(await linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor('new') })).toEqual({ linked: true, merged: false });
+			}
+		);
+		await withGoogleLink(
+			async () => {
+				throw new APIError('INTERNAL_SERVER_ERROR', { message: 'boom' });
+			},
+			async () => {
+				await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: idTokenFor('x') })).rejects.toBeInstanceOf(APIError);
+			}
+		);
 	});
 
 	test('a provider that isn’t set up is refused', async () => {
@@ -172,7 +188,9 @@ describe('linkWithIdToken conflicts', () => {
 		const saved = apple.clientId;
 		apple.clientId = null;
 		try {
-			await expect(linkWithIdToken(me, new Headers(), { provider: 'apple', idToken: idTokenFor('a') })).rejects.toMatchObject({ code: 'validation_error' });
+			await expect(linkWithIdToken(me, new Headers(), { provider: 'apple', idToken: idTokenFor('a') })).rejects.toMatchObject({
+				code: 'validation_error'
+			});
 		} finally {
 			apple.clientId = saved;
 		}
@@ -190,11 +208,13 @@ describe('linkWithIdToken', () => {
 			throw new APIError('UNAUTHORIZED', { message: 'Invalid id token' });
 		}) as never);
 		try {
-			await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: 'expired' })).rejects.toMatchObject({ status: 400, code: 'validation_error' });
+			await expect(linkWithIdToken(me, new Headers(), { provider: 'google', idToken: 'expired' })).rejects.toMatchObject({
+				status: 400,
+				code: 'validation_error'
+			});
 		} finally {
 			link.mockRestore();
 			Object.assign(google, saved);
 		}
 	});
 });
-

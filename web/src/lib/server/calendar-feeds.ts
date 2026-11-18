@@ -42,7 +42,10 @@ export async function getCalendarFeed(userId: string): Promise<CalendarFeed> {
 export async function resetCalendarFeed(userId: string): Promise<CalendarFeed> {
 	const token = newToken();
 	const values = { userId, tokenHash: hash(token), tokenSealed: encryptJson(token, `calendar-feed:${userId}`) };
-	await db.insert(calendarFeeds).values(values).onDuplicateKeyUpdate({ set: { tokenHash: values.tokenHash, tokenSealed: values.tokenSealed, createdAt: new Date() } });
+	await db
+		.insert(calendarFeeds)
+		.values(values)
+		.onDuplicateKeyUpdate({ set: { tokenHash: values.tokenHash, tokenSealed: values.tokenSealed, createdAt: new Date() } });
 	return toFeed(token);
 }
 

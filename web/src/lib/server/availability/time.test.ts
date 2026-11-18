@@ -1,18 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-	addDays,
-	dateOf,
-	daysBetween,
-	eachDate,
-	HOUR,
-	inRange,
-	minutesOf,
-	offsetAt,
-	startOfDate,
-	wallClock,
-	weekdayOf,
-	zonedInstant
-} from './time';
+import { addDays, dateOf, daysBetween, eachDate, HOUR, inRange, minutesOf, offsetAt, startOfDate, wallClock, weekdayOf, zonedInstant } from './time';
 
 const iso = (ms: number) => new Date(ms).toISOString();
 

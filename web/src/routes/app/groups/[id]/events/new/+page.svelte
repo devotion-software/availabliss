@@ -61,12 +61,12 @@
 
 <div class="page">
 	<PageHeader
-	title="Add event"
-	subtitle={data.group.name}
-	backHref={back}
-	backLabel="Back to calendar"
-	crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Add event' }]}
-/>
+		title="Add event"
+		subtitle={data.group.name}
+		backHref={back}
+		backLabel="Back to calendar"
+		crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Add event' }]}
+	/>
 	<form class="glass panel" onsubmit={submit} novalidate>
 		<p class="lead">Already decided? Add it straight to the group calendar. No vote needed.</p>
 		<CoverField bind:file={cover} disabled={busy} />

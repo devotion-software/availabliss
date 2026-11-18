@@ -80,7 +80,10 @@
 
 <svelte:head>
 	<title>Availabliss · Find the time that works for everyone</title>
-	<meta name="description" content="Connect your calendar once. Availabliss finds when everyone in your group is free, so nobody has to ask 'what about Thursday?' again." />
+	<meta
+		name="description"
+		content="Connect your calendar once. Availabliss finds when everyone in your group is free, so nobody has to ask 'what about Thursday?' again."
+	/>
 </svelte:head>
 
 <Orbs layout="a" />
@@ -141,7 +144,11 @@
 		<section id="how" class="how" aria-labelledby="how-title">
 			<h2 id="how-title">How it works</h2>
 			<ol class="steps">
-				<StepCard n={1} title="Connect your calendar once" text="Google, Outlook or iCloud. Pick which calendars mean busy. No calendar? Tap to block times yourself.">
+				<StepCard
+					n={1}
+					title="Connect your calendar once"
+					text="Google, Outlook or iCloud. Pick which calendars mean busy. No calendar? Tap to block times yourself."
+				>
 					{#snippet art()}
 						{#each calendars as cal (cal.name)}
 							<div class="art-row">
@@ -151,7 +158,11 @@
 						{/each}
 					{/snippet}
 				</StepCard>
-				<StepCard n={2} title="Make a group, say what you're planning" text="Two hours, an evening, a whole weekend, a week away. Bank holidays and school holidays understood.">
+				<StepCard
+					n={2}
+					title="Make a group, say what you're planning"
+					text="Two hours, an evening, a whole weekend, a week away. Bank holidays and school holidays understood."
+				>
 					{#snippet art()}
 						<div class="art-chips" role="radiogroup" aria-label="What are you planning?">
 							{#each PLANS as p, i (p.label)}
@@ -161,7 +172,11 @@
 						<span class="art-sub" aria-live="polite">{PLANS[plan].sub}</span>
 					{/snippet}
 				</StepCard>
-				<StepCard n={3} title="Pick a time. Everyone's in." text="Only the times that work for everyone show up. Propose one, people tap accept, and it lands in every calendar.">
+				<StepCard
+					n={3}
+					title="Pick a time. Everyone's in."
+					text="Only the times that work for everyone show up. Propose one, people tap accept, and it lands in every calendar."
+				>
 					{#snippet art()}
 						<div class="art-accept">
 							<SyncRing value={accepted ? 6 : 5} total={6} size={58} stroke={6} tone={accepted ? 'ok' : 'accent'}>
@@ -189,7 +204,10 @@
 			<span class="shield"><Icon name="lock" size={24} /></span>
 			<div>
 				<h2 id="privacy-title">Busy, not your business.</h2>
-				<p>Availabliss only shares that you're busy. Event names, places and who you're with never leave your calendar. Notes you add to blocked time are for you alone.</p>
+				<p>
+					Availabliss only shares that you're busy. Event names, places and who you're with never leave your calendar. Notes you add to blocked time
+					are for you alone.
+				</p>
 			</div>
 		</section>
 

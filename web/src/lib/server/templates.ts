@@ -19,11 +19,7 @@ const toTemplate = (r: Row): RequirementTemplate => ({
 });
 
 export async function listTemplates(userId: string): Promise<RequirementTemplate[]> {
-	const rows = await db
-		.select()
-		.from(requirementTemplates)
-		.where(eq(requirementTemplates.userId, userId))
-		.orderBy(asc(requirementTemplates.name));
+	const rows = await db.select().from(requirementTemplates).where(eq(requirementTemplates.userId, userId)).orderBy(asc(requirementTemplates.name));
 	return rows.map(toTemplate);
 }
 
@@ -49,11 +45,7 @@ export async function createTemplate(userId: string, input: { name: string; requ
 	return toTemplate(await getRow(userId, id));
 }
 
-export async function updateTemplate(
-	userId: string,
-	id: string,
-	patch: { name?: string; requirement?: Requirement }
-): Promise<RequirementTemplate> {
+export async function updateTemplate(userId: string, id: string, patch: { name?: string; requirement?: Requirement }): Promise<RequirementTemplate> {
 	await getRow(userId, id);
 	if (patch.name !== undefined || patch.requirement !== undefined) {
 		await db

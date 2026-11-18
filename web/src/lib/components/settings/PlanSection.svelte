@@ -35,7 +35,12 @@
 	</div>
 	<p class="detail">{detail || ' '}</p>
 	{#if plan}
-		<Button size="sm" variant={plan.tier === 'pro' ? 'secondary' : 'accent'} icon={plan.tier === 'pro' ? undefined : 'sparkle'} onclick={() => upgradeSheet.showFor()}>
+		<Button
+			size="sm"
+			variant={plan.tier === 'pro' ? 'secondary' : 'accent'}
+			icon={plan.tier === 'pro' ? undefined : 'sparkle'}
+			onclick={() => upgradeSheet.showFor()}
+		>
 			{plan.tier === 'pro' ? 'Manage Pro' : 'Upgrade to Pro'}
 		</Button>
 	{/if}

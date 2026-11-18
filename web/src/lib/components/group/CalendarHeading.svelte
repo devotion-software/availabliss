@@ -78,7 +78,11 @@
 		class="free-jump"
 		disabled={!previousFree}
 		onclick={() => previousFree && onjump(previousFree)}
-		aria-label={previousFree ? `Previous free date, ${formatDayKey(previousFree)}` : findingFree ? 'Previous free date, looking' : 'No earlier free dates'}
+		aria-label={previousFree
+			? `Previous free date, ${formatDayKey(previousFree)}`
+			: findingFree
+				? 'Previous free date, looking'
+				: 'No earlier free dates'}
 	>
 		<Icon name="chevron-left" size={13} />
 		{previousFree ? formatDayKey(previousFree) : findingFree ? 'Earlier' : 'None earlier'}

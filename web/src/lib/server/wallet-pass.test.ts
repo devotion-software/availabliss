@@ -64,7 +64,13 @@ describe('passes', () => {
 	});
 
 	test('text is tidied and capped', () => {
-		const pass = passDetails({ passTypeIdentifier: 'p', serialNumber: 's', description: `a\u0000b\n${'x'.repeat(300)}`, organizationName: 4, generic: {} })!;
+		const pass = passDetails({
+			passTypeIdentifier: 'p',
+			serialNumber: 's',
+			description: `a\u0000b\n${'x'.repeat(300)}`,
+			organizationName: 4,
+			generic: {}
+		})!;
 		expect(pass.description.startsWith('ab x')).toBe(true);
 		expect([...pass.description].length).toBe(120);
 		expect(pass.organizationName).toBe('4');
@@ -81,8 +87,20 @@ describe('passes', () => {
 	test('summaries for older apps', () => {
 		const pass = readWalletPass(makePass(), false)!.pass;
 		expect(attachmentSummary([{ kind: 'pass', name: 'gig.pkpass', pass }])).toBe('🎟️ Concert ticket');
-		expect(attachmentSummary([{ kind: 'pass', name: 'gig.pkpass', pass: { ...pass, description: '', style: 'boardingPass' } }])).toBe('🎟️ Boarding pass');
-		expect(attachmentSummary([{ kind: 'pass', name: 'a', pass }, { kind: 'pass', name: 'b', pass }])).toBe('🎟️ 2 passes');
-		expect(attachmentSummary([{ kind: 'pass', name: 'a', pass }, { kind: 'image', name: 'b' }])).toBe('📎 2 attachments');
+		expect(attachmentSummary([{ kind: 'pass', name: 'gig.pkpass', pass: { ...pass, description: '', style: 'boardingPass' } }])).toBe(
+			'🎟️ Boarding pass'
+		);
+		expect(
+			attachmentSummary([
+				{ kind: 'pass', name: 'a', pass },
+				{ kind: 'pass', name: 'b', pass }
+			])
+		).toBe('🎟️ 2 passes');
+		expect(
+			attachmentSummary([
+				{ kind: 'pass', name: 'a', pass },
+				{ kind: 'image', name: 'b' }
+			])
+		).toBe('📎 2 attachments');
 	});
 });

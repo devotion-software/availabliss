@@ -65,7 +65,6 @@ export const ref = (name: string): JsonSchema => ({ $ref: `#/components/schemas/
 const schema = (shape: Shape): JsonSchema => (typeof shape === 'string' ? ref(shape) : shape);
 const str: JsonSchema = { type: 'string' };
 const num: JsonSchema = { type: 'number' };
-const bool: JsonSchema = { type: 'boolean' };
 const list = (item: Shape): JsonSchema => ({ type: 'array', items: schema(item) });
 const nullable = (shape: Shape): JsonSchema => ({ anyOf: [schema(shape), { type: 'null' }] });
 /** An object with these properties, all required. */
@@ -107,6 +106,8 @@ const betterAuthResult: JsonSchema = {
 
 // ── Endpoints ────────────────────────────────────────────────────────────────
 
+// One endpoint per line reads as a table; Prettier would explode each into a block.
+// prettier-ignore
 export const endpoints: Endpoint[] = [
 	// Health
 	{ method: 'GET', path: '/health', tag: 'Health', auth: 'none', summary: 'Server health', response: 'Health', errors: { 503: "The database doesn't answer (Redis being down is still 200)" } },

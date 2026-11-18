@@ -53,7 +53,6 @@ function parseIcsTime(value: string, params: string, timeZone: string): { at: nu
 	return { at: zonedInstant(date, minutesOf(`${m[4]}:${m[5]}`), zone) + Number(m[6]) * 1000, date: false };
 }
 
-
 /** ISO 8601 durations like PT1H30M or P1D. */
 function parseDuration(value: string): number {
 	const m = value.match(/^-?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/);
@@ -65,7 +64,10 @@ function parseDuration(value: string): number {
 /** Busy spans from the VEVENTs in an iCalendar document. */
 export function parseBusyEvents(ics: string, timeZone: string): { start: number; end: number; uid?: string; title?: string }[] {
 	const unfolded = ics.replace(/\r?\n[ \t]/g, '');
-	const events = unfolded.split(/BEGIN:VEVENT/).slice(1).map((chunk) => chunk.split(/END:VEVENT/)[0]);
+	const events = unfolded
+		.split(/BEGIN:VEVENT/)
+		.slice(1)
+		.map((chunk) => chunk.split(/END:VEVENT/)[0]);
 	const out: { start: number; end: number; uid?: string; title?: string }[] = [];
 
 	for (const body of events) {
@@ -89,7 +91,11 @@ export function parseBusyEvents(ics: string, timeZone: string): { start: number;
 		// Expanded recurrences share their series' UID.
 		const uid = props.get('UID')?.value;
 		// SUMMARY text escapes \\, \; \, and \n (RFC 5545).
-		const title = props.get('SUMMARY')?.value.replace(/\\([\\;,])/g, '$1').replace(/\\[nN]/g, ' ').trim();
+		const title = props
+			.get('SUMMARY')
+			?.value.replace(/\\([\\;,])/g, '$1')
+			.replace(/\\[nN]/g, ' ')
+			.trim();
 		if (end && end > start.at) out.push({ start: start.at, end, ...(uid && { uid }), ...(title && { title }) });
 	}
 	return out;
@@ -173,7 +179,11 @@ export const caldav: CalendarAdapter<CaldavCredentials> = {
 	},
 
 	async busy(creds, calendars, from, to, timeZone) {
-		const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+		const stamp = (d: Date) =>
+			d
+				.toISOString()
+				.replace(/[-:]/g, '')
+				.replace(/\.\d{3}/, '');
 		const range = `start="${stamp(from)}" end="${stamp(to)}"`;
 		const body = `<?xml version="1.0" encoding="utf-8"?>
 <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">

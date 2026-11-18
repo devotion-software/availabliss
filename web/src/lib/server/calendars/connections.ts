@@ -28,7 +28,12 @@ async function toConnections(rows: ConnectionRow[]): Promise<CalendarConnection[
 	const cals = await db
 		.select()
 		.from(calendars)
-		.where(inArray(calendars.connectionId, rows.map((r) => r.id)))
+		.where(
+			inArray(
+				calendars.connectionId,
+				rows.map((r) => r.id)
+			)
+		)
 		.orderBy(asc(calendars.name));
 	return rows.map((r) => ({
 		id: r.id,
@@ -36,19 +41,13 @@ async function toConnections(rows: ConnectionRow[]): Promise<CalendarConnection[
 		label: r.label,
 		status: r.status,
 		lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
-		calendars: cals
-			.filter((c) => c.connectionId === r.id)
-			.map((c) => ({ id: c.id, name: c.name, color: c.color, busy: c.busy })),
+		calendars: cals.filter((c) => c.connectionId === r.id).map((c) => ({ id: c.id, name: c.name, color: c.color, busy: c.busy })),
 		syncUntil: r.provider === 'device' ? deviceHorizon : null
 	}));
 }
 
 export async function listConnections(userId: string): Promise<CalendarConnection[]> {
-	const rows = await db
-		.select()
-		.from(calendarConnections)
-		.where(eq(calendarConnections.userId, userId))
-		.orderBy(asc(calendarConnections.createdAt));
+	const rows = await db.select().from(calendarConnections).where(eq(calendarConnections.userId, userId)).orderBy(asc(calendarConnections.createdAt));
 	return toConnections(rows);
 }
 

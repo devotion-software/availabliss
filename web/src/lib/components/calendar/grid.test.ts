@@ -9,7 +9,12 @@ const day = (date: string, status: AvailabilityDay['status'], slotPosition: Avai
 // Weekends that work: 11–13 Dec, 1–3 Jan; nothing in November or February.
 const months: Record<string, AvailabilityDay[]> = {
 	'2026-11-01': [day('2026-11-20', 'busy'), day('2026-11-21', 'free')],
-	'2026-12-01': [day('2026-12-04', 'busy'), day('2026-12-11', 'match', 'start'), day('2026-12-12', 'match', 'middle'), day('2026-12-13', 'match', 'end')],
+	'2026-12-01': [
+		day('2026-12-04', 'busy'),
+		day('2026-12-11', 'match', 'start'),
+		day('2026-12-12', 'match', 'middle'),
+		day('2026-12-13', 'match', 'end')
+	],
 	'2027-01-01': [day('2027-01-01', 'match', 'start'), day('2027-01-02', 'match', 'middle'), day('2027-01-03', 'match', 'end')],
 	'2027-02-01': [day('2027-02-05', 'hidden')]
 };
@@ -75,7 +80,15 @@ describe('missingNote', () => {
 
 describe('subtractSpans', () => {
 	test('cuts holes', () => {
-		expect(subtractSpans([{ from: 0, to: 100 }], [{ from: 20, to: 30 }, { from: 90, to: 120 }])).toEqual([
+		expect(
+			subtractSpans(
+				[{ from: 0, to: 100 }],
+				[
+					{ from: 20, to: 30 },
+					{ from: 90, to: 120 }
+				]
+			)
+		).toEqual([
 			{ from: 0, to: 20 },
 			{ from: 30, to: 90 }
 		]);

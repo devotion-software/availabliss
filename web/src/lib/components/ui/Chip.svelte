@@ -36,14 +36,7 @@
 		</button>
 	</span>
 {:else}
-	<button
-		type="button"
-		class="chip {size} {tone} {className}"
-		class:on={selected}
-		class:dashed
-		aria-pressed={selected}
-		{...rest}
-	>
+	<button type="button" class="chip {size} {tone} {className}" class:on={selected} class:dashed aria-pressed={selected} {...rest}>
 		{@render children()}
 	</button>
 {/if}

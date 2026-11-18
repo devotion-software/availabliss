@@ -59,14 +59,14 @@ const blocks: [SignedIn, Record<string, unknown>][] = [
 for (const [person, block] of blocks) await call(person.token, 'POST', '/api/v1/blocks', block);
 
 // An open proposal for the weekend that works, accepted by some.
-const lakesAvailability = (
-	await call(sam.token, 'GET', `/api/v1/groups/${lakes.id}/availability?from=${todayUtc()}&to=${addDays(todayUtc(), 60)}`)
-).data;
+const lakesAvailability = (await call(sam.token, 'GET', `/api/v1/groups/${lakes.id}/availability?from=${todayUtc()}&to=${addDays(todayUtc(), 60)}`))
+	.data;
 const slot = lakesAvailability.slots[0];
 const proposal = slot
 	? (await call(ana.token, 'POST', `/api/v1/groups/${lakes.id}/proposals`, { start: slot.start, end: slot.end, location: 'Keswick' })).data
 	: null;
-if (proposal) for (const person of [priya, leo]) await call(person.token, 'POST', `/api/v1/proposals/${proposal.id}/respond`, { response: 'accepted' });
+if (proposal)
+	for (const person of [priya, leo]) await call(person.token, 'POST', `/api/v1/proposals/${proposal.id}/respond`, { response: 'accepted' });
 
 // Chat with a poll and read receipts.
 const say = (person: SignedIn, body: string) => call(person.token, 'POST', `/api/v1/groups/${lakes.id}/messages`, { body });
@@ -78,7 +78,11 @@ const poll = (
 		poll: { question: 'Where should we stay?', options: ['Keswick cottage', 'Ambleside YHA', 'Camping at Wasdale'] }
 	})
 ).data.poll;
-const votes: [SignedIn, number][] = [[priya, 0], [ana, 0], [tom, 1]];
+const votes: [SignedIn, number][] = [
+	[priya, 0],
+	[ana, 0],
+	[tom, 1]
+];
 for (const [person, option] of votes) await call(person.token, 'POST', `/api/v1/polls/${poll.id}/vote`, { optionIds: [poll.options[option].id] });
 await say(ana, 'Cottage. It has a wood burner, case closed');
 // An event added directly (no proposal): shows as an event card in chat.
@@ -95,13 +99,17 @@ for (const person of [priya, ana, tom]) {
 }
 
 // A confirmed book club evening, so the home screen has an "Up next" card.
-const bookAvailability = (
-	await call(sam.token, 'GET', `/api/v1/groups/${bookClub.id}/availability?from=${todayUtc()}&to=${addDays(todayUtc(), 30)}`)
-).data;
+const bookAvailability = (await call(sam.token, 'GET', `/api/v1/groups/${bookClub.id}/availability?from=${todayUtc()}&to=${addDays(todayUtc(), 30)}`))
+	.data;
 const evening = bookAvailability.slots[3] ?? bookAvailability.slots[0];
 if (evening) {
 	const booked = (
-		await call(sam.token, 'POST', `/api/v1/groups/${bookClub.id}/proposals`, { start: evening.start, end: evening.end, title: 'Book club', location: "Hana's" })
+		await call(sam.token, 'POST', `/api/v1/groups/${bookClub.id}/proposals`, {
+			start: evening.start,
+			end: evening.end,
+			title: 'Book club',
+			location: "Hana's"
+		})
 	).data;
 	for (const person of [ana, priya]) await call(person.token, 'POST', `/api/v1/proposals/${booked.id}/respond`, { response: 'accepted' });
 }

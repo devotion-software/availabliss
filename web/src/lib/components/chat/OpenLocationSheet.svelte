@@ -21,11 +21,21 @@
 		{#if apple}
 			<Button href={links.apple} target="_blank" rel="noopener noreferrer" icon="map" block onclick={() => (open = false)}>Apple Maps</Button>
 		{/if}
-		<Button href={links.google} target="_blank" rel="noopener noreferrer" icon="map" variant={apple ? 'secondary' : 'solid'} block onclick={() => (open = false)}>
+		<Button
+			href={links.google}
+			target="_blank"
+			rel="noopener noreferrer"
+			icon="map"
+			variant={apple ? 'secondary' : 'solid'}
+			block
+			onclick={() => (open = false)}
+		>
 			Google Maps
 		</Button>
 		{#if !apple}
-			<Button href={links.apple} target="_blank" rel="noopener noreferrer" icon="map" variant="secondary" block onclick={() => (open = false)}>Apple Maps</Button>
+			<Button href={links.apple} target="_blank" rel="noopener noreferrer" icon="map" variant="secondary" block onclick={() => (open = false)}>
+				Apple Maps
+			</Button>
 		{/if}
 		<Button href={links.what3words} target="_blank" rel="noopener noreferrer" icon="grid" variant="secondary" block onclick={() => (open = false)}>
 			what3words

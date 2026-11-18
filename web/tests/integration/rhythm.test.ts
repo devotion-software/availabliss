@@ -19,7 +19,14 @@ describe('rhythm', () => {
 		expect(await nextSuggestion(groupId, member)).toBeNull();
 
 		await updateGroup(groupId, owner, { rhythm: { every: 'month', prompt: true } });
-		await createEvent(groupId, owner, { title: 'Supper', start: '2032-03-05T18:00:00.000Z', end: '2032-03-05T21:00:00.000Z', allDay: false, location: null, note: null });
+		await createEvent(groupId, owner, {
+			title: 'Supper',
+			start: '2032-03-05T18:00:00.000Z',
+			end: '2032-03-05T21:00:00.000Z',
+			allDay: false,
+			location: null,
+			note: null
+		});
 		const now = Date.parse('2032-03-06T09:00:00Z');
 		const suggestion = await nextSuggestion(groupId, member, now);
 		expect(suggestion?.target).toBe('2032-04-02');
@@ -27,7 +34,10 @@ describe('rhythm', () => {
 
 		await promptNextPlans(now);
 		await promptNextPlans(now + 300_000);
-		const posted = await db.select().from(messages).where(and(eq(messages.groupId, groupId), eq(messages.kind, 'system')));
+		const posted = await db
+			.select()
+			.from(messages)
+			.where(and(eq(messages.groupId, groupId), eq(messages.kind, 'system')));
 		const prompts = posted.filter((m) => m.body?.startsWith('Same again?'));
 		expect(prompts).toHaveLength(1);
 		expect(prompts[0].body).toContain('works for everyone');

@@ -7,9 +7,7 @@ export const GET = () => {
 	return json({
 		webcredentials: { apps: appId ? [appId] : [] },
 		applinks: {
-			details: appId
-				? [{ appIDs: [appId], components: [{ '/': '/invite/*' }, { '/': '/app/*' }] }]
-				: []
+			details: appId ? [{ appIDs: [appId], components: [{ '/': '/invite/*' }, { '/': '/app/*' }] }] : []
 		}
 	});
 };

@@ -42,7 +42,9 @@
 		<button
 			type="button"
 			class="item {item.interval.source}"
-			aria-label="{item.interval.source === 'manual' ? 'Edit' : 'About'} {item.title}, {item.range ? `${clock(item.range.from)} to ${clock(item.range.to)}` : 'all day'}, {item.tag}"
+			aria-label="{item.interval.source === 'manual' ? 'Edit' : 'About'} {item.title}, {item.range
+				? `${clock(item.range.from)} to ${clock(item.range.to)}`
+				: 'all day'}, {item.tag}"
 			onclick={() => onopen(item.interval)}
 		>
 			<span class="when" aria-hidden="true">

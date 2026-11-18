@@ -35,7 +35,10 @@ export function errorFields(err: unknown): Fields {
 			name: err.name,
 			message: err.message,
 			...(status !== undefined && { status }),
-			stack: err.stack?.split('\n').slice(1, 6).map((l) => l.trim())
+			stack: err.stack
+				?.split('\n')
+				.slice(1, 6)
+				.map((l) => l.trim())
 		};
 	}
 	return { message: String(err) };

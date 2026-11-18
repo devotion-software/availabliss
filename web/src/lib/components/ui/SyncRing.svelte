@@ -19,13 +19,7 @@
 	const fraction = $derived(total > 0 ? Math.min(1, value / total) : 0);
 </script>
 
-<span
-	class="ring"
-	style:--size="{size}px"
-	role={label ? 'img' : undefined}
-	aria-label={label}
-	aria-hidden={label ? undefined : 'true'}
->
+<span class="ring" style:--size="{size}px" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'}>
 	<svg width={size} height={size} viewBox="0 0 {size} {size}">
 		<circle cx={size / 2} cy={size / 2} {r} fill="none" stroke="var(--line-2)" stroke-width={stroke} />
 		<circle

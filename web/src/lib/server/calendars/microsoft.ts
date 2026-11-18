@@ -16,7 +16,15 @@ interface CalendarsResponse {
 }
 
 interface CalendarViewResponse {
-	value: { id: string; seriesMasterId?: string | null; subject?: string | null; start: { dateTime: string }; end: { dateTime: string }; showAs: string; isCancelled: boolean }[];
+	value: {
+		id: string;
+		seriesMasterId?: string | null;
+		subject?: string | null;
+		start: { dateTime: string };
+		end: { dateTime: string };
+		showAs: string;
+		isCancelled: boolean;
+	}[];
 	'@odata.nextLink'?: string;
 }
 
@@ -46,7 +54,13 @@ export const microsoft: CalendarAdapter<OAuthCredentials> = {
 				for (const e of page.value) {
 					if (e.isCancelled || e.showAs === 'free' || e.showAs === 'workingElsewhere') continue;
 					// Keyed by the series, so "not busy for every occurrence" can match them all.
-					out.push({ calendarExternalId: cal.externalId, eventKey: eventKey(e.seriesMasterId ?? e.id), start: utc(e.start.dateTime), end: utc(e.end.dateTime), ...(e.subject?.trim() && { title: e.subject.trim() }) });
+					out.push({
+						calendarExternalId: cal.externalId,
+						eventKey: eventKey(e.seriesMasterId ?? e.id),
+						start: utc(e.start.dateTime),
+						end: utc(e.end.dateTime),
+						...(e.subject?.trim() && { title: e.subject.trim() })
+					});
 				}
 				next = page['@odata.nextLink'];
 			}

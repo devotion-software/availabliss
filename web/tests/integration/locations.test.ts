@@ -24,7 +24,9 @@ describe('locations in chat', () => {
 	test('a place comes back with its location, and a text summary with a maps link for older apps', async () => {
 		const sent = await sendLocation(groupId, member, dishoom);
 		expect(sent).toMatchObject({ kind: 'text', location: dishoom, attachments: [], caption: null });
-		expect(sent.body).toBe('📍 Dishoom Shoreditch\n7 Boundary St, London E2 7JE\nhttps://www.google.com/maps/search/?api=1&query=51.524546,-0.076855');
+		expect(sent.body).toBe(
+			'📍 Dishoom Shoreditch\n7 Boundary St, London E2 7JE\nhttps://www.google.com/maps/search/?api=1&query=51.524546,-0.076855'
+		);
 
 		const listed = (await listMessages(groupId, owner, null, 50)).messages.find((m) => m.id === sent.id);
 		expect(listed?.location).toEqual(dishoom);

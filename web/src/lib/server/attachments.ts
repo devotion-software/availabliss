@@ -169,13 +169,7 @@ export function attachmentSummary(list: (Pick<Attachment, 'kind' | 'name'> & { p
  * Streams an attachment to whoever holds a valid link, or to a signed-in member of its group.
  * Photos and GIFs show inline; files always download (`?download=1` downloads a photo too).
  */
-export async function serveAttachment(
-	id: string,
-	variant: Variant,
-	url: URL,
-	userId: string | null,
-	range: string | null
-): Promise<Response> {
+export async function serveAttachment(id: string, variant: Variant, url: URL, userId: string | null, range: string | null): Promise<Response> {
 	const row = await db.query.messageAttachments.findFirst({ where: eq(messageAttachments.id, id) });
 	const key = variant === 'thumb' ? row?.thumbKey : row?.storageKey;
 	if (!row || !key) throw notFound('Attachment not found');
@@ -205,6 +199,7 @@ const extensionOf = (name: string) => (name.includes('.') ? name.split('.').pop(
 
 /** A file name that is safe to store and show: no folders or control characters, at most 120 characters. */
 export function cleanName(raw: string): string {
+	// eslint-disable-next-line no-control-regex
 	const base = (raw.split(/[/\\]/).pop() ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim();
 	const chars = [...base];
 	if (chars.length <= 120) return base || 'file';
@@ -345,7 +340,11 @@ export async function uploadAttachment(groupId: string, userId: string, file: Fi
  * Checks that every id is the sender's own unsent upload in this group, in the order given.
  * Throws if any isn't.
  */
-export async function pendingUploads(groupId: string, userId: string, ids: string[]): Promise<Pick<AttachmentRow, 'id' | 'kind' | 'name' | 'pass'>[]> {
+export async function pendingUploads(
+	groupId: string,
+	userId: string,
+	ids: string[]
+): Promise<Pick<AttachmentRow, 'id' | 'kind' | 'name' | 'pass'>[]> {
 	const unique = [...new Set(ids)];
 	if (unique.length !== ids.length) throw badRequest('An attachment is listed twice');
 	if (ids.length > MAX_ATTACHMENTS) throw badRequest(`A message can have up to ${MAX_ATTACHMENTS} attachments`);
@@ -375,7 +374,12 @@ export async function claimUploads(messageId: string, ids: string[]): Promise<vo
 
 async function removeRows(rows: Pick<AttachmentRow, 'id' | 'storageKey' | 'thumbKey'>[]): Promise<void> {
 	if (!rows.length) return;
-	await db.delete(messageAttachments).where(inArray(messageAttachments.id, rows.map((r) => r.id)));
+	await db.delete(messageAttachments).where(
+		inArray(
+			messageAttachments.id,
+			rows.map((r) => r.id)
+		)
+	);
 	await deleteKeys(rows.flatMap((r) => (r.thumbKey ? [r.storageKey, r.thumbKey] : [r.storageKey])));
 }
 

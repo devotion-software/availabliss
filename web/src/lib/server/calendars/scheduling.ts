@@ -76,10 +76,15 @@ export async function syncStaleConnections(deadline = Infinity): Promise<number>
 		.orderBy(asc(calendarConnections.nextSyncAt))
 		.limit(50);
 
-	return pool(due.map((r) => r.id), SYNC_CONCURRENCY, deadline, async (id) => {
-		await syncConnection(id);
-		return true;
-	});
+	return pool(
+		due.map((r) => r.id),
+		SYNC_CONCURRENCY,
+		deadline,
+		async (id) => {
+			await syncConnection(id);
+			return true;
+		}
+	);
 }
 
 /** Runs `task` over `ids`, `concurrency` at a time, starting none after `deadline`. Counts the true results. */

@@ -100,7 +100,9 @@
 							{ROLE_LABEL[m.role]}
 						</StatusPill>
 					{/if}
-					<span class="mark" aria-hidden="true">{#if picked === m.userId}<Icon name="check" size={16} />{/if}</span>
+					<span class="mark" aria-hidden="true">
+						{#if picked === m.userId}<Icon name="check" size={16} />{/if}
+					</span>
 				</button>
 			{/each}
 		</div>

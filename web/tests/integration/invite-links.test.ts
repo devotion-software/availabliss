@@ -14,7 +14,12 @@ async function createLink(groupId: string, userId: string, body: unknown) {
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify(body)
 	});
-	const res = await (invite as (e: unknown) => Promise<Response>)({ request, params: { id: groupId }, url: new URL(request.url), locals: { user: { id: userId } } });
+	const res = await (invite as (e: unknown) => Promise<Response>)({
+		request,
+		params: { id: groupId },
+		url: new URL(request.url),
+		locals: { user: { id: userId } }
+	});
 	return { status: res.status, body: await res.json() };
 }
 

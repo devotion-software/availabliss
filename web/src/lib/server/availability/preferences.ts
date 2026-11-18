@@ -37,16 +37,19 @@ export function fits(pref: Pref, start: number, end: number, tz: string): boolea
 export function applyPreferences(availability: Availability, prefs: readonly Pref[], tz: string): Availability {
 	if (!prefs.length) return availability;
 	const slots = availability.slots.map((slot) => {
-		const start = Date.parse(slot.start), end = Date.parse(slot.end);
+		const start = Date.parse(slot.start),
+			end = Date.parse(slot.end);
 		const who = [...new Set(prefs.filter((p) => fits(p, start, end, tz)).map((p) => p.userId))];
 		return { ...slot, preferredBy: who };
 	});
 	const days = availability.days.map((day) => {
 		if (day.status !== 'match') return day;
-		const dayStart = zonedInstant(day.date, 0, tz), dayEnd = zonedInstant(addDays(day.date, 1), 0, tz);
+		const dayStart = zonedInstant(day.date, 0, tz),
+			dayEnd = zonedInstant(addDays(day.date, 1), 0, tz);
 		const who = new Set<string>();
 		for (const slot of slots) {
-			const start = Math.max(Date.parse(slot.start), dayStart), end = Math.min(Date.parse(slot.end), dayEnd);
+			const start = Math.max(Date.parse(slot.start), dayStart),
+				end = Math.min(Date.parse(slot.end), dayEnd);
 			if (end <= start) continue;
 			for (const p of prefs) if (fits(p, start, end, tz)) who.add(p.userId);
 		}
@@ -71,7 +74,9 @@ export function preferenceLabel(pref: Pref, tz: string): string {
 	if (pref.kind === 'dates' && pref.from && pref.to) {
 		const day = (d: string) => `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`;
 		if (pref.from === pref.to) return dayLabel(zonedInstant(pref.from, 12 * 60, tz), tz);
-		return pref.from.slice(5, 7) === pref.to.slice(5, 7) ? `${Number(pref.from.slice(8, 10))} – ${day(pref.to)}` : `${day(pref.from)} – ${day(pref.to)}`;
+		return pref.from.slice(5, 7) === pref.to.slice(5, 7)
+			? `${Number(pref.from.slice(8, 10))} – ${day(pref.to)}`
+			: `${day(pref.from)} – ${day(pref.to)}`;
 	}
 	const days = daysPart(pref.days);
 	if (!pref.window) return days;

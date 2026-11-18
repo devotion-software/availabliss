@@ -149,9 +149,7 @@ export async function setEventImage(eventId: string, userId: string, image: Arra
 export async function upcomingFor(userId: string): Promise<(GroupEvent & { groupName: string })[]> {
 	const now = new Date();
 	const horizon = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
-	const groupIds = (
-		await db.select({ id: groupMembers.groupId }).from(groupMembers).where(eq(groupMembers.userId, userId))
-	).map((r) => r.id);
+	const groupIds = (await db.select({ id: groupMembers.groupId }).from(groupMembers).where(eq(groupMembers.userId, userId))).map((r) => r.id);
 	if (!groupIds.length) return [];
 	const rows = await db
 		.select({ event: events, groupName: groups.name })
@@ -194,13 +192,11 @@ export async function myPlans(userId: string, now = new Date()): Promise<{ going
 				.where(and(eq(proposalResponses.userId, userId), inArray(proposalResponses.proposalId, proposalIds)))
 		: [];
 	const replyOf = new Map(replies.map((r) => [r.proposalId, r.response]));
-	const plans = rows.map(
-		(r): MyPlan => ({
-			...toGroupEvent(r.event),
-			groupName: r.groupName,
-			myResponse: r.event.proposalId ? (replyOf.get(r.event.proposalId) ?? null) : null
-		})
-	);
+	const plans = rows.map((r): MyPlan => ({
+		...toGroupEvent(r.event),
+		groupName: r.groupName,
+		myResponse: r.event.proposalId ? (replyOf.get(r.event.proposalId) ?? null) : null
+	}));
 	const upcoming = plans.filter((p) => Date.parse(p.end) >= now.getTime());
 	return {
 		going: upcoming.filter((p) => p.myResponse !== 'declined'),

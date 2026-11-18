@@ -117,6 +117,7 @@ function cleanText(value: unknown, strings: Map<string, string>): string | null 
 	if (typeof value === 'number' && Number.isFinite(value)) return String(value);
 	if (typeof value !== 'string') return null;
 	const text = (strings.get(value) ?? value)
+		// eslint-disable-next-line no-control-regex
 		.replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '')
 		.replace(/\s*\n\s*/g, ' ')
 		.trim();
@@ -240,6 +241,7 @@ const STYLE_NAMES: Record<WalletPassStyle, string> = {
 /** What a pass is, in a few words: its description, else "Ticket", "Boarding pass"… */
 export function passTitle(pass: Pick<WalletPass, 'description' | 'style' | 'count'> | null): string {
 	if (!pass) return 'Ticket';
-	if (pass.count > 1) return `${pass.count} ${pass.style === 'boardingPass' ? 'boarding passes' : pass.style === 'eventTicket' ? 'tickets' : 'passes'}`;
+	if (pass.count > 1)
+		return `${pass.count} ${pass.style === 'boardingPass' ? 'boarding passes' : pass.style === 'eventTicket' ? 'tickets' : 'passes'}`;
 	return pass.description || STYLE_NAMES[pass.style] || 'Ticket';
 }

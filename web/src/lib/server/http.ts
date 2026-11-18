@@ -71,9 +71,7 @@ export interface AuthedEvent<P extends Record<string, string> = Record<string, s
 }
 
 /** Wraps a handler so thrown ApiErrors / ZodErrors become JSON error responses. */
-export function handler<P extends Record<string, string>>(
-	fn: (event: RequestEvent<P>) => Promise<Response> | Response
-): RequestHandler<P> {
+export function handler<P extends Record<string, string>>(fn: (event: RequestEvent<P>) => Promise<Response> | Response): RequestHandler<P> {
 	return async (event) => {
 		try {
 			return await fn(event);
@@ -86,9 +84,7 @@ export function handler<P extends Record<string, string>>(
 }
 
 /** Like `handler`, but requires a signed-in user (cookie or bearer token). */
-export function authed<P extends Record<string, string>>(
-	fn: (ctx: AuthedEvent<P>) => Promise<Response> | Response
-): RequestHandler<P> {
+export function authed<P extends Record<string, string>>(fn: (ctx: AuthedEvent<P>) => Promise<Response> | Response): RequestHandler<P> {
 	return handler<P>((event) => {
 		const userId = event.locals.user?.id;
 		if (!userId) throw new ApiError('unauthorized', 'Sign in to continue');

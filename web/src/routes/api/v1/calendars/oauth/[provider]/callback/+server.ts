@@ -4,8 +4,7 @@ import { connectOAuth } from '#lib/server/calendars';
 import { log } from '#lib/server/log';
 
 /** Appends a query parameter to an app path or native deep link. */
-const withParam = (target: string, key: string, value: string) =>
-	`${target}${target.includes('?') ? '&' : '?'}${key}=${encodeURIComponent(value)}`;
+const withParam = (target: string, key: string, value: string) => `${target}${target.includes('?') ? '&' : '?'}${key}=${encodeURIComponent(value)}`;
 
 /**
  * Not authenticated by itself: whoever finishes consent must be shown to be the

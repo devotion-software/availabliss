@@ -21,7 +21,10 @@ export async function assignUsername(userId: string): Promise<string> {
 	for (const candidate of candidates) {
 		if (usernameProblem(candidate)) continue;
 		try {
-			const [result] = await db.update(user).set({ username: candidate }).where(and(eq(user.id, userId), isNull(user.username)));
+			const [result] = await db
+				.update(user)
+				.set({ username: candidate })
+				.where(and(eq(user.id, userId), isNull(user.username)));
 			if (result.affectedRows > 0) return candidate;
 			// Someone else assigned one first (two requests at once).
 			const now = await db.query.user.findFirst({ where: eq(user.id, userId), columns: { username: true } });

@@ -118,10 +118,20 @@ export async function markChatRead(userId: string, groupId: string): Promise<voi
 	const unread = await db
 		.select()
 		.from(notifications)
-		.where(and(eq(notifications.userId, userId), eq(notifications.groupId, groupId), eq(notifications.kind, 'message'), isNull(notifications.readAt)));
+		.where(
+			and(eq(notifications.userId, userId), eq(notifications.groupId, groupId), eq(notifications.kind, 'message'), isNull(notifications.readAt))
+		);
 	if (!unread.length) return;
 	const readAt = new Date();
-	await db.update(notifications).set({ readAt }).where(inArray(notifications.id, unread.map((r) => r.id)));
+	await db
+		.update(notifications)
+		.set({ readAt })
+		.where(
+			inArray(
+				notifications.id,
+				unread.map((r) => r.id)
+			)
+		);
 	for (const row of unread) {
 		publishToUsers([userId], { type: 'notification.created', groupId, payload: toNotification({ ...row, readAt }) });
 	}

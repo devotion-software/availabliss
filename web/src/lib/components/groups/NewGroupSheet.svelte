@@ -170,7 +170,9 @@
 			const userIds = people.map((m) => m.userId).filter((id) => invitees.has(id));
 			if (userIds.length) {
 				await createInvite(group.id, [], [], userIds).catch((err) =>
-					toasts.error(`${group.name} was made, but the invites didn't send (${err instanceof Error ? err.message : 'something went wrong'}). You can invite people from Members.`)
+					toasts.error(
+						`${group.name} was made, but the invites didn't send (${err instanceof Error ? err.message : 'something went wrong'}). You can invite people from Members.`
+					)
 				);
 			}
 			open = false;
@@ -190,7 +192,13 @@
 
 <Sheet
 	bind:open
-	title={atLimit || step === 'details' ? (basedOn ? 'New group with these people' : 'New group') : step === 'people' ? 'Who’s in?' : 'When are you looking for?'}
+	title={atLimit || step === 'details'
+		? basedOn
+			? 'New group with these people'
+			: 'New group'
+		: step === 'people'
+			? 'Who’s in?'
+			: 'When are you looking for?'}
 	description={atLimit
 		? undefined
 		: step === 'details'
@@ -210,8 +218,8 @@
 			<span class="limit-icon"><Icon name="groups" size={22} /></span>
 			<h3>You've made {FREE_GROUP_LIMIT} groups</h3>
 			<p>
-				Free accounts can create {FREE_GROUP_LIMIT}. Upgrade to Pro for unlimited groups, or delete one you no longer need. You can still join groups other
-				people make.
+				Free accounts can create {FREE_GROUP_LIMIT}. Upgrade to Pro for unlimited groups, or delete one you no longer need. You can still join groups
+				other people make.
 			</p>
 			<Button variant="accent" size="lg" block icon="sparkle" onclick={upgrade}>See Pro</Button>
 		</div>
@@ -247,7 +255,9 @@
 				<button type="button" role="checkbox" aria-checked={on} class:sel={on} onclick={() => toggleInvitee(m.userId)}>
 					<Avatar name={m.name} id={m.userId} image={m.image} size={34} />
 					<span class="name">{m.name}</span>
-					<span class="mark" aria-hidden="true">{#if on}<Icon name="check" size={16} />{/if}</span>
+					<span class="mark" aria-hidden="true">
+						{#if on}<Icon name="check" size={16} />{/if}
+					</span>
 				</button>
 			{/each}
 		</div>

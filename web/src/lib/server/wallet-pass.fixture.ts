@@ -75,7 +75,10 @@ export const concertPassJson = {
 			{ key: 'doors', label: 'Doors', value: '2026-12-01T19:30-05:00', dateStyle: 'PKDateStyleMedium', timeStyle: 'PKDateStyleShort' },
 			{ key: 'seat', label: 'Seat', value: '12A' }
 		],
-		auxiliaryFields: [{ key: 'row', label: 'Row', value: 7 }, { key: 'x', label: 'Extra', value: 'dropped (only four)' }]
+		auxiliaryFields: [
+			{ key: 'row', label: 'Row', value: 7 },
+			{ key: 'x', label: 'Extra', value: 'dropped (only four)' }
+		]
 	}
 };
 

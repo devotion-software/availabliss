@@ -96,12 +96,7 @@ export function* occurrenceDates(first: string, repeat: Repeat, fromDate: string
  * Occurrences of a block overlapping `[from, to)`. Repeats keep the same local
  * wall-clock time in `timeZone`, so they don't drift across DST changes.
  */
-export function expandBlock(
-	block: Pick<BlockRow, 'start' | 'end' | 'repeat' | 'until'>,
-	from: number,
-	to: number,
-	timeZone: string
-): Span[] {
+export function expandBlock(block: Pick<BlockRow, 'start' | 'end' | 'repeat' | 'until'>, from: number, to: number, timeZone: string): Span[] {
 	const start = block.start.getTime();
 	const duration = block.end.getTime() - start;
 	if (block.repeat === 'none') return start < to && start + duration > from ? [{ start, end: start + duration }] : [];
@@ -188,4 +183,3 @@ export async function deleteBlock(userId: string, id: string): Promise<void> {
 	await getBlock(userId, id);
 	await db.delete(manualBlocks).where(and(eq(manualBlocks.id, id), eq(manualBlocks.userId, userId)));
 }
-

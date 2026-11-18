@@ -85,7 +85,9 @@
 		<h2 id="prefs-h"><Icon name="heart" size={16} /> Preferred times</h2>
 		{#if !adding}<Button size="sm" variant="secondary" icon="plus" onclick={() => (adding = true)}>Add</Button>{/if}
 	</div>
-	<p class="lead">Say when you'd rather meet. It never rules a date out: times that work and fit someone's preference are marked and suggested first.</p>
+	<p class="lead">
+		Say when you'd rather meet. It never rules a date out: times that work and fit someone's preference are marked and suggested first.
+	</p>
 
 	{#if adding}
 		<form class="form" onsubmit={save}>

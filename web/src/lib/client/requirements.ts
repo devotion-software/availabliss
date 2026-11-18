@@ -76,8 +76,7 @@ export function presetOf(req: Requirement): PresetId {
 export function applyPreset(req: Requirement, id: PresetId): Requirement {
 	const preset = PRESETS.find((p) => p.id === id);
 	if (!preset?.length) return req;
-	const window =
-		preset.length.type === 'duration' && req.length.type === 'duration' && req.window ? req.window : (preset.window ?? null);
+	const window = preset.length.type === 'duration' && req.length.type === 'duration' && req.window ? req.window : (preset.window ?? null);
 	// "A week" (7 days in a row) can never fit in Fri–Sun: open up every day when the run is longer than the days allowed.
 	const days = preset.length.type === 'days' && preset.length.count > req.days.length ? ALL_DAYS : req.days;
 	return { ...req, length: structuredClone(preset.length), window, days: [...days] };
@@ -162,8 +161,7 @@ export interface RequirementPreview {
 }
 
 /** How many candidate slots a requirement produces, before anyone's busy time. */
-export const previewRequirement = (requirement: Requirement) =>
-	api.post<RequirementPreview>('/requirements/preview', { requirement });
+export const previewRequirement = (requirement: Requirement) => api.post<RequirementPreview>('/requirements/preview', { requirement });
 
 /** "13 weekends", "40 evenings", "1 day". */
 export function fitCountLabel(req: Requirement, count: number): string {
@@ -172,8 +170,7 @@ export function fitCountLabel(req: Requirement, count: number): string {
 }
 
 /** The range in `ranges` that already holds every day of `range`, if any (an identical one included). */
-export const coveringRange = (range: DateRange, ranges: readonly DateRange[]) =>
-	ranges.find((r) => r.from <= range.from && range.to <= r.to);
+export const coveringRange = (range: DateRange, ranges: readonly DateRange[]) => ranges.find((r) => r.from <= range.from && range.to <= r.to);
 
 /** The ranges that `range` overlaps or runs straight on from, so would be joined with it. */
 export const joiningRanges = (range: DateRange, ranges: readonly DateRange[]) =>

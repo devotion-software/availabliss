@@ -47,12 +47,9 @@
 				.catch(() => {});
 		};
 		refresh();
-		const off = live.on(
-			['availability.changed', 'proposal.created', 'proposal.updated', 'proposal.confirmed', 'event.changed'],
-			(e) => {
-				if (e.groupId === null || e.groupId === id) refresh();
-			}
-		);
+		const off = live.on(['availability.changed', 'proposal.created', 'proposal.updated', 'proposal.confirmed', 'event.changed'], (e) => {
+			if (e.groupId === null || e.groupId === id) refresh();
+		});
 		const offReconnect = live.onReconnect(refresh);
 		return () => {
 			request++;
@@ -81,11 +78,7 @@
 					<span>You can still propose it and see who can make it.</span>
 				{/if}
 			</p>
-			<Button
-				variant={slot ? 'accent' : 'secondary'}
-				size="sm"
-				onclick={() => onpropose(slot ?? { day: suggestion!.target })}>Propose</Button
-			>
+			<Button variant={slot ? 'accent' : 'secondary'} size="sm" onclick={() => onpropose(slot ?? { day: suggestion!.target })}>Propose</Button>
 		</div>
 	</section>
 {/if}

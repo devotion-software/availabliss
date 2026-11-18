@@ -21,7 +21,8 @@
 <ul class="tray" class:compact aria-label="Attachments to send">
 	{#each draft.items as item (item.key)}
 		{@const label = item.kind === 'file' ? `${item.file.name}, ${formatBytes(item.file.size)}` : item.kind === 'gif' ? 'GIF' : 'Photo'}
-		{@const state = item.status === 'uploading' ? `uploading, ${Math.round(item.progress * 100)}%` : item.status === 'error' ? `failed: ${item.error}` : 'ready'}
+		{@const state =
+			item.status === 'uploading' ? `uploading, ${Math.round(item.progress * 100)}%` : item.status === 'error' ? `failed: ${item.error}` : 'ready'}
 		<li class="item" class:file={item.kind === 'file'} class:failed={item.status === 'error'} aria-label="{label}, {state}">
 			{#if item.kind !== 'file'}
 				{#if item.preview}
@@ -41,18 +42,17 @@
 				<span class="overlay" aria-hidden="true">
 					<svg width="32" height="32" viewBox="0 0 32 32" class:spin={item.progress === 0}>
 						<circle cx="16" cy="16" r={R} class="track" />
-						<circle
-							cx="16"
-							cy="16"
-							r={R}
-							class="ring"
-							stroke-dasharray={C}
-							stroke-dashoffset={C * (1 - Math.max(0.06, item.progress))}
-						/>
+						<circle cx="16" cy="16" r={R} class="ring" stroke-dasharray={C} stroke-dashoffset={C * (1 - Math.max(0.06, item.progress))} />
 					</svg>
 				</span>
 			{:else if item.status === 'error'}
-				<button type="button" class="overlay retry" title={item.error ?? 'Upload failed'} aria-label="Retry {label}" onclick={() => draft.retry(item.key)}>
+				<button
+					type="button"
+					class="overlay retry"
+					title={item.error ?? 'Upload failed'}
+					aria-label="Retry {label}"
+					onclick={() => draft.retry(item.key)}
+				>
 					<Icon name="refresh" size={20} strokeWidth={2.4} />
 				</button>
 			{/if}

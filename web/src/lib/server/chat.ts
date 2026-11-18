@@ -171,7 +171,15 @@ export async function markReceipts(groupId: string, userId: string, upTo: string
 			set: state === 'seen' ? { seenAt: sql`coalesce(${messageReceipts.seenAt}, values(${messageReceipts.seenAt}))` } : { userId }
 		});
 
-	const changed = await db.select().from(messages).where(inArray(messages.id, recent.map((p) => p.id)));
+	const changed = await db
+		.select()
+		.from(messages)
+		.where(
+			inArray(
+				messages.id,
+				recent.map((p) => p.id)
+			)
+		);
 	const summaries = await receiptSummaries(changed, (await memberIds(groupId)).length);
 	await publishToGroup(groupId, 'message.receipts', { userId, state, receipts: [...summaries.values()] });
 }
@@ -208,9 +216,7 @@ export const locationSummary = (location: Pick<MessageLocation, 'name'>) => `�
 /** What apps that don't know `location` show as the text: the summary, the address and a maps link. */
 export function locationFallback(location: MessageLocation): string {
 	const query = `${coord(location.lat)},${coord(location.lng)}`;
-	return [locationSummary(location), location.address, `https://www.google.com/maps/search/?api=1&query=${query}`]
-		.filter(Boolean)
-		.join('\n');
+	return [locationSummary(location), location.address, `https://www.google.com/maps/search/?api=1&query=${query}`].filter(Boolean).join('\n');
 }
 
 // ─── Replies ──────────────────────────────────────────────────────────────
@@ -219,7 +225,12 @@ export function locationFallback(location: MessageLocation): string {
 const REPLY_SNIPPET_CHARS = 140;
 export const replySnippet = (text: string) => {
 	const line = text.replace(/\s+/g, ' ').trim();
-	return [...line].length > REPLY_SNIPPET_CHARS ? `${[...line].slice(0, REPLY_SNIPPET_CHARS - 1).join('').trimEnd()}…` : line;
+	return [...line].length > REPLY_SNIPPET_CHARS
+		? `${[...line]
+				.slice(0, REPLY_SNIPPET_CHARS - 1)
+				.join('')
+				.trimEnd()}…`
+		: line;
 };
 
 /** Previews of the messages being replied to, as they are now (edits and deletion included). */
@@ -390,14 +401,23 @@ interface PostInput {
 /** Messages can be 4000 characters, but APNs and FCM reject payloads over 4 KB. */
 const PUSH_PREVIEW_CHARS = 200;
 export const pushPreview = (text: string) =>
-	text.length > PUSH_PREVIEW_CHARS ? `${[...text].slice(0, PUSH_PREVIEW_CHARS - 1).join('').trimEnd()}…` : text;
+	text.length > PUSH_PREVIEW_CHARS
+		? `${[...text]
+				.slice(0, PUSH_PREVIEW_CHARS - 1)
+				.join('')
+				.trimEnd()}…`
+		: text;
 
 /** Inserts a message, publishes it live and pushes it to everyone else. */
 export async function postMessage(groupId: string, authorId: string | null, input: PostInput): Promise<Message> {
 	const id = newId();
 	const { attachments: uploads = [], ...values } = input;
 	await db.insert(messages).values({ id, groupId, authorId, ...values });
-	if (uploads.length) await claimUploads(id, uploads.map((a) => a.id));
+	if (uploads.length)
+		await claimUploads(
+			id,
+			uploads.map((a) => a.id)
+		);
 	const row = (await db.query.messages.findFirst({ where: eq(messages.id, id) }))!;
 	const members = await memberIds(groupId);
 	const [message] = await toMessages([row], authorId ?? '', members.length);
@@ -441,12 +461,7 @@ export async function sendText(
 }
 
 /** A place: the sender's current location or one they searched for (a text message with `location`). */
-export async function sendLocation(
-	groupId: string,
-	userId: string,
-	location: MessageLocation,
-	replyToId: string | null = null
-): Promise<Message> {
+export async function sendLocation(groupId: string, userId: string, location: MessageLocation, replyToId: string | null = null): Promise<Message> {
 	await requireMember(groupId, userId);
 	await checkReplyTo(groupId, replyToId);
 	return postMessage(groupId, userId, { kind: 'text', location, replyToId });

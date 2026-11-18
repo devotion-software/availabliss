@@ -20,7 +20,9 @@ let owner: string, admin: string, member: string, groupId: string;
 
 /** A real (if dull) photo: 2400×1200 so the resize shows. */
 const photo = async () => {
-	const png = await sharp({ create: { width: 2400, height: 1200, channels: 3, background: '#ff9e78' } }).png().toBuffer();
+	const png = await sharp({ create: { width: 2400, height: 1200, channels: 3, background: '#ff9e78' } })
+		.png()
+		.toBuffer();
 	return png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength) as ArrayBuffer;
 };
 const sizeOf = async (url: string | null) => {

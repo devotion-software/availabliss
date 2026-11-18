@@ -29,9 +29,7 @@ async function calendarWith(userId: string, name: string, busy: boolean, spans: 
 	await db.insert(calendarConnections).values({ id: connectionId, userId, provider: 'caldav', label: `Test ${name}`, credentials: null });
 	await db.insert(calendars).values({ id: calendarId, connectionId, externalId: name, name, busy });
 	if (spans.length) {
-		await db.insert(busyIntervals).values(
-			spans.map(([s, e]) => ({ id: newId(), userId, calendarId, start: new Date(s), end: new Date(e) }))
-		);
+		await db.insert(busyIntervals).values(spans.map(([s, e]) => ({ id: newId(), userId, calendarId, start: new Date(s), end: new Date(e) })));
 	}
 	return calendarId;
 }
@@ -40,8 +38,18 @@ describe('blocks CRUD', () => {
 	test('create, read, list newest first, update and delete', async () => {
 		const me = await fx.user();
 		const a = await createBlock(me, block('2031-01-05T09:00:00.000Z', '2031-01-05T10:00:00.000Z', { note: 'Dentist' }));
-		const b = await createBlock(me, block('2031-01-06T00:00:00.000Z', '2031-01-07T00:00:00.000Z', { allDay: true, repeat: 'weekly', until: '2031-02-01' }));
-		expect(a).toMatchObject({ start: '2031-01-05T09:00:00.000Z', end: '2031-01-05T10:00:00.000Z', allDay: false, repeat: 'none', until: null, note: 'Dentist' });
+		const b = await createBlock(
+			me,
+			block('2031-01-06T00:00:00.000Z', '2031-01-07T00:00:00.000Z', { allDay: true, repeat: 'weekly', until: '2031-02-01' })
+		);
+		expect(a).toMatchObject({
+			start: '2031-01-05T09:00:00.000Z',
+			end: '2031-01-05T10:00:00.000Z',
+			allDay: false,
+			repeat: 'none',
+			until: null,
+			note: 'Dentist'
+		});
 		expect(b).toMatchObject({ allDay: true, repeat: 'weekly', until: '2031-02-01' });
 		expect((await listBlocks(me)).map((x) => x.id)).toEqual([b.id, a.id]);
 		expect(await getBlock(me, a.id)).toEqual(a);
@@ -62,9 +70,9 @@ describe('blocks CRUD', () => {
 		const past = await apiError(createBlock(me, block('2020-01-05T09:00:00Z', '2020-01-05T10:00:00Z')));
 		expect(past.code).toBe('validation_error');
 		expect(past.message).toMatch(/already passed/);
-		expect((await apiError(createBlock(me, block('2020-01-05T09:00:00Z', '2020-01-05T10:00:00Z', { repeat: 'weekly', until: '2020-06-01' })))).code).toBe(
-			'validation_error'
-		);
+		expect(
+			(await apiError(createBlock(me, block('2020-01-05T09:00:00Z', '2020-01-05T10:00:00Z', { repeat: 'weekly', until: '2020-06-01' })))).code
+		).toBe('validation_error');
 		const weekly = await createBlock(me, block('2020-01-05T09:00:00Z', '2020-01-05T10:00:00Z', { repeat: 'weekly' }));
 		const later = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 		await createBlock(me, block(new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), later));

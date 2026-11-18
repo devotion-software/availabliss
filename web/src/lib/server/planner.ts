@@ -80,7 +80,9 @@ export function buildPrompt(input: {
 		'Times that work for everyone:',
 		...input.slots.map((s, i) => `${i + 1}. ${s.label} (${s.start} to ${s.end})`),
 		'',
-		input.holidays.length ? `Holidays in this period: ${input.holidays.map((h) => `${h.date} ${h.name}`).join('; ')}` : 'No public holidays in this period.'
+		input.holidays.length
+			? `Holidays in this period: ${input.holidays.map((h) => `${h.date} ${h.name}`).join('; ')}`
+			: 'No public holidays in this period.'
 	];
 	if (input.notes) lines.push('', `Notes from the person asking: ${input.notes}`);
 	return lines.join('\n');

@@ -10,7 +10,14 @@ const fx = fixture('feeds');
 afterAll(() => fx.cleanup());
 
 const tokenOf = (url: string) => url.split('/calendar/')[1].replace('.ics', '');
-const event = (title: string, day: string) => ({ title, start: `${day}T18:00:00.000Z`, end: `${day}T20:00:00.000Z`, allDay: false, location: null, note: null });
+const event = (title: string, day: string) => ({
+	title,
+	start: `${day}T18:00:00.000Z`,
+	end: `${day}T20:00:00.000Z`,
+	allDay: false,
+	location: null,
+	note: null
+});
 
 describe('calendar feeds', () => {
 	test('lists your groups’ plans, follows edits and deletions, and leaves out ones you can’t make', async () => {

@@ -229,12 +229,7 @@ describe('time and labels', () => {
 describe('most of us are free (quorum and optional members)', () => {
 	test('a quorum adds the weekends one person misses, marked partial with who’s missing', () => {
 		const result = computeAvailability(input({ requirement: { ...weekend, quorum: 2 } }));
-		expect(result.slots.map((s) => s.label)).toEqual([
-			'Fri 6 – Sun 8 Nov',
-			'Fri 13 – Sun 15 Nov',
-			'Fri 20 – Sun 22 Nov',
-			'Fri 27 – Sun 29 Nov'
-		]);
+		expect(result.slots.map((s) => s.label)).toEqual(['Fri 6 – Sun 8 Nov', 'Fri 13 – Sun 15 Nov', 'Fri 20 – Sun 22 Nov', 'Fri 27 – Sun 29 Nov']);
 		const byLabel = Object.fromEntries(result.slots.map((s) => [s.label, s.missingMemberIds]));
 		expect(byLabel['Fri 6 – Sun 8 Nov']).toEqual(['priya']);
 		expect(byLabel['Fri 20 – Sun 22 Nov']).toEqual(['tom']);
@@ -257,7 +252,13 @@ describe('most of us are free (quorum and optional members)', () => {
 	});
 
 	test('durations: stretches long enough where enough people are free', () => {
-		const evening: Requirement = { ...weekend, length: { type: 'duration', minutes: 120 }, window: { from: '18:00', to: '23:59' }, days: [], quorum: 2 };
+		const evening: Requirement = {
+			...weekend,
+			length: { type: 'duration', minutes: 120 },
+			window: { from: '18:00', to: '23:59' },
+			days: [],
+			quorum: 2
+		};
 		const twoBusy: MemberBusy[] = [
 			{ userId: 'a', synced: true, busy: [busy('2026-11-10T18:00:00Z', '2026-11-10T20:00:00Z')] },
 			{ userId: 'b', synced: true, busy: [busy('2026-11-10T19:00:00Z', '2026-11-10T21:00:00Z')] },

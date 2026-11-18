@@ -215,7 +215,12 @@ describe('notifications', () => {
 
 		// Someone else's subscription id, or a forged client state: ignored.
 		fake.reads = [];
-		await onMicrosoftNotifications({ value: [{ ...note('x'), clientState: 'forged' }, { ...note('x'), subscriptionId: 'unknown' }] });
+		await onMicrosoftNotifications({
+			value: [
+				{ ...note('x'), clientState: 'forged' },
+				{ ...note('x'), subscriptionId: 'unknown' }
+			]
+		});
 		await settle();
 		expect(fake.reads).toEqual([]);
 	});

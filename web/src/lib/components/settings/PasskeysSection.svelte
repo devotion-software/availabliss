@@ -81,8 +81,24 @@
 	/** A friendly default name, e.g. "Mac · Safari". */
 	function deviceName(): string {
 		const ua = navigator.userAgent;
-		const os = /iPhone|iPad/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'This device';
-		const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : '';
+		const os = /iPhone|iPad/.test(ua)
+			? 'iPhone'
+			: /Android/.test(ua)
+				? 'Android'
+				: /Mac/.test(ua)
+					? 'Mac'
+					: /Windows/.test(ua)
+						? 'Windows'
+						: 'This device';
+		const browser = /Edg\//.test(ua)
+			? 'Edge'
+			: /Chrome\//.test(ua)
+				? 'Chrome'
+				: /Firefox\//.test(ua)
+					? 'Firefox'
+					: /Safari\//.test(ua)
+						? 'Safari'
+						: '';
 		return browser ? `${os} · ${browser}` : os;
 	}
 </script>

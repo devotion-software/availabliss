@@ -61,7 +61,9 @@
 		<span class="text">
 			<span class="who">{memberLabel(members, proposal.createdBy, meId, { first: true })} proposed {proposal.title ? proposal.title : 'a time'}</span>
 			<span class="when">{fmt.current.when(proposal.start, proposal.end, proposal.allDay)}</span>
-			<span class="status {status.tone}">{status.text}{#if clash}<span class="clash"> · {clash}</span>{/if}</span>
+			<span class="status {status.tone}">
+				{status.text}{#if clash}<span class="clash"> · {clash}</span>{/if}
+			</span>
 		</span>
 		<span class="cta">{proposal.status === 'open' && myResponse === 'pending' ? 'Reply' : 'View'}</span>
 	</a>

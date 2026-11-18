@@ -59,11 +59,7 @@ async function holidaysForYear(country: string, year: number): Promise<CachedHol
 const MAX_HOLIDAY_YEARS = 2;
 
 /** Bank holidays by date for a country (and optional ISO 3166-2 subdivision). */
-export async function bankHolidays(
-	country: string | null,
-	subdivision: string | null,
-	range: DateRange
-): Promise<Map<string, string>> {
+export async function bankHolidays(country: string | null, subdivision: string | null, range: DateRange): Promise<Map<string, string>> {
 	const result = new Map<string, string>();
 	if (!country) return result;
 	const first = Number(range.from.slice(0, 4));
@@ -88,13 +84,7 @@ export async function schoolHolidayRanges(
 	const rows = await db
 		.select({ from: schoolHolidays.start, to: schoolHolidays.end, name: schoolHolidays.name })
 		.from(schoolHolidays)
-		.where(
-			and(
-				eq(schoolHolidays.authority, req.schoolAuthority),
-				lte(schoolHolidays.start, range.to),
-				gte(schoolHolidays.end, range.from)
-			)
-		);
+		.where(and(eq(schoolHolidays.authority, req.schoolAuthority), lte(schoolHolidays.start, range.to), gte(schoolHolidays.end, range.from)));
 	return [...rows, ...custom];
 }
 
@@ -145,4 +135,3 @@ export function detectRegion(headers: Headers): { country: string | null; subdiv
 	const timezone = headers.get('x-timezone');
 	return { country, subdivision: country === 'GB' ? 'GB-ENG' : null, timezone: timezone && isValidZone(timezone) ? timezone : null };
 }
-

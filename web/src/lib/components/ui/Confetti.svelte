@@ -31,6 +31,8 @@
 			const round = i % 3 === 0;
 			el.className = round ? 'piece dot' : 'piece';
 			el.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+			// Throwaway pieces in a host element Svelte renders empty; they go when the component unmounts.
+			// eslint-disable-next-line svelte/no-dom-manipulating
 			host.appendChild(el);
 
 			// Launch upward in a ~140° fan, then fall under gravity (px, seconds).

@@ -50,7 +50,8 @@
 		<form class="ask" onsubmit={ask}>
 			<label class="field">
 				<span>Anything to bear in mind? (optional)</span>
-				<textarea bind:value={notes} rows="3" maxlength="500" placeholder="e.g. We're around Manchester, two of us have kids, keep it cheap"></textarea>
+				<textarea bind:value={notes} rows="3" maxlength="500" placeholder="e.g. We're around Manchester, two of us have kids, keep it cheap"
+				></textarea>
 			</label>
 			<p class="privacy">
 				<Icon name="shield" size={14} />

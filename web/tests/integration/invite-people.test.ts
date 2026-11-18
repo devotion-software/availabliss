@@ -17,15 +17,23 @@ async function invitePeople(groupId: string, userId: string, body: unknown) {
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify(body)
 	});
-	const res = await (invite as (e: unknown) => Promise<Response>)({ request, params: { id: groupId }, url: new URL(request.url), locals: { user: { id: userId } } });
+	const res = await (invite as (e: unknown) => Promise<Response>)({
+		request,
+		params: { id: groupId },
+		url: new URL(request.url),
+		locals: { user: { id: userId } }
+	});
 	return { status: res.status, body: await res.json() };
 }
 
 const inviteItems = (userId: string) =>
-	db.select().from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.kind, 'invite.received')));
+	db
+		.select()
+		.from(notifications)
+		.where(and(eq(notifications.userId, userId), eq(notifications.kind, 'invite.received')));
 
 describe('a new group with the same people', () => {
-	test("invites people you share a group with by id; each gets an Activity invite only they can accept", async () => {
+	test('invites people you share a group with by id; each gets an Activity invite only they can accept', async () => {
 		const [sam, ana, ben, stranger] = await fx.users(4);
 		const old = await createGroup(sam, { name: 'Book club' }, 'UTC');
 		for (const id of [ana, ben]) await acceptInvite((await createInvite(old.id, sam, null)).token, id);

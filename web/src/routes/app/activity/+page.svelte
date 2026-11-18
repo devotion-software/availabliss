@@ -30,7 +30,11 @@
 
 	// Opening Activity marks everything read, and so does anything new arriving while
 	// it's open; unread rows keep their highlight for this visit.
-	const unreadIds = new SvelteSet(untrack(() => items).filter((n) => !n.readAt).map((n) => n.id));
+	const unreadIds = new SvelteSet(
+		untrack(() => items)
+			.filter((n) => !n.readAt)
+			.map((n) => n.id)
+	);
 	$effect(() => {
 		if (!activity.unread) return;
 		untrack(() => {
@@ -56,11 +60,9 @@
 					<a href={notificationHref(n)} class:unread={unreadIds.has(n.id) || !n.readAt}>
 						<span class="icon"><Icon name={ICON[n.kind] ?? 'bell'} size={18} /></span>
 						<span class="text">
-							<span class="title"
-								>{n.title}{#if n.kind === 'message' && !n.readAt && Number(n.data.count) > 1}<span class="count"
-										>{n.data.count} new</span
-									>{/if}</span
-							>
+							<span class="title">
+								{n.title}{#if n.kind === 'message' && !n.readAt && Number(n.data.count) > 1}<span class="count">{n.data.count} new</span>{/if}
+							</span>
 							<span class="body">{n.body}</span>
 						</span>
 						<time datetime={n.createdAt}>{fmt.current.relative(n.createdAt)}</time>

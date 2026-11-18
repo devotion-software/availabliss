@@ -80,8 +80,10 @@
 			aria-expanded={open === dateKey}
 			aria-controls="picker-{uid}"
 			aria-label="{which === 'start' ? 'Starts' : 'Ends'}, {date ? spokenDate(date) : 'no date'}"
-			onclick={() => toggle(dateKey)}>{dateText(date)}</button
+			onclick={() => toggle(dateKey)}
 		>
+			{dateText(date)}
+		</button>
 		{#if !allDay}
 			<button
 				type="button"
@@ -90,8 +92,10 @@
 				aria-expanded={open === timeKey}
 				aria-controls="picker-{uid}"
 				aria-label="{which === 'start' ? 'Start' : 'End'} time, {time || 'not set'}"
-				onclick={() => toggle(timeKey)}>{time || '--:--'}</button
+				onclick={() => toggle(timeKey)}
 			>
+				{time || '--:--'}
+			</button>
 		{/if}
 	</div>
 {/snippet}
@@ -111,7 +115,14 @@
 			{#if open === 'startDate'}
 				<MonthCalendar value={startDate} min={minDate} max={maxDate} {today} label={pickerLabel.startDate} onpick={(d) => pick('startDate', d)} />
 			{:else if open === 'endDate'}
-				<MonthCalendar value={endDate} min={startDate || minDate} max={maxDate} {today} label={pickerLabel.endDate} onpick={(d) => pick('endDate', d)} />
+				<MonthCalendar
+					value={endDate}
+					min={startDate || minDate}
+					max={maxDate}
+					{today}
+					label={pickerLabel.endDate}
+					onpick={(d) => pick('endDate', d)}
+				/>
 			{:else if open === 'startTime'}
 				<TimeWheel value={startTime} label={pickerLabel.startTime} onpick={(t) => pick('startTime', t)} />
 			{:else}

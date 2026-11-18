@@ -4,16 +4,7 @@
  *
  * Pure and synchronous: callers load busy time / holidays and pass them in.
  */
-import type {
-	Availability,
-	AvailabilityDay,
-	DateRange,
-	DayAvailability,
-	Requirement,
-	Slot,
-	SlotPosition,
-	Weekday
-} from '#lib/types';
+import type { Availability, AvailabilityDay, DateRange, DayAvailability, Requirement, Slot, SlotPosition, Weekday } from '#lib/types';
 import { clip, freeForQuorum, isFree, merge, overlaps, subtract, type Span } from './intervals';
 import { addDays, eachDate, inRange, minutesOf, startOfDate, weekdayOf, zonedInstant } from './time';
 import { slotLabel } from './labels';
@@ -207,9 +198,7 @@ export function computeAvailability(input: EngineInput): Availability {
 		if (!pieces) return { date, status: 'hidden', busyMemberIds: [], slotPosition: null, holiday };
 
 		const relevant = merge(pieces);
-		const busyMemberIds = busyByMember
-			.filter((m) => m.busy.some((b) => relevant.some((p) => overlaps(b, p))))
-			.map((m) => m.userId);
+		const busyMemberIds = busyByMember.filter((m) => m.busy.some((b) => relevant.some((p) => overlaps(b, p)))).map((m) => m.userId);
 		const slotPosition = matched.get(date) ?? null;
 		const status = slotPosition ? 'match' : busyMemberIds.length ? 'busy' : 'free';
 		const partial = status === 'match' && partialDates.has(date) && !fullDates.has(date);
@@ -295,4 +284,3 @@ export function computeDay(input: EngineInput, date: string): DayAvailability {
 }
 
 const toIso = (s: Span) => ({ start: new Date(s.start).toISOString(), end: new Date(s.end).toISOString() });
-

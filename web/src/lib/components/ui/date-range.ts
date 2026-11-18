@@ -26,7 +26,7 @@ const hm = (time: string) => {
 };
 
 /** Minutes since 1970-01-01 00:00 on the wall clock. */
-export const wallMinutes = (date: string, time: string) => (parseKey(date).getTime() / 60_000) + hm(time);
+export const wallMinutes = (date: string, time: string) => parseKey(date).getTime() / 60_000 + hm(time);
 
 /** The date and time `minutes` after `date` `time`. */
 export function shiftWall(date: string, time: string, minutes: number): { date: string; time: string } {

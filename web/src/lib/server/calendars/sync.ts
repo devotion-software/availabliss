@@ -134,7 +134,10 @@ export async function syncConnectionOnce(connectionId: string, options: SyncOpti
 		const refreshed = await adapter.refresh?.(creds);
 		if (refreshed) {
 			creds = refreshed;
-			await db.update(calendarConnections).set({ credentials: encryptJson(creds, context) }).where(eq(calendarConnections.id, row.id));
+			await db
+				.update(calendarConnections)
+				.set({ credentials: encryptJson(creds, context) })
+				.where(eq(calendarConnections.id, row.id));
 		}
 
 		const coverage = planCoverage(row, await horizonFor(row.userId));

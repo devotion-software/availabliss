@@ -69,9 +69,9 @@ export function safeRedirect(redirect: string | null): string {
 }
 
 export function encodeState(state: Omit<State, 'exp' | 'nonce'>): string {
-	const payload = Buffer.from(
-		JSON.stringify({ ...state, exp: Date.now() + 10 * 60 * 1000, nonce: randomBytes(8).toString('hex') })
-	).toString('base64url');
+	const payload = Buffer.from(JSON.stringify({ ...state, exp: Date.now() + 10 * 60 * 1000, nonce: randomBytes(8).toString('hex') })).toString(
+		'base64url'
+	);
 	return `${payload}.${signature(payload)}`;
 }
 

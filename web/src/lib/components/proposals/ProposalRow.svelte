@@ -35,7 +35,9 @@
 		<span class="by">{by} proposed{proposal.title ? ` · ${proposal.title}` : ''}</span>
 		<span class="when">{fmt.current.when(proposal.start, proposal.end, proposal.allDay)}</span>
 		{#if proposal.status === 'open'}
-			<span class="count">{counts}{#if clash}<span class="clash"> · {clash}</span>{/if}</span>
+			<span class="count">
+				{counts}{#if clash}<span class="clash"> · {clash}</span>{/if}
+			</span>
 		{:else if proposal.status === 'confirmed'}
 			<span class="count">{confirmedStatus(proposal)}</span>
 		{:else}

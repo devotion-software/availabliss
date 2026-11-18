@@ -18,7 +18,12 @@
 
 	const pending = $derived(members.filter((m) => !m.synced));
 	const synced = $derived(members.length - pending.length);
-	const names = $derived(listNames(pending.map((m) => firstName(m.name)), 2));
+	const names = $derived(
+		listNames(
+			pending.map((m) => firstName(m.name)),
+			2
+		)
+	);
 	let busy = $state(false);
 
 	async function nudge() {

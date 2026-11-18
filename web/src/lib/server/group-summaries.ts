@@ -108,11 +108,7 @@ async function unreadByGroup(groupIds: string[], userId: string): Promise<Map<st
 	return new Map(rows.map((r) => [r.groupId, Number(r.count)]));
 }
 
-async function statusFor(
-	group: GroupRow,
-	awaiting: string | undefined,
-	next: { id: string; start: Date } | undefined
-): Promise<GroupStatus> {
+async function statusFor(group: GroupRow, awaiting: string | undefined, next: { id: string; start: Date } | undefined): Promise<GroupStatus> {
 	if (awaiting) return { kind: 'needs_reply', proposalId: awaiting };
 	if (next) return { kind: 'confirmed', eventId: next.id, start: next.start.toISOString() };
 	const slots = await cachedSlotCount(group);

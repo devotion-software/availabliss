@@ -8,7 +8,14 @@ import { everyDay, fixture } from './fixtures';
 const fx = fixture('myplans');
 afterAll(() => fx.cleanup());
 
-const at = (day: string, title: string) => ({ title, start: `${day}T18:00:00.000Z`, end: `${day}T20:00:00.000Z`, allDay: false, location: null, note: null });
+const at = (day: string, title: string) => ({
+	title,
+	start: `${day}T18:00:00.000Z`,
+	end: `${day}T20:00:00.000Z`,
+	allDay: false,
+	location: null,
+	note: null
+});
 
 describe('myPlans', () => {
 	test('splits your plans across groups into going, can’t make it and past', async () => {

@@ -66,7 +66,14 @@
 >
 	<div class="choices">
 		{#if muted}
-			<Button variant="solid" icon="bell" block loading={busy === 'unmute'} disabled={busy !== null} onclick={() => run('unmute', () => unmuteGroup(groupId), `Unmuted ${groupName}`)}>
+			<Button
+				variant="solid"
+				icon="bell"
+				block
+				loading={busy === 'unmute'}
+				disabled={busy !== null}
+				onclick={() => run('unmute', () => unmuteGroup(groupId), `Unmuted ${groupName}`)}
+			>
 				Unmute
 			</Button>
 		{:else}

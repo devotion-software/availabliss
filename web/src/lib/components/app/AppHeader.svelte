@@ -32,12 +32,7 @@
 	</nav>
 	<span class="spacer"></span>
 	<Button variant="glass" size="sm" icon="plus" class="new" onclick={newGroupSheet.show}>New group</Button>
-	<IconButton
-		href="/app/activity"
-		icon="bell"
-		label={activity.unread ? `Activity, ${activity.unread} unread` : 'Activity'}
-		badge={activity.unread}
-	/>
+	<IconButton href="/app/activity" icon="bell" label={activity.unread ? `Activity, ${activity.unread} unread` : 'Activity'} badge={activity.unread} />
 	<ProfileMenu {user} />
 </header>
 

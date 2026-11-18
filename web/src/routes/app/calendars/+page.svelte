@@ -20,7 +20,10 @@
 	let sheetOpen = $state(false);
 
 	$effect(() => {
-		if (reportOAuthResult(page.url)) listConnections().then((c) => (connections = c)).catch(() => {});
+		if (reportOAuthResult(page.url))
+			listConnections()
+				.then((c) => (connections = c))
+				.catch(() => {});
 	});
 
 	const replace = (updated: CalendarConnection) => (connections = connections.map((c) => (c.id === updated.id ? updated : c)));
@@ -31,12 +34,12 @@
 
 <div class="page">
 	<PageHeader
-	title="Calendars"
-	subtitle="Choose which calendars mean you're busy"
-	backHref="/app/settings"
-	backLabel="Back to your settings"
-	crumbs={[{ label: 'You', href: '/app/settings' }, { label: 'Calendars' }]}
-/>
+		title="Calendars"
+		subtitle="Choose which calendars mean you're busy"
+		backHref="/app/settings"
+		backLabel="Back to your settings"
+		crumbs={[{ label: 'You', href: '/app/settings' }, { label: 'Calendars' }]}
+	/>
 
 	<div class="layout">
 		<div class="list">

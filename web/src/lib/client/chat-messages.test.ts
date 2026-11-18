@@ -1,7 +1,19 @@
 import { describe, expect, test } from 'bun:test';
 import type { Message } from '#lib/types';
 import type { Member } from '#lib/types';
-import { applyMessageUpdate, canEditMessage, canModifyMessage, canReplyTo, deletedCopy, replyAuthorName, replyPreview, replySnippet, replyingTo, threadReplyTarget, withThreadMessage } from './chat-messages';
+import {
+	applyMessageUpdate,
+	canEditMessage,
+	canModifyMessage,
+	canReplyTo,
+	deletedCopy,
+	replyAuthorName,
+	replyPreview,
+	replySnippet,
+	replyingTo,
+	threadReplyTarget,
+	withThreadMessage
+} from './chat-messages';
 
 const msg = (over: Partial<Message> = {}): Message => ({
 	id: 'm1',
@@ -88,7 +100,15 @@ test('deletedCopy', () => {
 });
 
 describe('replies', () => {
-	const quote = (over = {}) => ({ id: 'm1', authorId: 'u2', authorName: 'Priya Shah', kind: 'text' as const, text: 'hello', deleted: false, ...over });
+	const quote = (over = {}) => ({
+		id: 'm1',
+		authorId: 'u2',
+		authorName: 'Priya Shah',
+		kind: 'text' as const,
+		text: 'hello',
+		deleted: false,
+		...over
+	});
 	const members = new Map([['u2', { userId: 'u2', name: 'Priya Shah' } as Member]]);
 
 	test('text and polls that are sent and still there can be replied to', () => {
@@ -143,14 +163,27 @@ describe('threads', () => {
 		// Straight after you send, not to yourself.
 		expect(threadReplyTarget([...thread, msg({ id: '4', replyTo: quote('3') })], null, 'me')?.id).toBe('3');
 		// A picked message deleted since falls back.
-		expect(threadReplyTarget([msg({ id: '1', authorId: 'u2' }), msg({ id: '2', authorId: 'u3', deleted: true, body: null })], '2', 'me')?.id).toBe('1');
+		expect(threadReplyTarget([msg({ id: '1', authorId: 'u2' }), msg({ id: '2', authorId: 'u3', deleted: true, body: null })], '2', 'me')?.id).toBe(
+			'1'
+		);
 		expect(threadReplyTarget([msg({ id: '1' })], null, 'me')?.id).toBe('1');
 		expect(threadReplyTarget([], null, 'me')).toBeNull();
 	});
 });
 
 describe('replyPreview with attachments', () => {
-	const photo = { id: 'a1', kind: 'image' as const, name: 'p.jpg', mime: 'image/jpeg', size: 1, width: 1, height: 1, url: 'u', thumbnailUrl: null, pass: null };
+	const photo = {
+		id: 'a1',
+		kind: 'image' as const,
+		name: 'p.jpg',
+		mime: 'image/jpeg',
+		size: 1,
+		width: 1,
+		height: 1,
+		url: 'u',
+		thumbnailUrl: null,
+		pass: null
+	};
 	test('the caption when there is one', () => {
 		expect(replyPreview(msg({ body: 'Look', caption: 'Look', attachments: [photo] })).text).toBe('Look');
 	});

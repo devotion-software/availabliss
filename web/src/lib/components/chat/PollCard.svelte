@@ -98,7 +98,9 @@
 <section class="poll glass" class:mine class:compact aria-label="Poll: {poll.question}">
 	<div class="head">
 		<Icon name="poll" size={16} strokeWidth={2.2} />
-		<span>{mine ? 'Your poll' : `Poll by ${firstName(authorName ?? 'Someone')}`} · {total} vote{total === 1 ? '' : 's'}{poll.multi ? ' · pick any' : ''}</span>
+		<span>
+			{mine ? 'Your poll' : `Poll by ${firstName(authorName ?? 'Someone')}`} · {total} vote{total === 1 ? '' : 's'}{poll.multi ? ' · pick any' : ''}
+		</span>
 		{#if poll.closed}<StatusPill>Closed</StatusPill>{/if}
 	</div>
 	<h3>{poll.question}</h3>

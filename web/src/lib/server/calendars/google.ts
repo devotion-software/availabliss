@@ -75,12 +75,13 @@ async function allEvents(creds: OAuthCredentials, url: string, timeZone: string)
 	let zone = timeZone;
 	let pageToken: string | undefined;
 	do {
-		const page: EventsPage | null = await bearerFetch<EventsPage>(pageToken ? `${url}&pageToken=${encodeURIComponent(pageToken)}` : url, creds.accessToken).catch(
-			(err) => {
-				if (err instanceof HttpError && (err.status === 410 || err.status === 404)) return null;
-				throw err;
-			}
-		);
+		const page: EventsPage | null = await bearerFetch<EventsPage>(
+			pageToken ? `${url}&pageToken=${encodeURIComponent(pageToken)}` : url,
+			creds.accessToken
+		).catch((err) => {
+			if (err instanceof HttpError && (err.status === 410 || err.status === 404)) return null;
+			throw err;
+		});
 		if (!page) return null;
 		items.push(...(page.items ?? []));
 		zone = page.timeZone ?? zone;
@@ -95,7 +96,17 @@ const eventsUrl = (calendarId: string, params: Record<string, string>) =>
 function toBusy(calendarExternalId: string, events: GoogleEvent[], timeZone: string): RemoteBusy[] {
 	return events.flatMap((e) => {
 		const span = eventSpan(e, timeZone);
-		return span ? [{ calendarExternalId, eventKey: eventKey(seriesOf(e)), start: new Date(span.start), end: new Date(span.end), ...(e.summary?.trim() && { title: e.summary.trim() }) }] : [];
+		return span
+			? [
+					{
+						calendarExternalId,
+						eventKey: eventKey(seriesOf(e)),
+						start: new Date(span.start),
+						end: new Date(span.end),
+						...(e.summary?.trim() && { title: e.summary.trim() })
+					}
+				]
+			: [];
 	});
 }
 
@@ -142,7 +153,12 @@ export const google: CalendarAdapter<OAuthCredentials> = {
 	},
 
 	async busy(creds, calendars, from, to, timeZone) {
-		const out = await freeBusy(creds, calendars.filter((c) => c.changes !== 'cursor'), from, to);
+		const out = await freeBusy(
+			creds,
+			calendars.filter((c) => c.changes !== 'cursor'),
+			from,
+			to
+		);
 		for (const cal of calendars.filter((c) => c.changes === 'cursor')) out.push(...(await occurrences(creds, cal.externalId, from, to, timeZone)));
 		return out;
 	},

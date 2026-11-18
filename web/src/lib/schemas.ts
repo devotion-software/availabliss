@@ -3,7 +3,18 @@
  * Each schema mirrors a request body in docs/API.md.
  */
 import { z } from 'zod';
-import { BUSY_BUFFER_MINUTES, COLOR_THEMES, EVENT_REMINDERS, NOTIFICATION_CATEGORIES, RHYTHMS, REPEATS, RESPONSE_KINDS, THEME_MODES, TILE_COLORS, type Weekday } from './types';
+import {
+	BUSY_BUFFER_MINUTES,
+	COLOR_THEMES,
+	EVENT_REMINDERS,
+	NOTIFICATION_CATEGORIES,
+	RHYTHMS,
+	REPEATS,
+	RESPONSE_KINDS,
+	THEME_MODES,
+	TILE_COLORS,
+	type Weekday
+} from './types';
 import { isValidZone } from './timezone';
 import { normalizeUsername, usernameProblem } from './usernames';
 
@@ -30,9 +41,19 @@ export function instantRangeSchema<F extends string, T extends string>(fromKey: 
 		.refine((r) => r.to > r.from, { message: 'The end must be after the start' })
 		.refine((r) => r.to - r.from <= maxDays * 86_400_000, { message: `Ask for at most ${maxDays} days at a time` });
 }
-const weekday = z.int().min(0).max(6).transform((d) => d as Weekday);
+const weekday = z
+	.int()
+	.min(0)
+	.max(6)
+	.transform((d) => d as Weekday);
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
-const optionalText = (max: number) => z.string().trim().max(max).nullish().transform((v) => v || null);
+const optionalText = (max: number) =>
+	z
+		.string()
+		.trim()
+		.max(max)
+		.nullish()
+		.transform((v) => v || null);
 
 export const dateRangeSchema = z
 	.object({ from: dateString, to: dateString })
@@ -56,7 +77,13 @@ export const timeWindowSchema = z
 
 export const requirementSchema = z.object({
 	length: z.discriminatedUnion('type', [
-		z.object({ type: z.literal('duration'), minutes: z.int().min(15).max(24 * 60) }),
+		z.object({
+			type: z.literal('duration'),
+			minutes: z
+				.int()
+				.min(15)
+				.max(24 * 60)
+		}),
 		z.object({ type: z.literal('days'), count: z.int().min(1).max(31) }),
 		z.object({
 			type: z.literal('span'),
@@ -110,7 +137,10 @@ const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM');
 export const notificationSettingsSchema = z
 	.object({
 		off: z.array(z.enum(NOTIFICATION_CATEGORIES)).max(NOTIFICATION_CATEGORIES.length),
-		quietHours: z.object({ from: clock, to: clock }).refine((q) => q.from !== q.to, 'Pick different start and end times').nullable()
+		quietHours: z
+			.object({ from: clock, to: clock })
+			.refine((q) => q.from !== q.to, 'Pick different start and end times')
+			.nullable()
 	})
 	.partial();
 export const muteGroupSchema = z.object({ until: z.iso.datetime({ offset: true }).nullable() });
@@ -128,7 +158,10 @@ export const createGroupSchema = z.object({
 export const updateGroupSchema = createGroupSchema.partial().extend({
 	archived: z.boolean().optional(),
 	autoArchive: z.boolean().optional(),
-	rhythm: z.object({ every: z.enum(RHYTHMS), prompt: z.boolean().default(true) }).nullable().optional()
+	rhythm: z
+		.object({ every: z.enum(RHYTHMS), prompt: z.boolean().default(true) })
+		.nullable()
+		.optional()
 });
 
 export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
@@ -160,7 +193,9 @@ export const inviteSchema = z
 		// For a link: how many people can join with it (null: no limit). Left out: one, as before.
 		maxUses: z.number().int().min(1).max(1000).nullable().optional()
 	})
-	.refine((i) => (i.emails?.length ?? 0) + (i.usernames?.length ?? 0) + (i.userIds?.length ?? 0) <= 20, { message: 'Invite up to 20 people at a time' });
+	.refine((i) => (i.emails?.length ?? 0) + (i.usernames?.length ?? 0) + (i.userIds?.length ?? 0) <= 20, {
+		message: 'Invite up to 20 people at a time'
+	});
 
 const blockShape = {
 	start: isoDateTime,
@@ -171,14 +206,10 @@ const blockShape = {
 	note: optionalText(120)
 };
 /** Compares instants, not strings: offsets and fractional seconds make string order differ from time order. */
-const endsAfterStart = (b: { start?: string; end?: string }) =>
-	!b.start || !b.end || Date.parse(b.start) < Date.parse(b.end);
+const endsAfterStart = (b: { start?: string; end?: string }) => !b.start || !b.end || Date.parse(b.start) < Date.parse(b.end);
 
 export const createBlockSchema = z.object(blockShape).refine(endsAfterStart, { message: 'Ends before it starts' });
-export const updateBlockSchema = z
-	.object(blockShape)
-	.partial()
-	.refine(endsAfterStart, { message: 'Ends before it starts' });
+export const updateBlockSchema = z.object(blockShape).partial().refine(endsAfterStart, { message: 'Ends before it starts' });
 
 export const caldavSchema = z.object({
 	username: trimmed(255),
@@ -276,7 +307,13 @@ export const createMessageSchema = z.union([
 			lng: z.number().finite().min(-180).max(180),
 			name: optionalText(200),
 			address: optionalText(300),
-			accuracy: z.number().finite().min(0).max(100_000).nullish().transform((v) => v ?? null)
+			accuracy: z
+				.number()
+				.finite()
+				.min(0)
+				.max(100_000)
+				.nullish()
+				.transform((v) => v ?? null)
 		}),
 		replyToId: z.string().min(1).max(36).nullish()
 	}),

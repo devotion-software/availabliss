@@ -5,15 +5,26 @@ import { db } from '#lib/server/db';
 import { devices } from '#lib/server/db/schema';
 import { createGroup } from '#lib/server/groups';
 import { createEvent, deleteEvent, getEvent, listEvents, updateEvent, upcomingFor } from '#lib/server/events';
-import { closePoll, deleteMessage, editMessage, listMessages, markReceipts, messageInfo, messageThread, sendPoll, sendText, THREAD_LIMIT, vote } from '#lib/server/chat';
+import {
+	closePoll,
+	deleteMessage,
+	editMessage,
+	listMessages,
+	markReceipts,
+	messageInfo,
+	messageThread,
+	sendPoll,
+	sendText,
+	THREAD_LIMIT,
+	vote
+} from '#lib/server/chat';
 import { groupSummaries } from '#lib/server/group-summaries';
 import { newId } from '#lib/server/ids';
 import { messageReceipts, messages } from '#lib/server/db/schema';
 import { listNotifications, markRead, registerDevice, unregisterDevice } from '#lib/server/notifications';
 import { apiError, everyDay, fixture } from './fixtures';
 
-const unreadCount = async (groupId: string, userId: string) =>
-	(await groupSummaries(userId)).find((g) => g.id === groupId)?.unreadCount ?? 0;
+const unreadCount = async (groupId: string, userId: string) => (await groupSummaries(userId)).find((g) => g.id === groupId)?.unreadCount ?? 0;
 
 const fx = fixture('events');
 afterAll(() => fx.cleanup());
@@ -28,17 +39,29 @@ beforeAll(async () => {
 	await fx.join(groupId, member);
 });
 
-const inDays = (d: number, h = 18) => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + d, h)).toISOString();
+const inDays = (d: number, h = 18) =>
+	new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + d, h)).toISOString();
 
 describe('events', () => {
 	test('create notifies the others; members read, creator or admin edit', async () => {
-		const e = await createEvent(groupId, member, { title: 'Picnic', start: inDays(3), end: inDays(3, 20), allDay: false, location: 'Park', note: null });
+		const e = await createEvent(groupId, member, {
+			title: 'Picnic',
+			start: inDays(3),
+			end: inDays(3, 20),
+			allDay: false,
+			location: 'Park',
+			note: null
+		});
 		expect(e).toMatchObject({ groupId, title: 'Picnic', location: 'Park', createdBy: member, proposalId: null });
 		expect(await getEvent(e.id, owner)).toEqual(e);
 		expect((await apiError(getEvent(e.id, outsider))).code).toBe('not_found');
 
 		const { notifications } = await listNotifications(owner);
-		expect(notifications.find((n) => n.kind === 'event.created')).toMatchObject({ groupId, title: 'Events & chat', data: expect.objectContaining({ eventId: e.id }) });
+		expect(notifications.find((n) => n.kind === 'event.created')).toMatchObject({
+			groupId,
+			title: 'Events & chat',
+			data: expect.objectContaining({ eventId: e.id })
+		});
 		expect((await listNotifications(member)).notifications.some((n) => n.kind === 'event.created')).toBe(false);
 
 		const moved = await updateEvent(e.id, admin, { start: inDays(4), end: inDays(4, 21), title: 'Picnic (moved)' });
@@ -47,7 +70,14 @@ describe('events', () => {
 		expect((await apiError(updateEvent(e.id, admin, { start: inDays(4, 22) }))).code).toBe('validation_error');
 		expect((await apiError(updateEvent(e.id, admin, { end: inDays(4, 17) }))).code).toBe('validation_error');
 
-		const other = await createEvent(groupId, owner, { title: 'Owner’s', start: inDays(5), end: inDays(5, 19), allDay: false, location: null, note: null });
+		const other = await createEvent(groupId, owner, {
+			title: 'Owner’s',
+			start: inDays(5),
+			end: inDays(5, 19),
+			allDay: false,
+			location: null,
+			note: null
+		});
 		expect((await apiError(updateEvent(other.id, member, { title: 'Mine now' }))).code).toBe('forbidden');
 		expect((await apiError(deleteEvent(other.id, member))).code).toBe('forbidden');
 
@@ -236,7 +266,9 @@ describe('chat', () => {
 		const g = (await createGroup(owner, { name: 'Busy chat', requirement: everyDay() }, 'UTC')).id;
 		await fx.join(g, member);
 		// Insert straight into the table: 620 messages through sendText would be slow.
-		await db.insert(messages).values(Array.from({ length: 620 }, (_, i) => ({ id: newId(), groupId: g, authorId: owner, kind: 'text' as const, body: `m${i}` })));
+		await db
+			.insert(messages)
+			.values(Array.from({ length: 620 }, (_, i) => ({ id: newId(), groupId: g, authorId: owner, kind: 'text' as const, body: `m${i}` })));
 		const last = await sendText(g, owner, 'Last one');
 		expect(await unreadCount(g, member)).toBe(621);
 		await markReceipts(g, member, last.id, 'delivered');
@@ -271,7 +303,15 @@ describe('chat', () => {
 		expect((await apiError(closePoll(other.poll!.id, member))).code).toBe('forbidden');
 		// Not even the group's owner can close someone else's poll.
 		expect((await apiError(closePoll(poll.id, owner))).code).toBe('forbidden');
-		expect((await vote(other.poll!.id, member, other.poll!.options.map((o) => o.id))).options.every((o) => o.voterIds.includes(member))).toBe(true);
+		expect(
+			(
+				await vote(
+					other.poll!.id,
+					member,
+					other.poll!.options.map((o) => o.id)
+				)
+			).options.every((o) => o.voterIds.includes(member))
+		).toBe(true);
 
 		expect((await closePoll(poll.id, member)).closed).toBe(true);
 		const closed = await apiError(vote(poll.id, owner, [beach]));
@@ -298,7 +338,8 @@ describe('notifications and devices', () => {
 		const reader = await fx.user({ name: 'Rae' });
 		const g = (await createGroup(reader, { name: 'Chatty', requirement: everyDay() }, 'UTC')).id;
 		await fx.join(g, member);
-		const chatItems = async (userId: string) => (await listNotifications(userId)).notifications.filter((n) => n.groupId === g && n.kind === 'message');
+		const chatItems = async (userId: string) =>
+			(await listNotifications(userId)).notifications.filter((n) => n.groupId === g && n.kind === 'message');
 
 		await sendText(g, member, 'First');
 		const last = await sendText(g, member, 'Second');

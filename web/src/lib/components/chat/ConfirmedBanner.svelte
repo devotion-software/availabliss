@@ -133,10 +133,7 @@
 		color: var(--ink);
 		border-color: color-mix(in srgb, var(--ok) 35%, transparent);
 		/* The success tint over the glass. */
-		background-image: linear-gradient(
-			color-mix(in srgb, var(--ok-bg) 72%, transparent),
-			color-mix(in srgb, var(--ok-bg) 72%, transparent)
-		);
+		background-image: linear-gradient(color-mix(in srgb, var(--ok-bg) 72%, transparent), color-mix(in srgb, var(--ok-bg) 72%, transparent));
 		overflow: hidden;
 		transition: transform 0.15s ease;
 	}

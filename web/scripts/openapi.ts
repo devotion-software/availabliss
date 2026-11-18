@@ -74,7 +74,8 @@ function zodSchema(schema: z.ZodType): JsonSchema {
 	return json;
 }
 
-const isRaw = (value: unknown): value is RawContent => !!value && typeof value === 'object' && 'contentType' in value && !(value instanceof z.ZodType);
+const isRaw = (value: unknown): value is RawContent =>
+	!!value && typeof value === 'object' && 'contentType' in value && !(value instanceof z.ZodType);
 
 function queryParameters(schema: z.ZodType): Json[] {
 	const json = zodSchema(schema);
@@ -101,7 +102,12 @@ const ERROR_TEXT: Record<number, string> = {
 	429: 'rate_limited (see Retry-After)',
 	503: 'Unavailable'
 };
-const AUTH_TEXT = { none: 'No session needed.', user: 'Signed in.', admin: 'Signed in as a group admin or the owner.', owner: "Signed in as the group's owner." };
+const AUTH_TEXT = {
+	none: 'No session needed.',
+	user: 'Signed in.',
+	admin: 'Signed in as a group admin or the owner.',
+	owner: "Signed in as the group's owner."
+};
 
 const pathParams = (path: string) => [...path.matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
 const operationId = (e: Endpoint) =>
@@ -196,7 +202,12 @@ export function buildDocument(): Json {
 		components: {
 			securitySchemes: {
 				bearer: { type: 'http', scheme: 'bearer', description: 'Native apps: the token from the `set-auth-token` header of a sign-in.' },
-				cookie: { type: 'apiKey', in: 'cookie', name: 'better-auth.session_token', description: 'The web: the Better Auth session cookie (`__Secure-better-auth.session_token` over https).' }
+				cookie: {
+					type: 'apiKey',
+					in: 'cookie',
+					name: 'better-auth.session_token',
+					description: 'The web: the Better Auth session cookie (`__Secure-better-auth.session_token` over https).'
+				}
 			},
 			schemas: sortedSchemas
 		}
@@ -213,13 +224,17 @@ export function problems(doc: Json): string[] {
 			? ref
 					.slice(2)
 					.split('/')
-					.reduce<unknown>((node, key) => (node && typeof node === 'object' ? (node as Json)[key.replace(/~1/g, '/').replace(/~0/g, '~')] : undefined), doc)
+					.reduce<unknown>(
+						(node, key) => (node && typeof node === 'object' ? (node as Json)[key.replace(/~1/g, '/').replace(/~0/g, '~')] : undefined),
+						doc
+					)
 			: undefined;
 	const walk = (node: unknown, where: string) => {
 		if (Array.isArray(node)) node.forEach((n, i) => walk(n, `${where}[${i}]`));
 		else if (node && typeof node === 'object') {
 			for (const [key, value] of Object.entries(node)) {
-				if (key === '$ref' && (typeof value !== 'string' || resolveRef(value) === undefined)) found.push(`${where}: $ref ${String(value)} doesn't resolve`);
+				if (key === '$ref' && (typeof value !== 'string' || resolveRef(value) === undefined))
+					found.push(`${where}: $ref ${String(value)} doesn't resolve`);
 				walk(value, `${where}/${key}`);
 			}
 		}
@@ -234,7 +249,8 @@ export function problems(doc: Json): string[] {
 			ids.add(op.operationId as string);
 			const declared = ((op.parameters as Json[] | undefined) ?? []).filter((p) => p.in === 'path').map((p) => p.name);
 			if (declared.join() !== pathParams(path).join()) found.push(`${where}: path parameters ${declared.join()} don't match the path`);
-			if (!Object.keys(op.responses as Json).some((code) => code.startsWith('2') || code.startsWith('3'))) found.push(`${where}: no success response`);
+			if (!Object.keys(op.responses as Json).some((code) => code.startsWith('2') || code.startsWith('3')))
+				found.push(`${where}: no success response`);
 			if (!(op.summary as string)?.trim()) found.push(`${where}: no summary`);
 		}
 	}

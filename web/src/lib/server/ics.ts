@@ -3,7 +3,11 @@ import type { GroupEvent } from '#lib/types';
 import { dateOf } from './availability/time';
 
 // Any line break (\r\n, \r or \n) becomes the escaped \n, so text can't start a new property.
-const escape = (s: string) => s.replace(/\\/g, '\\\\').replace(/\r\n?|\n/g, '\\n').replace(/[,;]/g, (c) => `\\${c}`);
+const escape = (s: string) =>
+	s
+		.replace(/\\/g, '\\\\')
+		.replace(/\r\n?|\n/g, '\\n')
+		.replace(/[,;]/g, (c) => `\\${c}`);
 
 /** Folds lines longer than 75 octets as the spec requires. */
 function fold(line: string): string {

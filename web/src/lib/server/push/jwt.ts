@@ -7,9 +7,7 @@ export function signJwt(alg: 'ES256' | 'RS256', header: Record<string, string>, 
 	const key: KeyObject = createPrivateKey(pem);
 	const input = `${b64url(JSON.stringify({ alg, typ: 'JWT', ...header }))}.${b64url(JSON.stringify(claims))}`;
 	const signature =
-		alg === 'ES256'
-			? sign('sha256', Buffer.from(input), { key, dsaEncoding: 'ieee-p1363' })
-			: sign('sha256', Buffer.from(input), key);
+		alg === 'ES256' ? sign('sha256', Buffer.from(input), { key, dsaEncoding: 'ieee-p1363' }) : sign('sha256', Buffer.from(input), key);
 	return `${input}.${b64url(signature)}`;
 }
 

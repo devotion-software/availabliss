@@ -29,7 +29,16 @@
 		defaultLastDay?: string | null;
 		onsaved: (block: ManualBlock) => void;
 	}
-	let { open = $bindable(), timeZone, block = null, defaultDay, defaultRange = null, defaultAllDay = false, defaultLastDay = null, onsaved }: Props = $props();
+	let {
+		open = $bindable(),
+		timeZone,
+		block = null,
+		defaultDay,
+		defaultRange = null,
+		defaultAllDay = false,
+		defaultLastDay = null,
+		onsaved
+	}: Props = $props();
 
 	const uid = $props.id();
 
@@ -169,7 +178,13 @@
 			{#if panel === 'repeat'}
 				<div class="list" id="repeat-{uid}" role="radiogroup" aria-label="Repeat">
 					{#each choices as choice (choice.value)}
-						<button type="button" role="radio" aria-checked={repeat === choice.value} class:sel={repeat === choice.value} onclick={() => chooseRepeat(choice.value)}>
+						<button
+							type="button"
+							role="radio"
+							aria-checked={repeat === choice.value}
+							class:sel={repeat === choice.value}
+							onclick={() => chooseRepeat(choice.value)}
+						>
 							<span>{choice.label}</span>
 							{#if repeat === choice.value}<Icon name="check" size={18} />{/if}
 						</button>

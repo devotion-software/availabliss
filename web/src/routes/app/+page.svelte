@@ -51,7 +51,13 @@
 					<p class="none">All your groups are archived.</p>
 				{/if}
 				{#if archived.length}
-					<button type="button" class="archived-toggle" aria-expanded={showsArchived} aria-controls="archived-groups" onclick={() => (showsArchived = !showsArchived)}>
+					<button
+						type="button"
+						class="archived-toggle"
+						aria-expanded={showsArchived}
+						aria-controls="archived-groups"
+						onclick={() => (showsArchived = !showsArchived)}
+					>
 						<span>Archived ({archived.length})</span>
 						<span class="chevron" class:open={showsArchived}><Icon name="chevron-down" size={14} /></span>
 					</button>
@@ -65,10 +71,7 @@
 				{/if}
 			{:else}
 				<div class="glass empty">
-					<EmptyState
-						title="No groups yet"
-						message="Make a group for the people you're trying to get together, then share the invite link."
-					>
+					<EmptyState title="No groups yet" message="Make a group for the people you're trying to get together, then share the invite link.">
 						{#snippet actions()}
 							<Button variant="accent" icon="plus" onclick={newGroupSheet.show}>New group</Button>
 						{/snippet}

@@ -64,7 +64,13 @@ export function decodeFlow(raw: string | undefined, now = Date.now()): Flow | nu
 }
 
 /** `secure` follows the request so the Android emulator's plain-http dev server still works. */
-export const flowCookieOptions = (url: URL) => ({ path: FLOW_COOKIE_PATH, httpOnly: true, secure: url.protocol === 'https:', sameSite: 'lax' as const, maxAge: FLOW_SECONDS });
+export const flowCookieOptions = (url: URL) => ({
+	path: FLOW_COOKIE_PATH,
+	httpOnly: true,
+	secure: url.protocol === 'https:',
+	sameSite: 'lax' as const,
+	maxAge: FLOW_SECONDS
+});
 
 /**
  * Whether `session` was created by the flow in `flow` (allowing a little clock

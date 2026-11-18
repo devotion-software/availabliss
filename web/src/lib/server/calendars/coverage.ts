@@ -81,11 +81,7 @@ export interface Coverage {
 	farDue: boolean;
 }
 
-export function planCoverage(
-	row: { coveredUntil: Date | null; farSyncedAt: Date | null },
-	horizon: Date,
-	now = Date.now()
-): Coverage {
+export function planCoverage(row: { coveredUntil: Date | null; farSyncedAt: Date | null }, horizon: Date, now = Date.now()): Coverage {
 	const covered = row.coveredUntil;
 	const step = EXTEND_STEP_DAYS * DAY_MS;
 	const stepped = new Date(horizon.getTime() + step);

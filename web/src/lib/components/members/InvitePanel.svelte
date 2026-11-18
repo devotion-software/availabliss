@@ -95,7 +95,10 @@
 
 	/** "sam@example.com, @priya" (commas, spaces or new lines) → the emails and usernames, or why one's no good. */
 	function parsePeople(text: string): { emails: string[]; usernames: string[]; bad: string | null } {
-		const parts = text.split(/[\s,;]+/).map((p) => p.trim()).filter(Boolean);
+		const parts = text
+			.split(/[\s,;]+/)
+			.map((p) => p.trim())
+			.filter(Boolean);
 		const emails = new Set<string>();
 		const usernames = new Set<string>();
 		for (const p of parts) {
@@ -207,7 +210,13 @@
 							<span class="name">{inviteeLabel(i) ?? 'Invite link'}</span>
 							<span class="sub">{inviteeLabel(i) ? `Invited · invite ${expiry(i)}` : `${linkUsage(i)} · ${expiry(i)}`}</span>
 						</span>
-						<IconButton icon="x" label={inviteeLabel(i) ? `Revoke the invite for ${inviteeLabel(i)}` : 'Revoke this link'} variant="plain" size={36} onclick={() => revoke(i)} />
+						<IconButton
+							icon="x"
+							label={inviteeLabel(i) ? `Revoke the invite for ${inviteeLabel(i)}` : 'Revoke this link'}
+							variant="plain"
+							size={36}
+							onclick={() => revoke(i)}
+						/>
 					</li>
 				{/each}
 			</ul>

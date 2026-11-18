@@ -64,7 +64,13 @@ describe('createGroup', () => {
 		expect(err.status).toBe(402);
 		expect((await groupsFor(owner)).length).toBe(FREE_GROUP_LIMIT);
 
-		await saveEntitlement(owner, { proUntil: new Date(Date.now() + 86_400_000), lifetime: false, store: 'app_store', productId: 'pro_monthly', willRenew: true });
+		await saveEntitlement(owner, {
+			proUntil: new Date(Date.now() + 86_400_000),
+			lifetime: false,
+			store: 'app_store',
+			productId: 'pro_monthly',
+			willRenew: true
+		});
 		const fourth = await createGroup(owner, { name: 'Pro group' }, 'UTC');
 		expect(fourth.role).toBe('owner');
 		expect(await getPlan(owner)).toMatchObject({ tier: 'pro', groupLimit: null, groupsOwned: FREE_GROUP_LIMIT + 1, canCreateGroup: true });
@@ -161,8 +167,7 @@ describe('membership and roles', () => {
 		const [owner, person] = await fx.users(2);
 		const g = await createGroup(owner, { name: 'Roles club' }, 'UTC');
 		await fx.join(g.id, person);
-		const roleItems = async () =>
-			(await listNotifications(person)).notifications.filter((n) => n.kind === 'role.changed' && n.groupId === g.id);
+		const roleItems = async () => (await listNotifications(person)).notifications.filter((n) => n.kind === 'role.changed' && n.groupId === g.id);
 
 		await setMemberRole(g.id, owner, person, 'admin');
 		let items = await roleItems();
@@ -202,7 +207,7 @@ describe('membership and roles', () => {
 	});
 
 	test('leaveGroup: a member leaves', async () => {
-		const [owner, admin, member] = await fx.users(3);
+		const [owner, , member] = await fx.users(3);
 		const g = await createGroup(owner, { name: 'Leaving' }, 'UTC');
 		await fx.join(g.id, member);
 		expect(await leaveGroup(g.id, member)).toBeNull();
@@ -211,7 +216,7 @@ describe('membership and roles', () => {
 	});
 
 	test('leaveGroup: the only admin (the owner) must make someone else an admin first', async () => {
-		const [owner, admin, member] = await fx.users(3);
+		const [owner, , member] = await fx.users(3);
 		const g = await createGroup(owner, { name: 'Sole admin' }, 'UTC');
 		await fx.join(g.id, member);
 		const err = await apiError(leaveGroup(g.id, owner, member));
@@ -221,7 +226,7 @@ describe('membership and roles', () => {
 	});
 
 	test('leaveGroup: the only member deletes the group instead', async () => {
-		const [owner, admin, member] = await fx.users(3);
+		const [owner] = await fx.users(3);
 		const g = await createGroup(owner, { name: 'Alone' }, 'UTC');
 		expect((await apiError(leaveGroup(g.id, owner))).code).toBe('conflict');
 		expect(await roleIn(g.id, owner)).toBe('owner');
@@ -312,7 +317,10 @@ describe('invites', () => {
 		expect(await roleIn(groupId, racer)).toBe('member');
 
 		const late = await createInvite(groupId, owner, null);
-		await db.update(groupInvites).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(groupInvites.token, late.token));
+		await db
+			.update(groupInvites)
+			.set({ expiresAt: new Date(Date.now() - 1000) })
+			.where(eq(groupInvites.token, late.token));
 		const token2 = late.token;
 		expect((await apiError(previewInvite(token2))).code).toBe('not_found');
 		expect((await apiError(acceptInvite(token2, joiner))).code).toBe('not_found');
@@ -356,14 +364,14 @@ describe('invites', () => {
 });
 
 describe('nudge', () => {
-    test('two admins nudging at once: one gets through, the other is rate limited', async () => {
-        const [owner, admin, quiet] = await fx.users(3);
-        const g = await createGroup(owner, { name: 'Nudgers', requirement: everyDay() }, 'UTC');
-        await fx.join(g.id, admin, 'admin');
-        await fx.join(g.id, quiet);
-        const results = await Promise.allSettled([nudgeUnsynced(g.id, owner), nudgeUnsynced(g.id, admin)]);
-        expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
-        const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
-        expect(rejected.reason.code).toBe('rate_limited');
-    });
+	test('two admins nudging at once: one gets through, the other is rate limited', async () => {
+		const [owner, admin, quiet] = await fx.users(3);
+		const g = await createGroup(owner, { name: 'Nudgers', requirement: everyDay() }, 'UTC');
+		await fx.join(g.id, admin, 'admin');
+		await fx.join(g.id, quiet);
+		const results = await Promise.allSettled([nudgeUnsynced(g.id, owner), nudgeUnsynced(g.id, admin)]);
+		expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+		const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+		expect(rejected.reason.code).toBe('rate_limited');
+	});
 });

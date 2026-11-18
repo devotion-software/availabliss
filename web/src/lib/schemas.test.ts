@@ -35,10 +35,7 @@ describe('requirementSchema', () => {
 		expect(ok(requirementSchema, requirement())).toBe(true);
 		expect(ok(requirementSchema, requirement({ length: { type: 'duration', minutes: 120 } }))).toBe(true);
 		expect(
-			ok(
-				requirementSchema,
-				requirement({ length: { type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '23:59', weeksLater: 1 } })
-			)
+			ok(requirementSchema, requirement({ length: { type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '23:59', weeksLater: 1 } }))
 		).toBe(true);
 	});
 
@@ -199,7 +196,14 @@ describe('other schemas', () => {
 	});
 
 	test('device sync limits', () => {
-		const sync = { deviceId: 'd', deviceName: 'Phone', rangeStart: '2026-11-01T00:00:00Z', rangeEnd: '2027-02-01T00:00:00Z', calendars: [], busy: [] };
+		const sync = {
+			deviceId: 'd',
+			deviceName: 'Phone',
+			rangeStart: '2026-11-01T00:00:00Z',
+			rangeEnd: '2027-02-01T00:00:00Z',
+			calendars: [],
+			busy: []
+		};
 		expect(ok(deviceSyncSchema, sync)).toBe(true);
 		expect(ok(deviceSyncSchema, { ...sync, calendars: Array(201).fill({ externalId: 'x', name: 'n', color: null }) })).toBe(false);
 	});

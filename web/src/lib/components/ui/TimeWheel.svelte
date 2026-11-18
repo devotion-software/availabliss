@@ -29,13 +29,29 @@
 <div class="wheel" role="group" aria-label={label}>
 	<div class="col" bind:this={hoursEl} role="group" aria-label="Hour">
 		{#each HOURS as h (h)}
-			<button type="button" class:sel={h === hour} aria-pressed={h === hour} aria-label="{pad(h)} hours" onclick={() => onpick(`${pad(h)}:${pad(minute)}`)}>{pad(h)}</button>
+			<button
+				type="button"
+				class:sel={h === hour}
+				aria-pressed={h === hour}
+				aria-label="{pad(h)} hours"
+				onclick={() => onpick(`${pad(h)}:${pad(minute)}`)}
+			>
+				{pad(h)}
+			</button>
 		{/each}
 	</div>
 	<span class="colon" aria-hidden="true">:</span>
 	<div class="col" bind:this={minutesEl} role="group" aria-label="Minutes">
 		{#each minutes as m (m)}
-			<button type="button" class:sel={m === minute} aria-pressed={m === minute} aria-label="{pad(m)} minutes" onclick={() => onpick(`${pad(hour)}:${pad(m)}`)}>{pad(m)}</button>
+			<button
+				type="button"
+				class:sel={m === minute}
+				aria-pressed={m === minute}
+				aria-label="{pad(m)} minutes"
+				onclick={() => onpick(`${pad(hour)}:${pad(m)}`)}
+			>
+				{pad(m)}
+			</button>
 		{/each}
 	</div>
 </div>

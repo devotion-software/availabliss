@@ -32,15 +32,24 @@ describe('entitlementFromSubscriber', () => {
 	});
 
 	test('expired or missing entitlement is free', () => {
-		const expired = entitlementFromSubscriber({ entitlements: { pro: { expires_date: '2026-10-01T00:00:00Z', product_identifier: 'x' } } }, 'pro', NOW);
+		const expired = entitlementFromSubscriber(
+			{ entitlements: { pro: { expires_date: '2026-10-01T00:00:00Z', product_identifier: 'x' } } },
+			'pro',
+			NOW
+		);
 		expect(isActive(expired, NOW)).toBe(false);
 		expect(isActive(entitlementFromSubscriber({ entitlements: {} }, 'pro', NOW), NOW)).toBe(false);
-		expect(isActive(entitlementFromSubscriber({ entitlements: { other: { expires_date: null, product_identifier: 'x' } } }, 'pro', NOW), NOW)).toBe(false);
+		expect(isActive(entitlementFromSubscriber({ entitlements: { other: { expires_date: null, product_identifier: 'x' } } }, 'pro', NOW), NOW)).toBe(
+			false
+		);
 	});
 
 	test('lifetime purchase', () => {
 		const e = entitlementFromSubscriber(
-			{ entitlements: { pro: { expires_date: null, product_identifier: 'pro_lifetime' } }, non_subscriptions: { pro_lifetime: [{ store: 'play_store' }] } },
+			{
+				entitlements: { pro: { expires_date: null, product_identifier: 'pro_lifetime' } },
+				non_subscriptions: { pro_lifetime: [{ store: 'play_store' }] }
+			},
 			'pro',
 			NOW
 		);
@@ -53,7 +62,11 @@ describe('entitlementFromEvent (no REST key)', () => {
 	const current: Entitlement = { proUntil: new Date('2026-12-01T00:00:00Z'), lifetime: false, store: 'app_store', productId: 'm', willRenew: true };
 
 	test('purchases and renewals grant until expiry', () => {
-		const e = entitlementFromEvent({ type: 'RENEWAL', entitlement_ids: ['pro'], expiration_at_ms: Date.parse('2027-01-01T00:00:00Z'), store: 'APP_STORE', product_id: 'm' }, 'pro', null);
+		const e = entitlementFromEvent(
+			{ type: 'RENEWAL', entitlement_ids: ['pro'], expiration_at_ms: Date.parse('2027-01-01T00:00:00Z'), store: 'APP_STORE', product_id: 'm' },
+			'pro',
+			null
+		);
 		expect(e).toEqual({ proUntil: new Date('2027-01-01T00:00:00Z'), lifetime: false, store: 'app_store', productId: 'm', willRenew: true });
 	});
 

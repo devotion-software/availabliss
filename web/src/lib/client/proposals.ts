@@ -16,8 +16,7 @@ export const getProposal = (id: string, fetch?: Fetch) => api.get<Proposal>(`/pr
 export const createProposal = (groupId: string, body: ProposalInput) => api.post<Proposal>(`/groups/${groupId}/proposals`, body);
 /** Your own reply: a firm yes, a maybe (a soft yes) or can't make it. */
 export type Reply = Exclude<ResponseKind, 'pending'>;
-export const respondToProposal = (id: string, response: Reply) =>
-	api.post<Proposal>(`/proposals/${id}/respond`, { response });
+export const respondToProposal = (id: string, response: Reply) => api.post<Proposal>(`/proposals/${id}/respond`, { response });
 export const overrideResponse = (id: string, userId: string, response: ResponseKind) =>
 	api.post<Proposal>(`/proposals/${id}/override`, { userId, response });
 /** Withdraws an open proposal, or cancels a confirmed plan (deleting its event). */

@@ -180,7 +180,7 @@ describe('Wallet passes', () => {
 		count: 1
 	};
 
-	test('the card: event, date in the reader\'s zone, the details that add something', () => {
+	test("the card: event, date in the reader's zone, the details that add something", () => {
 		expect(passCard(pass, 'en-GB', 'Europe/London')).toEqual({
 			organization: 'Roundhouse',
 			headline: 'Winter Gig',
@@ -205,9 +205,17 @@ describe('Wallet passes', () => {
 	});
 
 	test('which browsers hand passes to Wallet', () => {
-		expect(opensWallet('Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140 Mobile/15E148 Safari/604.1')).toBe(true);
-		expect(opensWallet('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15')).toBe(true);
-		expect(opensWallet('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36')).toBe(false);
+		expect(
+			opensWallet(
+				'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140 Mobile/15E148 Safari/604.1'
+			)
+		).toBe(true);
+		expect(opensWallet('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15')).toBe(
+			true
+		);
+		expect(opensWallet('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36')).toBe(
+			false
+		);
 		expect(opensWallet('Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36')).toBe(false);
 	});
 });

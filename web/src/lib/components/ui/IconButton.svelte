@@ -13,20 +13,9 @@
 		iconSize?: number;
 		badge?: number | boolean;
 	};
-	type Props = Common &
-		(({ href: string } & Omit<HTMLAnchorAttributes, 'href'>) | ({ href?: undefined } & HTMLButtonAttributes));
+	type Props = Common & (({ href: string } & Omit<HTMLAnchorAttributes, 'href'>) | ({ href?: undefined } & HTMLButtonAttributes));
 
-	let {
-		icon,
-		label,
-		variant = 'glass',
-		size = 44,
-		shape = 'circle',
-		iconSize,
-		badge,
-		class: className = '',
-		...rest
-	}: Props = $props();
+	let { icon, label, variant = 'glass', size = 44, shape = 'circle', iconSize, badge, class: className = '', ...rest }: Props = $props();
 
 	const classes = $derived(`icon-btn ${variant} ${shape} ${className}`);
 	const badgeText = $derived(typeof badge === 'number' ? (badge > 99 ? '99+' : String(badge)) : '');

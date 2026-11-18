@@ -72,11 +72,31 @@ export const POST = authed<{ id: string }>(async ({ event, params, userId }) => 
 	const created = [];
 	for (const email of emails.length || people.length ? emails : [null]) {
 		const { id, token, expiresAt, maxUses } = await createInvite(params.id, userId, email, null, input.maxUses === undefined ? 1 : input.maxUses);
-		created.push({ id, maxUses, email, username: null as string | null, name: null as string | null, invitedUserId: null as string | null, token, url: inviteUrl(token), expiresAt: expiresAt.toISOString() });
+		created.push({
+			id,
+			maxUses,
+			email,
+			username: null as string | null,
+			name: null as string | null,
+			invitedUserId: null as string | null,
+			token,
+			url: inviteUrl(token),
+			expiresAt: expiresAt.toISOString()
+		});
 	}
 	for (const person of people) {
 		const { id, token, expiresAt, maxUses } = await createInvite(params.id, userId, null, person.id);
-		created.push({ id, maxUses, email: null, username: person.username, name: person.name, invitedUserId: person.id, token, url: inviteUrl(token), expiresAt: expiresAt.toISOString() });
+		created.push({
+			id,
+			maxUses,
+			email: null,
+			username: person.username,
+			name: person.name,
+			invitedUserId: person.id,
+			token,
+			url: inviteUrl(token),
+			expiresAt: expiresAt.toISOString()
+		});
 	}
 	if (emails.length || people.length) {
 		const [me, group] = await Promise.all([getMe(userId), getGroupRow(params.id)]);

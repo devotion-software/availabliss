@@ -60,7 +60,12 @@ async function load(rows: ProposalRow[]): Promise<Proposal[]> {
 	const responses = await db
 		.select()
 		.from(proposalResponses)
-		.where(inArray(proposalResponses.proposalId, rows.map((r) => r.id)));
+		.where(
+			inArray(
+				proposalResponses.proposalId,
+				rows.map((r) => r.id)
+			)
+		);
 	const byProposal = new Map<string, ResponseRow[]>(rows.map((r) => [r.id, []]));
 	for (const r of responses) byProposal.get(r.proposalId)?.push(r);
 
@@ -82,10 +87,7 @@ async function load(rows: ProposalRow[]): Promise<Proposal[]> {
 		const own = byProposal.get(row.id)!;
 		const start = row.start.getTime();
 		const end = row.end.getTime();
-		const busyIds =
-			row.status === 'open'
-				? own.map((r) => r.userId).filter((id) => busy.get(id)?.some((b) => b.start < end && b.end > start))
-				: [];
+		const busyIds = row.status === 'open' ? own.map((r) => r.userId).filter((id) => busy.get(id)?.some((b) => b.start < end && b.end > start)) : [];
 		return toProposal(row, own, busyIds);
 	});
 }
@@ -433,7 +435,13 @@ async function confirm(proposal: Proposal, members: string[], confirmedBy: strin
 		data: { proposalId, eventId }
 	});
 	// The email follows the same choices as the push (plans turned off, group muted, quiet hours).
-	await emailConfirmation(await pushRecipients(members, 'proposal.confirmed', proposal.groupId), group.name, when, proposalId, confirmedBy ? count : null);
+	await emailConfirmation(
+		await pushRecipients(members, 'proposal.confirmed', proposal.groupId),
+		group.name,
+		when,
+		proposalId,
+		confirmedBy ? count : null
+	);
 	return confirmed;
 }
 

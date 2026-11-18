@@ -87,7 +87,11 @@ export async function maintainPush<Creds>(
 }
 
 /** Stops the channels of these calendars (before the connection is removed). */
-export async function stopPush<Creds>(adapter: CalendarAdapter<Creds>, creds: Creds, rows: { pushId: string | null; pushResourceId: string | null }[]) {
+export async function stopPush<Creds>(
+	adapter: CalendarAdapter<Creds>,
+	creds: Creds,
+	rows: { pushId: string | null; pushResourceId: string | null }[]
+) {
 	for (const row of rows) if (row.pushId) await stopChannel(adapter, creds, { id: row.pushId, resourceId: row.pushResourceId });
 }
 

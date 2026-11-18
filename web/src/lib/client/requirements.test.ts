@@ -85,7 +85,9 @@ describe('labels', () => {
 
 	test('spanLabel', () => {
 		expect(spanLabel({ type: 'span', startDay: 4, startTime: '18:00', endDay: 6, endTime: '23:59', weeksLater: 0 })).toBe('Fri from 18:00 → Sun');
-		expect(spanLabel({ type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '12:00', weeksLater: 1 })).toBe('Tue → following Thu 12:00');
+		expect(spanLabel({ type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '12:00', weeksLater: 1 })).toBe(
+			'Tue → following Thu 12:00'
+		);
 	});
 
 	test('detailLabel and summarize', () => {
@@ -95,9 +97,9 @@ describe('labels', () => {
 		expect(detailLabel(withLength({ type: 'days', count: 1 }, { window: { from: '09:00', to: '17:00' }, days: [] }))).toBe(
 			'09:00–17:00 · any day · Nov – Jan'
 		);
-		expect(
-			detailLabel({ ...base('day'), schoolHolidaysOnly: true, dates: [{ from: '2026-12-01', to: '2026-12-02' }] })
-		).toBe('Fri–Sun · school holidays only · 1 date range');
+		expect(detailLabel({ ...base('day'), schoolHolidaysOnly: true, dates: [{ from: '2026-12-01', to: '2026-12-02' }] })).toBe(
+			'Fri–Sun · school holidays only · 1 date range'
+		);
 	});
 
 	test('fitCountLabel', () => {

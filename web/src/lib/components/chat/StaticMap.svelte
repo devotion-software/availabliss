@@ -20,7 +20,15 @@
 
 <div class="map" style:height="{height}px" bind:clientWidth={width} aria-hidden="true">
 	{#each tiles as tile (tile.url + tile.left)}
-		<img src={tile.url} alt="" loading="lazy" decoding="async" referrerpolicy="strict-origin-when-cross-origin" style:left="{tile.left}px" style:top="{tile.top}px" />
+		<img
+			src={tile.url}
+			alt=""
+			loading="lazy"
+			decoding="async"
+			referrerpolicy="strict-origin-when-cross-origin"
+			style:left="{tile.left}px"
+			style:top="{tile.top}px"
+		/>
 	{/each}
 	<span class="pin"><Icon name="map-pin" size={17} strokeWidth={2.4} /></span>
 	<span class="credit">© OpenStreetMap</span>

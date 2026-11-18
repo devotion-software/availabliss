@@ -40,7 +40,10 @@ check('validation errors are 400 with issues', (await call(sam.token, 'POST', '/
 // Group + invite
 const plan0 = await call(sam.token, 'GET', '/api/v1/me/plan');
 check('new accounts are on the free plan', plan0.data.tier === 'free' && plan0.data.groupLimit === 3 && plan0.data.canCreateGroup, plan0.data);
-check('webhook rejects requests without the shared secret', (await call(null, 'POST', '/api/v1/billing/revenuecat', { event: { type: 'RENEWAL' } })).status === 401);
+check(
+	'webhook rejects requests without the shared secret',
+	(await call(null, 'POST', '/api/v1/billing/revenuecat', { event: { type: 'RENEWAL' } })).status === 401
+);
 const group = await call(sam.token, 'POST', '/api/v1/groups', { name: 'Lake District crew' });
 check('create group (default weekend requirement)', group.status === 201 && group.data.requirement.length.type === 'span', group.data);
 const groupId = group.data.id;
@@ -87,7 +90,11 @@ const reader = live.body!.getReader();
 
 // Busy time: Priya blocks the first upcoming Saturday by hand; Sam blocks a repeating evening
 const avail0 = await call(sam.token, 'GET', `/api/v1/groups/${groupId}/availability?from=${today}&to=${addDays(today, 60)}`);
-check('availability before anyone syncs has no synced members', avail0.data.syncedCount === 0 && avail0.data.pendingMemberIds.length === 2, avail0.data);
+check(
+	'availability before anyone syncs has no synced members',
+	avail0.data.syncedCount === 0 && avail0.data.pendingMemberIds.length === 2,
+	avail0.data
+);
 check('only Fri–Sun columns are visible', JSON.stringify(avail0.data.visibleWeekdays) === '[4,5,6]', avail0.data.visibleWeekdays);
 
 const saturday = avail0.data.days.find((d: any) => new Date(`${d.date}T12:00:00Z`).getUTCDay() === 6 && d.date > addDays(today, 1)).date;
@@ -125,10 +132,18 @@ check('a time that works has no clashes', JSON.stringify(proposal.data.busyMembe
 
 // Proposing a time someone is busy for: allowed, with the clash reported.
 const busySat = { start: `${saturday}T18:00:00Z`, end: `${saturday}T21:00:00Z` };
-const conflicts = await call(sam.token, 'GET', `/api/v1/groups/${groupId}/conflicts?start=${encodeURIComponent(busySat.start)}&end=${encodeURIComponent(busySat.end)}`);
+const conflicts = await call(
+	sam.token,
+	'GET',
+	`/api/v1/groups/${groupId}/conflicts?start=${encodeURIComponent(busySat.start)}&end=${encodeURIComponent(busySat.end)}`
+);
 check('conflicts names who is busy', JSON.stringify(conflicts.data.busyMemberIds) === JSON.stringify([priya.id]), conflicts.data);
 const clashing = await call(sam.token, 'POST', `/api/v1/groups/${groupId}/proposals`, { ...busySat, title: 'Despite the wedding' });
-check('can propose a clashing time; proposal lists who is busy', clashing.status === 201 && clashing.data.busyMemberIds?.includes(priya.id), clashing.data);
+check(
+	'can propose a clashing time; proposal lists who is busy',
+	clashing.status === 201 && clashing.data.busyMemberIds?.includes(priya.id),
+	clashing.data
+);
 await call(sam.token, 'DELETE', `/api/v1/proposals/${clashing.data.id}`);
 const summaries = await call(priya.token, 'GET', '/api/v1/groups');
 check('group list says Priya needs to reply', summaries.data.groups[0].status.kind === 'needs_reply', summaries.data.groups[0]);
@@ -149,7 +164,11 @@ check('create poll', poll.data.poll?.options.length === 2, poll.data);
 const voted = await call(priya.token, 'POST', `/api/v1/polls/${poll.data.poll.id}/vote`, { optionIds: [poll.data.poll.options[0].id] });
 check('vote', voted.data.options[0].voterIds.includes(priya.id), voted.data);
 const history = await call(priya.token, 'GET', `/api/v1/groups/${groupId}/messages`);
-check('message history includes cards and chat', history.data.messages.some((m: any) => m.kind === 'proposal') && history.data.messages.length >= 4, history.data);
+check(
+	'message history includes cards and chat',
+	history.data.messages.some((m: any) => m.kind === 'proposal') && history.data.messages.length >= 4,
+	history.data
+);
 await call(priya.token, 'POST', `/api/v1/groups/${groupId}/messages/receipts`, { upTo: msg.data.id, state: 'delivered' });
 let info = await call(sam.token, 'GET', `/api/v1/messages/${msg.data.id}/info`);
 check('message info: delivered, not seen', info.data.delivered.length === 1 && info.data.seen.length === 0, info.data);
@@ -163,7 +182,11 @@ const notes = await call(priya.token, 'GET', '/api/v1/notifications');
 check('notifications recorded', notes.data.notifications.some((n: any) => n.kind === 'proposal.created') && notes.data.unread > 0, notes.data);
 await Bun.sleep(300);
 const types = new Set(events.map((e) => e.type));
-check('live stream delivered events', ['message.created', 'proposal.confirmed', 'poll.updated'].every((t) => types.has(t)), [...types]);
+check(
+	'live stream delivered events',
+	['message.created', 'proposal.confirmed', 'poll.updated'].every((t) => types.has(t)),
+	[...types]
+);
 await reader.cancel();
 
 // Calendars (no providers configured locally): device upload
@@ -196,7 +219,10 @@ check('well-known AASA served', (await call(null, 'GET', '/.well-known/apple-app
 		headers: { 'content-type': 'application/json', origin: BASE },
 		body: JSON.stringify({ email, otp: await otpFor(email) })
 	});
-	const session = signedIn.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+	const session = signedIn.headers
+		.getSetCookie()
+		.map((c) => c.split(';')[0])
+		.join('; ');
 	const verifier = 'v'.repeat(20) + crypto.randomUUID().replaceAll('-', '');
 	const callbackWith = async (flow: string | null) => {
 		const cookie = flow ? `${session}; ${FLOW_COOKIE}=${flow}` : session;
@@ -212,7 +238,10 @@ check('well-known AASA served', (await call(null, 'GET', '/.well-known/apple-app
 	check('native callback redirects to the app with a code', Boolean(code), code);
 	const wrong = await call(null, 'POST', '/api/v1/auth/native/exchange', { code, code_verifier: 'w'.repeat(43) });
 	check('exchange needs the matching verifier', wrong.status === 400, wrong.data);
-	check('a code is spent after a wrong verifier', (await call(null, 'POST', '/api/v1/auth/native/exchange', { code, code_verifier: verifier })).status === 400);
+	check(
+		'a code is spent after a wrong verifier',
+		(await call(null, 'POST', '/api/v1/auth/native/exchange', { code, code_verifier: verifier })).status === 400
+	);
 
 	const code2 = (await callbackWith(encodeFlow(challengeFor(verifier), beforeSignIn))).get('code');
 	const exchanged = await call(null, 'POST', '/api/v1/auth/native/exchange', { code: code2, code_verifier: verifier });

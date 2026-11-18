@@ -42,10 +42,7 @@ function ignoreFor(ignores: readonly Ignore[], calendarId: string, eventKey: str
 export async function syncedUserIds(userIds: string[]): Promise<Set<string>> {
 	if (!userIds.length) return new Set();
 	const [connected, blocked] = await Promise.all([
-		db
-			.selectDistinct({ userId: calendarConnections.userId })
-			.from(calendarConnections)
-			.where(inArray(calendarConnections.userId, userIds)),
+		db.selectDistinct({ userId: calendarConnections.userId }).from(calendarConnections).where(inArray(calendarConnections.userId, userIds)),
 		db.selectDistinct({ userId: manualBlocks.userId }).from(manualBlocks).where(inArray(manualBlocks.userId, userIds))
 	]);
 	return new Set([...connected, ...blocked].map((r) => r.userId));
@@ -106,12 +103,7 @@ export async function loadBusy(
 			.from(busyIntervals)
 			.innerJoin(calendars, eq(calendars.id, busyIntervals.calendarId))
 			.where(
-				and(
-					inArray(busyIntervals.userId, userIds),
-					eq(calendars.busy, true),
-					lt(busyIntervals.start, range.to),
-					gt(busyIntervals.end, range.from)
-				)
+				and(inArray(busyIntervals.userId, userIds), eq(calendars.busy, true), lt(busyIntervals.start, range.to), gt(busyIntervals.end, range.from))
 			),
 		db
 			.select()
@@ -128,7 +120,8 @@ export async function loadBusy(
 	]);
 
 	for (const r of calendarRows) {
-		const start = r.start.getTime(), end = r.end.getTime();
+		const start = r.start.getTime(),
+			end = r.end.getTime();
 		const ignore = ignoreFor(ignoreRows, r.calendarId, r.eventKey, start, end);
 		if (ignore && !includeIgnored) continue;
 		result.get(r.userId)!.push({

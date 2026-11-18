@@ -10,7 +10,11 @@ export interface CalendarItem {
 	note?: string | null;
 }
 
-const compactUtc = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+const compactUtc = (iso: string) =>
+	new Date(iso)
+		.toISOString()
+		.replace(/[-:]/g, '')
+		.replace(/\.\d{3}/, '');
 
 /** Opens Google Calendar's "new event" form prefilled with the item. */
 export function googleCalendarUrl(item: CalendarItem, dayKey: (iso: string) => string): string {

@@ -36,7 +36,8 @@
 		preset = id;
 		if (id === 'custom') {
 			// Start custom at hours rather than a span that looks like the weekend.
-			if (requirement.length.type === 'span') requirement = { ...requirement, length: { type: 'duration', minutes: 180 }, window: { from: '08:00', to: '23:00' } };
+			if (requirement.length.type === 'span')
+				requirement = { ...requirement, length: { type: 'duration', minutes: 180 }, window: { from: '08:00', to: '23:00' } };
 		} else requirement = applyPreset(requirement, id);
 	}
 

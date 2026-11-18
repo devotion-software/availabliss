@@ -4,4 +4,6 @@ import { notificationSettingsSchema } from '#lib/schemas';
 
 export const GET = authed(async ({ userId }) => json(await getNotificationSettings(userId)));
 
-export const PATCH = authed(async ({ event, userId }) => json(await updateNotificationSettings(userId, await body(event, notificationSettingsSchema))));
+export const PATCH = authed(async ({ event, userId }) =>
+	json(await updateNotificationSettings(userId, await body(event, notificationSettingsSchema)))
+);

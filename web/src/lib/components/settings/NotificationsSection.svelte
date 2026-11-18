@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { NOTIFICATION_CATEGORIES, type NotificationCategory, type NotificationSettings } from '#lib/types';
-	import { CATEGORY_LABELS, getNotificationSettings, updateNotificationSettings, type NotificationSettingsPatch } from '#lib/client/notification-settings';
+	import {
+		CATEGORY_LABELS,
+		getNotificationSettings,
+		updateNotificationSettings,
+		type NotificationSettingsPatch
+	} from '#lib/client/notification-settings';
 	import { toasts } from '#lib/client/toast.svelte';
 	import GlassPanel from '#lib/components/ui/GlassPanel.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';

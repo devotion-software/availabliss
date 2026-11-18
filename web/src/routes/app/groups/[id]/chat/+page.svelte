@@ -27,7 +27,12 @@
 	const groupId = $derived(data.group.id);
 	const meId = $derived(data.user.id);
 	const thread = $derived(
-		new ChatThread(groupId, meId, untrack(() => data.group.members.length), untrack(() => data.initial ?? undefined))
+		new ChatThread(
+			groupId,
+			meId,
+			untrack(() => data.group.members.length),
+			untrack(() => data.initial ?? undefined)
+		)
 	);
 	const others = $derived(
 		group.members

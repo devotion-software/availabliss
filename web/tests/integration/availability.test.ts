@@ -41,7 +41,15 @@ beforeAll(async () => {
 			.onDuplicateKeyUpdate({ set: { holidays: r.holidays, fetchedAt: new Date() } });
 	}
 	await db.insert(schoolHolidays).values([
-		{ id: newId(), country: COUNTRY, authority: AUTHORITY, authorityName: 'Test Borough', name: 'Spring break', start: '2031-03-07', end: '2031-03-08' },
+		{
+			id: newId(),
+			country: COUNTRY,
+			authority: AUTHORITY,
+			authorityName: 'Test Borough',
+			name: 'Spring break',
+			start: '2031-03-07',
+			end: '2031-03-08'
+		},
 		{ id: newId(), country: COUNTRY, authority: AUTHORITY, authorityName: 'Test Borough', name: 'Summer', start: '2031-07-20', end: '2031-08-31' }
 	]);
 });
@@ -88,7 +96,14 @@ describe('groupAvailability', () => {
 		[member, outsider] = await fx.users(2);
 		groupId = (await createGroup(owner, { name: 'Availability', requirement: { ...everyDay(), schoolAuthority: AUTHORITY } }, 'UTC')).id;
 		await fx.join(groupId, member);
-		await createBlock(member, { start: '2031-03-04T10:00:00Z', end: '2031-03-04T11:00:00Z', allDay: false, repeat: 'none', until: null, note: 'Private' });
+		await createBlock(member, {
+			start: '2031-03-04T10:00:00Z',
+			end: '2031-03-04T11:00:00Z',
+			allDay: false,
+			repeat: 'none',
+			until: null,
+			note: 'Private'
+		});
 	});
 
 	test('a busy member blocks their day; unsynced members are pending', async () => {
@@ -131,7 +146,11 @@ describe('groupAvailability', () => {
 		expect(d.date).toBe('2031-03-04');
 		const m = d.members.find((x) => x.userId === member)!;
 		// Busy is just busy: a hand-marked block looks the same as calendar busy to others.
-		expect(m).toEqual({ userId: member, pending: false, busy: [{ start: '2031-03-04T10:00:00.000Z', end: '2031-03-04T11:00:00.000Z', manual: false }] });
+		expect(m).toEqual({
+			userId: member,
+			pending: false,
+			busy: [{ start: '2031-03-04T10:00:00.000Z', end: '2031-03-04T11:00:00.000Z', manual: false }]
+		});
 		expect(d.members.find((x) => x.userId === owner)?.pending).toBe(true);
 		expect(JSON.stringify(d)).not.toContain('Private');
 		expect(d.everyoneFree).toEqual([

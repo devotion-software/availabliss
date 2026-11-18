@@ -131,9 +131,7 @@ export async function sendDueReminders(now = Date.now()): Promise<number> {
  * for an event added straight to the calendar, every member.
  */
 async function goingTo(groupId: string, proposalId: string | null): Promise<string[]> {
-	const members = (await db.select({ userId: groupMembers.userId }).from(groupMembers).where(eq(groupMembers.groupId, groupId))).map(
-		(m) => m.userId
-	);
+	const members = (await db.select({ userId: groupMembers.userId }).from(groupMembers).where(eq(groupMembers.groupId, groupId))).map((m) => m.userId);
 	if (!proposalId) return members;
 	const yes = await db
 		.select({ userId: proposalResponses.userId })

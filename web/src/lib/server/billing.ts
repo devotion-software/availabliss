@@ -93,7 +93,10 @@ export async function saveEntitlement(userId: string, e: Entitlement): Promise<v
 	// Lifetime has no expiry: proUntil stays null and the flag carries it (a far-future
 	// date would overflow MariaDB's TIMESTAMP range).
 	const values = { ...e, proUntil: e.lifetime ? null : e.proUntil };
-	await db.insert(userPlans).values({ userId, ...values }).onDuplicateKeyUpdate({ set: values });
+	await db
+		.insert(userPlans)
+		.values({ userId, ...values })
+		.onDuplicateKeyUpdate({ set: values });
 }
 
 // ─── RevenueCat ───────────────────────────────────────────────────────────
@@ -119,7 +122,16 @@ export function entitlementFromSubscriber(subscriber: RcSubscriber, entitlementI
 }
 
 // TRANSFER grants the receiving account; the giving one is downgraded separately.
-const GRANTING = new Set(['INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'PRODUCT_CHANGE', 'NON_RENEWING_PURCHASE', 'SUBSCRIPTION_EXTENDED', 'TEMPORARY_ENTITLEMENT_GRANT', 'TRANSFER']);
+const GRANTING = new Set([
+	'INITIAL_PURCHASE',
+	'RENEWAL',
+	'UNCANCELLATION',
+	'PRODUCT_CHANGE',
+	'NON_RENEWING_PURCHASE',
+	'SUBSCRIPTION_EXTENDED',
+	'TEMPORARY_ENTITLEMENT_GRANT',
+	'TRANSFER'
+]);
 
 export interface RcEvent {
 	type: string;
@@ -188,7 +200,13 @@ export async function syncFromRevenueCat(userId: string): Promise<boolean> {
 export async function handleRevenueCatEvent(event: RcEvent): Promise<void> {
 	// userId → whether every id that led to it was an alias of a merged account.
 	const ids = new Map<string, boolean>();
-	for (const id of [event.app_user_id, event.original_app_user_id, ...(event.aliases ?? []), ...(event.transferred_from ?? []), ...(event.transferred_to ?? [])]) {
+	for (const id of [
+		event.app_user_id,
+		event.original_app_user_id,
+		...(event.aliases ?? []),
+		...(event.transferred_from ?? []),
+		...(event.transferred_to ?? [])
+	]) {
 		const known = await knownUser(id);
 		if (known) ids.set(known.userId, (ids.get(known.userId) ?? true) && known.viaAlias);
 	}

@@ -24,9 +24,7 @@ describe('apiUrl', () => {
 	test('drops empty values and encodes the rest', () => {
 		expect(apiUrl('/groups')).toBe('/api/v1/groups');
 		expect(apiUrl('/groups', {})).toBe('/api/v1/groups');
-		expect(apiUrl('/x', { from: '2026-11-01', n: 0, flag: false, a: null, b: undefined, c: '' })).toBe(
-			'/api/v1/x?from=2026-11-01&n=0&flag=false'
-		);
+		expect(apiUrl('/x', { from: '2026-11-01', n: 0, flag: false, a: null, b: undefined, c: '' })).toBe('/api/v1/x?from=2026-11-01&n=0&flag=false');
 		expect(apiUrl('/search', { q: 'a&b c/é' })).toBe('/api/v1/search?q=a%26b+c%2F%C3%A9');
 	});
 });

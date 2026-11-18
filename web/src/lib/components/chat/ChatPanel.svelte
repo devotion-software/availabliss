@@ -26,7 +26,13 @@
 	// Keyed on ids only, so refetching group details doesn't throw away the conversation.
 	const groupId = $derived(group.id);
 	const meId = $derived(me.id);
-	const thread = $derived(new ChatThread(groupId, meId, untrack(() => group.members.length)));
+	const thread = $derived(
+		new ChatThread(
+			groupId,
+			meId,
+			untrack(() => group.members.length)
+		)
+	);
 
 	$effect(() => {
 		const t = thread;
@@ -44,7 +50,12 @@
 	<div class="messages">
 		<MessageList {thread} {group} meId={me.id} compact />
 	</div>
-	<Composer bind:this={composer} groupId={group.id} compact onsend={(b, ids) => thread.send(b, ids)} onpoll={() => (pollOpen = true)}
+	<Composer
+		bind:this={composer}
+		groupId={group.id}
+		compact
+		onsend={(b, ids) => thread.send(b, ids)}
+		onpoll={() => (pollOpen = true)}
 		{onpropose}
 		onlocation={() => (locationOpen = true)}
 		editing={thread.editing}

@@ -28,8 +28,7 @@ export function usernameProblem(username: string): string | null {
 	if (username.length < USERNAME_MIN) return `At least ${USERNAME_MIN} characters`;
 	if (username.length > USERNAME_MAX) return `At most ${USERNAME_MAX} characters`;
 	if (!/^[a-z0-9_.]+$/.test(username)) return 'Only letters, numbers, _ and .';
-	if (username.startsWith('.') || username.endsWith('.') || username.includes('..'))
-		return "A dot can't come first, last or twice in a row";
+	if (username.startsWith('.') || username.endsWith('.') || username.includes('..')) return "A dot can't come first, last or twice in a row";
 	if (RESERVED.has(username)) return "That one's reserved";
 	return null;
 }

@@ -22,7 +22,9 @@ export async function sendOtpEmail({ email, otp, type }: { email: string; otp: s
 	await deliver({
 		to: email,
 		subject: type === 'sign-in' ? 'Your Availabliss sign-in code' : 'Confirm your email for Availabliss',
-		html: layout(`<p style="${P}">${intro}</p>${codeBlock(otp)}<p style="${SMALL}">It expires in 10 minutes. If you didn't ask for it, ignore this email.</p>`),
+		html: layout(
+			`<p style="${P}">${intro}</p>${codeBlock(otp)}<p style="${SMALL}">It expires in 10 minutes. If you didn't ask for it, ignore this email.</p>`
+		),
 		text: `${intro}\n\nYour code is ${otp}. It expires in 10 minutes.`
 	});
 }

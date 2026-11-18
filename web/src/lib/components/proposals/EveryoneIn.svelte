@@ -129,9 +129,9 @@
 		<span class="bloom"><Logo size={132} /></span>
 		<h1>{allIn ? "Everyone's in." : "It's on."}</h1>
 		<p class="when">
-			<span class="lead"
-				>{allIn ? (count === 2 ? 'Both of you' : `All ${count} of you`) : `${coming.length} of ${proposal.responses.length}`} can make</span
-			>
+			<span class="lead">
+				{allIn ? (count === 2 ? 'Both of you' : `All ${count} of you`) : `${coming.length} of ${proposal.responses.length}`} can make
+			</span>
 			<span class="date">{parts.date}</span>
 			{#if parts.time}<span class="time">{parts.time}</span>{/if}
 			{#if proposal.location}<span class="place">in {proposal.location}</span>{/if}
@@ -215,7 +215,6 @@
 			{/each}
 		</section>
 	{/if}
-
 </div>
 
 <Sheet
@@ -225,12 +224,12 @@
 	width={420}
 >
 	<div class="choices">
-		<Button variant="solid" icon="check" block loading={busy === 'keep'} disabled={busy !== null} onclick={() => run('keep', onkeep)}
-			>Keep the plan</Button
-		>
-		<Button variant="danger" icon="calendar" block loading={busy === 'cancel'} disabled={busy !== null} onclick={() => run('cancel', oncancelplan)}
-			>Cancel and find another date</Button
-		>
+		<Button variant="solid" icon="check" block loading={busy === 'keep'} disabled={busy !== null} onclick={() => run('keep', onkeep)}>
+			Keep the plan
+		</Button>
+		<Button variant="danger" icon="calendar" block loading={busy === 'cancel'} disabled={busy !== null} onclick={() => run('cancel', oncancelplan)}>
+			Cancel and find another date
+		</Button>
 		<Button variant="secondary" block onclick={() => (reviewOpen = false)}>Decide later</Button>
 	</div>
 </Sheet>
@@ -245,14 +244,21 @@
 >
 	<div class="choices">
 		{#if mine !== 'accepted'}
-			<Button variant="solid" icon="check" block loading={busy === 'accepted'} disabled={busy !== null} onclick={() => run('accepted', () => onrespond('accepted'))}
-				>I can make it</Button
+			<Button
+				variant="solid"
+				icon="check"
+				block
+				loading={busy === 'accepted'}
+				disabled={busy !== null}
+				onclick={() => run('accepted', () => onrespond('accepted'))}
 			>
+				I can make it
+			</Button>
 		{/if}
 		{#if mine !== 'maybe'}
-			<Button variant="secondary" block loading={busy === 'maybe'} disabled={busy !== null} onclick={() => run('maybe', () => onrespond('maybe'))}
-				>Maybe, if I must</Button
-			>
+			<Button variant="secondary" block loading={busy === 'maybe'} disabled={busy !== null} onclick={() => run('maybe', () => onrespond('maybe'))}>
+				Maybe, if I must
+			</Button>
 		{/if}
 		{#if mine !== 'declined'}
 			<Button
@@ -260,8 +266,10 @@
 				block
 				loading={busy === 'declined'}
 				disabled={busy !== null}
-				onclick={() => run('declined', () => onrespond('declined'))}>I can’t make it</Button
+				onclick={() => run('declined', () => onrespond('declined'))}
 			>
+				I can’t make it
+			</Button>
 		{/if}
 		<Button variant="secondary" block onclick={() => (replyOpen = false)}>Cancel</Button>
 	</div>

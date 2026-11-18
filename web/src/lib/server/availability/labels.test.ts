@@ -45,12 +45,12 @@ describe('slotLabel', () => {
 describe('requirementSummary', () => {
 	test('spans', () => {
 		expect(requirementSummary(req(WEEKEND))).toBe('A weekend · Fri 18:00 → Sun · Nov – Jan');
-		expect(
-			requirementSummary(req({ type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '23:59', weeksLater: 1 }))
-		).toBe('Over a week · Tue → following Thu · Nov – Jan');
-		expect(
-			requirementSummary(req({ type: 'span', startDay: 0, startTime: '09:00', endDay: 2, endTime: '17:00', weeksLater: 0 }))
-		).toBe('A few days · Mon 09:00 → Wed 17:00 · Nov – Jan');
+		expect(requirementSummary(req({ type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '23:59', weeksLater: 1 }))).toBe(
+			'Over a week · Tue → following Thu · Nov – Jan'
+		);
+		expect(requirementSummary(req({ type: 'span', startDay: 0, startTime: '09:00', endDay: 2, endTime: '17:00', weeksLater: 0 }))).toBe(
+			'A few days · Mon 09:00 → Wed 17:00 · Nov – Jan'
+		);
 	});
 
 	test('day counts', () => {
@@ -70,9 +70,7 @@ describe('requirementSummary', () => {
 			'1.5 hours · any day · Nov'
 		);
 		expect(
-			requirementSummary(
-				req({ type: 'duration', minutes: 120 }, { schoolHolidaysOnly: true, dates: [{ from: '2026-12-01', to: '2026-12-02' }] })
-			)
+			requirementSummary(req({ type: 'duration', minutes: 120 }, { schoolHolidaysOnly: true, dates: [{ from: '2026-12-01', to: '2026-12-02' }] }))
 		).toBe('2 hours · any day · school holidays · chosen dates · Nov – Jan');
 	});
 

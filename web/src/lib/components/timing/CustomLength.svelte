@@ -26,15 +26,7 @@
 	const valueOf = (e: Event) => (e.currentTarget as HTMLInputElement).value;
 </script>
 
-<SegmentedControl
-	options={KINDS}
-	value={requirement.length.type}
-	label="Kind of length"
-	variant="soft"
-	size="sm"
-	block
-	onchange={setKind}
-/>
+<SegmentedControl options={KINDS} value={requirement.length.type} label="Kind of length" variant="soft" size="sm" block onchange={setKind} />
 {#if requirement.length.type === 'duration'}
 	<TextField
 		label="Hours"

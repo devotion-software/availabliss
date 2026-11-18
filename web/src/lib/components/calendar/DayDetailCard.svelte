@@ -65,10 +65,16 @@
 			<h3>{title}</h3>
 			<span class="sub">{sub}</span>
 		</div>
-		<StatusPill tone={partial ? 'indigo' : works ? 'mint' : 'neutral'}>{partial ? 'Most free' : works ? 'Works' : past ? 'Past' : 'Doesn’t fit'}</StatusPill>
+		<StatusPill tone={partial ? 'indigo' : works ? 'mint' : 'neutral'}>
+			{partial ? 'Most free' : works ? 'Works' : past ? 'Past' : 'Doesn’t fit'}
+		</StatusPill>
 	</div>
 	{#if !past && works && day?.preferredBy?.length}
-		<p class="pref"><Icon name="heart" size={13} /> {busyNames(day.preferredBy, members)} {day.preferredBy.length === 1 ? 'prefers' : 'prefer'} this</p>
+		<p class="pref">
+			<Icon name="heart" size={13} />
+			{busyNames(day.preferredBy, members)}
+			{day.preferredBy.length === 1 ? 'prefers' : 'prefer'} this
+		</p>
 	{/if}
 	{#if past}
 		<!-- Nothing to plan on a day that's gone. -->
@@ -87,8 +93,10 @@
 					class="act shortlist"
 					icon={shortlisted ? 'check' : 'plus'}
 					aria-pressed={shortlisted}
-					onclick={() => onshortlist(slot)}>{shortlisted ? 'Shortlisted' : 'Shortlist'}</Button
+					onclick={() => onshortlist(slot)}
 				>
+					{shortlisted ? 'Shortlisted' : 'Shortlist'}
+				</Button>
 			{/if}
 		{:else if free && !past}
 			{@const toMidnight = fmt.current.dayKey(free.end) !== date}
@@ -98,8 +106,9 @@
 				size="sm"
 				class="act"
 				onclick={() => onpropose({ start: free.start, end: free.end, label: '', ...(allDay && { allDay: true }) })}
-				>{allDay ? 'Propose all day' : `Propose ${fmt.current.time(free.start)} – ${toMidnight ? 'midnight' : fmt.current.time(free.end)}`}</Button
 			>
+				{allDay ? 'Propose all day' : `Propose ${fmt.current.time(free.start)} – ${toMidnight ? 'midnight' : fmt.current.time(free.end)}`}
+			</Button>
 		{:else if !past && onproposeday && (day?.status === 'busy' || day?.status === 'free')}
 			<Button variant="secondary" size="sm" class="act" onclick={() => onproposeday(date)}>Propose anyway</Button>
 		{/if}

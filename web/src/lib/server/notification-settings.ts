@@ -4,12 +4,7 @@
  * records everything, so nothing is lost, only not pushed.
  */
 import { and, eq, inArray } from 'drizzle-orm';
-import {
-	NOTIFICATION_CATEGORIES,
-	type NotificationCategory,
-	type NotificationKind,
-	type NotificationSettings
-} from '#lib/types';
+import { NOTIFICATION_CATEGORIES, type NotificationCategory, type NotificationKind, type NotificationSettings } from '#lib/types';
 import { db } from './db';
 import { groupMutes, user } from './db/schema';
 import { requireMember } from './groups';
@@ -28,8 +23,7 @@ export const CATEGORY_OF: Partial<Record<NotificationKind, NotificationCategory>
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-const cleanOff = (off: unknown): NotificationCategory[] =>
-	Array.isArray(off) ? NOTIFICATION_CATEGORIES.filter((c) => off.includes(c)) : [];
+const cleanOff = (off: unknown): NotificationCategory[] => (Array.isArray(off) ? NOTIFICATION_CATEGORIES.filter((c) => off.includes(c)) : []);
 const cleanQuiet = (q: unknown): NotificationSettings['quietHours'] => {
 	const v = q as { from?: unknown; to?: unknown } | null;
 	return v && typeof v.from === 'string' && typeof v.to === 'string' && TIME.test(v.from) && TIME.test(v.to) && v.from !== v.to
@@ -64,7 +58,10 @@ export async function updateNotificationSettings(
 export async function muteGroup(userId: string, groupId: string, until: string | null): Promise<NotificationSettings> {
 	await requireMember(groupId, userId);
 	const value = until ? new Date(until) : null;
-	await db.insert(groupMutes).values({ userId, groupId, until: value }).onDuplicateKeyUpdate({ set: { until: value } });
+	await db
+		.insert(groupMutes)
+		.values({ userId, groupId, until: value })
+		.onDuplicateKeyUpdate({ set: { until: value } });
 	return getNotificationSettings(userId);
 }
 
@@ -79,7 +76,8 @@ export function inQuietHours(quiet: NotificationSettings['quietHours'], timeZone
 	const w = wallClock(now, timeZone);
 	const minutes = w.hour * 60 + w.minute;
 	const toMinutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
-	const from = toMinutes(quiet.from), to = toMinutes(quiet.to);
+	const from = toMinutes(quiet.from),
+		to = toMinutes(quiet.to);
 	return from < to ? minutes >= from && minutes < to : minutes >= from || minutes < to;
 }
 
@@ -88,9 +86,15 @@ export async function pushRecipients(userIds: string[], kind: NotificationKind, 
 	if (!userIds.length) return [];
 	const category = CATEGORY_OF[kind];
 	const [prefs, mutes] = await Promise.all([
-		db.select({ id: user.id, off: user.notificationOff, quiet: user.quietHours, timezone: user.timezone }).from(user).where(inArray(user.id, userIds)),
+		db
+			.select({ id: user.id, off: user.notificationOff, quiet: user.quietHours, timezone: user.timezone })
+			.from(user)
+			.where(inArray(user.id, userIds)),
 		groupId && category
-			? db.select().from(groupMutes).where(and(eq(groupMutes.groupId, groupId), inArray(groupMutes.userId, userIds)))
+			? db
+					.select()
+					.from(groupMutes)
+					.where(and(eq(groupMutes.groupId, groupId), inArray(groupMutes.userId, userIds)))
 			: Promise.resolve([])
 	]);
 	const muted = new Set(mutes.filter((m) => m.until === null || m.until.getTime() > now).map((m) => m.userId));

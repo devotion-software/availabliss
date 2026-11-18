@@ -21,15 +21,30 @@ afterAll(async () => {
 
 let owner: string, member: string, outsider: string, groupId: string;
 
-const photo = async () => new File([await sharp({ create: { width: 3000, height: 1500, channels: 3, background: '#78b4ff' } }).jpeg().toBuffer()], 'IMG_0001.HEIC', { type: 'image/heic' });
+const photo = async () =>
+	new File(
+		[
+			await sharp({ create: { width: 3000, height: 1500, channels: 3, background: '#78b4ff' } })
+				.jpeg()
+				.toBuffer()
+		],
+		'IMG_0001.HEIC',
+		{ type: 'image/heic' }
+	);
 const gif = async () => {
-	const frame = (colour: string) => sharp({ create: { width: 40, height: 30, channels: 3, background: colour } }).png().toBuffer();
-	const bytes = await sharp([await frame('#f00'), await frame('#00f')], { join: { animated: true } }).gif().toBuffer();
+	const frame = (colour: string) =>
+		sharp({ create: { width: 40, height: 30, channels: 3, background: colour } })
+			.png()
+			.toBuffer();
+	const bytes = await sharp([await frame('#f00'), await frame('#00f')], { join: { animated: true } })
+		.gif()
+		.toBuffer();
 	return new File([bytes], 'dance.gif', { type: 'image/gif' });
 };
 const pdf = () => new File(['%PDF-1.4 tiny'], 'Plan.pdf', { type: 'application/pdf' });
 const keysOf = async (id: string) => (await db.query.messageAttachments.findFirst({ where: eq(messageAttachments.id, id) }))!;
-const fetchAs = (url: string, userId: string | null) => serveAttachment(new URL(url).pathname.split('/')[4], url.includes('/thumb?') ? 'thumb' : 'file', new URL(url), userId, null);
+const fetchAs = (url: string, userId: string | null) =>
+	serveAttachment(new URL(url).pathname.split('/')[4], url.includes('/thumb?') ? 'thumb' : 'file', new URL(url), userId, null);
 
 beforeAll(async () => {
 	owner = await fx.user({ name: 'Ola' });
@@ -55,10 +70,12 @@ describe('uploads', () => {
 
 	test('only members, only allowed types, nothing empty', async () => {
 		expect((await apiError(uploadAttachment(groupId, outsider, pdf()))).code).toBe('not_found');
-		expect((await apiError(uploadAttachment(groupId, member, new File(['MZ'], 'setup.exe'))))).toMatchObject({ code: 'validation_error' });
-		expect((await apiError(uploadAttachment(groupId, member, new File(['<svg/>'], 'x.svg', { type: 'image/svg+xml' }))))).toMatchObject({ code: 'validation_error' });
-		expect((await apiError(uploadAttachment(groupId, member, new File(['not a photo'], 'x.jpg'))))).toMatchObject({ code: 'validation_error' });
-		expect((await apiError(uploadAttachment(groupId, member, new File([], 'x.pdf'))))).toMatchObject({ code: 'validation_error' });
+		expect(await apiError(uploadAttachment(groupId, member, new File(['MZ'], 'setup.exe')))).toMatchObject({ code: 'validation_error' });
+		expect(await apiError(uploadAttachment(groupId, member, new File(['<svg/>'], 'x.svg', { type: 'image/svg+xml' })))).toMatchObject({
+			code: 'validation_error'
+		});
+		expect(await apiError(uploadAttachment(groupId, member, new File(['not a photo'], 'x.jpg')))).toMatchObject({ code: 'validation_error' });
+		expect(await apiError(uploadAttachment(groupId, member, new File([], 'x.pdf')))).toMatchObject({ code: 'validation_error' });
 	});
 });
 
@@ -140,13 +157,21 @@ describe('access', () => {
 });
 
 describe('Wallet passes', () => {
-	const logo = () => sharp({ create: { width: 320, height: 100, channels: 4, background: '#ffffff00' } }).png().toBuffer();
+	const logo = () =>
+		sharp({ create: { width: 320, height: 100, channels: 4, background: '#ffffff00' } })
+			.png()
+			.toBuffer();
 
 	test('a .pkpass becomes a pass card, kept byte for byte, served for Wallet', async () => {
 		const bytes = makePass(undefined, new Uint8Array(await logo()));
 		const p = await uploadAttachment(groupId, member, new File([bytes], 'Winter Gig.pkpass', { type: 'application/vnd.apple.pkpass' }));
 		expect(p).toMatchObject({ kind: 'pass', name: 'Winter Gig.pkpass', mime: 'application/vnd.apple.pkpass', size: bytes.byteLength });
-		expect(p.pass).toMatchObject({ description: 'Concert ticket', organizationName: 'Roundhouse', serialNumber: 'SEAT-12A', backgroundColor: '#201840' });
+		expect(p.pass).toMatchObject({
+			description: 'Concert ticket',
+			organizationName: 'Roundhouse',
+			serialNumber: 'SEAT-12A',
+			backgroundColor: '#201840'
+		});
 		// The logo, shrunk, as its thumbnail.
 		expect(p.thumbnailUrl).toContain('/thumb?');
 
@@ -192,7 +217,7 @@ describe('clean-up', () => {
 		expect(await getObject(storageKey)).toBeNull();
 	});
 
-	test("deleting the group deletes everything sent in it", async () => {
+	test('deleting the group deletes everything sent in it', async () => {
 		const g = (await createGroup(owner, { name: 'Short-lived', requirement: everyDay() }, 'UTC')).id;
 		const p = await uploadAttachment(g, owner, await photo());
 		await sendText(g, owner, null, null, [p.id]);

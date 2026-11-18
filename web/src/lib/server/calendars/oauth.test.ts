@@ -61,7 +61,16 @@ describe('safeRedirect', () => {
 	test('keeps app paths and the app scheme, falls back otherwise', () => {
 		expect(safeRedirect('/app/settings')).toBe('/app/settings');
 		expect(safeRedirect('availabliss://calendars?complete=1')).toBe('availabliss://calendars?complete=1');
-		for (const bad of ['https://evil.example/x', '//evil.example', '/\\evil.example', 'javascript:alert(1)', 'availabliss://x\ny', 'availabliss://a\\b', null, '']) {
+		for (const bad of [
+			'https://evil.example/x',
+			'//evil.example',
+			'/\\evil.example',
+			'javascript:alert(1)',
+			'availabliss://x\ny',
+			'availabliss://a\\b',
+			null,
+			''
+		]) {
 			expect(safeRedirect(bad)).toBe('/app/calendars');
 		}
 	});

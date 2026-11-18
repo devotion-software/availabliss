@@ -81,7 +81,14 @@ describe('sendDueReminders', () => {
 		const [owner, member] = await fx.users(2);
 		const groupId = (await createGroup(owner, { name: 'Book club', requirement: everyDay('2032-05-01', '2032-06-30') }, 'UTC')).id;
 		await fx.join(groupId, member);
-		await createEvent(groupId, owner, { title: 'Book swap', start: '2032-06-02T18:00:00.000Z', end: '2032-06-02T20:00:00.000Z', allDay: false, location: null, note: null });
+		await createEvent(groupId, owner, {
+			title: 'Book swap',
+			start: '2032-06-02T18:00:00.000Z',
+			end: '2032-06-02T20:00:00.000Z',
+			allDay: false,
+			location: null,
+			note: null
+		});
 		await sendDueReminders(at('2032-06-02T17:15:00Z'));
 		expect((await remindersFor([owner, member])).map((r) => r.userId).sort()).toEqual([owner, member].sort());
 	});
@@ -91,7 +98,14 @@ describe('sendDueReminders', () => {
 		const groupId = (await createGroup(owner, { name: 'Walks', requirement: everyDay('2032-05-01', '2032-06-30') }, 'UTC')).id;
 		await fx.join(groupId, replied);
 		await fx.join(groupId, waiting);
-		const p = await createProposal(groupId, owner, { start: '2032-06-10T10:00:00.000Z', end: '2032-06-10T12:00:00.000Z', allDay: false, title: null, location: null, note: null });
+		const p = await createProposal(groupId, owner, {
+			start: '2032-06-10T10:00:00.000Z',
+			end: '2032-06-10T12:00:00.000Z',
+			allDay: false,
+			title: null,
+			location: null,
+			note: null
+		});
 		await respond(p.id, replied, 'maybe');
 		await sendDueReminders(at('2032-06-09T12:00:00Z'));
 		await sendDueReminders(at('2032-06-09T12:05:00Z'));
