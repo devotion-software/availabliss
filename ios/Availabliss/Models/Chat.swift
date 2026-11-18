@@ -25,9 +25,43 @@ struct Message: Codable, Sendable, Identifiable, Equatable {
     /// Deleted by its author: shown as deleted, with no body.
     var deleted: Bool?
     var receipt: Receipt?
+    /// The message this one replies to, as it is now.
+    var replyTo: ReplyPreview?
 
     var isDeleted: Bool { deleted == true }
     var isEdited: Bool { editedAt != nil && !isDeleted }
+
+    /// A quoted message above a reply: who sent it and one line of it.
+    struct ReplyPreview: Codable, Sendable, Equatable {
+        let id: String
+        let authorId: String?
+        let authorName: String?
+        let kind: Kind
+        /// The text, or a poll's question. Nil once deleted.
+        var text: String?
+        var deleted: Bool
+
+        /// One line for the quote: "Deleted message", "Poll: Which park?" or the text.
+        var snippet: String {
+            if deleted { return "Deleted message" }
+            switch kind {
+            case .poll: return "Poll: \(text ?? "")"
+            case .proposal: return text ?? "Proposal"
+            case .event: return text ?? "Event"
+            default: return text ?? ""
+            }
+        }
+    }
+
+    /// Can be replied to: your own or others' text and polls that are still there.
+    var canReply: Bool { (kind == .text || kind == .poll) && !isDeleted }
+
+    /// This message as a quote, e.g. for "Replying to …" and to refresh replies after it changes.
+    func asReplyPreview(authorName: String?) -> ReplyPreview {
+        let raw = kind == .poll ? poll?.question : body
+        let text = raw.map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
+        return ReplyPreview(id: id, authorId: authorId, authorName: authorName, kind: kind, text: isDeleted ? nil : text, deleted: isDeleted)
+    }
 }
 
 struct EditMessageBody: Encodable, Sendable {
@@ -75,6 +109,8 @@ struct SendMessageBody: Encodable, Sendable {
     }
     var body: String?
     var poll: NewPoll?
+    /// The message this one replies to (text only).
+    var replyToId: String?
 }
 
 struct ReceiptBody: Encodable, Sendable {

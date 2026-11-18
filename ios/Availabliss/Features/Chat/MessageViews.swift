@@ -14,10 +14,18 @@ struct MessageRow: View {
     /// Your own text messages: edit it in the composer / ask to delete it.
     var onEdit: () -> Void = {}
     var onDelete: () -> Void = {}
+    /// Start a reply to this message in the composer.
+    var onReply: () -> Void = {}
+    /// Tapped the quote above a reply: go to the original (by id).
+    var openQuote: (String) -> Void = { _ in }
     @Environment(\.theme) private var theme
 
     private var isMine: Bool { message.authorId != nil && message.authorId == me }
     private var author: Member? { message.authorId.flatMap(group.member) }
+
+    private var quote: MessageQuote? {
+        message.replyTo.map { MessageQuote(preview: $0, name: ReplyNames.name(of: $0.authorId, fallback: $0.authorName, group: group, me: me)) }
+    }
 
     var body: some View {
         switch message.kind {
@@ -43,15 +51,17 @@ struct MessageRow: View {
                 }
             } else if isMine {
                 VStack(alignment: .trailing, spacing: 4) {
-                    MessageBubble(text: message.body ?? "", isMine: true)
+                    MessageBubble(text: message.body ?? "", isMine: true, quote: quote, openQuote: openQuote)
                         .onTapGesture(perform: openInfo)
                         .contextMenu {
+                            Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
                             Button(action: openInfo) { Label("Info", systemImage: "info.circle") }
                             Button(action: onEdit) { Label("Edit", systemImage: "pencil") }
                             Button(role: .destructive, action: onDelete) { Label("Delete", systemImage: "trash") }
                         }
                         .accessibilityAddTraits(.isButton)
                         .accessibilityHint("Shows message info")
+                        .accessibilityAction(named: "Reply", onReply)
                         .accessibilityAction(named: "Edit", onEdit)
                         .accessibilityAction(named: "Delete", onDelete)
                     if message.isEdited { EditedLabel() }
@@ -63,18 +73,27 @@ struct MessageRow: View {
             } else {
                 IncomingRow(author: author, showsName: startsRun) {
                     VStack(alignment: .leading, spacing: 4) {
-                        MessageBubble(text: message.body ?? "", isMine: false)
+                        MessageBubble(text: message.body ?? "", isMine: false, quote: quote, openQuote: openQuote)
                             .onTapGesture(perform: openInfo)
+                            .contextMenu {
+                                Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
+                                Button(action: openInfo) { Label("Info", systemImage: "info.circle") }
+                            }
                         if message.isEdited { EditedLabel() }
                     }
                 }
                 .accessibilityAddTraits(.isButton)
                 .accessibilityHint("Shows message info")
+                .accessibilityAction(named: "Reply", onReply)
             }
         case .poll:
             if let poll = message.poll {
                 VStack(alignment: .trailing, spacing: 4) {
                     PollCard(poll: poll, me: me, title: isMine ? "Your poll" : "Poll by \(author?.firstName ?? "Someone")", canClose: isMine, model: model)
+                        .contextMenu {
+                            Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
+                        }
+                        .accessibilityAction(named: "Reply", onReply)
                     if isMine, isLatestOwn, let receipt = message.receipt {
                         ReadReceipt(receipt: receipt, group: group, action: openInfo)
                     }
@@ -163,10 +182,141 @@ private struct DeletedBubble: View {
     }
 }
 
+/// Who a quoted message is from, as the chat names people.
+enum ReplyNames {
+    static func name(of authorId: String?, fallback: String?, group: Group, me: String?) -> String {
+        if let authorId, authorId == me { return "You" }
+        return authorId.flatMap(group.member)?.name ?? fallback ?? "Someone"
+    }
+}
+
+/// The quoted message above a reply's text.
+struct MessageQuote: Equatable {
+    let preview: Message.ReplyPreview
+    let name: String
+}
+
+/// Swipe a message right to reply: it follows your finger, an arrow fades in behind it, and past
+/// the threshold it clicks; let go there to reply.
+struct SwipeToReply: ViewModifier {
+    let isEnabled: Bool
+    let onReply: () -> Void
+    @State private var dragX: CGFloat = 0
+    @State private var armed = false
+    @Environment(\.theme) private var theme
+
+    private static let threshold: CGFloat = 56
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content
+                .offset(x: dragX)
+                .background(alignment: .leading) {
+                    Image(systemName: "arrowshape.turn.up.left.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(armed ? theme.onAccent : theme.accentInk)
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(armed ? theme.accent : theme.accentSoft))
+                        .scaleEffect(armed ? 1 : 0.7 + 0.3 * min(dragX / Self.threshold, 1))
+                        .opacity(min(dragX / Self.threshold, 1))
+                        .offset(x: min(dragX, Self.threshold) - 38)
+                        .accessibilityHidden(true)
+                }
+                .sensoryFeedback(.impact(weight: .light), trigger: armed) { _, now in now }
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 20)
+                        .onChanged { drag in
+                            let dx = drag.translation.width, dy = drag.translation.height
+                            guard dx > 0, abs(dx) > abs(dy) * 1.5 || dragX > 0 else { return }
+                            // Follows the finger, then resists past the threshold.
+                            dragX = dx <= Self.threshold ? dx : Self.threshold + (dx - Self.threshold) * 0.25
+                            armed = dx >= Self.threshold
+                        }
+                        .onEnded { _ in
+                            if armed { onReply() }
+                            armed = false
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { dragX = 0 }
+                        }
+                )
+        } else {
+            content
+        }
+    }
+}
+
+/// Stacks a quote over the text at the width of the wider of the two (up to what's offered),
+/// so the quote spans a long reply but a short reply doesn't stretch to the quote.
+private struct QuoteStack: Layout {
+    var spacing: CGFloat
+
+    private func width(_ proposal: ProposedViewSize, _ subviews: Subviews) -> CGFloat {
+        let ideal = subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+        return min(ideal, proposal.width ?? .infinity)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let w = width(proposal, subviews)
+        let heights = subviews.map { $0.sizeThatFits(ProposedViewSize(width: w, height: nil)).height }
+        return CGSize(width: w, height: heights.reduce(0, +) + spacing * CGFloat(max(subviews.count - 1, 0)))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for subview in subviews {
+            let size = ProposedViewSize(width: bounds.width, height: nil)
+            let height = subview.sizeThatFits(size).height
+            subview.place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, height: height))
+            y += height + spacing
+        }
+    }
+}
+
+/// "Ana" over one line of what they said, with a bar down the side. Tapping it goes to the original.
+private struct QuoteBlock: View {
+    let quote: MessageQuote
+    let isMine: Bool
+    let open: (String) -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button { open(quote.preview.id) } label: {
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(isMine ? theme.onSolid.opacity(0.55) : theme.accentInk)
+                    .frame(width: 3)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(quote.name)
+                        .bodyFont(12, .semibold, relativeTo: .caption)
+                        .foregroundStyle(isMine ? theme.onSolid : theme.accentInk)
+                        .lineLimit(1)
+                    Text(quote.preview.snippet)
+                        .bodyFont(12, relativeTo: .caption)
+                        .italic(quote.preview.deleted)
+                        .foregroundStyle(isMine ? theme.onSolid.opacity(0.75) : theme.muted)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 6)
+            .padding(.leading, 6)
+            .padding(.trailing, 10)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(isMine ? theme.onSolid.opacity(0.12) : theme.accentSoft))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Replying to \(quote.name): \(quote.preview.snippet)")
+        .accessibilityHint("Shows the original message")
+    }
+}
+
 /// Glass bubble for others (tail bottom-left), `solid` for you (tail bottom-right).
 struct MessageBubble: View {
     let text: String
     let isMine: Bool
+    /// The message this one replies to, quoted above the text.
+    var quote: MessageQuote?
+    var openQuote: (String) -> Void = { _ in }
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -177,17 +327,24 @@ struct MessageBubble: View {
             topTrailingRadius: 18,
             style: .continuous
         )
-        Text(text)
-            .bodyFont(14)
-            .lineSpacing(2)
-            .foregroundStyle(isMine ? theme.onSolid : theme.ink)
+        QuoteStack(spacing: 6) {
+            if let quote {
+                QuoteBlock(quote: quote, isMine: isMine, open: openQuote)
+                    .padding(.horizontal, -4)
+                    .padding(.top, -2)
+            }
+            Text(text)
+                .bodyFont(14)
+                .lineSpacing(2)
+                .foregroundStyle(isMine ? theme.onSolid : theme.ink)
+                .textSelection(.enabled)
+        }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .background {
                 if isMine { shape.fill(theme.solid) } else { Color.clear.modifier(GlassBackground(shape: shape, shadow: false)) }
             }
             .frame(maxWidth: 290, alignment: isMine ? .trailing : .leading)
-            .textSelection(.enabled)
     }
 }
 

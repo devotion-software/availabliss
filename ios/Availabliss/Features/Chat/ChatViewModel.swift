@@ -17,6 +17,8 @@ final class ChatViewModel {
     private(set) var editing: Message?
     /// The composer's draft from before editing started, put back when it ends.
     private var draftBeforeEdit = ""
+    /// The message your next one replies to, shown above the composer.
+    private(set) var replyingTo: Message?
 
     let groupId: String
     private let api: APIClient
@@ -86,13 +88,28 @@ final class ChatViewModel {
         isSending = true
         defer { isSending = false }
         draft = ""
+        let replying = replyingTo
+        replyingTo = nil
         do {
-            let message = try await api.send(API.Chat.send(groupId: groupId, SendMessageBody(body: text)))
+            let message = try await api.send(API.Chat.send(groupId: groupId, SendMessageBody(body: text, replyToId: replying?.id)))
             insert(message)
         } catch {
             draft = text
+            if replyingTo == nil { replyingTo = replying }
             self.error = error.userMessage
         }
+    }
+
+    // MARK: Replying
+
+    func startReplying(to message: Message) {
+        guard message.canReply else { return }
+        cancelEditing()
+        replyingTo = message
+    }
+
+    func cancelReplying() {
+        replyingTo = nil
     }
 
     func createPoll(question: String, options: [String], multi: Bool) async -> Bool {
@@ -138,6 +155,7 @@ final class ChatViewModel {
 
     func startEditing(_ message: Message) {
         guard message.kind == .text, !message.isDeleted, message.authorId == me else { return }
+        replyingTo = nil
         if editing == nil { draftBeforeEdit = draft }
         editing = message
         draft = message.body ?? ""
@@ -171,8 +189,10 @@ final class ChatViewModel {
             if let index = messages.firstIndex(where: { $0.id == message.id }) {
                 messages[index].deleted = true
                 messages[index].body = nil
+                refreshQuotes(of: messages[index])
             }
             if editing?.id == message.id { cancelEditing() }
+            if replyingTo?.id == message.id { cancelReplying() }
         } catch {
             self.error = error.userMessage
         }
@@ -180,10 +200,20 @@ final class ChatViewModel {
 
     /// An edited or deleted message: everything but the receipt, which is per viewer.
     private func replaceKeepingReceipt(_ message: Message) {
+        refreshQuotes(of: message)
         guard let index = messages.firstIndex(where: { $0.id == message.id }) else { return }
         var updated = message
         updated.receipt = messages[index].receipt
         messages[index] = updated
+    }
+
+    /// Quotes of a message aren't republished when it's edited or deleted, so update loaded replies here.
+    private func refreshQuotes(of message: Message) {
+        for index in messages.indices where messages[index].replyTo?.id == message.id {
+            let fresh = message.asReplyPreview(authorName: messages[index].replyTo?.authorName)
+            messages[index].replyTo?.text = fresh.text
+            messages[index].replyTo?.deleted = fresh.deleted
+        }
     }
 
     func info(for messageId: String) async -> MessageInfo? {
@@ -206,6 +236,7 @@ final class ChatViewModel {
             guard let message = event.payload(as: Message.self), message.groupId == groupId else { return }
             replaceKeepingReceipt(message)
             if message.isDeleted, editing?.id == message.id { cancelEditing() }
+            if message.isDeleted, replyingTo?.id == message.id { cancelReplying() }
         case .pollUpdated:
             if let poll = event.payload(as: Poll.self) { update(poll: poll) }
         case .messageReceipts:

@@ -11,6 +11,8 @@ struct ChatView: View {
     @State private var sheet: ChatSheet?
     /// Your message waiting for "Delete this message?".
     @State private var pendingDelete: Message?
+    /// The original of a tapped quote, briefly highlighted after scrolling to it.
+    @State private var highlightedId: String?
 
     enum ChatSheet: Identifiable {
         case poll, propose, event, info(Message)
@@ -45,12 +47,19 @@ struct ChatView: View {
             if model.editing != nil {
                 EditingStrip { model.cancelEditing() }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if let replying = model.replyingTo {
+                ReplyingStrip(
+                    name: ReplyNames.name(of: replying.authorId, fallback: nil, group: group, me: me),
+                    snippet: replying.asReplyPreview(authorName: nil).snippet
+                ) { model.cancelReplying() }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            Composer(text: $model.draft, isMenuOpen: $showsMenu, isSending: model.isSending, editingId: model.editing?.id) {
+            Composer(text: $model.draft, isMenuOpen: $showsMenu, isSending: model.isSending, editingId: model.editing?.id, replyingId: model.replyingTo?.id) {
                 Task { await model.send() }
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.editing?.id)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.replyingTo?.id)
         .confirmationDialog(
             "Delete this message?",
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
@@ -76,45 +85,73 @@ struct ChatView: View {
     }
 
     private var messageList: some View {
-        ScrollView {
-            LazyVStack(spacing: 10) {
-                if model.hasMore {
-                    ProgressView()
-                        .frame(height: 32)
-                        .onAppear { Task { await model.loadOlder() } }
-                }
-                if model.isLoading { StatusView(kind: .loading) }
-                ForEach(Array(model.messages.enumerated()), id: \.element.id) { index, message in
-                    if index == 0 || !Calendar.current.isDate(model.messages[index - 1].createdAt, inSameDayAs: message.createdAt) {
-                        Text(Formatting.chatDay(message.createdAt))
-                            .bodyFont(11, .semibold, relativeTo: .caption2)
-                            .foregroundStyle(theme.muted)
-                            .padding(.top, 4)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    if model.hasMore {
+                        ProgressView()
+                            .frame(height: 32)
+                            .onAppear { Task { await model.loadOlder() } }
                     }
-                    MessageRow(
-                        message: message,
-                        group: group,
-                        me: me,
-                        model: model,
-                        isLatestOwn: message.id == model.latestOwnMessageId,
-                        startsRun: startsRun(at: index),
-                        openInfo: { sheet = .info(message) },
-                        openProposal: { id in app.router.push(.proposal(id: id)) },
-                        onEdit: {
-                            showsMenu = false
-                            model.startEditing(message)
-                        },
-                        onDelete: { pendingDelete = message }
-                    )
-                    .id(message.id)
+                    if model.isLoading { StatusView(kind: .loading) }
+                    ForEach(Array(model.messages.enumerated()), id: \.element.id) { index, message in
+                        if index == 0 || !Calendar.current.isDate(model.messages[index - 1].createdAt, inSameDayAs: message.createdAt) {
+                            Text(Formatting.chatDay(message.createdAt))
+                                .bodyFont(11, .semibold, relativeTo: .caption2)
+                                .foregroundStyle(theme.muted)
+                                .padding(.top, 4)
+                        }
+                        MessageRow(
+                            message: message,
+                            group: group,
+                            me: me,
+                            model: model,
+                            isLatestOwn: message.id == model.latestOwnMessageId,
+                            startsRun: startsRun(at: index),
+                            openInfo: { sheet = .info(message) },
+                            openProposal: { id in app.router.push(.proposal(id: id)) },
+                            onEdit: {
+                                showsMenu = false
+                                model.startEditing(message)
+                            },
+                            onDelete: { pendingDelete = message },
+                            onReply: { reply(to: message) },
+                            openQuote: { id in showOriginal(id, proxy: proxy) }
+                        )
+                        .modifier(SwipeToReply(isEnabled: message.canReply) { reply(to: message) })
+                        .background {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(theme.accentSoft)
+                                .padding(-6)
+                                .opacity(highlightedId == message.id ? 1 : 0)
+                                .allowsHitTesting(false)
+                        }
+                        .id(message.id)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 8)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 8)
+            .defaultScrollAnchor(.bottom)
+            .scrollDismissesKeyboard(.interactively)
         }
-        .defaultScrollAnchor(.bottom)
-        .scrollDismissesKeyboard(.interactively)
+    }
+
+    private func reply(to message: Message) {
+        showsMenu = false
+        model.startReplying(to: message)
+    }
+
+    /// Scrolls to a quoted message (when it's loaded) and flashes it.
+    private func showOriginal(_ id: String, proxy: ScrollViewProxy) {
+        guard model.messages.contains(where: { $0.id == id }) else { return }
+        withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(id, anchor: .center) }
+        withAnimation(.easeOut(duration: 0.2)) { highlightedId = id }
+        Task {
+            try? await Task.sleep(for: .seconds(1.2))
+            if highlightedId == id { withAnimation(.easeOut(duration: 0.6)) { highlightedId = nil } }
+        }
     }
 
     /// First message in a run from the same person on the same day, so it shows their name.
@@ -174,6 +211,50 @@ private struct EditingStrip: View {
     }
 }
 
+/// Above the composer while you reply: "Replying to Ana", one line of what they said, and ✕ to cancel.
+private struct ReplyingStrip: View {
+    let name: String
+    let snippet: String
+    let cancel: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(theme.accentInk)
+                .frame(width: 3, height: 32)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Replying to \(name == "You" ? "yourself" : name)")
+                    .bodyFont(13, .semibold, relativeTo: .footnote)
+                    .foregroundStyle(theme.ink)
+                    .lineLimit(1)
+                Text(snippet)
+                    .bodyFont(12, relativeTo: .caption)
+                    .foregroundStyle(theme.muted)
+                    .lineLimit(1)
+            }
+            .accessibilityElement(children: .combine)
+            Spacer(minLength: 0)
+            Button(action: cancel) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(theme.muted)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Cancel reply")
+        }
+        .padding(.vertical, 6)
+        .padding(.leading, 14)
+        .padding(.trailing, 4)
+        .glass(cornerRadius: 18)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+    }
+}
+
 /// The three big buttons above the composer.
 private struct ComposerMenu: View {
     let choose: (ChatView.ChatSheet) -> Void
@@ -211,6 +292,8 @@ private struct Composer: View {
     let isSending: Bool
     /// The message being edited: Send becomes Save, and the field takes focus.
     let editingId: String?
+    /// The message being replied to: the field takes focus.
+    var replyingId: String?
     let send: () -> Void
     @Environment(\.theme) private var theme
     @FocusState private var isFocused: Bool
@@ -240,6 +323,7 @@ private struct Composer: View {
                 .onSubmit(send)
                 .focused($isFocused)
                 .onChange(of: editingId) { _, id in if id != nil { isFocused = true } }
+                .onChange(of: replyingId) { _, id in if id != nil { isFocused = true } }
                 .accessibilityLabel(editingId == nil ? "Message" : "Edit message")
 
             Button(action: send) {
