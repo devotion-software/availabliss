@@ -23,6 +23,7 @@ import { postMessage } from './chat';
 import { insertEvent, removeEvent, toGroupEvent } from './events';
 import { slotLabel } from './availability/labels';
 import { sendConfirmedEmail } from './email';
+import { pushRecipients } from './notification-settings';
 import { env } from './env';
 import { loadBusy, type LabelledBusy } from './busy';
 
@@ -431,7 +432,8 @@ async function confirm(proposal: Proposal, members: string[], confirmedBy: strin
 			: `${group.name}: ${when}. Tap to add it to your calendar.`,
 		data: { proposalId, eventId }
 	});
-	await emailConfirmation(members, group.name, when, proposalId, confirmedBy ? count : null);
+	// The email follows the same choices as the push (plans turned off, group muted, quiet hours).
+	await emailConfirmation(await pushRecipients(members, 'proposal.confirmed', proposal.groupId), group.name, when, proposalId, confirmedBy ? count : null);
 	return confirmed;
 }
 

@@ -96,6 +96,19 @@ export interface User {
 	eventReminders: EventReminders;
 }
 
+/** Kinds of push you can turn off, each covering some notification kinds (see NOTIFICATION_CATEGORY_KINDS). */
+export const NOTIFICATION_CATEGORIES = ['chat', 'proposals', 'plans', 'reminders', 'nudges'] as const;
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+
+export interface NotificationSettings {
+	/** Categories whose pushes (and emails) are off. Activity still lists everything. */
+	off: NotificationCategory[];
+	/** No pushes between these local times (in your time zone), e.g. 22:00–07:00; null for none. */
+	quietHours: { from: string; to: string } | null;
+	/** Groups you've muted: no pushes from them until `until` (null = until you unmute). */
+	mutes: { groupId: string; until: string | null }[];
+}
+
 export const EVENT_REMINDERS = ['both', 'day', 'hour', 'off'] as const;
 export type EventReminders = (typeof EVENT_REMINDERS)[number];
 

@@ -7,6 +7,7 @@ import {
   boolean,
   int,
   index,
+  json,
 } from "drizzle-orm/mysql-core";
 
 export const user = mysqlTable("user", {
@@ -35,6 +36,9 @@ export const user = mysqlTable("user", {
   busyBufferMinutes: int("busy_buffer_minutes").default(0).notNull(),
   // Pushes before a confirmed plan: 'both' (the day before and an hour before), 'day', 'hour' or 'off'.
   eventReminders: varchar("event_reminders", { length: 8 }).default("both").notNull(),
+  // Push categories turned off (["chat", …]) and quiet hours ({ from: "22:00", to: "07:00" }).
+  notificationOff: json("notification_off").$type<string[]>(),
+  quietHours: json("quiet_hours").$type<{ from: string; to: string } | null>(),
 });
 
 export const session = mysqlTable(

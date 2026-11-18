@@ -358,6 +358,21 @@ export const calendarFeeds = mysqlTable('calendar_feeds', {
 	createdAt: createdAt()
 });
 
+/** A group someone muted: no pushes from it until `until` (null = until they unmute). */
+export const groupMutes = mysqlTable(
+	'group_mutes',
+	{
+		userId: varchar('user_id', { length: 36 })
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		groupId: varchar('group_id', { length: 36 })
+			.notNull()
+			.references(() => groups.id, { onDelete: 'cascade' }),
+		until: farInstant('until')
+	},
+	(t) => [primaryKey({ columns: [t.userId, t.groupId] })]
+);
+
 // ─── Chat ─────────────────────────────────────────────────────────────────
 export const polls = mysqlTable('polls', {
 	id: id(),

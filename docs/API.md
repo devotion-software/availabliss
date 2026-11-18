@@ -228,6 +228,29 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | ------ | ---- | ---- | -------- |
 | GET | `/health` | | `{ ok: boolean; version: string; db: 'ok' \| 'down'; redis: 'ok' \| 'down' \| 'off' }` (`503` when the database doesn't answer; Redis being down still returns `200`) |
 
+### Notification settings
+
+| Method | Path | Body | Response |
+| ------ | ---- | ---- | -------- |
+| GET 🔒 | `/me/notification-settings` | | `NotificationSettings` |
+| PATCH 🔒 | `/me/notification-settings` | `{ off?: NotificationCategory[], quietHours?: { from: 'HH:MM', to: 'HH:MM' } \| null }` | `NotificationSettings` |
+| PUT 🔒 | `/groups/:id/mute` | `{ until: string \| null }` (ISO instant; null = until unmuted) | `NotificationSettings` |
+| DELETE 🔒 | `/groups/:id/mute` | | `NotificationSettings` |
+
+```ts
+type NotificationCategory = 'chat' | 'proposals' | 'plans' | 'reminders' | 'nudges';
+interface NotificationSettings {
+  off: NotificationCategory[];                 // pushes (and the confirmation email) turned off
+  quietHours: { from: string; to: string } | null; // local times in User.timezone; may wrap midnight
+  mutes: { groupId: string; until: string | null }[]; // active mutes only
+}
+```
+
+Before each push the server leaves out anyone who turned that category off (chat = `message`;
+proposals = `proposal.created`, `proposal.changed`; plans = `proposal.confirmed`, `event.created`;
+reminders = `reminder`; nudges = `nudge`), muted the group, or is in quiet hours. Invites and role
+changes always push. Activity still records everything.
+
 ### Calendar feed (webcal)
 
 | Method | Path | Body | Response |

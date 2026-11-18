@@ -3,7 +3,7 @@
  * Each schema mirrors a request body in docs/API.md.
  */
 import { z } from 'zod';
-import { BUSY_BUFFER_MINUTES, COLOR_THEMES, EVENT_REMINDERS, REPEATS, RESPONSE_KINDS, THEME_MODES, TILE_COLORS, type Weekday } from './types';
+import { BUSY_BUFFER_MINUTES, COLOR_THEMES, EVENT_REMINDERS, NOTIFICATION_CATEGORIES, REPEATS, RESPONSE_KINDS, THEME_MODES, TILE_COLORS, type Weekday } from './types';
 import { isValidZone } from './timezone';
 import { normalizeUsername, usernameProblem } from './usernames';
 
@@ -103,6 +103,15 @@ export const updateMeSchema = z
 		username
 	})
 	.partial();
+
+const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM');
+export const notificationSettingsSchema = z
+	.object({
+		off: z.array(z.enum(NOTIFICATION_CATEGORIES)).max(NOTIFICATION_CATEGORIES.length),
+		quietHours: z.object({ from: clock, to: clock }).refine((q) => q.from !== q.to, 'Pick different start and end times').nullable()
+	})
+	.partial();
+export const muteGroupSchema = z.object({ until: z.iso.datetime().nullable() });
 
 export const createGroupSchema = z.object({
 	name: trimmed(80),

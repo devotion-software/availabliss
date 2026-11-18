@@ -5,6 +5,8 @@ import { devices, notifications } from './db/schema';
 import { newId } from './ids';
 import { publishToUsers } from './realtime';
 import { sendPush } from './push';
+import { pushRecipients } from './notification-settings';
+import { log } from './log';
 
 interface NotifyInput {
 	kind: NotificationKind;
@@ -69,7 +71,12 @@ export async function notify(userIds: string[], input: NotifyInput): Promise<voi
 	}
 
 	// Push is best effort and shouldn't hold up the request.
-	if (input.push !== false) void sendPush(userIds, { title: input.title, body: input.body, data });
+	// Leaves out categories people turned off, muted groups and quiet hours (Activity still has it).
+	if (input.push !== false) {
+		void pushRecipients(userIds, input.kind, input.groupId, Date.now())
+			.then((to) => sendPush(to, { title: input.title, body: input.body, data }))
+			.catch((err) => log.warn('push', 'choosing recipients failed', { err }));
+	}
 }
 
 /** The group's one Activity item for each user, created or brought up to date (see `record`). */
