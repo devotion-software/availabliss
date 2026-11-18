@@ -270,6 +270,8 @@ export const proposals = mysqlTable(
 		allDay: boolean('all_day').default(false).notNull(),
 		status: mysqlEnum('status', ['open', 'confirmed', 'cancelled']).default('open').notNull(),
 		eventId: varchar('event_id', { length: 36 }),
+		/** Set when the proposer or an admin confirmed it before everyone had accepted ("Confirm anyway"). */
+		confirmedBy: varchar('confirmed_by', { length: 36 }),
 		createdAt: createdAt()
 	},
 	(t) => [index('proposals_group_idx').on(t.groupId, t.status)]

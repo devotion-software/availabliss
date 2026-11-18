@@ -1,0 +1,1 @@
+ALTER TABLE `proposals` ADD `confirmed_by` varchar(36);

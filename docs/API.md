@@ -515,6 +515,7 @@ interface Proposal {
   status: 'open' | 'confirmed' | 'cancelled';
   createdBy: string; createdAt: string;
   eventId: string | null;               // set once confirmed
+  confirmedBy?: string | null;          // confirmed before everyone accepted ("Confirm anyway"): who did it; null otherwise
   responses: { userId: string; response: ResponseKind; setBy: string | null; updatedAt: string }[];
   busyMemberIds: string[];              // open proposals: members busy at this time (empty otherwise)
 }
@@ -531,11 +532,18 @@ A time doesn't have to work for everyone to be proposed. Clients warn first
 | GET 🔒 | `/proposals/:id` | | `Proposal` |
 | POST 🔒 | `/proposals/:id/respond` | `{ response: 'accepted' \| 'declined' }` | `Proposal` |
 | POST 👑 | `/proposals/:id/override` | `{ userId, response: ResponseKind }` | `Proposal` |
+| POST 🔒 | `/proposals/:id/confirm` | | `Proposal` ("Confirm anyway": creator or admin; open only; `409` until someone besides the caller has accepted) |
 | DELETE 🔒 | `/proposals/:id` | | `204` (creator or admin; marks cancelled) |
 
 When every member has accepted, the proposal becomes `confirmed`, an `Event` is
 created, and every member gets a push notification and a `proposal.confirmed`
-live event.
+live event. The creator or an admin can also confirm it before then with
+`POST /proposals/:id/confirm` ("Confirm anyway", e.g. when someone can't make
+it); the same happens, with `confirmedBy` set, a chat message "It's on for …
+(3 of 4 can make it)" instead of "Everyone's in for …", and a push titled
+"It's on". Replies stay as they were, so `responses` says who's coming
+(`accepted`), who can't (`declined`) and who never replied (`pending`). Members
+with no response joined the group after it was confirmed.
 
 ### Events
 

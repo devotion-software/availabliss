@@ -1,7 +1,9 @@
 /**
  * Proposals: someone suggests a time, everyone accepts or declines, admins can
  * override a response. When every member has accepted, the proposal is
- * confirmed, an event is created and everyone is notified.
+ * confirmed, an event is created and everyone is notified. The proposer or an
+ * admin can also confirm it before then ("Confirm anyway"), once someone else
+ * can make it.
  */
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Proposal, ResponseKind } from '#lib/types';
@@ -37,6 +39,7 @@ const toProposal = (row: ProposalRow, responses: ResponseRow[], busyMemberIds: s
 	createdBy: row.createdBy,
 	createdAt: row.createdAt.toISOString(),
 	eventId: row.eventId,
+	confirmedBy: row.confirmedBy ?? null,
 	responses: responses.map((r) => ({
 		userId: r.userId,
 		response: r.response,
@@ -222,12 +225,41 @@ export async function cancelProposal(proposalId: string, userId: string): Promis
  * confirmed. Takes the freshly loaded proposal so callers don't load it twice.
  */
 async function confirmIfEveryoneAccepted(proposal: Proposal): Promise<Proposal | null> {
-	const proposalId = proposal.id;
 	if (proposal.status !== 'open') return null;
 	const members = await memberIds(proposal.groupId);
 	const accepted = new Set(proposal.responses.filter((r) => r.response === 'accepted').map((r) => r.userId));
 	if (!members.every((m) => accepted.has(m))) return null;
+	return confirm(proposal, members, null);
+}
 
+/**
+ * "Confirm anyway": the proposer or an admin confirms an open proposal before everyone
+ * has accepted (someone can't make it, or hasn't replied). Needs at least one acceptance
+ * besides theirs, so a plan isn't confirmed that nobody else can make. Whoever hasn't
+ * accepted keeps their reply (declined or pending), so the plan shows who's coming.
+ */
+export async function confirmAnyway(proposalId: string, userId: string): Promise<Proposal> {
+	const row = await requireOpen(proposalId);
+	const role = await requireMember(row.groupId, userId);
+	if (row.createdBy !== userId && role === 'member') throw forbidden('Only the proposer or an admin can confirm this');
+	const proposal = await fetchProposal(proposalId);
+	if (!proposal.responses.some((r) => r.response === 'accepted' && r.userId !== userId)) {
+		throw conflict('Nobody else can make it yet');
+	}
+	const members = await memberIds(proposal.groupId);
+	const everyone = members.every((m) => proposal.responses.some((r) => r.userId === m && r.response === 'accepted'));
+	const result = await confirm(proposal, members, everyone ? null : userId);
+	// Cancelled meanwhile.
+	if (result.status !== 'confirmed') throw conflict(`This proposal is already ${result.status}`);
+	return result;
+}
+
+/**
+ * Flips the proposal to confirmed, creates its event and tells everyone. `confirmedBy` is
+ * who confirmed it anyway, or null when everyone accepted.
+ */
+async function confirm(proposal: Proposal, members: string[], confirmedBy: string | null): Promise<Proposal> {
+	const proposalId = proposal.id;
 	const group = await getGroupRow(proposal.groupId);
 	const eventId = await db.transaction(async (tx) => {
 		// Claim the confirmation first. When the last members accept at the same
@@ -235,7 +267,7 @@ async function confirmIfEveryoneAccepted(proposal: Proposal): Promise<Proposal |
 		// creates the event and sends the messages, pushes and emails.
 		const [claimed] = await tx
 			.update(proposals)
-			.set({ status: 'confirmed' })
+			.set({ status: 'confirmed', confirmedBy })
 			.where(and(eq(proposals.id, proposalId), eq(proposals.status, 'open')));
 		if (!claimed.affectedRows) return null;
 		const id = await insertEvent(tx, proposal.groupId, proposal.createdBy, {
@@ -254,27 +286,36 @@ async function confirmIfEveryoneAccepted(proposal: Proposal): Promise<Proposal |
 	if (!eventId) return fetchProposal(proposalId);
 
 	// Only the status and event changed, and confirmed proposals list nobody as busy.
-	const confirmed: Proposal = { ...proposal, status: 'confirmed', eventId, busyMemberIds: [] };
+	const confirmed: Proposal = { ...proposal, status: 'confirmed', eventId, confirmedBy, busyMemberIds: [] };
 	const when = slotLabel({ start: Date.parse(proposal.start), end: Date.parse(proposal.end) }, group.requirement);
 	const event = toGroupEvent((await db.query.events.findFirst({ where: eq(events.id, eventId) }))!);
+	const coming = proposal.responses.filter((r) => r.response === 'accepted').length;
+	const total = proposal.responses.length;
+	const count = `${coming} of ${total} can make it`;
 
-	await postMessage(proposal.groupId, null, { kind: 'system', body: `Everyone's in for ${when}`, eventId });
+	await postMessage(proposal.groupId, null, {
+		kind: 'system',
+		body: confirmedBy ? `It's on for ${when} (${count})` : `Everyone's in for ${when}`,
+		eventId
+	});
 	await publishToGroup(proposal.groupId, 'proposal.confirmed', { proposal: confirmed, event });
 	await notify(members, {
 		kind: 'proposal.confirmed',
 		groupId: proposal.groupId,
-		title: "Everyone's in",
-		body: `${group.name}: ${when}. Tap to add it to your calendar.`,
+		title: confirmedBy ? "It's on" : "Everyone's in",
+		body: confirmedBy
+			? `${group.name}: ${when}. ${count}. Tap to add it to your calendar.`
+			: `${group.name}: ${when}. Tap to add it to your calendar.`,
 		data: { proposalId, eventId }
 	});
-	await emailConfirmation(members, group.name, when, proposalId);
+	await emailConfirmation(members, group.name, when, proposalId, confirmedBy ? count : null);
 	return confirmed;
 }
 
-async function emailConfirmation(userIds: string[], groupName: string, when: string, proposalId: string) {
+async function emailConfirmation(userIds: string[], groupName: string, when: string, proposalId: string, count: string | null) {
 	const people = await db.select({ email: user.email }).from(user).where(inArray(user.id, userIds));
 	const url = `${env.baseUrl}/app/proposals/${proposalId}`;
-	await Promise.allSettled(people.map((p) => sendConfirmedEmail({ email: p.email, groupName, when, url })));
+	await Promise.allSettled(people.map((p) => sendConfirmedEmail({ email: p.email, groupName, when, url, count })));
 }
 
 // ─── Membership changes ───────────────────────────────────────────────────

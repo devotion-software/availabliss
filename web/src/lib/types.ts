@@ -256,6 +256,11 @@ export interface Proposal {
 	createdBy: string;
 	createdAt: string;
 	eventId: string | null;
+	/**
+	 * Confirmed proposals: who confirmed it before everyone had accepted ("Confirm anyway"),
+	 * null when it confirmed itself because everyone accepted.
+	 */
+	confirmedBy: string | null;
 	responses: ProposalResponse[];
 	/** Open proposals only: members whose calendars or blocks say they're busy at this time. */
 	busyMemberIds: string[];

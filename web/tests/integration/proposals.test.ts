@@ -7,6 +7,7 @@ import { createGroup, removeMember } from '#lib/server/groups';
 import {
 	awaitingReply,
 	cancelProposal,
+	confirmAnyway,
 	createProposal,
 	getProposal,
 	listProposals,
@@ -164,6 +165,61 @@ describe('responding', () => {
 		await respond(p.id, g.admin, 'accepted');
 		const confirmed = await override(p.id, g.owner, g.member, 'accepted');
 		expect(confirmed.status).toBe('confirmed');
+	});
+});
+
+describe('confirmAnyway', () => {
+	test('the proposer can confirm once someone else can make it; who is coming stays recorded', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(18));
+		// Only the proposer has accepted so far.
+		expect((await apiError(confirmAnyway(p.id, g.owner))).code).toBe('conflict');
+		await respond(p.id, g.admin, 'accepted');
+		await respond(p.id, g.member, 'declined');
+		expect((await apiError(confirmAnyway(p.id, g.member))).code).toBe('forbidden');
+		expect((await apiError(confirmAnyway(p.id, g.outsider))).code).toBe('not_found');
+
+		const confirmed = await confirmAnyway(p.id, g.owner);
+		expect(confirmed).toMatchObject({ status: 'confirmed', confirmedBy: g.owner });
+		expect(confirmed.eventId).toBeTruthy();
+		const byUser = Object.fromEntries(confirmed.responses.map((r) => [r.userId, r.response]));
+		expect(byUser).toEqual({ [g.owner]: 'accepted', [g.admin]: 'accepted', [g.member]: 'declined' });
+		expect(await getProposal(p.id, g.member)).toMatchObject({ status: 'confirmed', confirmedBy: g.owner });
+
+		const made = await db.select().from(events).where(eq(events.proposalId, p.id));
+		expect(made.length).toBe(1);
+		const system = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		expect(system.map((m) => m.body)).toEqual([expect.stringContaining('(2 of 3 can make it)')]);
+		expect(system[0].body!.startsWith("It's on for")).toBe(true);
+		const pushed = await db.select().from(notifications).where(and(eq(notifications.groupId, g.groupId), eq(notifications.kind, 'proposal.confirmed')));
+		expect(pushed.map((n) => n.userId).sort()).toEqual([g.owner, g.admin, g.member].sort());
+		expect(pushed[0].title).toBe("It's on");
+
+		// Closed now, like any confirmed proposal.
+		expect((await apiError(confirmAnyway(p.id, g.owner))).code).toBe('conflict');
+	});
+
+	test('an admin can confirm someone else’s proposal with replies still missing', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.member, slot(19));
+		const confirmed = await confirmAnyway(p.id, g.admin);
+		expect(confirmed).toMatchObject({ status: 'confirmed', confirmedBy: g.admin });
+		expect(confirmed.responses.find((r) => r.userId === g.owner)?.response).toBe('pending');
+	});
+
+	test('a proposal that confirms itself has no confirmedBy', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(20));
+		await respond(p.id, g.admin, 'accepted');
+		expect(await respond(p.id, g.member, 'accepted')).toMatchObject({ status: 'confirmed', confirmedBy: null });
+	});
+
+	test('a cancelled proposal cannot be confirmed', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(21));
+		await respond(p.id, g.admin, 'accepted');
+		await cancelProposal(p.id, g.owner);
+		expect((await apiError(confirmAnyway(p.id, g.owner))).code).toBe('conflict');
 	});
 });
 

@@ -52,8 +52,20 @@ export async function sendNudgeEmail(p: { email: string; groupName: string; url:
 	});
 }
 
-export async function sendConfirmedEmail(p: { email: string; groupName: string; when: string; url: string }) {
+/** `count` ("3 of 4 can make it") when it was confirmed before everyone accepted. */
+export async function sendConfirmedEmail(p: { email: string; groupName: string; when: string; url: string; count?: string | null }) {
 	const group = escapeHtml(p.groupName);
+	if (p.count) {
+		await deliver({
+			to: p.email,
+			subject: `It's on: ${p.groupName}, ${p.when}`,
+			html: layout(
+				`<p style="${P}"><strong>${group}</strong> is on for <strong>${escapeHtml(p.when)}</strong>. ${escapeHtml(p.count)}.</p>${button(p.url, 'Add to calendar')}`
+			),
+			text: `${p.groupName} is on for ${p.when}. ${p.count}.\n\n${p.url}`
+		});
+		return;
+	}
 	await deliver({
 		to: p.email,
 		subject: `Everyone's in: ${p.groupName}, ${p.when}`,
