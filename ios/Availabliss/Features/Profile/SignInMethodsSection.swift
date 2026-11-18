@@ -53,16 +53,12 @@ struct SignInMethodsSection: View {
         .padding(16)
         .glass(cornerRadius: 24)
         .task(id: app.accountVersion) { await load() }
-        .confirmationDialog(
-            pending.map { "Merge \($0.candidate.name.isEmpty ? $0.candidate.email : $0.candidate.name) into this account?" } ?? "",
-            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
-            titleVisibility: .visible,
-            presenting: pending
-        ) { pending in
-            Button("Merge accounts", role: .destructive) { Task { await merge(pending) } }
-            Button("Cancel", role: .cancel) {}
+        .confirmSheet(item: $pending) { pending in
+            "Merge \(pending.candidate.name.isEmpty ? pending.candidate.email : pending.candidate.name) into this account?"
         } message: { pending in
-            Text(mergeMessage(pending))
+            mergeMessage(pending)
+        } options: { pending in
+            [ConfirmOption("Merge accounts", kind: .destructive) { Task { await merge(pending) } }]
         }
     }
 

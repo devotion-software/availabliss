@@ -37,15 +37,15 @@ struct ProfileView: View {
         .screenBackground(OrbLayout.appearance)
         .foregroundStyle(theme.ink)
         .chromeless()
-        .confirmationDialog("Sign out of Availabliss?", isPresented: $confirmsSignOut, titleVisibility: .visible) {
-            Button("Sign out", role: .destructive) { Task { await app.signOut() } }
+        .confirmSheet("Sign out?", isPresented: $confirmsSignOut, message: "You'll need to sign in again to use Availabliss on this device.") {
+            [ConfirmOption("Sign out", kind: .destructive) { Task { await app.signOut() } }]
         }
-        .confirmationDialog("Delete your account and all your data? This can't be undone.", isPresented: $confirmsDelete, titleVisibility: .visible) {
-            Button("Delete account", role: .destructive) {
+        .confirmSheet("Delete your account?", isPresented: $confirmsDelete, message: "This removes you from every group and deletes your busy times, blocks and messages. It can't be undone.") {
+            [ConfirmOption("Delete account", systemImage: "trash", kind: .destructive) {
                 Task {
                     do { try await app.deleteAccount() } catch { self.error = error.userMessage }
                 }
-            }
+            }]
         }
         .sheet(isPresented: $editsName) {
             EditNameSheet(initialName: app.session.user?.name ?? "") { toast = "Name updated" }

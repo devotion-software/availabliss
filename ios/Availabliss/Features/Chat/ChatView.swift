@@ -60,15 +60,12 @@ struct ChatView: View {
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.editing?.id)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.replyingTo?.id)
-        .confirmationDialog(
-            "Delete this message?",
-            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-            titleVisibility: .visible,
-            presenting: pendingDelete
-        ) { message in
-            Button("Delete", role: .destructive) { Task { await model.delete(message) } }
+        .confirmSheet(item: $pendingDelete) { _ in
+            "Delete this message?"
         } message: { _ in
-            Text("It'll show as deleted for everyone.")
+            "It'll show as deleted for everyone."
+        } options: { message in
+            [ConfirmOption("Delete message", systemImage: "trash", kind: .destructive) { Task { await model.delete(message) } }]
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showsMenu)
         .screenBackground(OrbLayout.chat)

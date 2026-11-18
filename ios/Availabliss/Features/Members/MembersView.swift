@@ -58,21 +58,22 @@ struct MembersView: View {
                 if event.kind == .memberChanged || event.kind == .reconnected { await model.load() }
             }
         }
-        .confirmationDialog(confirmationTitle, isPresented: Binding(get: { confirmation != nil }, set: { if !$0 { confirmation = nil } }), titleVisibility: .visible, presenting: confirmation) { item in
+        .confirmSheet(item: $confirmation) { item in
+            switch item {
+            case .remove(let member): "Remove \(member.name) from the group?"
+            }
+        } message: { item in
+            switch item {
+            case .remove(let member): "\(member.firstName) will lose access to the group's plans and chat."
+            }
+        } options: { item in
             switch item {
             case .remove(let member):
-                Button("Remove \(member.firstName)", role: .destructive) { Task { await model.remove(member) } }
+                [ConfirmOption("Remove \(member.firstName)", kind: .destructive) { Task { await model.remove(member) } }]
             }
         }
         .errorAlert($model.error)
         .toast($model.toast)
-    }
-
-    private var confirmationTitle: String {
-        switch confirmation {
-        case .remove(let member): "Remove \(member.name) from the group?"
-        case nil: ""
-        }
     }
 
     private func canManage(_ member: Member) -> Bool {

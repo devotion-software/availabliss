@@ -71,17 +71,14 @@ struct MyTimeView: View {
                 return ok
             }
         }
-        .confirmationDialog(
-            "Remove this block?",
-            isPresented: Binding(get: { model.pendingRemoval != nil }, set: { if !$0 { model.pendingRemoval = nil } }),
-            titleVisibility: .visible,
-            presenting: model.pendingRemoval
-        ) { block in
-            Button(block.repeat == .none ? "Remove block" : "Remove every occurrence", role: .destructive) {
-                Task { await model.remove(block) }
-            }
+        .confirmSheet(item: $model.pendingRemoval) { _ in
+            "Remove this block?"
         } message: { block in
-            Text("\(block.note ?? "Busy") · \(block.scheduleDescription)")
+            "\(block.note ?? "Busy") · \(block.scheduleDescription)"
+        } options: { block in
+            [ConfirmOption(block.repeat == .none ? "Remove block" : "Remove every occurrence", systemImage: "trash", kind: .destructive) {
+                Task { await model.remove(block) }
+            }]
         }
         .toast($toast)
         .errorAlert($model.error)

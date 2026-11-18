@@ -95,15 +95,27 @@ private struct PendingProposalView: View {
         .safeAreaInset(edge: .bottom) {
             if proposal.status == .open { replyBar }
         }
-        .confirmationDialog("Set a reply", isPresented: Binding(get: { overrideTarget != nil }, set: { if !$0 { overrideTarget = nil } }), presenting: overrideTarget) { member in
-            Button("\(member.firstName) can make it") { Task { await model.override(userId: member.userId, response: .accepted) } }
-            Button("\(member.firstName) can't make it") { Task { await model.override(userId: member.userId, response: .declined) } }
-            Button("Clear reply") { Task { await model.override(userId: member.userId, response: .pending) } }
+        .confirmSheet(item: $overrideTarget) { member in
+            "Set \(member.firstName)\u{2019}s reply"
+        } message: { _ in
+            "As an admin you can set anyone\u{2019}s reply."
+        } options: { member in
+            [
+                ConfirmOption("\(member.firstName) can make it", systemImage: "checkmark", kind: .secondary) {
+                    Task { await model.override(userId: member.userId, response: .accepted) }
+                },
+                ConfirmOption("\(member.firstName) can\u{2019}t make it", systemImage: "xmark", kind: .secondary) {
+                    Task { await model.override(userId: member.userId, response: .declined) }
+                },
+                ConfirmOption("Clear reply", kind: .secondary) {
+                    Task { await model.override(userId: member.userId, response: .pending) }
+                },
+            ]
         }
-        .confirmationDialog("Cancel this proposal?", isPresented: $confirmsCancel, titleVisibility: .visible) {
-            Button("Cancel proposal", role: .destructive) {
+        .confirmSheet("Cancel this proposal?", isPresented: $confirmsCancel, message: "It'll show as cancelled for everyone in the group.", cancelTitle: "Keep proposal") {
+            [ConfirmOption("Cancel proposal", kind: .destructive) {
                 Task { if await model.cancel() { app.router.pop() } }
-            }
+            }]
         }
     }
 

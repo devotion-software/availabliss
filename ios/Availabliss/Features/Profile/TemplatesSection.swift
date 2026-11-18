@@ -36,15 +36,12 @@ struct TemplatesSection: View {
         .padding(16)
         .glass(cornerRadius: 24)
         .task(id: [app.accountVersion, app.templatesVersion]) { await load() }
-        .confirmationDialog(
-            "Delete this template?",
-            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-            titleVisibility: .visible,
-            presenting: pendingDelete
-        ) { template in
-            Button("Delete \u{201C}\(template.name)\u{201D}", role: .destructive) { Task { await remove(template) } }
-        } message: { _ in
-            Text("Groups already using this timing keep it.")
+        .confirmSheet(item: $pendingDelete) { _ in
+            "Delete this template?"
+        } message: { template in
+            "\u{201C}\(template.name)\u{201D} will be deleted. Groups already using this timing keep it."
+        } options: { template in
+            [ConfirmOption("Delete template", systemImage: "trash", kind: .destructive) { Task { await remove(template) } }]
         }
     }
 
