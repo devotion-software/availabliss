@@ -67,6 +67,10 @@ data class UpNextUi(
     val calendar: CalendarStatus,
     /** The event's cover photo. */
     val image: String? = null,
+    /** Its group's tile beside the name: its photo, or the monogram on its colour (no monogram until the groups list has it). */
+    val groupMonogram: String = "",
+    val groupColor: TileColor = TileColor.T1,
+    val groupImage: String? = null,
 )
 
 data class HomeUiState(
@@ -182,6 +186,9 @@ class HomeViewModel @Inject constructor(
             groupId = event.groupId,
             proposalId = event.proposalId,
             groupName = event.groupName ?: summary?.name.orEmpty(),
+            groupMonogram = summary?.monogram.orEmpty(),
+            groupColor = summary?.color ?: TileColor.T1,
+            groupImage = summary?.image,
             title = event.title,
             whenLabel = DateTimes.dayAndTime(event.start, event.allDay),
             detail = listOfNotNull(event.location?.takeIf { it.isNotBlank() }?.let { "At $it" }, going).joinToString(" · "),

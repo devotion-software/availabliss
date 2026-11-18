@@ -299,7 +299,16 @@ private fun UpNextCard(upNext: UpNextUi, onOpen: () -> Unit, onAddToCalendar: ()
                     style = AvailablissTheme.type.captionStrong,
                     padding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
                 )
-                Text(upNext.groupName, style = AvailablissTheme.type.caption, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(
+                    Modifier.weight(1f, fill = false).padding(start = Spacing.m),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (upNext.groupMonogram.isNotEmpty()) {
+                        GroupTile(upNext.groupMonogram, colors.tile(upNext.groupColor), image = upNext.groupImage, size = 20.dp, radius = 7.dp)
+                    }
+                    Text(upNext.groupName, style = AvailablissTheme.type.caption, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(upNext.whenLabel, style = AvailablissTheme.type.titleLarge, color = colors.ink)
@@ -399,8 +408,8 @@ private fun HomePreview() {
                 greeting = "Hi, Sam",
                 profileInitial = "S",
                 upNext = listOf(
-                    UpNextUi("e1", "g1", "p1", "Book club", "Book club", "Wed 11 Nov · 18:30", "At Hana's · 8 going", calendar = CalendarStatus()),
-                    UpNextUi("e2", "g2", null, "Lake District crew", "Pub quiz", "Tue 24 Nov · 19:30", "At The Bell · 5 going", calendar = CalendarStatus()),
+                    UpNextUi("e1", "g1", "p1", "Book club", "Book club", "Wed 11 Nov · 18:30", "At Hana's · 8 going", calendar = CalendarStatus(), groupMonogram = "BC", groupColor = TileColor.T3),
+                    UpNextUi("e2", "g2", null, "Lake District crew", "Pub quiz", "Tue 24 Nov · 19:30", "At The Bell · 5 going", calendar = CalendarStatus(), groupMonogram = "LD", groupColor = TileColor.T1),
                 ),
                 groups = listOf(
                     GroupTileUi("1", "Lake District crew", "LD", TileColor.T1, "2 weekends work", PillTone.Indigo, "A weekend · Fri 6pm → Sun · Nov–Jan", people, 4 / 6f, "2 of 6 to sync", 3),
