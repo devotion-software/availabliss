@@ -39,6 +39,8 @@ final class DeviceCalendarService {
 
     private static let busyKey = "calendar.busyIds"
     private static let addedKey = "calendar.addedEvents"
+    /// The calendar plans were last added to, offered first next time.
+    private static let lastAddCalendarKey = "calendar.lastAddCalendar"
     private static let uploadedHashesKey = "calendar.uploadedHashes"
     private static let uploadedTimesKey = "calendar.uploadedTimes"
     private static let horizonKey = "calendar.horizon"
@@ -311,6 +313,26 @@ final class DeviceCalendarService {
         (UserDefaults.standard.dictionary(forKey: Self.addedKey) as? [String: String])?[eventId] != nil
     }
 
+    /// Whether to ask which calendar before adding: only with full access (write-only
+    /// access can't list calendars) and more than one to choose from.
+    var canChooseCalendar: Bool { hasFullAccess && writableCalendars.count > 1 }
+
+    /// The calendar to offer first: the one last added to, else the phone's default.
+    var preferredCalendar: EKCalendar? {
+        if let id = UserDefaults.standard.string(forKey: Self.lastAddCalendarKey),
+           let calendar = writableCalendars.first(where: { $0.calendarIdentifier == id }) {
+            return calendar
+        }
+        return store.defaultCalendarForNewEvents
+    }
+
+    /// Writable calendars grouped by account, for choosing where a plan goes.
+    var writableCalendarsBySource: [(source: String, calendars: [EKCalendar])] {
+        Dictionary(grouping: writableCalendars, by: { $0.source.title })
+            .map { (source: $0.key, calendars: $0.value) }
+            .sorted { $0.source < $1.source }
+    }
+
     /// Saves a confirmed plan into the user's calendar. Asks for write access if needed.
     func add(_ event: GroupEvent, to calendar: EKCalendar? = nil) async throws {
         if !canWrite {
@@ -334,6 +356,9 @@ final class DeviceCalendarService {
         var added = (UserDefaults.standard.dictionary(forKey: Self.addedKey) as? [String: String]) ?? [:]
         added[event.id] = item.eventIdentifier ?? ""
         UserDefaults.standard.set(added, forKey: Self.addedKey)
+        if let calendar {
+            UserDefaults.standard.set(calendar.calendarIdentifier, forKey: Self.lastAddCalendarKey)
+        }
     }
 
     // MARK: Background refresh

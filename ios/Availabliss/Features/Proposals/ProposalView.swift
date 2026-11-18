@@ -1,4 +1,3 @@
-import EventKit
 import SwiftUI
 
 /// A proposal: acceptance ring, member replies, Accept / Can't make it, admin Override,
@@ -233,7 +232,6 @@ private struct ConfirmedView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var bloom = false
-    @State private var calendar: EKCalendar?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -261,7 +259,6 @@ private struct ConfirmedView: View {
         .padding(.bottom, 24)
         .onAppear {
             withAnimation(.spring(response: 0.7, dampingFraction: 0.6).delay(0.1)) { bloom = true }
-            calendar = app.deviceCalendar.store.defaultCalendarForNewEvents
         }
         .sensoryFeedback(.success, trigger: bloom)
     }
@@ -300,43 +297,13 @@ private struct ConfirmedView: View {
     @ViewBuilder
     private var actions: some View {
         VStack(spacing: 10) {
-            if app.deviceCalendar.hasFullAccess, !app.deviceCalendar.writableCalendars.isEmpty {
-                CalendarPickerRow(selection: $calendar, calendars: app.deviceCalendar.writableCalendars)
-            }
             if let event = model.event {
-                AddToCalendarButton(event: event, calendar: calendar)
+                AddToCalendarButton(event: event)
             } else {
                 ProgressView().frame(height: 54)
             }
         }
         .padding(14)
         .glass(cornerRadius: 28)
-    }
-}
-
-private struct CalendarPickerRow: View {
-    @Binding var selection: EKCalendar?
-    let calendars: [EKCalendar]
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        Menu {
-            ForEach(calendars, id: \.calendarIdentifier) { calendar in
-                Button("\(calendar.title) · \(calendar.source.title)") { selection = calendar }
-            }
-        } label: {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 4).fill(selection.map { Color(cgColor: $0.cgColor) } ?? theme.warn).frame(width: 12, height: 12)
-                (Text(selection?.title ?? "Calendar").fontWeight(.semibold) + Text(" · \(selection?.source.title ?? "")").foregroundColor(theme.muted))
-                    .bodyFont(14)
-                    .foregroundStyle(theme.ink)
-                Spacer()
-                Image(systemName: "chevron.down").font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.muted)
-            }
-            .padding(.horizontal, 14)
-            .frame(minHeight: 52)
-            .surfaceBackground(cornerRadius: 16)
-        }
-        .accessibilityLabel("Calendar: \(selection?.title ?? "default")")
     }
 }
