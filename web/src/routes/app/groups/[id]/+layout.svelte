@@ -5,11 +5,15 @@
 	import { unread } from '#lib/client/unread.svelte';
 	import GroupSidebar from '#lib/components/groups/GroupSidebar.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
-	import Menu from '#lib/components/ui/Menu.svelte';
+	import Menu, { type MenuItem } from '#lib/components/ui/Menu.svelte';
 	import { groupSubtitle, isAdminRole } from '#lib/client/members';
 	import { toasts } from '#lib/client/toast.svelte';
 	import { leavingGroups } from '#lib/client/groups';
 	import { newGroupSheet } from '#lib/client/ui-state.svelte';
+	import { getNotificationSettings, groupMute } from '#lib/client/notification-settings';
+	import Icon from '#lib/components/ui/Icon.svelte';
+	import MuteGroupSheet from '#lib/components/groups/MuteGroupSheet.svelte';
+	import type { NotificationSettings } from '#lib/types';
 
 	let { data, children } = $props();
 
@@ -21,7 +25,17 @@
 	// Timing and Members open as their own screens, each with a way back to the calendar.
 	const showNav = $derived(route === '/app/groups/[id]');
 	const isAdmin = $derived(isAdminRole(data.group.role));
-	const more = $derived([
+
+	// Your notification settings, to know whether this group is muted (loaded once, kept by the sheet).
+	let notifySettings = $state<NotificationSettings | null>(null);
+	let muteOpen = $state(false);
+	$effect(() => {
+		getNotificationSettings()
+			.then((s) => (notifySettings = s))
+			.catch(() => {});
+	});
+	const mute = $derived(groupMute(notifySettings, data.group.id));
+	const more = $derived<MenuItem[]>([
 		{ label: 'Plans', icon: 'check-circle' as const, onselect: () => goto(`${base}/proposals`) },
 		{ label: 'Timing', icon: 'sliders' as const, onselect: () => goto(`${base}/timing`) },
 		{
@@ -33,6 +47,11 @@
 		...(data.group.members.length > 1
 			? [{ label: 'New group with these people', icon: 'plus' as const, onselect: () => newGroupSheet.showFrom(data.group) }]
 			: []),
+		{
+			label: mute ? 'Unmute notifications' : 'Mute notifications',
+			icon: mute ? ('bell' as const) : ('bell-off' as const),
+			onselect: () => void (muteOpen = true)
+		},
 		{ label: 'Group settings', icon: 'settings' as const, onselect: () => goto(`${base}/settings`) }
 	]);
 
@@ -70,7 +89,9 @@
 				<IconButton href="/app" icon="chevron-left" label="Back to groups" />
 				<div class="titles">
 					<h1>{data.group.name}</h1>
-					<span class="sub">{groupSubtitle(data.group)}</span>
+					<span class="sub">
+						{#if mute}<span class="muted-tag"><Icon name="bell-off" size={12} /> Muted</span> · {/if}{groupSubtitle(data.group)}
+					</span>
 				</div>
 				<IconButton href="{base}/chat" icon="chat" label={unreadChat ? `Chat, ${unreadChat} unread` : 'Chat'} badge={unreadChat} />
 				<Menu icon="more" label="More" items={more} />
@@ -79,6 +100,15 @@
 		{@render children()}
 	</div>
 </div>
+
+<MuteGroupSheet
+	bind:open={muteOpen}
+	groupId={data.group.id}
+	groupName={data.group.name}
+	muted={mute !== null}
+	until={mute?.until ?? null}
+	onsaved={(s) => (notifySettings = s)}
+/>
 
 <style>
 	.group-layout {
@@ -129,6 +159,15 @@
 	.sub {
 		font-size: 12px;
 		color: var(--muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.muted-tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		vertical-align: -1px;
 	}
 	.side {
 		display: none;

@@ -18,6 +18,7 @@
 	import PlanSection from '#lib/components/settings/PlanSection.svelte';
 	import TemplatesSection from '#lib/components/settings/TemplatesSection.svelte';
 	import RemindersSection from '#lib/components/settings/RemindersSection.svelte';
+	import NotificationsSection from '#lib/components/settings/NotificationsSection.svelte';
 	import UsernameField from '#lib/components/settings/UsernameField.svelte';
 	import { ApiError } from '#lib/client/api';
 	import { normalizeUsername } from '#lib/usernames';
@@ -153,6 +154,8 @@
 			</GlassPanel>
 
 			<RemindersSection reminders={data.user.eventReminders} />
+
+			<NotificationsSection />
 
 			<div class="appearance">
 				<h2 class="section-title">Appearance</h2>
