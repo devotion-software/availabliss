@@ -336,6 +336,11 @@ interface AvailablissApi {
     @POST("api/v1/proposals/{id}/override")
     suspend fun overrideResponse(@Path("id") id: String, @Body body: OverrideRequest): Proposal
 
+    /** "Keep the plan" after someone can't make it any more: clears `needsReview`. */
+    @POST("api/v1/proposals/{id}/keep")
+    suspend fun keepPlan(@Path("id") id: String): Proposal
+
+    /** Withdraws an open proposal, or cancels a confirmed plan (deleting its event). */
     @DELETE("api/v1/proposals/{id}")
     suspend fun cancelProposal(@Path("id") id: String)
     // endregion

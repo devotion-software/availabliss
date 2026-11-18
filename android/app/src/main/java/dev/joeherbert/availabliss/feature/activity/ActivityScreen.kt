@@ -232,6 +232,7 @@ private fun PermissionCard(onOpenSettings: () -> Unit) {
 private fun NotificationKind.icon(): ImageVector = when (this) {
     NotificationKind.ProposalCreated -> AvIcons.ProposalCheck
     NotificationKind.ProposalConfirmed -> AvIcons.Check
+    NotificationKind.ProposalChanged -> AvIcons.Alert
     NotificationKind.Nudge -> AvIcons.Clock
     NotificationKind.InviteAccepted -> AvIcons.AddPerson
     NotificationKind.InviteReceived -> AvIcons.AddPerson

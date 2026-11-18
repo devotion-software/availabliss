@@ -1,6 +1,9 @@
 package dev.joeherbert.availabliss.feature.proposal
 
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
@@ -89,17 +92,30 @@ data class ProposalActions(
     val onOverride: (userId: String, ResponseKind) -> Unit = { _, _ -> },
     val onCancel: () -> Unit = {},
     val onConfirmAnyway: () -> Unit = {},
+    val onKeepPlan: () -> Unit = {},
+    val onCancelPlan: () -> Unit = {},
     val onAddToCalendar: () -> Unit = {},
     val onOpenChat: (groupId: String) -> Unit = {},
 )
 
 @Composable
-fun ProposalScreen(onBack: () -> Unit, onOpenChat: (groupId: String) -> Unit, viewModel: ProposalViewModel = hiltViewModel()) {
+fun ProposalScreen(
+    onBack: () -> Unit,
+    onOpenChat: (groupId: String) -> Unit,
+    onOpenGroupCalendar: (groupId: String) -> Unit = {},
+    viewModel: ProposalViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
     AddToCalendarEffect(state.calendar, viewModel::onIntentHandled, viewModel::chooseCalendar, viewModel::cancelCalendarChoice)
     LaunchedEffect(state.closed) { if (state.closed) onBack() }
+    LaunchedEffect(state.findAnotherDate) {
+        if (state.findAnotherDate) {
+            viewModel.onFoundAnotherDate()
+            onOpenGroupCalendar(state.groupId)
+        }
+    }
     val currentOnBack by rememberUpdatedState(onBack)
     val currentOnOpenChat by rememberUpdatedState(onOpenChat)
     // One instance for the screen's lifetime so unchanged parts skip recomposition.
@@ -111,6 +127,8 @@ fun ProposalScreen(onBack: () -> Unit, onOpenChat: (groupId: String) -> Unit, vi
             onOverride = viewModel::override,
             onCancel = viewModel::cancel,
             onConfirmAnyway = viewModel::confirmAnyway,
+            onKeepPlan = viewModel::keepPlan,
+            onCancelPlan = viewModel::cancelPlan,
             onAddToCalendar = viewModel::addToCalendar,
             onOpenChat = { currentOnOpenChat(it) },
         )
@@ -366,6 +384,7 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             GlassIconButton(AvIcons.Back, "Back", actions.onBack)
         }
+        ReviewPrompt(state, actions)
         GlassPanel(
             Modifier.fillMaxWidth().padding(top = 10.dp).semantics { liveRegion = LiveRegionMode.Polite },
             shape = Shapes.panel,
@@ -456,8 +475,99 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
                 enabled = state.groupId.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (state.canChangeReply) ChangeReply(state, actions.onRespond)
         }
     }
+}
+
+/**
+ * For the proposer or an admin after someone who was coming dropped out: a panel that stays
+ * until they choose, and a sheet (opened by itself once per visit) to keep the plan or cancel it.
+ */
+@Composable
+private fun ReviewPrompt(state: ProposalUiState, actions: ProposalActions) {
+    if (!state.needsReview) return
+    var open by remember { mutableStateOf(false) }
+    var prompted by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!prompted) {
+            prompted = true
+            kotlinx.coroutines.delay(600)
+            open = true
+        }
+    }
+    Column(Modifier.fillMaxWidth().padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        ClashPanel(state.reviewHeadline, "Keep the plan with who can make it, or cancel it and find another date.")
+        SecondaryButton(
+            text = "Keep or cancel…",
+            onClick = { open = true },
+            enabled = !state.responding,
+            height = 44.dp,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    if (open) {
+        ConfirmSheet(
+            title = state.reviewHeadline,
+            message = "The plan's still on. Keep it with who can make it, or cancel it and find another date.",
+            options = listOf(
+                ConfirmOption("Keep the plan", onClick = {
+                    open = false
+                    actions.onKeepPlan()
+                }, icon = AvIcons.Check),
+                ConfirmOption("Cancel and find another date", onClick = {
+                    open = false
+                    actions.onCancelPlan()
+                }, icon = AvIcons.Calendar, kind = ConfirmOption.Kind.Destructive),
+            ),
+            onDismiss = { open = false },
+            cancelText = "Decide later",
+        )
+    }
+}
+
+/** "Can't make it any more?" (or "Can make it after all?") under the plan, confirmed in a sheet. */
+@Composable
+private fun ChangeReply(state: ProposalUiState, onRespond: (ResponseKind) -> Unit) {
+    val colors = AvailablissTheme.colors
+    var open by remember { mutableStateOf(false) }
+    val label = when (state.myResponse) {
+        ResponseKind.Accepted -> "Can't make it any more?"
+        ResponseKind.Declined -> "Can make it after all?"
+        else -> "Can you make it?"
+    }
+    Text(
+        label,
+        style = AvailablissTheme.type.label,
+        color = colors.muted,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth()
+            .clickable(enabled = !state.responding, role = Role.Button) { open = true }
+            .padding(vertical = 10.dp),
+    )
+    if (!open) return
+    val iCant = ConfirmOption("I can't make it", onClick = {
+        open = false
+        onRespond(ResponseKind.Declined)
+    }, kind = if (state.myResponse == ResponseKind.Accepted) ConfirmOption.Kind.Destructive else ConfirmOption.Kind.Secondary)
+    val iCan = ConfirmOption("I can make it", onClick = {
+        open = false
+        onRespond(ResponseKind.Accepted)
+    }, icon = AvIcons.Check)
+    ConfirmSheet(
+        title = if (state.myResponse == ResponseKind.Accepted) "Can't make it any more?" else "Can you make it?",
+        message = if (state.myResponse == ResponseKind.Accepted) {
+            "The plan stays on. Whoever proposed it and the admins will be told, so they can keep it or find another date."
+        } else {
+            "Let everyone know whether you're coming."
+        },
+        options = when (state.myResponse) {
+            ResponseKind.Accepted -> listOf(iCant)
+            ResponseKind.Declined -> listOf(iCan)
+            else -> listOf(iCan, iCant)
+        },
+        onDismiss = { open = false },
+    )
 }
 
 /** Who's coming (or, [quiet], who can't, never replied or joined the group since): a titled glass list of people. */

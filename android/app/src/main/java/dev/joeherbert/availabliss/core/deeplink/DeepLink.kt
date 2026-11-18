@@ -87,7 +87,7 @@ sealed interface DeepLink {
             val proposalId = data["proposalId"]?.takeIf { it.isNotBlank() }
             val token = data["token"]?.takeIf { it.isNotBlank() }
             return when (data["kind"]) {
-                "proposal.created", "proposal.confirmed" ->
+                "proposal.created", "proposal.confirmed", "proposal.changed" ->
                     proposalId?.let(::Proposal) ?: groupId?.let(::GroupCalendar)
                 "message" -> groupId?.let(::GroupChat)
                 "event.created" -> groupId?.let(::GroupEvents)

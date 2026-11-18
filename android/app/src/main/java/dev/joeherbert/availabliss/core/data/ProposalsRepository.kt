@@ -45,6 +45,9 @@ class ProposalsRepository @Inject constructor(
 
     suspend fun cancel(id: String): ApiResult<Unit> = call { api.cancelProposal(id) }
 
+    /** "Keep the plan" after someone can't make it any more. */
+    suspend fun keep(id: String): ApiResult<Proposal> = call { api.keepPlan(id) }
+
     /** "Confirm anyway" before everyone has accepted. */
     suspend fun confirm(id: String): ApiResult<Proposal> = call { api.confirmProposal(id) }
 }

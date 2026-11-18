@@ -9,6 +9,8 @@ import kotlinx.serialization.json.JsonNull
 enum class NotificationKind(override val wire: String) : WireEnum {
     ProposalCreated("proposal.created"),
     ProposalConfirmed("proposal.confirmed"),
+    /** A confirmed plan changed: someone can't make it any more, or it was cancelled. */
+    ProposalChanged("proposal.changed"),
     Nudge("nudge"),
     InviteAccepted("invite.accepted"),
     /** Someone invited you by username; `data.token` is the invite. */

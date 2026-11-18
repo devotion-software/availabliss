@@ -83,6 +83,14 @@ data class ProposalUiState(
     val canConfirmAnyway: Boolean = false,
     /** For the Confirm anyway sheet: "Priya can't make it and Tom hasn't replied. …" */
     val confirmAnywayMessage: String = "",
+    /** Confirmed, and you're the proposer or an admin while someone who was coming has dropped out. */
+    val needsReview: Boolean = false,
+    /** "Priya can't make it any more" */
+    val reviewHeadline: String = "",
+    /** You were asked (members who joined since weren't), so you can still change your reply once confirmed. */
+    val canChangeReply: Boolean = false,
+    /** Cancelled a confirmed plan: go to the group's calendar to find another date. */
+    val findAnotherDate: Boolean = false,
     /** Open proposals that clash with someone's busy time: "Priya is busy then". */
     val clash: String? = null,
     /** "Their calendars or blocked time overlap. …" */
@@ -109,6 +117,7 @@ private data class ProposalData(
     val error: String? = null,
     val responding: Boolean = false,
     val closed: Boolean = false,
+    val findAnotherDate: Boolean = false,
     val message: UserMessage? = null,
 )
 
@@ -201,6 +210,35 @@ class ProposalViewModel @Inject constructor(
         }
     }
 
+    /** "Keep the plan": clears the review; whoever dropped out stays as can't make it. */
+    fun keepPlan() {
+        if (data.value.responding) return
+        viewModelScope.launch {
+            data.update { it.copy(responding = true) }
+            when (val result = proposals.keep(proposalId)) {
+                is ApiResult.Success -> {
+                    setProposal(result.value)
+                    data.update { it.copy(responding = false) }
+                }
+                is ApiResult.Failure -> data.update { it.copy(responding = false, message = UserMessage(result.error.message)) }
+            }
+        }
+    }
+
+    /** "Cancel and find another date": cancels the plan (its event goes too), then opens the group's calendar. */
+    fun cancelPlan() {
+        if (data.value.responding) return
+        viewModelScope.launch {
+            data.update { it.copy(responding = true) }
+            when (val result = proposals.cancel(proposalId)) {
+                is ApiResult.Success -> data.update { it.copy(responding = false, findAnotherDate = true) }
+                is ApiResult.Failure -> data.update { it.copy(responding = false, message = UserMessage(result.error.message)) }
+            }
+        }
+    }
+
+    fun onFoundAnotherDate() = data.update { it.copy(findAnotherDate = false) }
+
     fun cancel() {
         viewModelScope.launch {
             when (val result = proposals.cancel(proposalId)) {
@@ -246,6 +284,14 @@ class ProposalViewModel @Inject constructor(
         }
         val who = parts.joinToString(" and ").let { if (it.isEmpty()) "" else "$it. " }
         return "${who}Everyone will be told it's on, with ${ProposalFormatting.acceptedCount(p)} of ${p.responses.size} coming."
+    }
+
+    /** "Priya can't make it any more" / "Priya and Tom can't make it any more". */
+    private fun reviewHeadline(p: Proposal, members: List<ProposalMemberUi>, meId: String?, directory: MemberDirectory): String {
+        val dropped = p.responses.filter { it.droppedOut }.map { it.userId }.toSet()
+        val names = members.filter { it.userId in dropped }
+            .map { if (it.userId == meId) "You" else directory[it.userId]?.name?.firstName() ?: "Someone" }
+        return if (names.isEmpty()) "Someone can't make it any more" else "${names.joinNamesSummary(4)} can't make it any more"
     }
 
     private fun ProposalData.toUi(cal: AddToCalendarState, meId: String?): ProposalUiState {
@@ -306,7 +352,7 @@ class ProposalViewModel @Inject constructor(
                 .map { it.copy(note = if (it.userId == p.createdBy) "Proposed this" else "") },
             cantMakeIt = if (!confirmed) emptyList() else members
                 .filter { it.userId in responses && it.response == ResponseKind.Declined && inGroup(it.userId) }
-                .map { it.copy(note = "") },
+                .map { it.copy(note = if (responses[it.userId]?.droppedOut == true) "Can't make it any more" else "") },
             notReplied = if (!confirmed) emptyList() else members
                 .filter { it.userId in responses && it.response == ResponseKind.Pending && inGroup(it.userId) }
                 .map { it.copy(note = "") },
@@ -318,6 +364,10 @@ class ProposalViewModel @Inject constructor(
             canConfirmAnyway = p.status == ProposalStatus.Open && meId != null && (p.createdBy == meId || isAdmin) &&
                 p.responses.any { it.response == ResponseKind.Accepted && it.userId != meId },
             confirmAnywayMessage = confirmAnywayMessage(p, members, meId, directory),
+            needsReview = confirmed && p.needsReview && meId != null && (p.createdBy == meId || isAdmin),
+            reviewHeadline = reviewHeadline(p, members, meId, directory),
+            canChangeReply = confirmed && meId != null && meId in responses,
+            findAnotherDate = findAnotherDate,
             clash = Clash.text(busyIds, { directory[it]?.name }, meId),
             clashDetail = Clash.detail(busyIds, meId),
             iAmBusy = meId != null && meId in busyIds,

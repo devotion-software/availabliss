@@ -235,6 +235,14 @@ fun MainNavHost(root: RootViewModel) {
                             nav.navigate(GroupChatRoute(groupId))
                         }
                     },
+                    // A cancelled plan: back to the group's calendar to pick another date.
+                    onOpenGroupCalendar = { groupId ->
+                        nav.popBackStack()
+                        val current = nav.currentBackStackEntry
+                        if (current?.destination?.hasRoute<GroupRoute>() != true || current.toRoute<GroupRoute>().groupId != groupId) {
+                            nav.navigate(GroupRoute(groupId))
+                        }
+                    },
                 )
             }
             composable<CreateProposalRoute> {

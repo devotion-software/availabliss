@@ -34,6 +34,8 @@ data class Proposal(
     /** Confirmed before everyone accepted ("Confirm anyway"): who did it. Null otherwise, and on older servers. */
     val confirmedBy: String? = null,
     val responses: List<ProposalResponse> = emptyList(),
+    /** Confirmed: someone who was coming can't make it any more; the proposer or an admin should keep or cancel it. */
+    val needsReview: Boolean = false,
     /** Open proposals: members whose calendars or blocked time clash with it (ids only). */
     val busyMemberIds: List<String> = emptyList(),
 ) {
@@ -50,6 +52,8 @@ data class ProposalResponse(
     val response: ResponseKind,
     val setBy: String? = null,
     val updatedAt: String,
+    /** Confirmed: said they can't make it after it was confirmed, not yet reviewed. */
+    val droppedOut: Boolean = false,
 )
 
 @Serializable
