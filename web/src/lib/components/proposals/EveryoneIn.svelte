@@ -6,8 +6,10 @@
 	import AddToCalendar from '#lib/components/events/AddToCalendar.svelte';
 	import Avatar from '#lib/components/ui/Avatar.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
+	import Sheet from '#lib/components/ui/Sheet.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
 	import { memberMap, memberLabel } from '#lib/client/members';
-	import { everyoneIn } from './responses';
+	import { everyoneIn, listNames } from './responses';
 
 	/**
 	 * The confirmed state: "Everyone's in." (or "It's on." when confirmed before everyone accepted)
@@ -18,8 +20,14 @@
 		group: Group;
 		/** The signed-in user's id, to mark "(you)". */
 		me: string;
+		/** Change your own reply once confirmed. */
+		onrespond: (response: 'accepted' | 'declined') => Promise<unknown>;
+		/** "Keep the plan" after someone dropped out (proposer or admin). */
+		onkeep: () => Promise<unknown>;
+		/** "Cancel and find another date" (proposer or admin). */
+		oncancelplan: () => Promise<unknown>;
 	}
-	let { proposal, group, me }: Props = $props();
+	let { proposal, group, me, onrespond, onkeep, oncancelplan }: Props = $props();
 
 	const fmt = useFormat();
 	const range = $derived(fmt.current.when(proposal.start, proposal.end, proposal.allDay));
@@ -38,6 +46,42 @@
 	// Replies are only asked of the members at the time, so anyone without one joined the group afterwards.
 	const joinedLater = $derived(ordered.filter((m) => !replies.has(m.userId)));
 	const allIn = $derived(everyoneIn(proposal));
+
+	// Someone who was coming dropped out: the proposer or an admin keeps the plan or cancels it.
+	const reviewer = $derived(proposal.createdBy === me || group.role === 'owner' || group.role === 'admin');
+	const needsReview = $derived(reviewer && !!proposal.needsReview);
+	const reviewHeadline = $derived.by(() => {
+		const names = ordered
+			.filter((m) => proposal.responses.some((r) => r.userId === m.userId && r.droppedOut))
+			.map((m) => (m.userId === me ? 'You' : memberLabel(members, m.userId, me, { first: true })));
+		return names.length ? `${listNames(names)} can’t make it any more` : 'Someone can’t make it any more';
+	});
+	let reviewOpen = $state(false);
+	// The review sheet opens by itself once per visit; after that, the panel's button opens it.
+	let prompted = false;
+	$effect(() => {
+		if (!needsReview || prompted) return;
+		prompted = true;
+		const timer = setTimeout(() => (reviewOpen = true), 600);
+		return () => clearTimeout(timer);
+	});
+
+	// Your own reply, changeable once confirmed (only if you were asked: not if you joined since).
+	const mine = $derived(replies.get(me));
+	let replyOpen = $state(false);
+	let busy = $state<'keep' | 'cancel' | 'accepted' | 'declined' | null>(null);
+	async function run(kind: NonNullable<typeof busy>, action: () => Promise<unknown>) {
+		busy = kind;
+		try {
+			await action();
+			reviewOpen = false;
+			replyOpen = false;
+		} catch {
+			// The page shows the error.
+		} finally {
+			busy = null;
+		}
+	}
 	const count = $derived(coming.length || proposal.responses.length || group.members.length);
 
 	// The confirmed event's cover photo, if someone has added one.
@@ -57,6 +101,15 @@
 </script>
 
 <div class="confirmed">
+	{#if needsReview}
+		<div class="review">
+			<div class="dropped" role="status">
+				<Icon name="alert" size={18} />
+				<span><strong>{reviewHeadline}.</strong> Keep the plan with who can make it, or cancel it and find another date.</span>
+			</div>
+			<Button variant="secondary" block disabled={busy !== null} onclick={() => (reviewOpen = true)}>Keep or cancel…</Button>
+		</div>
+	{/if}
 	<div class="status glass" role="status">
 		<Logo size={34} />
 		<div class="status-text">
@@ -102,6 +155,7 @@
 						<Avatar name={m.name} id={m.userId} image={m.image} size={28} />
 						<div class="who">
 							<span class="name">{memberLabel(members, m.userId, me)}</span>
+							{#if proposal.responses.some((r) => r.userId === m.userId && r.droppedOut)}<span class="why">Can’t make it any more</span>{/if}
 						</div>
 					</div>
 				{/each}
@@ -140,11 +194,95 @@
 			/>
 		{/if}
 		<Button variant="secondary" size="lg" icon="chat" block href="/app/groups/{group.id}/chat">Go to chat</Button>
+		{#if mine}
+			<button type="button" class="change" disabled={busy !== null} onclick={() => (replyOpen = true)}>
+				{mine === 'accepted' ? 'Can’t make it any more?' : mine === 'declined' ? 'Can make it after all?' : 'Can you make it?'}
+			</button>
+		{/if}
 		<a class="back" href="/app/groups/{group.id}">Back to {group.name}</a>
 	</div>
 </div>
 
+<Sheet
+	bind:open={reviewOpen}
+	title={reviewHeadline}
+	description="The plan’s still on. Keep it with who can make it, or cancel it and find another date."
+	width={420}
+>
+	<div class="choices">
+		<Button variant="solid" icon="check" block loading={busy === 'keep'} disabled={busy !== null} onclick={() => run('keep', onkeep)}
+			>Keep the plan</Button
+		>
+		<Button variant="danger" icon="calendar" block loading={busy === 'cancel'} disabled={busy !== null} onclick={() => run('cancel', oncancelplan)}
+			>Cancel and find another date</Button
+		>
+		<Button variant="secondary" block onclick={() => (reviewOpen = false)}>Decide later</Button>
+	</div>
+</Sheet>
+
+<Sheet
+	bind:open={replyOpen}
+	title={mine === 'accepted' ? 'Can’t make it any more?' : 'Can you make it?'}
+	description={mine === 'accepted'
+		? 'The plan stays on. Whoever proposed it and the admins will be told, so they can keep it or find another date.'
+		: 'Let everyone know whether you’re coming.'}
+	width={420}
+>
+	<div class="choices">
+		{#if mine !== 'accepted'}
+			<Button variant="solid" icon="check" block loading={busy === 'accepted'} disabled={busy !== null} onclick={() => run('accepted', () => onrespond('accepted'))}
+				>I can make it</Button
+			>
+		{/if}
+		{#if mine !== 'declined'}
+			<Button
+				variant={mine === 'accepted' ? 'danger' : 'secondary'}
+				block
+				loading={busy === 'declined'}
+				disabled={busy !== null}
+				onclick={() => run('declined', () => onrespond('declined'))}>I can’t make it</Button
+			>
+		{/if}
+		<Button variant="secondary" block onclick={() => (replyOpen = false)}>Cancel</Button>
+	</div>
+</Sheet>
+
 <style>
+	.review {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.dropped {
+		display: flex;
+		gap: 10px;
+		align-items: flex-start;
+		padding: 12px 14px;
+		border-radius: 18px;
+		background: var(--warn-bg);
+		color: var(--warn-ink);
+		font-size: 13px;
+		line-height: 1.4;
+	}
+	.dropped :global(svg) {
+		flex: none;
+		margin-top: 1px;
+	}
+	.choices {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.change {
+		align-self: center;
+		min-height: 40px;
+		padding: 0 12px;
+		background: none;
+		border: 0;
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--muted);
+	}
 	.confirmed {
 		flex: 1;
 		display: flex;

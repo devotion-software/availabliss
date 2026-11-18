@@ -18,7 +18,10 @@ export const respondToProposal = (id: string, response: 'accepted' | 'declined')
 	api.post<Proposal>(`/proposals/${id}/respond`, { response });
 export const overrideResponse = (id: string, userId: string, response: ResponseKind) =>
 	api.post<Proposal>(`/proposals/${id}/override`, { userId, response });
+/** Withdraws an open proposal, or cancels a confirmed plan (deleting its event). */
 export const cancelProposal = (id: string) => api.del(`/proposals/${id}`);
+/** "Keep the plan" after someone can't make it any more: clears `needsReview`. */
+export const keepPlan = (id: string) => api.post<Proposal>(`/proposals/${id}/keep`);
 /** "Confirm anyway": the proposer or an admin confirms before everyone has accepted. */
 export const confirmProposal = (id: string) => api.post<Proposal>(`/proposals/${id}/confirm`);
 /** Members who are busy during a time, to warn before proposing it. */

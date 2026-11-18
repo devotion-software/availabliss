@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
 	import type { Member, Proposal, ResponseKind } from '#lib/types';
-	import { cancelProposal, confirmProposal, getProposal, overrideResponse, respondToProposal } from '#lib/client/proposals';
+	import { cancelProposal, confirmProposal, getProposal, keepPlan, overrideResponse, respondToProposal } from '#lib/client/proposals';
 	import { live, proposalOf } from '#lib/client/live.svelte';
 	import { useFormat } from '#lib/client/format';
 	import { isAdminRole, memberMap, memberLabel } from '#lib/client/members';
@@ -140,6 +140,37 @@
 		}
 	}
 
+	// Once confirmed: change your reply, or (proposer or admin) keep or cancel the plan after someone dropped out.
+	async function changeReply(response: 'accepted' | 'declined') {
+		try {
+			await apply(() => respondToProposal(proposal.id, response));
+			toasts.success(response === 'accepted' ? "You're in" : 'Thanks for letting everyone know');
+			invalidate('app:groups');
+		} catch (err) {
+			toasts.error(err);
+			throw err;
+		}
+	}
+	async function keep() {
+		try {
+			await apply(() => keepPlan(proposal.id));
+			toasts.success('Plan kept');
+		} catch (err) {
+			toasts.error(err);
+			throw err;
+		}
+	}
+	async function cancelPlan() {
+		try {
+			await cancelProposal(proposal.id);
+			toasts.success('Plan cancelled. Pick another date');
+			await goto(`/app/groups/${group.id}`, { invalidateAll: true });
+		} catch (err) {
+			toasts.error(err);
+			throw err;
+		}
+	}
+
 	let withdrawOpen = $state(false);
 	async function withdraw() {
 		try {
@@ -156,7 +187,7 @@
 <svelte:head><title>Proposal · {group.name} · Availabliss</title></svelte:head>
 
 {#if proposal.status === 'confirmed'}
-	<EveryoneIn {proposal} {group} {me} />
+	<EveryoneIn {proposal} {group} {me} onrespond={changeReply} onkeep={keep} oncancelplan={cancelPlan} />
 {:else}
 	<div class="page">
 		<PageHeader
