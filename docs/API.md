@@ -181,9 +181,17 @@ interface Group extends Omit<GroupSummary, 'status' | 'unreadCount' | 'memberPre
   requirement: Requirement;
   members: Member[];
   autoArchive: boolean;     // archive it automatically once its event has passed (see below); off by default
+  rhythm: { every: 'week' | 'two-weeks' | 'month'; prompt: boolean } | null; // how often it meets; see "Rhythm" below
   createdAt: string;
 }
 ```
+
+**Rhythm.** A group that meets regularly can set `rhythm` (weekly, fortnightly or monthly: the same
+weekday in the same week of the next month, "the first Friday"). `GET /groups/:id/next` → `{ suggestion:
+{ target: 'YYYY-MM-DD', slot: Slot | null } | null }` gives the free time nearest the next one (a week or
+so either side, everyone-free first; null without a rhythm). With `prompt: true`, once a plan has ended and
+nothing newer is planned or proposed, the server posts "Same again? … works for everyone" in the chat and
+sends a `reminder` (`data.reminder: 'next'`, with the slot's `start`/`end`), once per plan.
 
 **Automatic archiving.** With `autoArchive` on, the server archives the group (for everyone, as an admin
 archiving it would; `group.updated` is published) once its latest event has ended and nothing else is planned:
@@ -496,7 +504,7 @@ muted and can't be tapped, and the date pickers start at today (or an edited blo
 | GET 🔒 | `/groups` | | `{ groups: GroupSummary[] }` |
 | POST 🔒 | `/groups` | `{ name, color?, requirement? }` | `Group` (creator is owner; `402 upgrade_required` past the free limit) |
 | GET 🔒 | `/groups/:id` | | `Group` |
-| PATCH 👑 | `/groups/:id` | `{ name?, color?, requirement?, archived?, autoArchive? }` | `Group` (publishes `group.updated`; `archived: true` archives it for everyone, `false` unarchives; `autoArchive` turns automatic archiving on or off) |
+| PATCH 👑 | `/groups/:id` | `{ name?, color?, requirement?, archived?, autoArchive?, rhythm? }` | `Group` (publishes `group.updated`; `archived: true` archives it for everyone, `false` unarchives; `autoArchive` turns automatic archiving on or off) |
 | PUT 👑 | `/groups/:id/image` | the image bytes (as `/me/avatar`) | `Group` (`image` shrunk to fit 512 px; publishes `group.updated`) |
 | DELETE 👑 | `/groups/:id/image` | | `Group` (no photo: the monogram tile) |
 | DELETE ⭐ | `/groups/:id` | | `204` |

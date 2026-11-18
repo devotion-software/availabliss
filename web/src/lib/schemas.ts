@@ -3,7 +3,7 @@
  * Each schema mirrors a request body in docs/API.md.
  */
 import { z } from 'zod';
-import { BUSY_BUFFER_MINUTES, COLOR_THEMES, EVENT_REMINDERS, NOTIFICATION_CATEGORIES, REPEATS, RESPONSE_KINDS, THEME_MODES, TILE_COLORS, type Weekday } from './types';
+import { BUSY_BUFFER_MINUTES, COLOR_THEMES, EVENT_REMINDERS, NOTIFICATION_CATEGORIES, RHYTHMS, REPEATS, RESPONSE_KINDS, THEME_MODES, TILE_COLORS, type Weekday } from './types';
 import { isValidZone } from './timezone';
 import { normalizeUsername, usernameProblem } from './usernames';
 
@@ -125,7 +125,11 @@ export const createGroupSchema = z.object({
  * `archived` moves the group to (true) or out of (false) the archived section of everyone's groups list;
  * `autoArchive` archives it by itself once its latest event has passed.
  */
-export const updateGroupSchema = createGroupSchema.partial().extend({ archived: z.boolean().optional(), autoArchive: z.boolean().optional() });
+export const updateGroupSchema = createGroupSchema.partial().extend({
+	archived: z.boolean().optional(),
+	autoArchive: z.boolean().optional(),
+	rhythm: z.object({ every: z.enum(RHYTHMS), prompt: z.boolean().default(true) }).nullable().optional()
+});
 
 export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
 

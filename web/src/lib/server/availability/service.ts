@@ -1,6 +1,6 @@
 /** Loads a group's members, busy time and holidays, then runs the engine. */
 import { and, eq, gt, inArray } from 'drizzle-orm';
-import type { Availability, DayAvailability, Requirement } from '#lib/types';
+import type { Availability, DayAvailability, Requirement, Slot } from '#lib/types';
 import { db } from '../db';
 import { groupMembers, proposalResponses, proposals, user } from '../db/schema';
 import { isPro } from '../billing';
@@ -146,6 +146,12 @@ export async function previewRequirement(userId: string, requirement: Requiremen
  * What the AI planner may see about a group's coming weeks: the slots that work
  * for everyone and named holidays. No member names or busy time.
  */
+/** The slots that work between two dates, for suggestions (no viewer, so no Pro scores). */
+export async function suggestionAvailability(group: GroupRow, from: string, to: string): Promise<Slot[]> {
+	if (to < from) return [];
+	return computeAvailability(await engineInput(group, from, to)).slots;
+}
+
 export async function planningContext(group: GroupRow, maxSlots = 25) {
 	const from = [today(group.requirement.timezone), group.requirement.range.from].sort()[1];
 	const to = [group.requirement.range.to, addDays(from, MAX_RANGE_DAYS)].sort()[0];

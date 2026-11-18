@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { mediaUrl } from './media-urls';
 import { alias } from 'drizzle-orm/mysql-core';
-import type { Group, Member, Requirement, Role, TileColor } from '#lib/types';
+import type { Group, Member, Requirement, Rhythm, Role, TileColor } from '#lib/types';
 import { TILE_COLORS } from '#lib/types';
 import { monogram } from '#lib/monogram';
 import { db } from './db';
@@ -101,7 +101,7 @@ export function groupBase(row: GroupRow, role: Role, members: Member[]) {
 		memberCount: members.length,
 		syncedCount: members.filter((m) => m.synced).length,
 		requirementSummary: requirementSummary(row.requirement)
-	} satisfies Omit<Group, 'requirement' | 'members' | 'autoArchive' | 'createdAt'>;
+	} satisfies Omit<Group, 'requirement' | 'members' | 'autoArchive' | 'rhythm' | 'createdAt'>;
 }
 
 const toGroup = (row: GroupRow, role: Role, members: Member[]): Group => ({
@@ -109,6 +109,7 @@ const toGroup = (row: GroupRow, role: Role, members: Member[]): Group => ({
 	requirement: row.requirement,
 	members,
 	autoArchive: row.autoArchive,
+	rhythm: row.rhythm ?? null,
 	createdAt: row.createdAt.toISOString()
 });
 
@@ -179,7 +180,7 @@ export async function updateGroup(
 	{
 		archived,
 		...patch
-	}: { name?: string; color?: TileColor; requirement?: Requirement; archived?: boolean; autoArchive?: boolean }
+	}: { name?: string; color?: TileColor; requirement?: Requirement; archived?: boolean; autoArchive?: boolean; rhythm?: Rhythm | null }
 ): Promise<Group> {
 	await requireMember(groupId, userId, 'admin');
 	const set: Partial<GroupRow> = { ...patch };

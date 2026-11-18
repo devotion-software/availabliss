@@ -174,7 +174,16 @@ export interface Group extends Omit<GroupSummary, 'status' | 'unreadCount' | 'me
 	members: Member[];
 	/** Archived automatically once its latest event has passed and nothing else is planned (admins choose). */
 	autoArchive: boolean;
+	/** How often the group meets ("roughly monthly"), used to suggest the next plan; null for none. */
+	rhythm: Rhythm | null;
 	createdAt: string;
+}
+
+export const RHYTHMS = ['week', 'two-weeks', 'month'] as const;
+export interface Rhythm {
+	every: (typeof RHYTHMS)[number];
+	/** After each plan, post "Same again?" in the chat with the next free time near the rhythm. */
+	prompt: boolean;
 }
 
 export interface BusyInterval {

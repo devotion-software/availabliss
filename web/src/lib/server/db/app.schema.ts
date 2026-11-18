@@ -23,6 +23,7 @@ import {
 	RESPONSE_KINDS,
 	ROLES,
 	type Requirement,
+	type Rhythm,
 	type MessageLocation,
 	type WalletPass,
 	type Weekday
@@ -189,6 +190,8 @@ export const groups = mysqlTable('groups', {
 	archivedAt: instant('archived_at'),
 	/** Archive it automatically once its latest event has passed and nothing else is planned (admins choose; off by default). */
 	autoArchive: boolean('auto_archive').default(false).notNull(),
+	/** How often the group meets, for suggesting the next plan (null: no rhythm). */
+	rhythm: json('rhythm').$type<Rhythm | null>(),
 	/**
 	 * The end of the latest event that has already archived it automatically, or that had passed when someone
 	 * unarchived it: it isn't archived automatically again until an event ending after this has passed.
