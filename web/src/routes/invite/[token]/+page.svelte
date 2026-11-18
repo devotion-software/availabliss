@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resetAppearance } from '#lib/client/session';
-	import { acceptInvite } from '#lib/client/groups';
+	import { acceptInvite, declineInvite } from '#lib/client/groups';
 	import { toasts } from '#lib/client/toast.svelte';
 	import { daysBetween, todayIn } from '#lib/client/dates';
 	import { useFormat, plural } from '#lib/client/format';
@@ -64,6 +64,20 @@
 	}
 
 	const openGroup = (id: string) => goto(`/app/groups/${id}`, { invalidateAll: true });
+
+	// Sent to you in Activity (by username, or as one of a group's people): you can turn it down.
+	let declining = $state(false);
+	async function decline() {
+		declining = true;
+		try {
+			await declineInvite(data.token);
+			toasts.info('Invite declined');
+			await goto('/app/activity', { invalidateAll: true });
+		} catch (err) {
+			toasts.error(err);
+			declining = false;
+		}
+	}
 </script>
 
 <svelte:head><title>{data.invite ? `Join ${data.invite.groupName}` : 'Invite'} · Availabliss</title></svelte:head>
@@ -94,7 +108,10 @@
 				</p>
 				<Button variant="accent" size="lg" block loading={switching} onclick={switchAccount}>Sign in with another account</Button>
 			{:else if data.user}
-				<Button variant="accent" size="lg" block loading={joining} onclick={join}>Join group</Button>
+				<Button variant="accent" size="lg" block loading={joining} disabled={declining} onclick={join}>Join group</Button>
+				{#if data.invite.personal}
+					<Button variant="secondary" size="lg" block loading={declining} disabled={joining} onclick={decline}>Decline</Button>
+				{/if}
 			{:else}
 				<Button href={signInHref} size="lg" block>Sign in to join</Button>
 				<span class="hint">New here? Signing in creates your account.</span>

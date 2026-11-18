@@ -31,7 +31,7 @@
 	const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
 
 	// The newest link anyone can use.
-	const link = $derived(invites.find((i) => i.email === null && i.username === null) ?? null);
+	const link = $derived(invites.find((i) => i.email === null && i.username === null && !i.name) ?? null);
 
 	$effect(() => {
 		const id = groupId;
@@ -142,7 +142,7 @@
 
 	const expiry = (i: GroupInvite) => `expires ${fmt.current.dayLong(i.expiresAt)}`;
 	/** Who an invite is for, or null for a link anyone can use. */
-	const inviteeLabel = (i: GroupInvite) => i.email ?? (i.username ? `@${i.username}` : null);
+	const inviteeLabel = (i: GroupInvite) => i.email ?? (i.username ? `@${i.username}` : (i.name ?? null));
 </script>
 
 <section class="invite glass" aria-labelledby="invite-h">

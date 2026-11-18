@@ -105,7 +105,7 @@
 	<TabBar label="Main" {tabs} />
 {/if}
 {#if NewGroupSheet}
-	<NewGroupSheet bind:open={newGroupSheet.open} user={data.user} />
+	<NewGroupSheet bind:open={newGroupSheet.open} user={data.user} basedOn={newGroupSheet.basedOn} />
 {/if}
 <UpgradeSheet bind:open={upgradeSheet.open} user={data.user} reason={upgradeSheet.reason} />
 

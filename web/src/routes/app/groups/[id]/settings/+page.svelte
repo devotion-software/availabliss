@@ -4,6 +4,7 @@
 	import { deleteGroup, setMyName, updateGroup } from '#lib/client/groups';
 	import { accountName, groupSubtitle, isAdminRole } from '#lib/client/members';
 	import { toasts } from '#lib/client/toast.svelte';
+	import { newGroupSheet } from '#lib/client/ui-state.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import Toggle from '#lib/components/ui/Toggle.svelte';
@@ -196,6 +197,16 @@
 				<Button variant="ghost" size="sm" disabled={savingMyName} onclick={() => saveMyName(null)}>Use {myAccountName} instead</Button>
 			{/if}
 		</section>
+
+		{#if group.members.length > 1}
+			<section class="glass card" aria-labelledby="new-group-title">
+				<div class="text">
+					<h2 id="new-group-title">Same people, new plan</h2>
+					<p class="small">Start another group with everyone here. You choose who to invite, and each of them gets an invite to accept.</p>
+				</div>
+				<Button variant="secondary" icon="plus" onclick={() => newGroupSheet.showFrom(group)}>New group with these people</Button>
+			</section>
+		{/if}
 
 		{#if canEdit}
 			<section class="glass card" aria-labelledby="archive-title">

@@ -24,6 +24,8 @@ export interface InvitePreview {
 	email: string | null;
 	/** Who it was sent to by username, or null. */
 	username: string | null;
+	/** Sent to one person's Activity, so they can decline it (older servers omit it). */
+	personal?: boolean;
 }
 
 export const listGroups = (fetch?: Fetch) => api.get<{ groups: GroupSummary[] }>('/groups', { fetch }).then((r) => r.groups);
@@ -72,12 +74,14 @@ export const nudgeGroup = (groupId: string) => api.post<{ nudged: number }>(`/gr
 
 /**
  * Nobody: a link anyone can use. Emails and usernames: one invite each (emailed, or sent to their
- * Activity), only for that person.
+ * Activity), only for that person. User ids: likewise to their Activity, for people already in a
+ * group with you.
  */
-export const createInvite = (groupId: string, emails: string[] = [], usernames: string[] = []) =>
+export const createInvite = (groupId: string, emails: string[] = [], usernames: string[] = [], userIds: string[] = []) =>
 	api.post<Invite>(`/groups/${groupId}/invites`, {
 		...(emails.length && { emails }),
-		...(usernames.length && { usernames })
+		...(usernames.length && { usernames }),
+		...(userIds.length && { userIds })
 	});
 export const listInvites = (groupId: string, fetch?: Fetch) =>
 	api.get<{ invites: GroupInvite[] }>(`/groups/${groupId}/invites`, { fetch }).then((r) => r.invites);
@@ -85,6 +89,8 @@ export const revokeInvite = (groupId: string, inviteId: string) => api.del(`/gro
 export const getInvite = (token: string, fetch?: Fetch) => api.get<InvitePreview>(`/invites/${token}`, { fetch });
 /** `joined`: false when you were already in the group. */
 export const acceptInvite = (token: string) => api.post<Group & { joined?: boolean }>(`/invites/${token}/accept`);
+/** Turns down an invite sent to you; it and its Activity item go. */
+export const declineInvite = (token: string) => api.post(`/invites/${token}/decline`);
 
 /** Every member's preferred times for the group. */
 export const listPreferences = (groupId: string, fetch?: Fetch) =>

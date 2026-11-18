@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
-	import { TILE_COLORS, type Requirement, type RequirementTemplate, type TileColor, type User } from '#lib/types';
+	import { TILE_COLORS, type Group, type Member, type Requirement, type RequirementTemplate, type TileColor, type User } from '#lib/types';
 	import { createGroupSchema, requirementSchema } from '#lib/schemas';
-	import { createGroup } from '#lib/client/groups';
+	import { createGroup, createInvite } from '#lib/client/groups';
 	import { ApiError } from '#lib/client/api';
 	import { getPlan } from '#lib/client/plan';
 	import { upgradeSheet } from '#lib/client/ui-state.svelte';
@@ -23,21 +23,35 @@
 	import SaveTemplate from '#lib/components/timing/SaveTemplate.svelte';
 	import { listTemplates, requirementFromTemplate } from '#lib/client/templates';
 	import { monogram } from '#lib/monogram';
+	import Avatar from '#lib/components/ui/Avatar.svelte';
 
 	/**
 	 * New group in two steps: 1) name, colour and optionally a saved template;
 	 * 2) the full timing editor (days, times, holidays, date range) with a live
 	 * count of how many times fit, before the group is created.
+	 *
+	 * "New group with these people" (`basedOn`, from a group's More menu or settings) starts from
+	 * that group: its name with a 2, its colour and its timing, plus a step between the two listing
+	 * its other members, all ticked. Each one still ticked gets an invite to accept once it's made.
 	 */
 	interface Props {
 		open: boolean;
-		user: Pick<User, 'timezone' | 'country'>;
+		user: Pick<User, 'id' | 'timezone' | 'country'>;
+		basedOn?: Group | null;
 	}
-	let { open = $bindable(), user }: Props = $props();
+	let { open = $bindable(), user, basedOn = null }: Props = $props();
 
 	const fmt = useFormat();
 
-	let step = $state<1 | 2>(1);
+	type Step = 'details' | 'people' | 'timing';
+	let step = $state<Step>('details');
+	/** The other group's members (not you), and who of them gets an invite. */
+	let people = $state<Member[]>([]);
+	let invitees = $state<Set<string>>(new Set());
+	/** The timing is the other group's (picked to start with; a template replaces it). */
+	let copiesTiming = $state(false);
+	const steps = $derived<Step[]>(people.length ? ['details', 'people', 'timing'] : ['details', 'timing']);
+	const stepIndex = $derived(steps.indexOf(step));
 	let name = $state('');
 	let color = $state<TileColor>('t1');
 	/** Your saved timings; picking one starts step 2 from it instead of the default. */
@@ -49,16 +63,44 @@
 	/** Free accounts at their group limit see an upgrade prompt instead of the form. */
 	let atLimit = $state(false);
 
-	// Fresh form each time the sheet opens.
+	// Fresh form each time the sheet opens (from another group: its name with a 2, colour, timing and people).
 	$effect.pre(() => {
 		if (!open) return;
-		step = 1;
-		name = '';
-		color = TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)];
+		step = 'details';
+		name = basedOn ? nextName(basedOn.name) : '';
+		color = basedOn?.color ?? TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)];
 		templateId = null;
-		requirement = defaultRequirement(user.timezone, fmt.current.today(), 'weekend');
+		copiesTiming = !!basedOn;
+		requirement = basedOn ? copiedTiming(basedOn) : defaultRequirement(user.timezone, fmt.current.today(), 'weekend');
+		const others = basedOn?.members.filter((m) => m.userId !== user.id) ?? [];
+		people = others;
+		invitees = new Set(others.map((m) => m.userId));
 		error = null;
 	});
+
+	/** "Book club" → "Book club 2", "Book club 2" → "Book club 3". */
+	function nextName(old: string): string {
+		const trimmed = old.trim();
+		const m = /^(.*) (\d{1,3})$/.exec(trimmed);
+		return m ? `${m[1]} ${Number(m[2]) + 1}` : `${trimmed} 2`.slice(0, 80);
+	}
+
+	const copiedTiming = (group: Group) => requirementFromTemplate(group, fmt.current.today(), user.timezone);
+
+	/** The other group's timing, or (tapped again) the default. */
+	function toggleCopiedTiming() {
+		if (!basedOn) return;
+		copiesTiming = !copiesTiming;
+		templateId = null;
+		requirement = copiesTiming ? copiedTiming(basedOn) : defaultRequirement(user.timezone, fmt.current.today(), 'weekend');
+	}
+
+	function toggleInvitee(id: string) {
+		const next = new Set(invitees);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		invitees = next;
+	}
 
 	$effect(() => {
 		if (!open) return;
@@ -79,6 +121,7 @@
 			return;
 		}
 		templateId = t.id;
+		copiesTiming = false;
 		requirement = requirementFromTemplate(t, fmt.current.today(), user.timezone);
 	}
 
@@ -103,8 +146,10 @@
 			return;
 		}
 		error = null;
-		step = 2;
+		step = steps[stepIndex + 1] ?? 'timing';
 	}
+
+	const back = () => (step = steps[Math.max(stepIndex - 1, 0)]);
 
 	function upgrade() {
 		open = false;
@@ -121,6 +166,13 @@
 		busy = true;
 		try {
 			const group = await createGroup({ name: name.trim(), color, requirement: req });
+			// Keep the people's order from the other group.
+			const userIds = people.map((m) => m.userId).filter((id) => invitees.has(id));
+			if (userIds.length) {
+				await createInvite(group.id, [], [], userIds).catch((err) =>
+					toasts.error(`${group.name} was made, but the invites didn't send (${err instanceof Error ? err.message : 'something went wrong'}). You can invite people from Members.`)
+				);
+			}
 			open = false;
 			await invalidate('app:groups');
 			await goto(`/app/groups/${group.id}`);
@@ -128,7 +180,7 @@
 			if (err instanceof ApiError && err.code === 'upgrade_required') atLimit = true;
 			else if (err instanceof ApiError && err.issue('name')) {
 				error = err.issue('name')!;
-				step = 1;
+				step = 'details';
 			} else toasts.error(err);
 		} finally {
 			busy = false;
@@ -138,12 +190,20 @@
 
 <Sheet
 	bind:open
-	title={atLimit ? 'New group' : step === 1 ? 'New group' : 'When are you looking for?'}
-	description={atLimit ? undefined : step === 1 ? 'Name it and pick a colour. Timing comes next.' : `Fine-tune the timing for ${name.trim()}. You can change it later.`}
-	width={step === 2 && !atLimit ? 640 : 480}
+	title={atLimit || step === 'details' ? (basedOn ? 'New group with these people' : 'New group') : step === 'people' ? 'Who’s in?' : 'When are you looking for?'}
+	description={atLimit
+		? undefined
+		: step === 'details'
+			? basedOn
+				? `Starting from ${basedOn.name}. Name it and pick a colour; you’ll choose who to invite next.`
+				: 'Name it and pick a colour. Timing comes next.'
+			: step === 'people'
+				? `Everyone ticked gets an invite to ${name.trim()} to accept. Untick anyone you’d rather leave out.`
+				: `Fine-tune the timing for ${name.trim()}. You can change it later.`}
+	width={step === 'timing' && !atLimit ? 640 : 480}
 >
 	{#snippet lead()}
-		{#if !atLimit}<StepDots total={2} step={step === 1 ? 1 : 2} />{/if}
+		{#if !atLimit}<StepDots total={steps.length} step={stepIndex + 1} />{/if}
 	{/snippet}
 	{#if atLimit}
 		<div class="limit">
@@ -155,7 +215,7 @@
 			</p>
 			<Button variant="accent" size="lg" block icon="sparkle" onclick={upgrade}>See Pro</Button>
 		</div>
-	{:else if step === 1}
+	{:else if step === 'details'}
 		<form class="form" onsubmit={next} novalidate>
 			<div class="name-row">
 				<GroupTile monogram={tileLetters} {color} size={50} />
@@ -164,10 +224,13 @@
 
 			<GroupColorPicker value={color} onchange={(c) => (color = c)} />
 
-			{#if templates.length}
+			{#if templates.length || basedOn}
 				<fieldset>
-					<legend class="eyebrow">Start from a template</legend>
+					<legend class="eyebrow">{basedOn ? 'Timing' : 'Start from a template'}</legend>
 					<div class="chips">
+						{#if basedOn}
+							<Chip selected={copiesTiming} onclick={toggleCopiedTiming}>Same as {basedOn.name}</Chip>
+						{/if}
 						{#each templates as t (t.id)}
 							<Chip selected={templateId === t.id} onclick={() => pickTemplate(t)}>{t.name}</Chip>
 						{/each}
@@ -175,8 +238,19 @@
 				</fieldset>
 			{/if}
 
-			<Button type="submit" variant="accent" size="lg" block icon="arrow-right">Next: timing</Button>
+			<Button type="submit" variant="accent" size="lg" block icon="arrow-right">{steps[1] === 'people' ? 'Next: people' : 'Next: timing'}</Button>
 		</form>
+	{:else if step === 'people'}
+		<div class="list" role="group" aria-label="Who to invite">
+			{#each people as m (m.userId)}
+				{@const on = invitees.has(m.userId)}
+				<button type="button" role="checkbox" aria-checked={on} class:sel={on} onclick={() => toggleInvitee(m.userId)}>
+					<Avatar name={m.name} id={m.userId} image={m.image} size={34} />
+					<span class="name">{m.name}</span>
+					<span class="mark" aria-hidden="true">{#if on}<Icon name="check" size={16} />{/if}</span>
+				</button>
+			{/each}
+		</div>
 	{:else}
 		<div class="form">
 			<RequirementsEditor bind:requirement country={user.country} />
@@ -185,11 +259,17 @@
 	{/if}
 
 	{#snippet footer()}
-		{#if !atLimit && step === 2}
+		{#if !atLimit && step === 'people'}
+			<div class="bar-actions">
+				<Button variant="secondary" icon="chevron-left" onclick={back}>Back</Button>
+				<Button variant="accent" icon="arrow-right" onclick={() => (step = 'timing')}>Next: timing</Button>
+			</div>
+		{/if}
+		{#if !atLimit && step === 'timing'}
 			<div class="bar">
 				<FitPreview {requirement} timeZone={user.timezone} />
 				<div class="bar-actions">
-					<Button variant="secondary" icon="chevron-left" onclick={() => (step = 1)}>Back</Button>
+					<Button variant="secondary" icon="chevron-left" onclick={back}>Back</Button>
 					<Button variant="accent" loading={busy} onclick={create}>Create group</Button>
 				</div>
 			</div>
@@ -236,6 +316,52 @@
 		display: flex;
 		gap: 8px;
 		margin-left: auto;
+	}
+	.list {
+		display: flex;
+		flex-direction: column;
+		border-radius: 20px;
+		border: 1px solid var(--line);
+		padding: 0 12px;
+	}
+	.list button {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		min-height: 56px;
+		padding: 8px 0;
+		background: none;
+		border: 0;
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.list button + button {
+		border-top: 1px solid var(--line);
+	}
+	.name {
+		flex: 1;
+		min-width: 0;
+		font-size: 15px;
+		font-weight: 600;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.mark {
+		width: 22px;
+		height: 22px;
+		border-radius: 50%;
+		border: 1.5px solid var(--line-2);
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+	}
+	.sel .mark {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: var(--on-accent);
 	}
 	.limit {
 		display: flex;

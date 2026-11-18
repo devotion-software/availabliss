@@ -9,6 +9,7 @@
 	import { groupSubtitle, isAdminRole } from '#lib/client/members';
 	import { toasts } from '#lib/client/toast.svelte';
 	import { leavingGroups } from '#lib/client/groups';
+	import { newGroupSheet } from '#lib/client/ui-state.svelte';
 
 	let { data, children } = $props();
 
@@ -28,6 +29,10 @@
 			icon: isAdmin ? ('user-plus' as const) : ('users' as const),
 			onselect: () => goto(`${base}/members`)
 		},
+		// Another group with the same people (anyone in it can start one).
+		...(data.group.members.length > 1
+			? [{ label: 'New group with these people', icon: 'plus' as const, onselect: () => newGroupSheet.showFrom(data.group) }]
+			: []),
 		{ label: 'Group settings', icon: 'settings' as const, onselect: () => goto(`${base}/settings`) }
 	]);
 
