@@ -130,7 +130,7 @@
 <svelte:head><title>Proposal · {group.name} · Availabliss</title></svelte:head>
 
 {#if proposal.status === 'confirmed'}
-	<EveryoneIn {proposal} {group} />
+	<EveryoneIn {proposal} {group} {me} />
 {:else}
 	<div class="page">
 		<PageHeader
