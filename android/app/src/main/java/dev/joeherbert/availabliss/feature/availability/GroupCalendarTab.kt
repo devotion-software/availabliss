@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +46,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -133,6 +136,7 @@ fun GroupCalendarTab(
         onPrevious = viewModel::previous,
         onNext = viewModel::next,
         onToday = viewModel::jumpToToday,
+        onJumpTo = viewModel::jumpTo,
         onRetry = viewModel::refresh,
         onPropose = { slot ->
             val (start, end, allDay) = viewModel.proposalFor(slot)
@@ -167,6 +171,8 @@ fun GroupCalendarContent(
     onPropose: (Slot) -> Unit,
     /** "Today": back to today's month or week. */
     onToday: () -> Unit = {},
+    /** A free date either side: to its month or week, with it selected. */
+    onJumpTo: (LocalDate) -> Unit = {},
     snackbar: @Composable () -> Unit = {},
     /** "Propose anyway" on a day that doesn't work for everyone. */
     onProposeDay: (LocalDate) -> Unit = {},
@@ -197,6 +203,7 @@ fun GroupCalendarContent(
                 val next = { forward = true; onNext() }
                 val today = { forward = state.todayIsLater; onToday() }
                 HeadingRow(state, onSelectView, previous, next, today)
+                FreeJumps(state) { date -> forward = date.isAfter(state.selectedDate); onJumpTo(date) }
                 state.coverageNote?.let { CoverageNote(it) }
                 state.error?.let { ErrorBanner(it, onRetry = onRetry) }
                 AnimatedContent(
@@ -352,6 +359,52 @@ private fun HeadingRow(state: GroupCalendarUiState, onSelectView: (CalendarView)
             selected = state.view,
             onSelect = onSelectView,
         )
+    }
+}
+
+/**
+ * "‹ Fri 25 Dec · Free dates · Fri 5 Feb ›": to the nearest date that works for everyone before or
+ * after the month or week on screen, skipping ones where nothing works. A side is greyed out when
+ * there's none that way in the group's search range.
+ */
+@Composable
+private fun FreeJumps(state: GroupCalendarUiState, onJump: (LocalDate) -> Unit) {
+    val colors = AvailablissTheme.colors
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) { FreeJumpButton(-1, state.previousFree, state.findingFree, onJump) }
+        Text("Free dates", style = AvailablissTheme.type.micro, color = colors.muted, modifier = Modifier.clearAndSetSemantics {})
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { FreeJumpButton(1, state.nextFree, state.findingFree, onJump) }
+    }
+}
+
+@Composable
+private fun FreeJumpButton(direction: Int, date: LocalDate?, finding: Boolean, onJump: (LocalDate) -> Unit) {
+    val colors = AvailablissTheme.colors
+    val name = if (direction < 0) "Previous free" else "Next free"
+    val label = date?.let(DateTimes::shortDay) ?: when {
+        finding -> if (direction < 0) "Earlier" else "Later"
+        else -> if (direction < 0) "None earlier" else "None later"
+    }
+    val description = date?.let { "$name date, ${DateTimes.shortDay(it)}" } ?: if (finding) "$name date, looking" else if (direction < 0) "No earlier free dates" else "No later free dates"
+    Row(
+        Modifier
+            .heightIn(min = 44.dp)
+            .alpha(if (date == null) 0.7f else 1f)
+            .clip(CircleShape)
+            .then(if (date != null) Modifier.clickable(role = Role.Button) { onJump(date) } else Modifier)
+            .semantics(mergeDescendants = true) { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            Modifier.clip(CircleShape).background(if (date == null) colors.line else colors.accentSoft).padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            val tint = if (date == null) colors.muted else colors.accentInk
+            if (direction < 0) Icon(AvIcons.Back, null, tint = tint, modifier = Modifier.size(12.dp))
+            Text(label, style = AvailablissTheme.type.label, color = tint, maxLines = 1)
+            if (direction > 0) Icon(AvIcons.Forward, null, tint = tint, modifier = Modifier.size(12.dp))
+        }
     }
 }
 

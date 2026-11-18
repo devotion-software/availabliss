@@ -23,6 +23,7 @@ import dev.joeherbert.availabliss.core.network.model.DayStatus
 import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.Role
 import dev.joeherbert.availabliss.core.network.model.Slot
+import dev.joeherbert.availabliss.core.network.model.SlotPosition
 import dev.joeherbert.availabliss.designsystem.component.availability.EveryoneBandUi
 import dev.joeherbert.availabliss.designsystem.component.availability.MonthCellUi
 import dev.joeherbert.availabliss.designsystem.component.availability.TimelineRowUi
@@ -83,6 +84,13 @@ data class GroupCalendarUiState(
     val awayFromToday: Boolean = false,
     /** Today is later than what's on screen (which way "Today" slides). */
     val todayIsLater: Boolean = true,
+    /** The nearest dates that work for everyone before / after the month or week on screen; null when there's none. */
+    val previousFree: LocalDate? = null,
+    val nextFree: LocalDate? = null,
+    /** Still looking for them: the buttons wait rather than say there's none. */
+    val findingFree: Boolean = true,
+    /** The selected day (which way a jump to a free date slides). */
+    val selectedDate: LocalDate = DateTimes.today(),
 )
 
 private data class RawState(
@@ -100,6 +108,9 @@ private data class RawState(
     val nudging: Boolean = false,
     val error: String? = null,
     val message: UserMessage? = null,
+    val previousFree: LocalDate? = null,
+    val nextFree: LocalDate? = null,
+    val findingFree: Boolean = true,
 )
 
 @HiltViewModel
@@ -117,6 +128,9 @@ class GroupCalendarViewModel @Inject constructor(
     private var detailJob: Job? = null
     private var dayJob: Job? = null
     private var liveRefreshJob: Job? = null
+    private var freeJob: Job? = null
+    /** The group's search range: nothing outside it can work, so the free-date search stops at its ends. */
+    private var searchRange: Pair<LocalDate, LocalDate>? = null
 
     // Months and days already fetched, and ones on their way (a page change or a prefetch), so
     // paging to a neighbouring month or week shows it straight away instead of waiting on the network.
@@ -153,6 +167,19 @@ class GroupCalendarViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch {
+            groups.group(groupId).collect { group ->
+                val range = group?.requirement?.range?.let { r ->
+                    val from = DateTimes.parseDate(r.from)
+                    val to = DateTimes.parseDate(r.to)
+                    if (from != null && to != null) from to to else null
+                }
+                if (range != searchRange) {
+                    searchRange = range
+                    findFreeNeighbours()
+                }
+            }
+        }
         // GroupViewModel (the hosting screen) refetches the group itself on reconnect.
         viewModelScope.launch { liveEvents.reconnected.collect { refresh() } }
     }
@@ -186,6 +213,19 @@ class GroupCalendarViewModel @Inject constructor(
     }
 
     fun next() = step(1)
+
+    /** To the month or week holding [date] (a free date either side), with it selected. */
+    fun jumpTo(date: LocalDate) {
+        val r = raw.value
+        lastDelta = if (date.isAfter(r.selected)) 1 else -1
+        val month = YearMonth.from(date)
+        raw.update { s ->
+            val moved = s.copy(month = month, selected = date, userPicked = true)
+            months[month]?.let { moved.copy(availability = it) } ?: moved
+        }
+        if (r.month != month) loadMonth() else loadDay()
+        loadForView()
+    }
 
     fun refresh() {
         liveRefreshJob?.cancel()
@@ -275,6 +315,7 @@ class GroupCalendarViewModel @Inject constructor(
                         s.copy(loading = false, availability = result.value, error = null, selected = defaultSelection(s, result.value))
                     }
                     if (raw.value.day?.date != raw.value.selected.toString() || silent) loadDay()
+                    findFreeNeighbours()
                     prefetchMonth(month.plusMonths(1))
                     prefetchMonth(month.minusMonths(1))
                 }
@@ -343,6 +384,7 @@ class GroupCalendarViewModel @Inject constructor(
 
     private fun loadForView() {
         detailJob?.cancel()
+        findFreeNeighbours()
         val r = raw.value
         if (r.view == CalendarView.Week) loadDay()
         detailJob = when (r.view) {
@@ -384,6 +426,10 @@ class GroupCalendarViewModel @Inject constructor(
         }
         return GroupCalendarUiState(
             awayFromToday = awayFromToday,
+            previousFree = r.previousFree,
+            nextFree = r.nextFree,
+            findingFree = r.findingFree,
+            selectedDate = r.selected,
             todayIsLater = if (r.view == CalendarView.Month) YearMonth.from(today).isAfter(r.month) else today.isAfter(r.selected),
             loading = r.loading,
             groupName = group?.name.orEmpty(),
@@ -418,6 +464,47 @@ class GroupCalendarViewModel @Inject constructor(
             error = r.error,
             message = r.message,
         )
+    }
+
+    /**
+     * Looks either side of the month or week on screen for the nearest free dates (the first day of
+     * a run that works, from today on), fetching further months within the search range.
+     */
+    private fun findFreeNeighbours() {
+        val range = searchRange ?: return
+        freeJob?.cancel()
+        freeJob = viewModelScope.launch {
+            val r = raw.value
+            val (start, end) = when (r.view) {
+                CalendarView.Month -> r.month.atDay(1) to r.month.atEndOfMonth()
+                CalendarView.Week -> DateTimes.startOfWeek(r.selected).let { it to it.plusDays(6) }
+            }
+            val earliest = maxOf(range.first, DateTimes.today())
+            val next = freeDay(maxOf(end.plusDays(1), DateTimes.today()), range.second, forward = true)
+            val previous = freeDay(earliest, start.minusDays(1), forward = false)
+            val now = raw.value
+            if (now.view != r.view || now.month != r.month || DateTimes.startOfWeek(now.selected) != DateTimes.startOfWeek(r.selected) && r.view == CalendarView.Week) return@launch
+            raw.update { it.copy(previousFree = previous, nextFree = next, findingFree = false) }
+        }
+    }
+
+    /** The first (or, going back, the last) day in [from]..[to] where a run that works starts. */
+    private suspend fun freeDay(from: LocalDate, to: LocalDate, forward: Boolean): LocalDate? {
+        if (to.isBefore(from)) return null
+        var month = YearMonth.from(if (forward) from else to)
+        // A search range is a few months; the cap just keeps a very long one from fetching for ever.
+        repeat(24) {
+            if (if (forward) month.isAfter(YearMonth.from(to)) else month.isBefore(YearMonth.from(from))) return null
+            val loaded = fetchMonth(month).getOrNull() ?: return null
+            val starts = loaded.days.filter { day ->
+                val date = DateTimes.parseDate(day.date)
+                date != null && !date.isBefore(from) && !date.isAfter(to) && day.status == DayStatus.Match &&
+                    day.slotPosition != SlotPosition.Middle && day.slotPosition != SlotPosition.End
+            }
+            (if (forward) starts.firstOrNull() else starts.lastOrNull())?.let { return DateTimes.parseDate(it.date) }
+            month = if (forward) month.plusMonths(1) else month.minusMonths(1)
+        }
+        return null
     }
 
     /** A day's status: from the month on screen, or a neighbouring month already fetched. */
