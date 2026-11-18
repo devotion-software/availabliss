@@ -1,10 +1,20 @@
 import { error } from '@sveltejs/kit';
-import { localFile } from '#lib/server/media';
+import { getPicture } from '#lib/server/media';
+import { verifyMediaSignature } from '#lib/server/media-urls';
 import type { RequestHandler } from './$types';
 
-/** Development only: profile pictures kept on disk when R2 isn't configured. */
-export const GET: RequestHandler = async ({ params }) => {
-	const bytes = await localFile(params.key);
-	if (!bytes) error(404, 'Not found');
-	return new Response(new Uint8Array(bytes), { headers: { 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=31536000, immutable' } });
+/**
+ * Profile pictures, group photos and event covers, only with a valid signed link (see
+ * media-urls.ts): the files themselves are private. Links stay the same all day, so they're
+ * cached by the browser (not by shared caches, as they're private).
+ */
+export const GET: RequestHandler = async ({ params, url }) => {
+	if (!verifyMediaSignature(params.key, url.searchParams.get('e'), url.searchParams.get('s'))) error(404, 'Not found');
+	const picture = await getPicture(params.key);
+	if (!picture) error(404, 'Not found');
+	const headers = new Headers(picture.headers);
+	headers.set('content-type', 'image/jpeg');
+	headers.set('cache-control', 'private, max-age=604800, immutable');
+	headers.set('x-content-type-options', 'nosniff');
+	return new Response(picture.body as BodyInit, { headers });
 };

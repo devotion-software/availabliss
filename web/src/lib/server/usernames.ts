@@ -1,4 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm';
+import { mediaUrl } from './media-urls';
 import type { UsernameCheck, UserSummary } from '#lib/types';
 import { normalizeUsername, usernameBase, usernameProblem } from '#lib/usernames';
 import { db, isDuplicateKey } from './db';
@@ -40,7 +41,7 @@ export async function findByUsername(raw: string): Promise<UserSummary | null> {
 		where: eq(user.username, username),
 		columns: { id: true, username: true, name: true, image: true }
 	});
-	return row?.username ? { id: row.id, username: row.username, name: row.name, image: row.image ?? null } : null;
+	return row?.username ? { id: row.id, username: row.username, name: row.name, image: mediaUrl(row.image ?? null) } : null;
 }
 
 /** Whether `raw` can be your username, and who has it if someone does. */

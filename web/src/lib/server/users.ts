@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
+import { mediaUrl } from './media-urls';
 import type { ColorTheme, ThemeMode, User } from '#lib/types';
 import { COLOR_THEMES, THEME_MODES } from '#lib/types';
 import { toBusyBuffer } from '#lib/busy-buffer';
@@ -19,7 +20,7 @@ export const toUser = (row: UserRow): User => ({
 	name: row.name,
 	email: row.email,
 	username: row.username,
-	image: row.image ?? null,
+	image: mediaUrl(row.image ?? null),
 	themeMode: oneOf<ThemeMode>(THEME_MODES, row.themeMode, 'system'),
 	colorTheme: oneOf<ColorTheme>(COLOR_THEMES, row.colorTheme, 'dawn'),
 	country: row.country,

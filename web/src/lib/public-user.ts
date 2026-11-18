@@ -1,4 +1,5 @@
 import { COLOR_THEMES, THEME_MODES, type User } from './types';
+import { mediaUrl } from './server/media-urls';
 import type { User as AuthUser } from './auth';
 import { toBusyBuffer } from './busy-buffer';
 
@@ -9,7 +10,7 @@ export function toPublicUser(u: AuthUser): User {
 		name: u.name,
 		email: u.email,
 		username: u.username ?? null,
-		image: u.image ?? null,
+		image: mediaUrl(u.image ?? null),
 		themeMode: THEME_MODES.find((m) => m === u.themeMode) ?? 'system',
 		colorTheme: COLOR_THEMES.find((t) => t === u.colorTheme) ?? 'dawn',
 		country: u.country ?? null,

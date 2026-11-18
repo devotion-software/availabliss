@@ -1,7 +1,8 @@
 /**
- * Profile pictures, group photos and event covers (and, privately, chat attachments): resized on the server (sharp), stored in Cloudflare R2 (S3-compatible,
- * signed with aws4fetch). Without R2 configured (local development), files go to `.uploads/`
- * on disk and are served by /media/[...key].
+ * Profile pictures, group photos and event covers (and chat attachments): resized on the server
+ * (sharp), stored privately in Cloudflare R2 (S3-compatible, signed with aws4fetch). Without R2
+ * configured (local development), files go to `.uploads/` on disk. Pictures are served by
+ * /media/[...key] behind signed links (see media-urls.ts); attachments by /api/v1/attachments.
  */
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { AwsClient } from 'aws4fetch';
@@ -10,6 +11,9 @@ import { dirname, join, resolve } from 'node:path';
 import { env } from './env';
 import { badRequest } from './http';
 import { newToken } from './ids';
+import { MEDIA_KEY, keyOf, storedUrlOf } from './media-urls';
+
+export { keyOf, mediaUrl } from './media-urls';
 
 const LOCAL_DIR = resolve('.uploads');
 /** Longest side of a stored picture: avatars and group photos are cropped small; covers show wide. */
@@ -17,26 +21,12 @@ export const IMAGE_SIZES = { avatar: 512, group: 512, cover: 1600 } as const;
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 const r2 = (() => {
-	const { accountId, accessKeyId, secretAccessKey, bucket, publicUrl } = env.r2;
-	if (!accountId || !accessKeyId || !secretAccessKey || !bucket || !publicUrl) return null;
+	const { accountId, accessKeyId, secretAccessKey, bucket } = env.r2;
+	if (!accountId || !accessKeyId || !secretAccessKey || !bucket) return null;
 	const client = new AwsClient({ accessKeyId, secretAccessKey, service: 's3', region: 'auto' });
 	const objectUrl = (key: string) => `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${key}`;
-	return { client, objectUrl, publicUrl };
+	return { client, objectUrl };
 })();
-
-/** Where a stored file is served from. */
-function publicUrlOf(key: string): string {
-	return r2 ? `${r2.publicUrl}/${key}` : `${env.baseUrl}/media/${key}`;
-}
-
-/** The storage key behind one of our URLs, or null for anyone else's (e.g. a Google photo). */
-export function keyOf(url: string | null): string | null {
-	if (!url) return null;
-	for (const base of [r2?.publicUrl, `${env.baseUrl}/media`]) {
-		if (base && url.startsWith(`${base}/`)) return url.slice(base.length + 1);
-	}
-	return null;
-}
 
 /** Shrinks an uploaded image to fit `maxSide` and re-encodes it as JPEG (dropping any metadata). */
 export async function processImage(input: ArrayBuffer, maxSide: number = IMAGE_SIZES.avatar): Promise<Uint8Array> {
@@ -60,11 +50,11 @@ export const processAvatar = (input: ArrayBuffer) => processImage(input, IMAGE_S
 /** Where each kind of picture is kept: `<folder>/<owner id>/<token>.jpg`. */
 const FOLDERS = { avatar: 'avatars', group: 'groups', cover: 'events' } as const;
 
-/** Stores a picture under a fresh key and returns its public URL. */
+/** Stores a picture under a fresh key and returns where it lives (sign it with `mediaUrl` to send it). */
 export async function putImage(kind: keyof typeof FOLDERS, ownerId: string, bytes: Uint8Array): Promise<string> {
 	const key = `${FOLDERS[kind]}/${ownerId}/${newToken()}.jpg`;
-	await putObject(key, bytes, 'image/jpeg', 'public, max-age=31536000, immutable');
-	return publicUrlOf(key);
+	await putObject(key, bytes, 'image/jpeg');
+	return storedUrlOf(key);
 }
 
 /** Writes bytes under `key` (R2, or `.uploads/` without it). */
@@ -120,7 +110,7 @@ export async function deleteKeys(keys: string[]): Promise<void> {
 	);
 }
 
-/** Stores a user's picture under a fresh key and returns its public URL. */
+/** Stores a user's picture under a fresh key and returns where it lives. */
 export const putAvatar = (userId: string, bytes: Uint8Array) => putImage('avatar', userId, bytes);
 
 /** Deletes one of our stored files (best effort; other URLs are left alone). */
@@ -129,8 +119,9 @@ export async function deleteStored(url: string | null): Promise<void> {
 	if (key) await deleteKeys([key]);
 }
 
-/** A locally stored file's bytes (dev without R2), or null. */
-export async function localFile(key: string): Promise<Buffer | null> {
-	if (r2 || !/^(avatars|groups|events)\/[\w-]+\/[\w-]+\.jpg$/.test(key)) return null;
-	return readFile(join(LOCAL_DIR, key)).catch(() => null);
+/** A stored picture (R2, or `.uploads/` in development) for /media to serve, or null. */
+export async function getPicture(key: string): Promise<{ body: ReadableStream | Uint8Array; headers: Headers } | null> {
+	if (!MEDIA_KEY.test(key)) return null;
+	const object = await getObject(key);
+	return object && { body: object.body, headers: object.headers };
 }

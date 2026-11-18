@@ -3,7 +3,14 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import sharp from 'sharp';
 import { createGroup, getGroup, setGroupImage } from '#lib/server/groups';
 import { createEvent, deleteEvent, getEvent, setEventImage } from '#lib/server/events';
-import { keyOf, localFile } from '#lib/server/media';
+import { getPicture, keyOf } from '#lib/server/media';
+import { verifyMediaSignature } from '#lib/server/media-urls';
+
+/** The stored file behind one of our picture links (local disk in tests), or null once it's deleted. */
+const localFile = async (key: string) => {
+	const picture = await getPicture(key);
+	return picture ? Buffer.from(picture.body as Uint8Array) : null;
+};
 import { apiError, everyDay, fixture } from './fixtures';
 
 const fx = fixture('images');
@@ -36,7 +43,11 @@ describe('group photo', () => {
 		expect((await apiError(setGroupImage(groupId, member, await photo()))).code).toBe('forbidden');
 
 		const first = (await setGroupImage(groupId, admin, await photo())).image;
-		expect(first).toContain('/groups/');
+		expect(first).toContain('/media/groups/');
+		// Sent as a signed link to the private file.
+		const link = new URL(first!);
+		expect(verifyMediaSignature(keyOf(first)!, link.searchParams.get('e'), link.searchParams.get('s'))).toBe(true);
+		expect(verifyMediaSignature(keyOf(first)!, link.searchParams.get('e'), 'x'.repeat(32))).toBe(false);
 		expect((await getGroup(groupId, member)).image).toBe(first);
 		const meta = await sizeOf(first);
 		expect(Math.max(meta.width!, meta.height!)).toBe(512);

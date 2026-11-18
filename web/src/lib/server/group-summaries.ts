@@ -4,6 +4,7 @@
  * across all the user's groups; only the slot count is per group, and cached.
  */
 import { and, asc, count, eq, gt, gte, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { mediaUrl } from './media-urls';
 import type { GroupStatus, GroupSummary, Member } from '#lib/types';
 import { db } from './db';
 import { events, groupMembers, messageReceipts, messages, proposalResponses, proposals, user } from './db/schema';
@@ -37,6 +38,7 @@ async function membersByGroup(groupIds: string[]): Promise<Map<string, Member[]>
 	for (const { groupId, email, ...m } of rows) {
 		result.get(groupId)!.push({
 			...m,
+			image: mediaUrl(m.image),
 			name: displayName({ name: m.name, email, nameInGroup: m.nameInGroup }),
 			nameInGroup: m.nameInGroup || null,
 			joinedAt: m.joinedAt.toISOString(),

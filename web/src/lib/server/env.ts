@@ -67,8 +67,9 @@ export const env = {
 	fcmServiceAccount: optional('FCM_SERVICE_ACCOUNT'),
 
 	/**
-	 * Cloudflare R2 (S3-compatible) for profile pictures. `publicUrl` is the bucket's public
-	 * domain (r2.dev or a custom one). Unset: pictures are kept on local disk (dev only).
+	 * Cloudflare R2 (S3-compatible), private, for pictures and chat files. `publicUrl` is only the
+	 * bucket's old public domain, so pictures stored before it went private are still recognised.
+	 * Unset: files are kept on local disk (dev only).
 	 */
 	r2: {
 		accountId: optional('R2_ACCOUNT_ID'),

@@ -1,5 +1,6 @@
 /** Group events: created directly, or automatically when a proposal is confirmed. */
 import { and, asc, eq, gt, gte, inArray, lt } from 'drizzle-orm';
+import { mediaUrl } from './media-urls';
 import type { GroupEvent } from '#lib/types';
 import { db, type Tx } from './db';
 import { events, groupMembers, groups } from './db/schema';
@@ -25,7 +26,7 @@ export const toGroupEvent = (row: EventRow): GroupEvent => ({
 	start: row.start.toISOString(),
 	end: row.end.toISOString(),
 	allDay: row.allDay,
-	image: row.image ?? null,
+	image: mediaUrl(row.image ?? null),
 	createdBy: row.createdBy,
 	createdAt: row.createdAt.toISOString()
 });

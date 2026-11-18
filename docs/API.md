@@ -97,6 +97,12 @@ production (`RATE_LIMIT=on|off` overrides).
 ## Shared types
 
 ```ts
+/**
+ * Pictures (`User.image`, `Member.image`, `Group.image`, `GroupEvent.image` …) are private files
+ * sent as signed links, `<host>/media/<key>?e=<expiry>&s=<signature>`. A link works for 7–8 days and
+ * stays the same all day, so cache by URL; it changes daily. Without a valid signature /media is 404.
+ * A picture from a sign-in provider (e.g. Google) is its own URL, passed through as it is.
+ */
 type Role = 'owner' | 'admin' | 'member';
 type ThemeMode = 'light' | 'dark' | 'system';
 type ColorTheme = 'dawn' | 'lagoon' | 'sunset' | 'orchid' | 'grove';

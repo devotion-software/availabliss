@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { mediaUrl } from './media-urls';
 import { alias } from 'drizzle-orm/mysql-core';
 import type { Group, Member, Requirement, Role, TileColor } from '#lib/types';
 import { TILE_COLORS } from '#lib/types';
@@ -77,6 +78,7 @@ export async function listMembers(groupId: string): Promise<Member[]> {
 	const synced = await syncedUserIds(rows.map((r) => r.userId));
 	return rows.map(({ email, ...r }) => ({
 		...r,
+		image: mediaUrl(r.image),
 		name: displayName({ name: r.name, email, nameInGroup: r.nameInGroup }),
 		nameInGroup: r.nameInGroup || null,
 		joinedAt: r.joinedAt.toISOString(),
@@ -93,7 +95,7 @@ export function groupBase(row: GroupRow, role: Role, members: Member[]) {
 		name: row.name,
 		color: (TILE_COLORS as readonly string[]).includes(row.color) ? (row.color as TileColor) : 't1',
 		monogram: monogram(row.name),
-		image: row.image ?? null,
+		image: mediaUrl(row.image ?? null),
 		role,
 		archived: row.archivedAt != null,
 		memberCount: members.length,
