@@ -73,7 +73,6 @@ import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
 import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
-import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.ToggleRow
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
@@ -149,7 +148,6 @@ data class GroupSettingsActions(
 
 @Composable
 fun GroupSettingsContent(state: GroupSettingsUiState, snackbar: SnackbarHostState, actions: GroupSettingsActions) {
-    val colors = AvailablissTheme.colors
     AvailablissBackground(OrbLayout.GroupCalendar) {
         Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             ScreenHeader(
@@ -175,11 +173,7 @@ fun GroupSettingsContent(state: GroupSettingsUiState, snackbar: SnackbarHostStat
                     DetailsCard(state, actions)
                     if (state.canEdit) ArchiveCard(state, actions)
                     LeaveCard(state, actions)
-                    if (state.canDelete) {
-                        Box(Modifier.fillMaxWidth().padding(top = Spacing.s), contentAlignment = Alignment.Center) {
-                            TextAction("Delete group", actions.onDelete, color = colors.warnInk)
-                        }
-                    }
+                    if (state.canDelete) DeleteCard(actions)
                 }
             }
         }
@@ -342,6 +336,24 @@ private fun LeaveCard(state: GroupSettingsUiState, actions: GroupSettingsActions
             )
         }
         WarningButton("Leave group", AvIcons.SignOut, onClick = actions.onLeave, height = 44.dp, shape = Shapes.controlSmall, textStyle = type.bodySmallStrong)
+    }
+}
+
+/** Only the owner sees it. Its own card, like Leave group, so deleting reads as a deliberate step. */
+@Composable
+private fun DeleteCard(actions: GroupSettingsActions) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    GlassPanel(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Delete group", style = type.bodySmallStrong, color = colors.ink)
+            Text(
+                "Deletes it for everyone in it, with its chat, plans and photos.",
+                style = type.caption.copy(fontWeight = FontWeight.Normal),
+                color = colors.muted,
+            )
+        }
+        WarningButton("Delete group", AvIcons.Trash, onClick = actions.onDelete, height = 44.dp, shape = Shapes.controlSmall, textStyle = type.bodySmallStrong)
     }
 }
 
