@@ -29,6 +29,10 @@ final class DeviceCalendarService {
     private(set) var lastError: String?
     /// Asked to upgrade write-only access to full and didn't get it; iOS won't ask again.
     private(set) var fullAccessDeclined: Bool
+    /// Plans added to a calendar from this phone, by event id.
+    private(set) var addedEvents: [String: AddedEvent] = [:]
+    /// Bumped when the calendar database changes, so views re-check added plans.
+    private(set) var storeVersion = 0
 
     @ObservationIgnored let store = EKEventStore()
     @ObservationIgnored private let api: APIClient
@@ -38,7 +42,9 @@ final class DeviceCalendarService {
     @ObservationIgnored private var needsResync = false
 
     private static let busyKey = "calendar.busyIds"
+    /// Before the calendar and the plan's times were kept too (event id → item id).
     private static let addedKey = "calendar.addedEvents"
+    private static let addedV2Key = "calendar.addedEvents.v2"
     /// The calendar plans were last added to, offered first next time.
     private static let lastAddCalendarKey = "calendar.lastAddCalendar"
     private static let uploadedHashesKey = "calendar.uploadedHashes"
@@ -53,6 +59,7 @@ final class DeviceCalendarService {
         self.authorization = EKEventStore.authorizationStatus(for: .event)
         self.busyCalendarIds = Set(UserDefaults.standard.stringArray(forKey: Self.busyKey) ?? [])
         self.fullAccessDeclined = UserDefaults.standard.bool(forKey: Self.fullAccessDeclinedKey)
+        self.addedEvents = loadAdded()
         if hasFullAccess { reloadCalendars() }
     }
 
@@ -128,6 +135,7 @@ final class DeviceCalendarService {
         changeObserver = NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 // Calendars or whole accounts may have been added or removed.
+                self?.storeVersion += 1
                 self?.reloadCalendars(refreshSources: false)
                 self?.scheduleSync()
             }
@@ -309,8 +317,56 @@ final class DeviceCalendarService {
 
     // MARK: Adding events
 
-    func isAdded(_ eventId: String) -> Bool {
-        (UserDefaults.standard.dictionary(forKey: Self.addedKey) as? [String: String])?[eventId] != nil
+    /// A plan this phone put in a calendar: the calendar copy, and the plan's times when it was
+    /// added (to notice the plan moving). Older installs only kept the identifier.
+    struct AddedEvent: Codable, Equatable {
+        var itemId: String
+        var calendarId: String?
+        var start: Date?
+        var end: Date?
+    }
+
+    /// Where a plan stands in the phone's calendars.
+    enum AddedState: Equatable {
+        case notAdded
+        /// In `calendar` (nil when write-only access can't say which, or check it's still there).
+        case added(EKCalendar?)
+    }
+
+    func addedState(_ eventId: String) -> AddedState {
+        guard let record = addedEvents[eventId] else { return .notAdded }
+        guard hasFullAccess else { return .added(nil) }
+        // Deleted in the calendar app since: offer Add to calendar again.
+        guard let item = addedItem(record) else { return .notAdded }
+        return .added(item.calendar)
+    }
+
+    private func addedItem(_ record: AddedEvent) -> EKEvent? {
+        _ = storeVersion
+        guard hasFullAccess, !record.itemId.isEmpty else { return nil }
+        return store.event(withIdentifier: record.itemId)
+    }
+
+    private func loadAdded() -> [String: AddedEvent] {
+        let defaults = UserDefaults.standard
+        var added: [String: AddedEvent] = [:]
+        if let data = defaults.data(forKey: Self.addedV2Key),
+           let decoded = try? JSONDecoder().decode([String: AddedEvent].self, from: data) {
+            added = decoded
+        }
+        if let legacy = defaults.dictionary(forKey: Self.addedKey) as? [String: String] {
+            for (eventId, itemId) in legacy where added[eventId] == nil {
+                added[eventId] = AddedEvent(itemId: itemId)
+            }
+            defaults.removeObject(forKey: Self.addedKey)
+            if let data = try? JSONEncoder().encode(added) { defaults.set(data, forKey: Self.addedV2Key) }
+        }
+        return added
+    }
+
+    private func record(_ item: EKEvent, for event: GroupEvent) {
+        addedEvents[event.id] = AddedEvent(itemId: item.eventIdentifier ?? "", calendarId: item.calendar?.calendarIdentifier, start: event.start, end: event.end)
+        if let data = try? JSONEncoder().encode(addedEvents) { UserDefaults.standard.set(data, forKey: Self.addedV2Key) }
     }
 
     /// Whether to ask which calendar before adding: only with full access (write-only
@@ -342,6 +398,55 @@ final class DeviceCalendarService {
         guard canWrite else { throw CalendarAccessError.denied }
 
         let item = EKEvent(eventStore: store)
+        fill(item, from: event)
+        item.calendar = calendar ?? store.defaultCalendarForNewEvents
+        try store.save(item, span: .thisEvent, commit: true)
+        record(item, for: event)
+        if let calendar {
+            UserDefaults.standard.set(calendar.calendarIdentifier, forKey: Self.lastAddCalendarKey)
+        }
+    }
+
+    /// Moves an added plan to another calendar, or adds it there again if it was deleted from
+    /// the calendar since. Remembers the calendar for next time.
+    func move(_ event: GroupEvent, to calendar: EKCalendar) async throws {
+        guard let record = addedEvents[event.id], let item = addedItem(record) else {
+            try await add(event, to: calendar)
+            return
+        }
+        UserDefaults.standard.set(calendar.calendarIdentifier, forKey: Self.lastAddCalendarKey)
+        guard item.calendar?.calendarIdentifier != calendar.calendarIdentifier else { return }
+        let previous = item.calendar
+        item.calendar = calendar
+        do {
+            try store.save(item, span: .thisEvent, commit: true)
+            self.record(item, for: event)
+        } catch {
+            // Some accounts won't take an event from another account: copy it over instead.
+            item.calendar = previous
+            let copy = EKEvent(eventStore: store)
+            fill(copy, from: event)
+            copy.calendar = calendar
+            try store.save(copy, span: .thisEvent, commit: true)
+            self.record(copy, for: event)
+            if let old = store.event(withIdentifier: record.itemId) {
+                try? store.remove(old, span: .thisEvent, commit: true)
+            }
+        }
+    }
+
+    /// Updates the calendar copy when the plan has moved since it was added (only the time,
+    /// title and place, and only if the plan itself changed, so edits made in the calendar stay).
+    func updateIfPlanChanged(_ event: GroupEvent) {
+        guard let record = addedEvents[event.id], let start = record.start, let end = record.end,
+              start != event.start || end != event.end,
+              let item = addedItem(record) else { return }
+        fill(item, from: event, includeNote: false)
+        guard (try? store.save(item, span: .thisEvent, commit: true)) != nil else { return }
+        self.record(item, for: event)
+    }
+
+    private func fill(_ item: EKEvent, from event: GroupEvent, includeNote: Bool = true) {
         item.title = event.title
         item.startDate = event.start
         // The API's all-day end is the exclusive midnight after the last day; EventKit
@@ -349,16 +454,7 @@ final class DeviceCalendarService {
         item.endDate = event.allDay ? max(event.start, event.end.addingTimeInterval(-1)) : event.end
         item.isAllDay = event.allDay
         item.location = event.location
-        item.notes = event.note
-        item.calendar = calendar ?? store.defaultCalendarForNewEvents
-        try store.save(item, span: .thisEvent, commit: true)
-
-        var added = (UserDefaults.standard.dictionary(forKey: Self.addedKey) as? [String: String]) ?? [:]
-        added[event.id] = item.eventIdentifier ?? ""
-        UserDefaults.standard.set(added, forKey: Self.addedKey)
-        if let calendar {
-            UserDefaults.standard.set(calendar.calendarIdentifier, forKey: Self.lastAddCalendarKey)
-        }
+        if includeNote { item.notes = event.note }
     }
 
     // MARK: Background refresh
