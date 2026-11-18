@@ -18,7 +18,7 @@ struct GroupsHomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 header
                 if !model.upNext.isEmpty {
-                    UpNextPager(events: model.upNext, goingCount: model.memberCount(forGroup:), open: openPlan)
+                    UpNextPager(events: model.upNext, goingCount: model.memberCount(forGroup:), group: model.group, open: openPlan)
                 }
                 groupsHeader
                 groupsList
@@ -174,18 +174,19 @@ struct GroupsHomeView: View {
 private struct UpNextPager: View {
     let events: [GroupEvent]
     let goingCount: (String) -> Int?
+    let group: (String) -> GroupSummary?
     let open: (GroupEvent) -> Void
     @State private var page: String?
 
     var body: some View {
         if events.count == 1, let event = events.first {
-            UpNextCard(event: event, goingCount: goingCount(event.groupId)) { open(event) }
+            UpNextCard(event: event, group: group(event.groupId), goingCount: goingCount(event.groupId)) { open(event) }
         } else {
             VStack(spacing: 12) {
                 ScrollView(.horizontal) {
                     HStack(alignment: .top, spacing: 20) {
                         ForEach(events) { event in
-                            UpNextCard(event: event, goingCount: goingCount(event.groupId)) { open(event) }
+                            UpNextCard(event: event, group: group(event.groupId), goingCount: goingCount(event.groupId)) { open(event) }
                                 .frame(maxHeight: .infinity)
                                 .containerRelativeFrame(.horizontal)
                                 .id(event.id)
@@ -248,6 +249,8 @@ private struct PageDots: View {
 /// card opens the plan.
 private struct UpNextCard: View {
     let event: GroupEvent
+    /// Its group from your list, for the small photo or coloured tile beside the name.
+    let group: GroupSummary?
     let goingCount: Int?
     let open: () -> Void
     @Environment(\.theme) private var theme
@@ -269,8 +272,13 @@ private struct UpNextCard: View {
             HStack {
                 StatusPill(text: "It\u{2019}s on", tone: .mint, systemImage: "checkmark", fontSize: 12)
                 Spacer()
-                if let groupName = event.groupName {
-                    Text(groupName).bodyFont(12, .medium, relativeTo: .caption).foregroundStyle(theme.muted)
+                if let groupName = event.groupName ?? group?.name {
+                    HStack(spacing: 6) {
+                        if let group {
+                            GroupTile(monogram: group.monogram, colorToken: group.color, imageURL: group.image, size: 20, cornerRadius: 7)
+                        }
+                        Text(groupName).bodyFont(12, .medium, relativeTo: .caption).foregroundStyle(theme.muted).lineLimit(1)
+                    }
                 }
             }
             VStack(alignment: .leading, spacing: 4) {

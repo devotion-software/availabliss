@@ -9,6 +9,8 @@ struct ScreenHeader<Trailing: View>: View {
     var onBack: (() -> Void)?
     /// Makes the title a link (shown with a chevron after it).
     var onTitle: (() -> Void)?
+    /// Shown before the title, e.g. the group's photo or coloured tile.
+    var leading: AnyView?
     @ViewBuilder var trailing: Trailing
     @Environment(\.theme) private var theme
 
@@ -17,6 +19,7 @@ struct ScreenHeader<Trailing: View>: View {
             if let onBack {
                 IconButton(systemImage: "chevron.left", label: backLabel, action: onBack)
             }
+            if let leading { leading }
             VStack(alignment: .leading, spacing: 0) {
                 if let onTitle {
                     Button(action: onTitle) {
@@ -48,8 +51,8 @@ struct ScreenHeader<Trailing: View>: View {
 }
 
 extension ScreenHeader where Trailing == EmptyView {
-    init(title: String, subtitle: String? = nil, titleSize: CGFloat = 24, backLabel: String = "Back", onBack: (() -> Void)? = nil, onTitle: (() -> Void)? = nil) {
-        self.init(title: title, subtitle: subtitle, titleSize: titleSize, backLabel: backLabel, onBack: onBack, onTitle: onTitle) { EmptyView() }
+    init(title: String, subtitle: String? = nil, titleSize: CGFloat = 24, backLabel: String = "Back", onBack: (() -> Void)? = nil, onTitle: (() -> Void)? = nil, leading: AnyView? = nil) {
+        self.init(title: title, subtitle: subtitle, titleSize: titleSize, backLabel: backLabel, onBack: onBack, onTitle: onTitle, leading: leading) { EmptyView() }
     }
 }
 

@@ -41,6 +41,10 @@ final class GroupsHomeViewModel {
     func memberCount(forGroup id: String) -> Int? {
         groups.first { $0.id == id }?.memberCount
     }
+
+    func group(_ id: String) -> GroupSummary? {
+        groups.first { $0.id == id }
+    }
 }
 
 extension GroupSummary {

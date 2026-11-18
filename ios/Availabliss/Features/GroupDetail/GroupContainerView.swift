@@ -76,16 +76,24 @@ private struct GroupTopBar: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
+    /// The group's photo, or its monogram on the group's colour, beside its name in the chat's header (as on
+    /// Android and web). The calendar's header leaves it out: with Chat and More beside it there's no room.
+    private var tile: AnyView {
+        AnyView(GroupTile(monogram: group.monogram, colorToken: group.color, imageURL: group.image, size: 40, cornerRadius: 14))
+    }
+
     var body: some View {
         SwiftUI.Group {
             if section == .settings {
                 ScreenHeader(title: "Group settings", subtitle: group.name, titleSize: 22,
                              backLabel: app.router.isOverGroup(group.id) ? "Back to calendar" : "Back", onBack: { app.router.back() })
             } else if let section, app.router.isOverGroup(group.id) {
-                ScreenHeader(title: group.name, titleSize: 22, backLabel: "Back to calendar", onBack: { app.router.back() })
+                ScreenHeader(title: group.name, titleSize: 22, backLabel: "Back to calendar", onBack: { app.router.back() },
+                             leading: section == .chat ? tile : nil)
             } else if section != nil {
                 // Opened from elsewhere (Activity): back returns there; the name opens the group.
-                ScreenHeader(title: group.name, titleSize: 22, onBack: { app.router.back() }, onTitle: { app.router.pop(); app.open(.group(id: group.id)) })
+                ScreenHeader(title: group.name, titleSize: 22, onBack: { app.router.back() }, onTitle: { app.router.pop(); app.open(.group(id: group.id)) },
+                             leading: section == .chat ? tile : nil)
             } else {
                 GroupHeader(group: group, unreadCount: unreadCount)
             }
