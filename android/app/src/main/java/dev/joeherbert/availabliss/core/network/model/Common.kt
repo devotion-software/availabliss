@@ -74,10 +74,27 @@ data class User(
     val onboarded: Boolean = false,
     /** Minutes counted as busy before and after each busy time when finding free slots (0, 15, 30, 60, 120). */
     val busyBufferMinutes: Int = 0,
+    /** Pushes before confirmed plans you're going to. Missing (older servers) means [EventReminders.Both]. */
+    val eventReminders: EventReminders = EventReminders.Both,
 ) {
     /** The name other people see (outside a group that has its own name for them): their name, or their email. */
     val accountName: String get() = name.trim().ifEmpty { email }
 }
+
+/**
+ * `User.eventReminders`: which reminders to push before a confirmed plan you're going to
+ * (a day before, an hour before, both or neither). Values this build doesn't know decode as [Both].
+ */
+@Serializable(with = EventRemindersSerializer::class)
+enum class EventReminders(override val wire: String) : WireEnum {
+    Both("both"),
+    DayBefore("day"),
+    HourBefore("hour"),
+    Off("off"),
+}
+
+object EventRemindersSerializer :
+    LenientEnumSerializer<EventReminders>("EventReminders", EventReminders.entries.toTypedArray(), EventReminders.Both)
 
 /** Someone found by username, to invite them. */
 @Serializable

@@ -2,11 +2,13 @@ package dev.joeherbert.availabliss.core.network
 
 import dev.joeherbert.availabliss.core.network.model.CalendarProvider
 import dev.joeherbert.availabliss.core.network.model.ConnectionsResponse
+import dev.joeherbert.availabliss.core.network.model.EventReminders
 import dev.joeherbert.availabliss.core.network.model.NotificationKind
 import dev.joeherbert.availabliss.core.network.model.NotificationsResponse
 import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.RespondRequest
 import dev.joeherbert.availabliss.core.network.model.ResponseKind
+import dev.joeherbert.availabliss.core.network.model.User
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -18,9 +20,24 @@ class LenientEnumTest {
         val body = """{"unread":2,"notifications":[
             {"id":"1","kind":"proposal.confirmed","title":"t","body":"b","createdAt":"2026-11-03T10:00:00Z"},
             {"id":"2","kind":"poll.closed","title":"t","body":"b","createdAt":"2026-11-03T10:00:00Z"},
-            {"id":"3","kind":"invite.received","title":"t","body":"b","data":{"token":"abc"},"createdAt":"2026-11-03T10:00:00Z"}]}"""
+            {"id":"3","kind":"invite.received","title":"t","body":"b","data":{"token":"abc"},"createdAt":"2026-11-03T10:00:00Z"},
+            {"id":"4","kind":"reminder","title":"t","body":"b","data":{"proposalId":"p","reminder":"day"},"createdAt":"2026-11-03T10:00:00Z"}]}"""
         val kinds = json.decodeFromString(NotificationsResponse.serializer(), body).notifications.map { it.kind }
-        assertEquals(listOf(NotificationKind.ProposalConfirmed, NotificationKind.Unknown, NotificationKind.InviteReceived), kinds)
+        assertEquals(
+            listOf(NotificationKind.ProposalConfirmed, NotificationKind.Unknown, NotificationKind.InviteReceived, NotificationKind.Reminder),
+            kinds,
+        )
+    }
+
+    @Test
+    fun `plan reminders decode by wire value, default to both when missing and fall back to both`() {
+        fun decode(extra: String) =
+            json.decodeFromString(User.serializer(), """{"id":"u","name":"Sam","email":"s@example.com"$extra}""").eventReminders
+        assertEquals(EventReminders.Both, decode(""))
+        assertEquals(EventReminders.HourBefore, decode(""","eventReminders":"hour""""))
+        assertEquals(EventReminders.Off, decode(""","eventReminders":"off""""))
+        assertEquals(EventReminders.Both, decode(""","eventReminders":"week""""))
+        assertEquals("\"day\"", json.encodeToString(EventReminders.serializer(), EventReminders.DayBefore))
     }
 
     @Test

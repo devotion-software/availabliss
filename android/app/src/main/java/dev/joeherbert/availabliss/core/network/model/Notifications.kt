@@ -19,6 +19,11 @@ enum class NotificationKind(override val wire: String) : WireEnum {
     EventCreated("event.created"),
     /** Your role in a group changed (made an admin, no longer one, or handed ownership); `data.role` is the new one. */
     RoleChanged("role.changed"),
+    /**
+     * Before a plan: `data.reminder` is `day` / `hour` (a confirmed plan you're going to, with
+     * `eventId` and `proposalId` when it came from one) or `reply` (an open proposal you haven't answered).
+     */
+    Reminder("reminder"),
 
     /** A kind added on the server after this build. */
     Unknown(""),

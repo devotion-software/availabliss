@@ -244,6 +244,7 @@ private fun NotificationKind.icon(): ImageVector = when (this) {
     NotificationKind.Message -> AvIcons.Chat
     NotificationKind.EventCreated -> AvIcons.CalendarAdd
     NotificationKind.RoleChanged -> AvIcons.Shield
+    NotificationKind.Reminder -> AvIcons.Bell
     NotificationKind.Unknown -> AvIcons.Bell
 }
 

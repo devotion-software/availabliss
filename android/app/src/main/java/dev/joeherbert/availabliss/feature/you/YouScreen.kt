@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.BuildConfig
+import dev.joeherbert.availabliss.core.network.model.EventReminders
 import dev.joeherbert.availabliss.core.network.model.LinkProviders
 import dev.joeherbert.availabliss.core.network.model.LinkedAccount
 import dev.joeherbert.availabliss.core.network.model.LinkedAccounts
@@ -86,8 +87,11 @@ fun YouScreen(
     onOpenRegion: () -> Unit,
     onSignOut: () -> Unit,
     viewModel: YouViewModel = hiltViewModel(),
+    remindersViewModel: PlanRemindersViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val reminders by remindersViewModel.reminders.collectAsStateWithLifecycle()
+    val remindersMessage by remindersViewModel.message.collectAsStateWithLifecycle()
     val username by viewModel.username.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // Credential Manager sheets run in this scope so the ViewModel never holds the Activity.
@@ -104,6 +108,7 @@ fun YouScreen(
     val pickPhoto = rememberPhotoPicker(onUnreadable = viewModel::photoUnreadable, onPicked = viewModel::setPhoto)
     if (upgrading) UpgradeSheet(onDismiss = { upgrading = false }, onUpgraded = viewModel::upgraded)
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
+    UserMessageEffect(remindersMessage, snackbar) { remindersViewModel.onMessageShown() }
 
     AvailablissBackground(OrbLayout.Main) {
         YouContent(
@@ -119,6 +124,8 @@ fun YouScreen(
             onSignOut = onSignOut,
             onDelete = viewModel::requestDelete,
             onOpenPro = { upgrading = true },
+            reminders = reminders,
+            onSelectReminders = remindersViewModel::select,
             templateActions = TemplateActions(
                 onRename = viewModel::startRenamingTemplate,
                 onNameChange = viewModel::onTemplateNameChange,
@@ -183,6 +190,8 @@ fun YouContent(
     onDelete: () -> Unit,
     onLink: (provider: String) -> Unit = {},
     onOpenPro: () -> Unit = {},
+    reminders: EventReminders = EventReminders.Both,
+    onSelectReminders: (EventReminders) -> Unit = {},
     templateActions: TemplateActions = TemplateActions(),
 ) {
     val colors = AvailablissTheme.colors
@@ -216,6 +225,8 @@ fun YouContent(
                 loading = state.addingPasskey,
             )
         }
+
+        PlanRemindersCard(reminders, onSelectReminders)
 
         SignInMethodsPanel(state, onLink)
 
