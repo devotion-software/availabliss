@@ -20,8 +20,11 @@
 		/** Shown when the optional AI planner is set up on this server. */
 		onplan?: () => void;
 		max?: number;
+		/** Shortlisting times for a date poll: whether a slot's picked, and picking / unpicking one. */
+		picked?: (slot: Slot) => boolean;
+		onpick?: (slot: Slot) => void;
 	}
-	let { slots, members = new Map(), pendingCount, onpropose, onselect, onplan, max = 4 }: Props = $props();
+	let { slots, members = new Map(), pendingCount, onpropose, onselect, onplan, max = 4, picked, onpick }: Props = $props();
 
 	const fmt = useFormat();
 	// Fewer people missing first, then the best date score (Pro), then preferences, then soonest.
@@ -41,7 +44,21 @@
 		{@const missing = missingLine(slot.missingMemberIds ?? [], members)}
 		{@const fair = fairLine(slot.fairFor, members)}
 		{@const best = scored && i === 0}
-		<div class="option" class:best>
+		{@const on = picked?.(slot) ?? false}
+		<div class="option" class:best class:on>
+			{#if onpick}
+				<button
+					type="button"
+					class="pick"
+					class:on
+					aria-pressed={on}
+					aria-label="Shortlist {slot.label}"
+					title={on ? 'Remove from the shortlist' : 'Shortlist for a poll'}
+					onclick={() => onpick(slot)}
+				>
+					{#if on}<Icon name="check" size={12} strokeWidth={3.5} />{/if}
+				</button>
+			{/if}
 			<button type="button" class="when" onclick={() => onselect?.(slot)}>
 				{#if best}<span class="badge"><Icon name="sparkle" size={12} /> Best for the group</span>{/if}
 				<span class="label">{slot.label}</span>
@@ -111,6 +128,38 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
+	}
+	.option.on {
+		box-shadow: inset 0 0 0 1.5px var(--accent-soft);
+	}
+	.option.best.on {
+		box-shadow: inset 0 0 0 1.5px var(--accent);
+	}
+	/* The shortlist tick: a square checkbox with a 44px tap target. */
+	.pick {
+		position: relative;
+		flex: none;
+		width: 22px;
+		height: 22px;
+		margin: -2px -2px -2px 0;
+		border-radius: 7px;
+		border: 2px solid var(--line-3);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #fff;
+		transition:
+			background 0.15s ease,
+			border-color 0.15s ease;
+	}
+	.pick::after {
+		content: '';
+		position: absolute;
+		inset: -11px;
+	}
+	.pick.on {
+		background: var(--accent);
+		border-color: var(--accent);
 	}
 	.when {
 		flex: 1;

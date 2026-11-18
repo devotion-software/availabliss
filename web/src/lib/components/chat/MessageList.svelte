@@ -21,6 +21,7 @@
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import ThreadSheet from './ThreadSheet.svelte';
+	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
 
 	/** The scrolling message log for a thread. Reports visibility so `seen` receipts are honest. */
 	interface Props {
@@ -49,6 +50,19 @@
 	let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 	let confirmOpen = $state(false);
 	let deleting = $state<Message | null>(null);
+
+	// "Propose this" on a date poll's leading time: the propose sheet with it filled in. Proposing
+	// closes your own poll (only its author can).
+	let proposeOpen = $state(false);
+	let proposeFrom = $state<{ pollId: string; mine: boolean; slot: { start: string; end: string; allDay: boolean } } | null>(null);
+	function proposeFromPoll(m: Message, slot: { start: string; end: string; allDay: boolean }) {
+		proposeFrom = { pollId: m.poll!.id, mine: m.authorId === meId, slot };
+		proposeOpen = true;
+	}
+	async function proposed() {
+		const from = proposeFrom;
+		if (from?.mine && !thread.messages.find((m) => m.poll?.id === from.pollId)?.poll?.closed) await thread.closePoll(from.pollId);
+	}
 
 	// Plain (non-reactive) bookkeeping for scroll behaviour.
 	let atBottom = true;
@@ -251,6 +265,9 @@
 								canClose={item.mine}
 								onvote={(ids) => thread.vote(m.poll!.id, ids)}
 								onclose={() => thread.closePoll(m.poll!.id)}
+								groupId={group.id}
+								{members}
+								onpropose={item.mine || admin ? (slot) => proposeFromPoll(m, slot) : undefined}
 							/>
 							{#if thread.canReply(m)}
 								<button type="button" class="poll-reply" aria-label="Reply to the poll" title="Reply" onclick={() => reply(m)}>
@@ -304,6 +321,7 @@
 <ThreadSheet focusId={threadFor} {group} {meId} onclose={() => (threadFor = null)} onshowinchat={showInChat} />
 
 <MessageInfoSheet bind:open={infoOpen} message={infoMessage} {members} {meId} />
+<ProposeSheet bind:open={proposeOpen} {group} {meId} initial={proposeFrom?.slot ?? null} onproposed={proposed} />
 
 <MessageMenu
 	anchor={menuAnchor}

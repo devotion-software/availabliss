@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import type { Group } from '#lib/types';
+	import type { Group, Proposal } from '#lib/types';
 	import { createProposal, getConflicts } from '#lib/client/proposals';
 	import { memberMap } from '#lib/client/members';
 	import { clashText } from '#lib/components/proposals/clash';
@@ -27,8 +27,10 @@
 		meId: string;
 		/** What to prefill: a slot that works, or just a day. */
 		initial?: { start: string; end: string; allDay?: boolean; label?: string; title?: string; note?: string } | { day: string } | null;
+		/** Sent (before going to the proposal), e.g. to close the date poll it came from. */
+		onproposed?: (proposal: Proposal) => unknown;
 	}
-	let { open = $bindable(), group, meId, initial = null }: Props = $props();
+	let { open = $bindable(), group, meId, initial = null, onproposed }: Props = $props();
 	const groupId = $derived(group.id);
 
 	const fmt = useFormat();
@@ -127,6 +129,7 @@
 				note: optional(draft.note)
 			});
 			open = false;
+			await Promise.resolve(onproposed?.(proposal)).catch(() => {});
 			toasts.success('Proposed. Everyone will be asked.');
 			await goto(`/app/proposals/${proposal.id}`);
 		} catch (err) {

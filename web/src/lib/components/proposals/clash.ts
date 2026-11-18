@@ -22,3 +22,13 @@ export function clashShort(busyIds: readonly string[], members: Map<string, Memb
 	if (busyIds.length > 1) return `${busyIds.length} busy then`;
 	return `${firstName(members.get(busyIds[0])?.name ?? 'Someone')} busy then`;
 }
+
+/** Per option in a date poll: "Everyone's free", "Ana's busy", "You're busy", "Ana and Jo are busy". */
+export function busyLine(busyIds: readonly string[], members: Map<string, Member>, meId: string): string {
+	if (!busyIds.length) return "Everyone's free";
+	const mine = busyIds.includes(meId);
+	const others = busyIds.filter((id) => id !== meId).map((id) => firstName(members.get(id)?.name ?? 'Someone'));
+	const names = mine ? ['You', ...others] : others;
+	if (names.length === 1) return mine ? "You're busy" : `${names[0]}'s busy`;
+	return `${listNames(names, 2)} are busy`;
+}

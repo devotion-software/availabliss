@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
-	import type { TileColor } from '#lib/types';
-	import { deleteGroup, setMyName, updateGroup } from '#lib/client/groups';
+	import type { Rhythm, TileColor } from '#lib/types';
+	import { deleteGroup, RHYTHM_LABELS, setMyName, updateGroup } from '#lib/client/groups';
 	import { accountName, groupSubtitle, isAdminRole } from '#lib/client/members';
 	import { toasts } from '#lib/client/toast.svelte';
 	import { newGroupSheet } from '#lib/client/ui-state.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import Toggle from '#lib/components/ui/Toggle.svelte';
+	import Select from '#lib/components/ui/Select.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';
 	import GroupTile from '#lib/components/ui/GroupTile.svelte';
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
@@ -78,12 +79,45 @@
 	let deleteOpen = $state(false);
 	let leaveOpen = $state(false);
 
+	// How often the group meets, and whether to post "Same again?" in the chat after each plan.
+	// Both follow the saved setting (and go back if saving fails).
+	const RHYTHM_OPTIONS = [
+		{ value: 'none', label: 'None' },
+		...(Object.entries(RHYTHM_LABELS) as [Rhythm['every'], string][]).map(([value, label]) => ({ value, label }))
+	];
+	let every = $state('none');
+	let prompt = $state(true);
+	let savingRhythm = $state(false);
+	$effect.pre(() => {
+		every = group.rhythm?.every ?? 'none';
+		prompt = group.rhythm?.prompt ?? true;
+	});
+	async function saveRhythm(next: Rhythm | null, done: string) {
+		savingRhythm = true;
+		if (!(await save({ rhythm: next }, done))) {
+			every = group.rhythm?.every ?? 'none';
+			prompt = group.rhythm?.prompt ?? true;
+		}
+		savingRhythm = false;
+	}
+	function setEvery(value: string) {
+		if (value === 'none') saveRhythm(null, 'No regular meet-ups');
+		else saveRhythm({ every: value as Rhythm['every'], prompt }, `Set to ${RHYTHM_LABELS[value as Rhythm['every']].toLowerCase()}`);
+	}
+	function setPrompt(on: boolean) {
+		if (every === 'none') return;
+		saveRhythm({ every: every as Rhythm['every'], prompt: on }, on ? 'The chat will suggest the next one' : 'No suggestions in the chat');
+	}
+
 	async function left() {
 		toasts.success(`You left ${group.name}`);
 		await goto('/app', { invalidateAll: true });
 	}
 
-	async function save(patch: { name?: string; color?: TileColor; archived?: boolean; autoArchive?: boolean }, done: string): Promise<boolean> {
+	async function save(
+		patch: { name?: string; color?: TileColor; archived?: boolean; autoArchive?: boolean; rhythm?: Rhythm | null },
+		done: string
+	): Promise<boolean> {
 		try {
 			await updateGroup(group.id, patch);
 			// The group's own details and the groups list (sidebar and home) both show it.
@@ -195,6 +229,27 @@
 			</form>
 			{#if myNameInGroup !== null && !myNameChanged}
 				<Button variant="ghost" size="sm" disabled={savingMyName} onclick={() => saveMyName(null)}>Use {myAccountName} instead</Button>
+			{/if}
+		</section>
+
+		<section class="glass card" aria-labelledby="rhythm-title">
+			<div class="text">
+				<h2 id="rhythm-title">How often do you meet?</h2>
+				<p class="small">
+					{canEdit
+						? 'The calendar suggests the next one, near the same day each time.'
+						: "Only the group's owner and admins can change this."}
+				</p>
+			</div>
+			<Select label="How often" hideLabel bind:value={every} options={RHYTHM_OPTIONS} disabled={!canEdit || savingRhythm} onchange={setEvery} />
+			{#if every !== 'none'}
+				<div class="auto">
+					<div class="text">
+						<h3 id="rhythm-prompt-title">Suggest the next one in the chat</h3>
+						<p class="small">After each plan, the chat asks “Same again?” with a time that works.</p>
+					</div>
+					<Toggle bind:checked={prompt} labelledby="rhythm-prompt-title" disabled={!canEdit || savingRhythm} onchange={setPrompt} />
+				</div>
 			{/if}
 		</section>
 

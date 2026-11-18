@@ -23,7 +23,14 @@ export const sendMessage = (groupId: string, body: string, replyToId?: string | 
 /** Shares a place (your position, or one you found). */
 export const sendLocation = (groupId: string, location: MessageLocation, replyToId?: string | null) =>
 	api.post<Message>(`/groups/${groupId}/messages`, { location, ...(replyToId && { replyToId }) });
-export const sendPoll = (groupId: string, poll: PollInput) => api.post<Message>(`/groups/${groupId}/messages`, { poll });
+/** A date poll: 2–5 times from the calendar for the group to vote on (pick any, by default). */
+export interface DatePollInput {
+	question: string;
+	slots: { start: string; end: string; allDay?: boolean }[];
+	multi?: boolean;
+}
+
+export const sendPoll = (groupId: string, poll: PollInput | DatePollInput) => api.post<Message>(`/groups/${groupId}/messages`, { poll });
 export const sendReceipt = (groupId: string, upTo: string, state: 'delivered' | 'seen') =>
 	api.post(`/groups/${groupId}/messages/receipts`, { upTo, state });
 export const getMessageInfo = (messageId: string) => api.get<MessageInfo>(`/messages/${messageId}/info`);

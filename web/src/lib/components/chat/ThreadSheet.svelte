@@ -140,6 +140,8 @@
 							mine={item.mine}
 							authorName={m.authorId ? members.get(m.authorId)?.name : undefined}
 							canClose={false}
+							groupId={group.id}
+							{members}
 							onvote={(ids) => rt?.vote(m.poll!.id, ids)}
 							onclose={() => {}}
 						/>

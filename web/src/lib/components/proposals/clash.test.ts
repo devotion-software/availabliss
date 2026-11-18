@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { Member } from '#lib/types';
-import { clashShort, clashText } from './clash';
+import { busyLine, clashShort, clashText } from './clash';
 
 const m = (userId: string, name: string) => [userId, { userId, name } as Member] as const;
 const members = new Map([m('me', 'Sam Taylor'), m('p', 'Priya Shah'), m('a', 'Alex'), m('j', 'Jo'), m('t', 'Tom'), m('l', 'Lee')]);
@@ -18,4 +18,12 @@ test('clashShort', () => {
 	expect(clashShort([], members)).toBeNull();
 	expect(clashShort(['p'], members)).toBe('Priya busy then');
 	expect(clashShort(['p', 'a'], members)).toBe('2 busy then');
+});
+
+test('busyLine', () => {
+	expect(busyLine([], members, 'me')).toBe("Everyone's free");
+	expect(busyLine(['p'], members, 'me')).toBe("Priya's busy");
+	expect(busyLine(['me'], members, 'me')).toBe("You're busy");
+	expect(busyLine(['me', 'p'], members, 'me')).toBe('You and Priya are busy');
+	expect(busyLine(['p', 'a', 'j'], members, 'me')).toBe('Priya, Alex and 1 other are busy');
 });

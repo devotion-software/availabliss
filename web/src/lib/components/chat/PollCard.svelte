@@ -1,10 +1,20 @@
 <script lang="ts">
-	import type { Poll } from '#lib/types';
+	import { untrack } from 'svelte';
+	import type { Member, Poll } from '#lib/types';
 	import Icon from '#lib/components/ui/Icon.svelte';
-	import { firstName } from '#lib/client/format';
+	import { firstName, useFormat } from '#lib/client/format';
+	import { getConflicts } from '#lib/client/proposals';
+	import { live } from '#lib/client/live.svelte';
+	import { busyLine } from '#lib/components/proposals/clash';
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
+	import Button from '#lib/components/ui/Button.svelte';
 
-	/** A poll in the chat (Chat.dc.html): tap an option to vote, bars show the split. */
+	type PollSlot = NonNullable<Poll['options'][number]['slot']>;
+
+	/**
+	 * A poll in the chat (Chat.dc.html): tap an option to vote, bars show the split. A date poll's
+	 * options are times: each says who's busy then, and its creator (or an admin) can propose the leader.
+	 */
 	interface Props {
 		poll: Poll;
 		meId: string;
@@ -15,13 +25,67 @@
 		compact?: boolean;
 		onvote: (optionIds: string[]) => void;
 		onclose?: () => void;
+		/** For a date poll's "Ana's busy" per option. */
+		groupId?: string;
+		members?: Map<string, Member>;
+		/** "Propose this" on the leading time (the poll's creator and admins). */
+		onpropose?: (slot: PollSlot) => void;
 	}
-	let { poll, meId, mine = false, authorName, canClose = false, compact = false, onvote, onclose }: Props = $props();
+	let {
+		poll,
+		meId,
+		mine = false,
+		authorName,
+		canClose = false,
+		compact = false,
+		onvote,
+		onclose,
+		groupId,
+		members = new Map(),
+		onpropose
+	}: Props = $props();
+
+	const fmt = useFormat();
+	const dated = $derived(poll.options.some((o) => o.slot));
+	const ahead = (slot: PollSlot) => new Date(slot.end).getTime() > Date.now();
 
 	const counts = $derived(poll.options.map((o) => o.voterIds.length));
 	const total = $derived(counts.reduce((a, b) => a + b, 0));
 	const max = $derived(Math.max(0, ...counts));
 	const myVotes = $derived(poll.options.filter((o) => o.voterIds.includes(meId)).map((o) => o.id));
+
+	// The leading time (most votes, the earliest on a tie), for "Propose this".
+	const leadId = $derived.by(() => {
+		if (!max) return null;
+		return poll.options.find((o, i) => counts[i] === max && o.slot && ahead(o.slot))?.id ?? null;
+	});
+
+	// Who's busy at each time still to come (refreshed when anyone's busy time changes). Not for closed polls.
+	let busy = $state<Record<string, string[]>>({});
+	const slotKey = $derived(
+		poll.closed ? '' : poll.options.map((o) => (o.slot && ahead(o.slot) ? `${o.id}@${o.slot.start}/${o.slot.end}` : '')).join()
+	);
+	$effect(() => {
+		const id = groupId;
+		void slotKey;
+		if (!id || !slotKey) return;
+		// Keyed on the times only, so votes coming in don't refetch.
+		const wanted = untrack(() => poll.options.filter((o) => o.slot && ahead(o.slot)));
+		let stale = false;
+		const refresh = () => {
+			Promise.all(wanted.map((o) => getConflicts(id, o.slot!.start, o.slot!.end).then((ids) => [o.id, ids] as const)))
+				.then((entries) => !stale && (busy = Object.fromEntries(entries)))
+				.catch(() => {});
+		};
+		refresh();
+		const off = live.on(['availability.changed'], (e) => {
+			if (e.groupId === null || e.groupId === id) refresh();
+		});
+		return () => {
+			stale = true;
+			off();
+		};
+	});
 
 	function pick(id: string) {
 		if (poll.closed) return;
@@ -42,22 +106,33 @@
 		{#each poll.options as option, i (option.id)}
 			{@const on = myVotes.includes(option.id)}
 			{@const n = counts[i]}
+			{@const label = option.slot ? fmt.current.when(option.slot.start, option.slot.end, option.slot.allDay) : option.label}
+			{@const who = busy[option.id] ? busyLine(busy[option.id], members, meId) : null}
 			<button
 				type="button"
 				class="option"
 				class:on
+				class:leading={dated && option.id === leadId}
 				aria-pressed={on}
 				disabled={poll.closed}
-				aria-label="{option.label}, {n} vote{n === 1 ? '' : 's'}"
+				aria-label="{label}, {n} vote{n === 1 ? '' : 's'}{who ? `, ${who}` : ''}"
 				onclick={() => pick(option.id)}
 			>
 				<span class="bar" class:lead={n > 0 && n === max} style:width="{total ? Math.round((n / total) * 100) : 0}%"></span>
 				<span class="mark" class:square={poll.multi}>
 					{#if on}<Icon name="check" size={11} strokeWidth={3.5} />{/if}
 				</span>
-				<span class="label">{option.label}</span>
+				<span class="label">
+					{label}
+					{#if who}<span class="busy" class:free={!busy[option.id].length}>{who}</span>{/if}
+				</span>
 				<span class="count">{n}</span>
 			</button>
+			{#if onpropose && option.slot && option.id === leadId}
+				<div class="propose">
+					<Button variant="accent" size="sm" icon="calendar-plus" onclick={() => onpropose(option.slot!)}>Propose this</Button>
+				</div>
+			{/if}
 		{/each}
 	</div>
 	{#if canClose && !poll.closed && onclose}
@@ -167,8 +242,32 @@
 	.label {
 		position: relative;
 		flex: 1;
+		min-width: 0;
+		padding: 6px 0;
+		display: flex;
+		flex-direction: column;
 		font-size: 14px;
 		font-weight: 600;
+	}
+	.busy {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--warn-ink);
+	}
+	.busy.free {
+		color: var(--ok-ink);
+	}
+	.option.leading {
+		border-color: var(--accent-soft);
+		box-shadow: inset 0 0 0 1px var(--accent-soft);
+	}
+	.option.leading.on {
+		border-color: var(--accent);
+	}
+	.propose {
+		display: flex;
+		justify-content: flex-end;
+		margin: -2px 0 2px;
 	}
 	.count {
 		position: relative;

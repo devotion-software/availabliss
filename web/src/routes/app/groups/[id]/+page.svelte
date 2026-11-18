@@ -29,6 +29,9 @@
 	import Breadcrumbs from '#lib/components/ui/Breadcrumbs.svelte';
 	import ChatPanel from '#lib/components/chat/ChatPanel.svelte';
 	import PlansCard from '#lib/components/proposals/PlansCard.svelte';
+	import NextCard from '#lib/components/group/NextCard.svelte';
+	import DatePollSheet from '#lib/components/group/DatePollSheet.svelte';
+	import Button from '#lib/components/ui/Button.svelte';
 
 	let { data } = $props();
 
@@ -396,6 +399,23 @@
 	const phoneWidth = $derived(narrow.matches === true);
 	const phone = $derived(isDesktop.matches !== true);
 
+	// Times shortlisted for a date poll ("Ask the group"): 2–5 of them.
+	const POLL_MAX = 5;
+	let shortlist = $state<Slot[]>([]);
+	let askOpen = $state(false);
+	const sameSlot = (a: Slot, b: Slot) => a.start === b.start && a.end === b.end;
+	const isPicked = (slot: Slot) => shortlist.some((s) => sameSlot(s, slot));
+	function togglePick(slot: Slot) {
+		if (isPicked(slot)) shortlist = shortlist.filter((s) => !sameSlot(s, slot));
+		else if (shortlist.length >= POLL_MAX) toasts.info(`A poll can have up to ${POLL_MAX} times.`);
+		else shortlist = [...shortlist, slot];
+	}
+	// A new group starts with an empty shortlist.
+	$effect(() => {
+		void group.id;
+		untrack(() => (shortlist = []));
+	});
+
 	function selectSlot(slot: Slot) {
 		select(fmt.current.dayKey(slot.start));
 		view = 'month';
@@ -404,7 +424,7 @@
 
 <svelte:head><title>{group.name} · Availabliss</title></svelte:head>
 
-<div class="page">
+<div class="page" class:with-bar={shortlist.length > 0}>
 	<div class="main">
 
 		{#if desk}
@@ -432,6 +452,7 @@
 				<Icon name="pencil" size={15} class="muted" />
 			</a>
 			<PlansCard {group} meId={data.user.id} />
+			<NextCard {group} onpropose={propose} />
 		</div>
 		{/if}
 
@@ -526,10 +547,15 @@
 			{noun}
 			onpropose={propose}
 			onproposeday={(day) => propose({ day })}
+			shortlisted={selectedSlot ? isPicked(selectedSlot) : false}
+			onshortlist={togglePick}
 		/>
 	</div>
 
 	<aside class="aside">
+		{#if desk}
+			<div class="desk-only"><NextCard {group} onpropose={propose} /></div>
+		{/if}
 		<BestOptions
 			slots={availability.slots}
 			{members}
@@ -537,6 +563,8 @@
 			onpropose={propose}
 			onselect={selectSlot}
 			onplan={aiPlanner?.available ? openPlanner : undefined}
+			picked={isPicked}
+			onpick={togglePick}
 		/>
 		<!-- Only mounted on desktop: it loads and subscribes to the chat. Phones open the chat from the header. -->
 		{#if isDesktop.matches}
@@ -547,7 +575,25 @@
 	</aside>
 </div>
 
+{#if shortlist.length}
+	<div class="shortlist glass" role="region" aria-label="Shortlist" transition:fly={{ y: prefersReducedMotion.current ? 0 : 24, duration: 200 }}>
+		<span class="picked" aria-live="polite">
+			<strong>{shortlist.length} picked</strong>
+			<span>{shortlist.length < 2 ? 'Pick another time' : 'Let the group vote'}</span>
+		</span>
+		<button type="button" class="clear" onclick={() => (shortlist = [])}>Clear</button>
+		<Button variant="accent" size="sm" icon="poll" disabled={shortlist.length < 2} onclick={() => (askOpen = true)}>Ask the group</Button>
+	</div>
+{/if}
+
 <ProposeSheet bind:open={proposeOpen} {group} meId={data.user.id} initial={proposeInitial} />
+<DatePollSheet
+	bind:open={askOpen}
+	groupId={group.id}
+	slots={shortlist}
+	onremove={(slot) => (shortlist = shortlist.filter((s) => !sameSlot(s, slot)))}
+	onposted={() => (shortlist = [])}
+/>
 <PlannerSheet bind:open={plannerOpen} groupId={group.id} onpropose={({ slot, title, note }) => propose({ ...slot, title, note })} />
 
 <style>
@@ -827,6 +873,49 @@
 		color: var(--muted);
 		opacity: 0.7;
 		cursor: default;
+	}
+	.with-bar {
+		padding-bottom: 76px;
+	}
+	/* "3 picked · Ask the group": floats above the tab bar while times are shortlisted. */
+	.shortlist {
+		position: fixed;
+		left: 50%;
+		transform: translateX(-50%);
+		bottom: calc(var(--tabbar-space) + env(safe-area-inset-bottom));
+		z-index: 40;
+		width: min(calc(100vw - 32px), 440px);
+		border-radius: 22px;
+		padding: 8px 8px 8px 16px;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.picked {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.picked strong {
+		font-size: 15px;
+		font-weight: 650;
+	}
+	.picked span {
+		font-size: 12px;
+		color: var(--muted);
+	}
+	.clear {
+		min-height: 44px;
+		padding: 0 6px;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--accent-ink);
+	}
+	@media (min-width: 900px) {
+		.shortlist {
+			bottom: 24px;
+		}
 	}
 	.free-label {
 		font-size: 12px;

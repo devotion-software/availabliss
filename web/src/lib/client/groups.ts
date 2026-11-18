@@ -1,5 +1,5 @@
 import { api, type Fetch } from './api';
-import type { Group, GroupInvite, GroupPreference, GroupSummary, Member, Requirement, TileColor, Weekday } from '#lib/types';
+import type { Group, GroupInvite, GroupPreference, GroupSummary, Member, Requirement, Rhythm, Slot, TileColor, Weekday } from '#lib/types';
 
 export interface GroupInput {
 	name: string;
@@ -33,10 +33,27 @@ export const getGroup = (id: string, fetch?: Fetch) => api.get<Group>(`/groups/$
 export const createGroup = (body: GroupInput) => api.post<Group>('/groups', body);
 /**
  * `archived` moves the group to (true) or out of (false) the Archived section of everyone's groups list;
- * `autoArchive` has it archive itself once its event has passed.
+ * `autoArchive` has it archive itself once its event has passed; `rhythm` is how often it meets (null for none).
  */
-export const updateGroup = (id: string, patch: Partial<GroupInput> & { archived?: boolean; autoArchive?: boolean }) =>
-	api.patch<Group>(`/groups/${id}`, patch);
+export const updateGroup = (
+	id: string,
+	patch: Partial<GroupInput> & { archived?: boolean; autoArchive?: boolean; rhythm?: Rhythm | null }
+) => api.patch<Group>(`/groups/${id}`, patch);
+
+/** The next time near the group's rhythm: the date it points at, and the free time nearest it (null if none). */
+export interface NextSuggestion {
+	target: string;
+	slot: Slot | null;
+}
+/** How often a group meets, as offered in its settings. */
+export const RHYTHM_LABELS: Record<Rhythm['every'], string> = {
+	week: 'Every week',
+	'two-weeks': 'Every two weeks',
+	month: 'Every month'
+};
+/** Null when the group has no rhythm. */
+export const getNextSuggestion = (id: string, fetch?: Fetch) =>
+	api.get<{ suggestion: NextSuggestion | null }>(`/groups/${id}/next`, { fetch }).then((r) => r.suggestion);
 /**
  * Groups you're leaving or deleting from this tab, so the live "you're no longer in it" event
  * that follows doesn't announce it a second time.

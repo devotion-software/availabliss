@@ -22,8 +22,11 @@
 		onpropose: (slot: Slot & { allDay?: boolean }) => void;
 		/** Propose a day that doesn't work for everyone (the proposal sheet warns who's busy). */
 		onproposeday?: (date: string) => void;
+		/** Shortlisting the day's time for a date poll: whether it's picked, and picking / unpicking it. */
+		shortlisted?: boolean;
+		onshortlist?: (slot: Slot) => void;
 	}
-	let { date, day, detail, slot, members, meId, noun, onpropose, onproposeday }: Props = $props();
+	let { date, day, detail, slot, members, meId, noun, onpropose, onproposeday, shortlisted = false, onshortlist }: Props = $props();
 	// The first time everyone's free that day (else enough of the group, with a quorum), offered when no whole slot fits.
 	const free = $derived(detail?.everyoneFree[0] ?? detail?.mostFree?.[0] ?? null);
 
@@ -77,6 +80,16 @@
 	<div class="actions">
 		{#if works && slot}
 			<Button variant="accent" size="sm" class="act" onclick={() => onpropose(slot)}>Propose this {noun}</Button>
+			{#if onshortlist}
+				<Button
+					variant="secondary"
+					size="sm"
+					class="act shortlist"
+					icon={shortlisted ? 'check' : 'plus'}
+					aria-pressed={shortlisted}
+					onclick={() => onshortlist(slot)}>{shortlisted ? 'Shortlisted' : 'Shortlist'}</Button
+				>
+			{/if}
 		{:else if free && !past}
 			{@const toMidnight = fmt.current.dayKey(free.end) !== date}
 			{@const allDay = toMidnight && fmt.current.dayKey(free.start) === date && fmt.current.time(free.start) === '00:00'}
@@ -140,6 +153,10 @@
 	.actions {
 		display: flex;
 		gap: 8px;
+	}
+	.actions :global(.act.shortlist) {
+		flex: 0 1 auto;
+		padding: 0 14px;
 	}
 	.actions :global(.act) {
 		flex: 1;
