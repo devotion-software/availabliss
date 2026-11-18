@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import type { AvailabilityDay } from '#lib/types';
-import { findFreeDay, startsFreeRun } from './grid';
+import type { AvailabilityDay, Member } from '#lib/types';
+import { findFreeDay, missingNote, missingOn, startsFreeRun } from './grid';
+import { subtractSpans } from './timeline';
 
 const day = (date: string, status: AvailabilityDay['status'], slotPosition: AvailabilityDay['slotPosition'] = null) =>
 	({ date, status, slotPosition, busyMemberIds: [], holiday: null }) as AvailabilityDay;
@@ -53,5 +54,30 @@ describe('findFreeDay', () => {
 	});
 	test('a month that fails to load gives up', async () => {
 		expect(await findFreeDay(() => Promise.reject(new Error('offline')), '2026-12-01', '2027-02-14', true)).toBeNull();
+	});
+});
+
+describe('missingNote', () => {
+	const members = new Map([
+		['a', { userId: 'a', name: 'Ana Silva' }],
+		['b', { userId: 'b', name: 'Tom' }]
+	] as [string, Member][]);
+	test('names one person, counts more', () => {
+		expect(missingNote(['a'], members)).toBe('Ana busy');
+		expect(missingNote(['a', 'b'], members)).toBe('2 missing');
+		expect(missingNote([], members)).toBe('Most free');
+	});
+	test('missingOn prefers the slot', () => {
+		expect(missingOn({ busyMemberIds: ['b'] }, { missingMemberIds: ['a'] })).toEqual(['a']);
+		expect(missingOn({ busyMemberIds: ['b'] }, null)).toEqual(['b']);
+	});
+});
+
+describe('subtractSpans', () => {
+	test('cuts holes', () => {
+		expect(subtractSpans([{ from: 0, to: 100 }], [{ from: 20, to: 30 }, { from: 90, to: 120 }])).toEqual([
+			{ from: 0, to: 20 },
+			{ from: 30, to: 90 }
+		]);
 	});
 });

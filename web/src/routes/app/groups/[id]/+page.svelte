@@ -532,6 +532,7 @@
 	<aside class="aside">
 		<BestOptions
 			slots={availability.slots}
+			{members}
 			pendingCount={availability.pendingMemberIds.length}
 			onpropose={propose}
 			onselect={selectSlot}

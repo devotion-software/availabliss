@@ -42,6 +42,18 @@ export function busyNames(ids: readonly string[], members: Map<string, Member>, 
 	return listNames(names, 2);
 }
 
+/** The note for a time only most of the group can make: "Ana busy", "2 missing". */
+export function missingNote(ids: readonly string[], members: Map<string, Member>): string {
+	if (ids.length === 0) return 'Most free';
+	if (ids.length === 1) return `${firstName(members.get(ids[0])?.name ?? 'Someone')} busy`;
+	return `${ids.length} missing`;
+}
+
+/** Who's missing on a partial `match` day: its slot's `missingMemberIds`, else the day's busy members. */
+export function missingOn(day: Pick<AvailabilityDay, 'busyMemberIds'>, slot: Pick<Slot, 'missingMemberIds'> | null): string[] {
+	return slot?.missingMemberIds?.length ? slot.missingMemberIds : day.busyMemberIds;
+}
+
 export const dayMap = (days: readonly AvailabilityDay[]) => new Map(days.map((d) => [d.date, d]));
 
 export { weekdayOf };

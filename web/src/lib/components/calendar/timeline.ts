@@ -41,3 +41,21 @@ export function hourTicks(axis: Axis, step = 4): { label: string; at: number }[]
 
 /** "18:00 – late", "10:00 – 14:30" */
 export const spanText = (from: number, to: number) => `${minutesToTime(from)} – ${to >= 1439 ? 'late' : minutesToTime(to)}`;
+
+/** `from` minus `cut`, both as sorted, non-overlapping [from, to] minute spans. */
+export function subtractSpans(
+	from: readonly { from: number; to: number }[],
+	cut: readonly { from: number; to: number }[]
+): { from: number; to: number }[] {
+	const out: { from: number; to: number }[] = [];
+	for (const span of from) {
+		let start = span.from;
+		for (const c of cut) {
+			if (c.to <= start || c.from >= span.to) continue;
+			if (c.from > start) out.push({ from: start, to: c.from });
+			start = Math.max(start, c.to);
+		}
+		if (start < span.to) out.push({ from: start, to: span.to });
+	}
+	return out;
+}

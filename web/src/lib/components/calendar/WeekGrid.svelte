@@ -2,10 +2,14 @@
 	import type { DayAvailability, Member } from '#lib/types';
 	import { formatDayKey, useFormat } from '#lib/client/format';
 	import Spinner from '#lib/components/ui/Spinner.svelte';
-	import { busyNames } from './grid';
-	import { axisFor, clampToAxis, hourTicks, mergeAxes, pct, spanText, type Axis } from './timeline';
+	import { busyNames, missingNote } from './grid';
+	import { axisFor, clampToAxis, hourTicks, mergeAxes, pct, spanText, subtractSpans, type Axis } from './timeline';
 
-	/** A week of the group's visible days: shared free time as accent blocks, everything else as faded busy blocks. */
+	/**
+	 * A week of the group's visible days: shared free time as accent blocks, time only most of the
+	 * group can make (with a quorum or optional members) as soft accent blocks, everything else as
+	 * faded busy blocks.
+	 */
 	interface Props {
 		dates: readonly string[];
 		/** Day detail per date; missing = still loading, null = outside the timing. */
@@ -39,30 +43,44 @@
 		from: number;
 		to: number;
 		free: boolean;
+		/** Free for enough of the group, not everyone. */
+		most?: boolean;
 		label: string;
 	}
 
 	function blocks(date: string, day: DayAvailability): Block[] {
 		const range = day.window ? clampToAxis(day.window, date, axis, tz) : { from: axis.start, to: axis.end };
 		if (!range) return [];
-		const free = day.everyoneFree
-			.map((i) => clampToAxis(i, date, axis, tz))
-			.filter((x) => x !== null)
-			.sort((a, b) => a.from - b.from);
+		const clamp = (list: DayAvailability['everyoneFree']) =>
+			list
+				.map((i) => clampToAxis(i, date, axis, tz))
+				.filter((x) => x !== null)
+				.sort((a, b) => a.from - b.from);
+		const free = clamp(day.everyoneFree);
+		// `mostFree` includes everyone's free time: keep only the stretches where someone's missing.
+		const most = subtractSpans(clamp(day.mostFree ?? []), free);
 		const out: Block[] = [];
 		let cursor = range.from;
-		const pushBusy = (from: number, to: number) => {
-			if (to - from < 15) return;
-			const ids = day.members
+		const busyIds = (from: number, to: number) =>
+			day.members
 				.filter((m) => m.busy.some((b) => {
 					const s = clampToAxis(b, date, axis, tz);
 					return s && s.from < to && s.to > from;
 				}))
 				.map((m) => m.userId);
+		const pushBusy = (from: number, to: number) => {
+			if (to - from < 15) return;
+			const ids = busyIds(from, to);
 			out.push({ from, to, free: false, label: ids.length ? busyNames(ids, members, true) : 'Busy' });
 		};
-		for (const f of free) {
+		const good = [...free.map((f) => ({ ...f, most: false })), ...most.map((f) => ({ ...f, most: true }))].sort((a, b) => a.from - b.from);
+		for (const f of good) {
 			if (f.from > cursor) pushBusy(cursor, f.from);
+			if (f.most) {
+				out.push({ from: f.from, to: f.to, free: true, most: true, label: missingNote(busyIds(f.from, f.to), members) });
+				cursor = Math.max(cursor, f.to);
+				continue;
+			}
 			// A daily window that starts after the axis (e.g. 18:00) means "free from", never "all day".
 			const windowLate = range.from > axis.start;
 			const whole = !windowLate && f.from <= range.from && f.to >= range.to;
@@ -84,19 +102,20 @@
 		{#each dates as d (d)}
 			{@const day = days.get(d)}
 			{@const parts = day ? blocks(d, day) : []}
-			{@const free = parts.filter((b) => b.free)}
+			{@const free = parts.filter((b) => b.free && !b.most)}
+			{@const most = parts.filter((b) => b.most)}
 			{@const busy = parts.filter((b) => !b.free)}
 			<li>
 				<button type="button" class="card glass" class:on={d === selected} class:faded={!works(d)} aria-pressed={d === selected} onclick={() => onselect?.(d)}>
 					<span class="date" class:keep={d === today}><span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span></span>
 					<span class="info">
-						<span class="what" class:free={free.length > 0}>
-							{#if day === undefined}Loading…{:else if day === null}Outside the timing{:else}{free[0]?.label ?? "No time when everyone's free"}{/if}
+						<span class="what" class:free={free.length > 0 || most.length > 0}>
+							{#if day === undefined}Loading…{:else if day === null}Outside the timing{:else}{free[0]?.label ?? (most[0] ? `Most free · ${most[0].label}` : "No time when everyone's free")}{/if}
 						</span>
 						{#if busy.length}<span class="who">{busy[0].label} busy</span>{/if}
 						<span class="strip" aria-hidden="true">
-							{#each [...busy, ...free] as b (b.from + (b.free ? 'f' : 'b'))}
-								<i class:free={b.free} style:left="{pct(b.from, axis)}%" style:width="{pct(b.to, axis) - pct(b.from, axis)}%"></i>
+							{#each [...busy, ...most, ...free] as b (b.from + (b.most ? 'm' : b.free ? 'f' : 'b'))}
+								<i class:free={b.free} class:most={b.most} style:left="{pct(b.from, axis)}%" style:width="{pct(b.to, axis) - pct(b.from, axis)}%"></i>
 							{/each}
 						</span>
 					</span>
@@ -142,6 +161,7 @@
 							role="listitem"
 							class="block"
 							class:free={b.free}
+							class:most={b.most}
 							style:top="{pct(b.from, axis)}%"
 							style:height="{pct(b.to, axis) - pct(b.from, axis)}%"
 						>
@@ -229,6 +249,9 @@
 	}
 	.strip i.free {
 		background: var(--accent);
+	}
+	.strip i.most {
+		background: color-mix(in srgb, var(--accent) 40%, transparent);
 	}
 	.week {
 		display: flex;
@@ -322,6 +345,13 @@
 		opacity: 1;
 		border-color: transparent;
 		box-shadow: 0 12px 24px -16px var(--accent);
+	}
+	/* Free for enough of the group, not everyone: a soft accent block with an accent outline. */
+	.block.most {
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		border: 1.5px solid var(--accent);
+		box-shadow: none;
 	}
 	@media (min-width: 900px) {
 		.block {

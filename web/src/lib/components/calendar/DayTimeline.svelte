@@ -4,7 +4,10 @@
 	import { memberLabel } from '#lib/client/members';
 	import { clampToAxis, hourTicks, pct, spanText, type Axis } from './timeline';
 
-	/** Who's busy when on one day: an "Everyone" row of shared free time, then a row per member. */
+	/**
+	 * Who's busy when on one day: an "Everyone" row of shared free time, a "Most free" row when the
+	 * group has a quorum or optional members, then a row per member.
+	 */
 	interface Props {
 		day: DayAvailability;
 		members: Map<string, Member>;
@@ -22,6 +25,8 @@
 	const windowStart = $derived(day.window ? fmt.current.time(day.window.start) : null);
 
 	const free = $derived(day.everyoneFree.map((i) => clampToAxis(i, day.date, axis, tz)).filter((x) => x !== null));
+	// When enough of the group is free (includes when everyone is). Only with a quorum or optional members.
+	const most = $derived(day.mostFree ? day.mostFree.map((i) => clampToAxis(i, day.date, axis, tz)).filter((x) => x !== null) : null);
 	// You first, then synced members, then people who haven't synced.
 	const rows = $derived(
 		[...day.members]
@@ -54,6 +59,21 @@
 			{/each}
 		</div>
 
+		{#if most}
+			<span class="who most-who">Most free</span>
+			<div
+				class="track shared"
+				role="img"
+				aria-label={most.length ? `Most of the group free ${most.map((f) => spanText(f.from, f.to)).join(', ')}` : 'No time when most of the group is free'}
+			>
+				{#each most as f (f.from)}
+					<div class="free most" style={style(f.from, f.to)}><span>{spanText(f.from, f.to)}</span></div>
+				{:else}
+					<span class="none">No time when most are free</span>
+				{/each}
+			</div>
+		{/if}
+
 		{#each rows as m (m.userId)}
 			<span class="who">{m.name}</span>
 			<div
@@ -83,6 +103,7 @@
 		<span><i class="key free-key"></i>Free</span>
 		<span><i class="key busy-key"></i>Busy</span>
 		<span><i class="key all-key"></i>Everyone free</span>
+		{#if most}<span><i class="key most-key"></i>Most free</span>{/if}
 	</div>
 </div>
 
@@ -152,6 +173,16 @@
 		overflow: hidden;
 		white-space: nowrap;
 	}
+	/* Enough of the group free, not necessarily everyone: a lighter band. */
+	.free.most {
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		box-shadow: inset 0 0 0 1.5px var(--accent);
+	}
+	.most-who {
+		font-weight: 600;
+		color: var(--accent-ink);
+	}
 	.busy {
 		position: absolute;
 		top: 0;
@@ -209,6 +240,10 @@
 	}
 	.all-key {
 		background: var(--accent);
+	}
+	.most-key {
+		background: var(--accent-soft);
+		box-shadow: inset 0 0 0 1.5px var(--accent);
 	}
 	.timeline {
 		/* Someone's busy time: clearly darker than the mint free track. */

@@ -155,7 +155,7 @@
 		</p>
 	{/if}
 
-	<RequirementsEditor bind:requirement={draft} readonly={!admin} country={data.user.country} {regionLabel} />
+	<RequirementsEditor bind:requirement={draft} readonly={!admin} country={data.user.country} {regionLabel} members={data.group.members} meId={data.user.id} />
 	<!-- Anyone can keep a copy of a group's timing to reuse, admin or not. -->
 	<SaveTemplate requirement={draft} suggestion={data.group.name} />
 

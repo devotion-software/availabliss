@@ -8,6 +8,10 @@
 	import { blankDraft, draftFromRange, draftTimes, optional, type EventDraft } from '#lib/client/event-form';
 	import { useFormat } from '#lib/client/format';
 	import { toasts } from '#lib/client/toast.svelte';
+	import { ApiError } from '#lib/client/api';
+	import { getPlan } from '#lib/client/plan';
+	import { draftWithAi } from '#lib/client/planner';
+	import { upgradeSheet } from '#lib/client/ui-state.svelte';
 	import Sheet from '#lib/components/ui/Sheet.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import EventFields from './EventFields.svelte';
@@ -70,6 +74,43 @@
 	});
 	const clash = $derived(clashText(busyIds, memberMap(group), meId));
 
+	// "Draft with AI": only offered when the server has AI set up (like Plan with AI); Pro to use.
+	let ai = $state<{ available: boolean; included: boolean } | null>(null);
+	$effect(() => {
+		// Reload when the upgrade sheet closes too, so buying Pro unlocks it straight away.
+		if (!open || upgradeSheet.open) return;
+		let stale = false;
+		getPlan()
+			.then((p) => !stale && (ai = p.aiPlanner))
+			.catch(() => {});
+		return () => {
+			stale = true;
+		};
+	});
+	let drafting = $state(false);
+	async function aiDraft() {
+		if (!ai?.included) {
+			upgradeSheet.showFor('AI drafts are part of Pro: a title and message for the time you picked.');
+			return;
+		}
+		const times = draftTimes(draft, fmt.current.timeZone);
+		if ('error' in times) {
+			error = times.error;
+			return;
+		}
+		drafting = true;
+		try {
+			const result = await draftWithAi(groupId, times.start, times.end);
+			draft.title = result.title;
+			draft.note = result.note;
+		} catch (err) {
+			if (err instanceof ApiError && err.code === 'upgrade_required') upgradeSheet.showFor(err.message);
+			else toasts.error(err);
+		} finally {
+			drafting = false;
+		}
+	}
+
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
 		const times = draftTimes(draft, fmt.current.timeZone);
@@ -98,6 +139,11 @@
 
 <Sheet bind:open title="Propose a time" description="Everyone in the group gets asked. You accept automatically.">
 	<form class="form" onsubmit={submit} novalidate>
+		{#if ai?.available}
+			<div class="ai">
+				<Button variant="ghost" size="sm" icon="sparkle" loading={drafting} onclick={aiDraft}>Draft with AI</Button>
+			</div>
+		{/if}
 		<EventFields bind:draft {error} />
 		{#if clash}
 			<div class="clash" role="status">
@@ -114,6 +160,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
+	}
+	.ai {
+		display: flex;
+		justify-content: flex-end;
+		margin: -6px 0 -10px;
 	}
 	.clash {
 		display: flex;

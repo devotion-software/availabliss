@@ -5,13 +5,16 @@
 	interface Props {
 		columns: readonly Weekday[];
 		compact?: boolean;
+		/** Days only most of the group can make are showing. */
+		partial?: boolean;
 	}
-	let { columns, compact = false }: Props = $props();
+	let { columns, compact = false, partial = false }: Props = $props();
 	const daysLabel = $derived(summarizeDays(columns));
 </script>
 
 <div class="legend" class:compact>
 	<span class="item"><span class="key match"></span>Works for everyone</span>
+	{#if partial}<span class="item"><span class="key partial"></span>Most of us free</span>{/if}
 	<span class="item"><span class="key busy"></span>Someone's busy</span>
 	{#if columns.length < 7}
 		<span>{compact ? `${daysLabel} only` : `Showing ${daysLabel} only, the days this group's timing can use`}</span>
@@ -49,6 +52,10 @@
 	}
 	.match {
 		background: var(--accent);
+	}
+	.partial {
+		background: var(--accent-soft);
+		border: 1.5px solid var(--accent);
 	}
 	.busy {
 		background: var(--busy-bg);

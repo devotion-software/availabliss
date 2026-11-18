@@ -3,13 +3,14 @@
 	import type { Availability, AvailabilityDay, Member } from '#lib/types';
 	import { dayNumber, formatDayKey, useFormat, weekdayName } from '#lib/client/format';
 	import { WEEKDAY_NAMES, weekdayShort } from '#lib/client/requirements';
-	import { busyNames, dayMap, monthRows, slotOn, visibleColumns } from './grid';
+	import { busyNames, dayMap, missingNote, missingOn, monthRows, slotOn, visibleColumns } from './grid';
 	import CalendarLegend from './CalendarLegend.svelte';
 
 	/**
 	 * Month of group availability. Only the weekday columns the timing can use
 	 * are drawn; days that work for everyone are accent, multi-day slots join
-	 * into one band, busy days are faded.
+	 * into one band, busy days are faded. Days only most of the group can make
+	 * (`partial`, with a quorum or optional members) get a soft accent fill.
 	 */
 	interface Props {
 		availability: Availability;
@@ -29,6 +30,7 @@
 	const rows = $derived(monthRows(month, columns));
 	const days = $derived(dayMap(availability.days));
 	const today = $derived(fmt.current.today());
+	const anyPartial = $derived(availability.days.some((d) => d.status === 'match' && d.partial && d.date >= today));
 
 	let grid: HTMLElement | undefined = $state();
 
@@ -37,6 +39,7 @@
 		if (!day) return '';
 		if (day.status === 'match') {
 			const slot = slotOn(availability.slots, date, fmt.current.dayKey);
+			if (day.partial) return missingNote(missingOn(day, slot), members);
 			const starts = slot && fmt.current.dayKey(slot.start) === date ? fmt.current.time(slot.start) : null;
 			if (starts && starts !== '00:00') return compact ? starts : `Free from ${starts}`;
 			return compact ? 'all free' : 'Everyone free';
@@ -50,7 +53,10 @@
 		const parts = [`${weekdayName(date, 'long')} ${formatDayKey(date).split(' ').slice(1).join(' ')}`];
 		if (day?.preferredBy?.length) parts.push(`${busyNames(day.preferredBy, members)} ${day.preferredBy.length === 1 ? 'prefers' : 'prefer'} it`);
 		if (date === today) parts.push('today');
-		if (day?.status === 'match') parts.push('works for everyone');
+		if (day?.status === 'match' && day.partial) {
+			const ids = missingOn(day, slotOn(availability.slots, date, fmt.current.dayKey));
+			parts.push(ids.length ? `works for most of the group, ${busyNames(ids, members)} busy` : 'works for most of the group');
+		} else if (day?.status === 'match') parts.push('works for everyone');
 		else if (day?.status === 'busy') parts.push(day.busyMemberIds.length ? `${busyNames(day.busyMemberIds, members)} busy` : 'someone is busy');
 		else if (day?.status === 'free') parts.push('free, but not for the whole timing');
 		if (day?.holiday) parts.push(day.holiday);
@@ -96,6 +102,7 @@
 						type="button"
 						data-cell
 						class="cell {day.status} {day.slotPosition ?? ''}"
+						class:partial={day.status === 'match' && day.partial}
 						class:selected={selected === date}
 						class:today={date === today}
 						aria-pressed={selected === date}
@@ -115,7 +122,7 @@
 			{/each}
 		{/each}
 	</div>
-	{#if legend}<CalendarLegend {columns} {compact} />{/if}
+	{#if legend}<CalendarLegend {columns} {compact} partial={anyPartial} />{/if}
 </div>
 
 <style>
@@ -225,6 +232,13 @@
 		color: var(--on-accent);
 		box-shadow: 0 14px 28px -16px var(--accent);
 	}
+	/* Only most of the group is free: a soft accent fill and outline instead of the solid accent. */
+	.match.partial {
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		border: 1.5px solid var(--accent);
+		box-shadow: none;
+	}
 	/* Multi-day slots read as one band. */
 	.match.start {
 		border-radius: 18px 6px 6px 18px;
@@ -290,6 +304,13 @@
 	.selected:not(.match) {
 		border-color: var(--ink);
 		box-shadow: inset 0 0 0 1px var(--ink);
+	}
+	.today.match.partial .num {
+		background: var(--accent);
+		color: var(--on-accent);
+	}
+	.selected.match.partial {
+		box-shadow: inset 0 0 0 1.5px var(--accent-ink);
 	}
 	.selected.match {
 		box-shadow:

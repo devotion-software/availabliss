@@ -24,13 +24,16 @@
 		onproposeday?: (date: string) => void;
 	}
 	let { date, day, detail, slot, members, meId, noun, onpropose, onproposeday }: Props = $props();
-	// The first time everyone's free that day, offered when no whole slot fits.
-	const free = $derived(detail?.everyoneFree[0] ?? null);
+	// The first time everyone's free that day (else enough of the group, with a quorum), offered when no whole slot fits.
+	const free = $derived(detail?.everyoneFree[0] ?? detail?.mostFree?.[0] ?? null);
 
 	const fmt = useFormat();
 	// Past days look like days outside the timing: nothing to plan.
 	const past = $derived(date < fmt.current.today());
 	const works = $derived(!past && day?.status === 'match' && slot !== null);
+	/** Who's missing from the time that works (with a quorum or optional members). */
+	const missing = $derived(works ? (slot?.missingMemberIds ?? []) : []);
+	const partial = $derived(works && (day?.partial === true || missing.length > 0));
 	const title = $derived.by(() => {
 		const label = slot && works ? slot.label : formatDayKey(date);
 		return date === fmt.current.today() && !works ? `Today · ${label}` : label;
@@ -41,7 +44,9 @@
 		let text = '';
 		if (works && slot) {
 			const t = fmt.current.time(slot.start);
-			text = t === '00:00' ? 'Everyone synced is free' : `Everyone synced is free from ${fmt.current.startsAt(slot.start).replace('From ', '')}`;
+			const who = partial ? 'Most of the group is free' : 'Everyone synced is free';
+			text = t === '00:00' ? who : `${who} from ${fmt.current.startsAt(slot.start).replace('From ', '')}`;
+			if (missing.length) text += ` · ${busyNames(missing, members)} ${missing.length === 1 ? 'is' : 'are'} busy`;
 		} else if (day.status === 'busy') {
 			const n = day.busyMemberIds.length;
 			text = n ? `${busyNames(day.busyMemberIds, members)} ${n === 1 ? 'is' : 'are'} busy` : 'Someone is busy';
@@ -57,7 +62,7 @@
 			<h3>{title}</h3>
 			<span class="sub">{sub}</span>
 		</div>
-		<StatusPill tone={works ? 'mint' : 'neutral'}>{works ? 'Works' : past ? 'Past' : 'Doesn’t fit'}</StatusPill>
+		<StatusPill tone={partial ? 'indigo' : works ? 'mint' : 'neutral'}>{partial ? 'Most free' : works ? 'Works' : past ? 'Past' : 'Doesn’t fit'}</StatusPill>
 	</div>
 	{#if !past && works && day?.preferredBy?.length}
 		<p class="pref"><Icon name="heart" size={13} /> {busyNames(day.preferredBy, members)} {day.preferredBy.length === 1 ? 'prefers' : 'prefer'} this</p>

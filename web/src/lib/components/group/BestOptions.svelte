@@ -1,12 +1,19 @@
 <script lang="ts">
-	import type { Slot } from '#lib/types';
+	import type { Member, Slot } from '#lib/types';
 	import { useFormat } from '#lib/client/format';
+	import Icon from '#lib/components/ui/Icon.svelte';
+	import { fairLine, missingLine, rankSlots } from './best';
 	import Button from '#lib/components/ui/Button.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
 
-	/** The slots that work for everyone, each with a Propose button. */
+	/**
+	 * The slots that work (for everyone, or most of the group with a quorum), each with a Propose
+	 * button. With Pro scores, the top one is "Best for the group".
+	 */
 	interface Props {
 		slots: readonly Slot[];
+		/** For "Ana can't make it" and "Fair for Ana". */
+		members?: Map<string, Member>;
 		pendingCount: number;
 		onpropose: (slot: Slot) => void;
 		onselect?: (slot: Slot) => void;
@@ -14,18 +21,12 @@
 		onplan?: () => void;
 		max?: number;
 	}
-	let { slots, pendingCount, onpropose, onselect, onplan, max = 4 }: Props = $props();
+	let { slots, members = new Map(), pendingCount, onpropose, onselect, onplan, max = 4 }: Props = $props();
 
 	const fmt = useFormat();
-	// Times that fit more people's preferences first, then soonest.
-	const upcoming = $derived(
-		slots
-			.filter((s) => new Date(s.end) > new Date())
-			.map((s, i) => ({ s, i }))
-			.sort((a, b) => (b.s.preferredBy?.length ?? 0) - (a.s.preferredBy?.length ?? 0) || a.i - b.i)
-			.slice(0, max)
-			.map((x) => x.s)
-	);
+	// Fewer people missing first, then the best date score (Pro), then preferences, then soonest.
+	const upcoming = $derived(rankSlots(slots.filter((s) => new Date(s.end) > new Date())).slice(0, max));
+	const scored = $derived(upcoming.some((s) => s.score !== undefined));
 	const note = $derived(pendingCount ? 'Everyone synced is free' : 'Everyone is free');
 </script>
 
@@ -36,15 +37,21 @@
 			<Button variant="ghost" size="sm" icon="sparkle" onclick={onplan}>Plan with AI</Button>
 		{/if}
 	</div>
-	{#each upcoming as slot (slot.start)}
-		<div class="option">
+	{#each upcoming as slot, i (slot.start)}
+		{@const missing = missingLine(slot.missingMemberIds ?? [], members)}
+		{@const fair = fairLine(slot.fairFor, members)}
+		{@const best = scored && i === 0}
+		<div class="option" class:best>
 			<button type="button" class="when" onclick={() => onselect?.(slot)}>
+				{#if best}<span class="badge"><Icon name="sparkle" size={12} /> Best for the group</span>{/if}
 				<span class="label">{slot.label}</span>
 				<span class="note"
-					>{fmt.current.startsAt(slot.start) || note}{#if slot.preferredBy?.length}<span class="prefers">
+					>{fmt.current.startsAt(slot.start) || (missing ? 'Most of the group is free' : note)}{#if slot.preferredBy?.length}<span class="prefers">
 							· {slot.preferredBy.length} {slot.preferredBy.length === 1 ? 'prefers' : 'prefer'}</span
 						>{/if}</span
 				>
+				{#if missing}<span class="missing">{missing}</span>{/if}
+				{#if fair}<span class="fair">{fair}</span>{/if}
 			</button>
 			<Button variant="accent" size="sm" onclick={() => onpropose(slot)}>Propose</Button>
 		</div>
@@ -54,6 +61,28 @@
 </section>
 
 <style>
+	.best {
+		box-shadow: inset 0 0 0 1.5px var(--accent);
+	}
+	.badge {
+		align-self: flex-start;
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		margin-bottom: 2px;
+		font-size: 11px;
+		font-weight: 700;
+		color: var(--accent-ink);
+	}
+	.missing {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--warn-ink);
+	}
+	.fair {
+		font-size: 12px;
+		color: var(--accent-ink);
+	}
 	.prefers {
 		color: var(--accent-ink);
 		font-weight: 600;

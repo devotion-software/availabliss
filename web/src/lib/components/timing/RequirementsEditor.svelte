@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import type { Requirement, Weekday } from '#lib/types';
+	import type { Member, Requirement, Weekday } from '#lib/types';
 	import {
 		PRESETS,
 		WEEKDAY_NAMES,
@@ -16,6 +16,7 @@
 	import DayPicker from './DayPicker.svelte';
 	import CustomLength from './CustomLength.svelte';
 	import SettingRow from './SettingRow.svelte';
+	import WhoNeedsFree from './WhoNeedsFree.svelte';
 	import DateRangeChips from './DateRangeChips.svelte';
 	import Sheet from '#lib/components/ui/Sheet.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
@@ -29,8 +30,11 @@
 		/** The viewer's country, for bank holiday wording and school authorities. */
 		country: string | null;
 		regionLabel?: string;
+		/** The group's members, for "Who needs to be free" (left out where there's no group yet). */
+		members?: Member[];
+		meId?: string;
 	}
-	let { requirement = $bindable(), readonly = false, country, regionLabel }: Props = $props();
+	let { requirement = $bindable(), readonly = false, country, regionLabel, members, meId }: Props = $props();
 
 	const uid = $props.id();
 	const detected = $derived(presetOf(requirement));
@@ -202,6 +206,10 @@
 		<h2 class="eyebrow">Or only these dates</h2>
 		<DateRangeChips bind:ranges={requirement.dates} {readonly} start={requirement.range.from} emptyText="Any date in the search window." />
 	</section>
+
+	{#if members && members.length > 1}
+		<WhoNeedsFree bind:requirement {members} {meId} {readonly} />
+	{/if}
 </fieldset>
 
 <Sheet bind:open={pickingRange} title="Search between" placement="center" width={420}>
