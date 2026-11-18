@@ -18,6 +18,11 @@ struct MessageRow: View {
     var onReply: () -> Void = {}
     /// Tapped the quote above a reply (by the original's id).
     var openQuote: (String) -> Void = { _ in }
+    /// Tapped a photo / a file in the message.
+    var openImage: (Attachment) -> Void = { _ in }
+    var openFile: (Attachment) -> Void = { _ in }
+    /// The file being downloaded to open.
+    var openingFileId: String?
     /// Open the thread this message is part of (nil hides "View thread").
     var onOpenThread: (() -> Void)?
     /// In a thread: go to this message in the chat.
@@ -71,7 +76,7 @@ struct MessageRow: View {
                 }
             } else if isMine {
                 VStack(alignment: .trailing, spacing: 4) {
-                    MessageBubble(text: message.body ?? "", isMine: true, quote: quote, quoteHint: quoteHint, openQuote: openQuote)
+                    MessageBubble(text: message.text ?? "", isMine: true, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files, openImage: openImage, openFile: openFile, openingFileId: openingFileId)
                         .onTapGesture(perform: openInfo)
                         .contextMenu { menu }
                         .accessibilityAddTraits(.isButton)
@@ -87,7 +92,7 @@ struct MessageRow: View {
             } else {
                 IncomingRow(author: author, showsName: startsRun) {
                     VStack(alignment: .leading, spacing: 4) {
-                        MessageBubble(text: message.body ?? "", isMine: false, quote: quote, quoteHint: quoteHint, openQuote: openQuote)
+                        MessageBubble(text: message.text ?? "", isMine: false, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files, openImage: openImage, openFile: openFile, openingFileId: openingFileId)
                             .onTapGesture(perform: openInfo)
                             .contextMenu { menu }
                         if message.isEdited { EditedLabel() }
@@ -342,6 +347,11 @@ struct MessageBubble: View {
     var quote: MessageQuote?
     var quoteHint = "Shows the thread"
     var openQuote: (String) -> Void = { _ in }
+    /// Photos, GIFs and files, above the text (the caption).
+    var attachments: [Attachment] = []
+    var openImage: (Attachment) -> Void = { _ in }
+    var openFile: (Attachment) -> Void = { _ in }
+    var openingFileId: String?
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -358,11 +368,19 @@ struct MessageBubble: View {
                     .padding(.horizontal, -4)
                     .padding(.top, -2)
             }
-            Text(text)
-                .bodyFont(14)
-                .lineSpacing(2)
-                .foregroundStyle(isMine ? theme.onAccent : theme.ink)
-                .textSelection(.enabled)
+            if !attachments.isEmpty {
+                AttachmentGallery(attachments: attachments, isMine: isMine, openImage: openImage, openFile: openFile, loadingFileId: openingFileId)
+                    .padding(.horizontal, -8)
+                    .padding(.top, -5)
+                    .padding(.bottom, text.isEmpty ? -5 : 0)
+            }
+            if !text.isEmpty || attachments.isEmpty {
+                Text(text)
+                    .bodyFont(14)
+                    .lineSpacing(2)
+                    .foregroundStyle(isMine ? theme.onAccent : theme.ink)
+                    .textSelection(.enabled)
+            }
         }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)

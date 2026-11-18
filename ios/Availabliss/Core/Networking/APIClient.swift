@@ -39,6 +39,17 @@ final class APIClient: Sendable {
         }
     }
 
+    /// Like `send`, for uploads: reports how much of the body has gone (0…1) as it's sent.
+    func upload<Response>(_ endpoint: Endpoint<Response>, progress: @escaping @Sendable (Double) -> Void) async throws -> Response {
+        let request = try makeRequest(for: endpoint)
+        let (data, _) = try await perform(request, unauthorizedEndsSession: endpoint.unauthorizedEndsSession, session: .availablissUploads, delegate: UploadProgress(report: progress))
+        do {
+            return try JSONCoding.decoder.decode(Response.self, from: data)
+        } catch {
+            throw APIError.decoding(String(describing: error))
+        }
+    }
+
     /// Builds an authorised `URLRequest` for an arbitrary path (used by the SSE client).
     func authorizedRequest(path: String, mount: APIMount = .v1) throws -> URLRequest {
         try makeRequest(for: Endpoint<EmptyResponse>(.get, path, mount: mount))
@@ -87,11 +98,16 @@ final class APIClient: Sendable {
         return request
     }
 
-    private func perform(_ request: URLRequest, unauthorizedEndsSession: Bool) async throws -> (Data, HTTPURLResponse) {
+    private func perform(
+        _ request: URLRequest,
+        unauthorizedEndsSession: Bool,
+        session override: URLSession? = nil,
+        delegate: URLSessionTaskDelegate? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await (override ?? session).data(for: request, delegate: delegate)
         } catch {
             if error.isCancellation { throw APIError.cancelled }
             throw APIError.transport(error.localizedDescription)
@@ -126,4 +142,45 @@ extension URLSession {
         configuration.timeoutIntervalForResource = 60
         return URLSession(configuration: configuration)
     }()
+
+    /// For chat uploads (up to 25 MB): the same, but with time for a slow connection to send it.
+    static let availablissUploads: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.httpShouldSetCookies = false
+        configuration.timeoutIntervalForRequest = 60
+        configuration.waitsForConnectivity = false
+        configuration.timeoutIntervalForResource = 600
+        return URLSession(configuration: configuration)
+    }()
+}
+
+/// Passes an upload's progress on as it's sent.
+private final class UploadProgress: NSObject, URLSessionTaskDelegate, Sendable {
+    let report: @Sendable (Double) -> Void
+    init(report: @escaping @Sendable (Double) -> Void) { self.report = report }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+        guard totalBytesExpectedToSend > 0 else { return }
+        report(Double(totalBytesSent) / Double(totalBytesExpectedToSend))
+    }
+}
+
+/// A multipart/form-data body with one file.
+struct MultipartForm {
+    let body: Data
+    let contentType: String
+
+    init(file: Data, field: String, name: String, mime: String) {
+        let boundary = "availabliss-\(UUID().uuidString)"
+        // Quotes and line breaks would end the header early.
+        let safeName = name.replacingOccurrences(of: "\"", with: "'").components(separatedBy: .newlines).joined()
+        var body = Data()
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"\(field)\"; filename=\"\(safeName)\"\r\n".utf8))
+        body.append(Data("Content-Type: \(mime)\r\n\r\n".utf8))
+        body.append(file)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        self.body = body
+        contentType = "multipart/form-data; boundary=\(boundary)"
+    }
 }

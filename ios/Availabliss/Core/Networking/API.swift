@@ -225,6 +225,13 @@ enum API {
             .init(.post, "/polls/\(pollId.pathEncoded)/vote", body: VoteBody(optionIds: optionIds))
         }
         static func closePoll(pollId: String) -> Endpoint<Poll> { .init(.post, "/polls/\(pollId.pathEncoded)/close") }
+        /// Uploads one photo, GIF or file for the chat (multipart, field `file`); send its id with a message.
+        static func upload(groupId: String, data: Data, name: String, mime: String) -> Endpoint<Attachment> {
+            var endpoint = Endpoint<Attachment>(.post, "/groups/\(groupId.pathEncoded)/attachments", timeout: 120)
+            let form = MultipartForm(file: data, field: "file", name: name, mime: mime)
+            endpoint.rawBody = (form.body, form.contentType)
+            return endpoint
+        }
     }
 
     // MARK: Notifications & devices

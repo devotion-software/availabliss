@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 @MainActor
 @Observable
@@ -19,6 +20,9 @@ final class ChatViewModel {
     private var draftBeforeEdit = ""
     /// The message your next one replies to, shown above the composer.
     private(set) var replyingTo: Message?
+    /// Photos and files picked for the next message, uploading as soon as they're picked.
+    private(set) var uploads: [PendingUpload] = []
+    private var uploadTasks: [UUID: Task<Void, Never>] = [:]
 
     /// The thread open in its sheet: the first message of a chain of replies and every reply under it, oldest first.
     private(set) var thread: [Message] = []
@@ -91,23 +95,97 @@ final class ChatViewModel {
 
     // MARK: Sending
 
+    /// Whether Send can go: some text or an uploaded attachment, with nothing still uploading or failed.
+    var canSend: Bool {
+        if editing != nil { return true }
+        let hasText = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if uploads.isEmpty { return hasText }
+        return uploads.allSatisfy { $0.uploaded != nil }
+    }
+
     func send() async {
         if editing != nil { return await saveEdit() }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isSending else { return }
+        let attachments = uploads.compactMap(\.uploaded)
+        guard canSend, !isSending, !text.isEmpty || !attachments.isEmpty else { return }
         isSending = true
         defer { isSending = false }
         draft = ""
         let replying = replyingTo
         replyingTo = nil
+        let sent = uploads
+        uploads = []
         do {
-            let message = try await api.send(API.Chat.send(groupId: groupId, SendMessageBody(body: text, replyToId: replying?.id)))
+            let body = SendMessageBody(body: text.isEmpty ? nil : text, replyToId: replying?.id, attachmentIds: attachments.isEmpty ? nil : attachments.map(\.id))
+            let message = try await api.send(API.Chat.send(groupId: groupId, body))
             insert(message)
         } catch {
             draft = text
+            if uploads.isEmpty { uploads = sent }
             if replyingTo == nil { replyingTo = replying }
             self.error = error.userMessage
         }
+    }
+
+    // MARK: Attachments
+
+    /// Adds picked photos or files to the next message and starts uploading them (up to 10 in all).
+    func attach(_ picked: [(data: Data, name: String, mime: String, preview: UIImage?)]) {
+        let room = AttachmentFormat.maxPerMessage - uploads.count
+        if picked.count > room { error = "A message can have up to \(AttachmentFormat.maxPerMessage) photos and files." }
+        for item in picked.prefix(max(room, 0)) {
+            let limit = item.preview != nil ? AttachmentFormat.maxPhotoBytes : AttachmentFormat.maxFileBytes
+            guard item.data.count <= limit else {
+                error = item.preview != nil ? "Photos can be up to 15 MB." : "\(item.name) is too big: files can be up to 25 MB."
+                continue
+            }
+            let upload = PendingUpload(name: item.name, mime: item.mime, data: item.data, preview: item.preview)
+            uploads.append(upload)
+            start(upload)
+        }
+    }
+
+    func removeUpload(_ upload: PendingUpload) {
+        uploadTasks[upload.id]?.cancel()
+        uploadTasks[upload.id] = nil
+        uploads.removeAll { $0.id == upload.id }
+    }
+
+    func retryUpload(_ upload: PendingUpload) {
+        guard let index = uploads.firstIndex(where: { $0.id == upload.id }) else { return }
+        uploads[index].error = nil
+        uploads[index].progress = 0
+        start(uploads[index])
+    }
+
+    private func start(_ upload: PendingUpload) {
+        let api = self.api, groupId = self.groupId, id = upload.id
+        uploadTasks[id] = Task { [weak self] in
+            do {
+                let attachment = try await api.upload(API.Chat.upload(groupId: groupId, data: upload.data, name: upload.name, mime: upload.mime)) { fraction in
+                    Task { @MainActor in self?.setProgress(id, fraction) }
+                }
+                self?.finishUpload(id, attachment: attachment, error: nil)
+            } catch where error.isCancellation {
+            } catch {
+                self?.finishUpload(id, attachment: nil, error: error.userMessage)
+            }
+        }
+    }
+
+    private func setProgress(_ id: UUID, _ fraction: Double) {
+        guard let index = uploads.firstIndex(where: { $0.id == id }), uploads[index].isUploading else { return }
+        // Held just short of done until the server has answered.
+        uploads[index].progress = min(fraction, 0.95)
+    }
+
+    private func finishUpload(_ id: UUID, attachment: Attachment?, error: String?) {
+        uploadTasks[id] = nil
+        guard let index = uploads.firstIndex(where: { $0.id == id }) else { return }
+        uploads[index].progress = 1
+        uploads[index].uploaded = attachment
+        uploads[index].error = error
+        if let error { self.error = error }
     }
 
     // MARK: Replying
@@ -235,7 +313,7 @@ final class ChatViewModel {
         replyingTo = nil
         if editing == nil { draftBeforeEdit = draft }
         editing = message
-        draft = message.body ?? ""
+        draft = message.text ?? ""
     }
 
     func cancelEditing() {
@@ -248,8 +326,9 @@ final class ChatViewModel {
     private func saveEdit() async {
         guard let message = editing, !isSending else { return }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        guard text != message.body else { return cancelEditing() }
+        // With attachments the caption can be cleared.
+        guard !text.isEmpty || !message.files.isEmpty else { return }
+        guard text != (message.text ?? "") else { return cancelEditing() }
         isSending = true
         defer { isSending = false }
         do {
@@ -266,6 +345,8 @@ final class ChatViewModel {
             var deleted = message
             deleted.deleted = true
             deleted.body = nil
+            deleted.attachments = []
+            deleted.caption = nil
             replaceKeepingReceipt(deleted)
             if editing?.id == message.id { cancelEditing() }
             if replyingTo?.id == message.id { cancelReplying() }

@@ -1,4 +1,7 @@
+import PhotosUI
+import QuickLook
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Group chat: bubbles, proposal / event cards, polls, read receipts and the + composer.
 struct ChatView: View {
@@ -21,6 +24,20 @@ struct ChatView: View {
     @State private var unseenCount = 0
     /// A message to scroll to and flash ("Show in chat" from a thread).
     @State private var showRequest: String?
+    @State private var pickingPhotos = false
+    @State private var photoSelection: [PhotosPickerItem] = []
+    @State private var pickingFiles = false
+    /// A message's photos open full screen, at the one tapped.
+    @State private var viewing: ViewerTarget?
+    /// A downloaded file open in QuickLook.
+    @State private var previewFile: URL?
+    @State private var openingFileId: String?
+
+    struct ViewerTarget: Identifiable {
+        let attachments: [Attachment]
+        let selected: String
+        var id: String { selected }
+    }
 
     /// Scrolled back further than this, the jump-to-latest button shows.
     private static let jumpThreshold: CGFloat = 200
@@ -29,6 +46,8 @@ struct ChatView: View {
 
     enum ChatSheet: Identifiable {
         case poll, propose, event, info(Message)
+        /// Not sheets: the photo library and the file picker.
+        case photos, files
         /// The thread a message is part of (by the message's id).
         case thread(String)
         var id: String {
@@ -38,6 +57,8 @@ struct ChatView: View {
             case .propose: "propose"
             case .event: "event"
             case .info(let message): "info-\(message.id)"
+            case .photos: "photos"
+            case .files: "files"
             }
         }
     }
@@ -56,7 +77,11 @@ struct ChatView: View {
             if showsMenu {
                 ComposerMenu { choice in
                     showsMenu = false
-                    sheet = choice
+                    switch choice {
+                    case .photos: pickingPhotos = true
+                    case .files: pickingFiles = true
+                    default: sheet = choice
+                    }
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -70,10 +95,37 @@ struct ChatView: View {
                 ) { model.cancelReplying() }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            Composer(text: $model.draft, isMenuOpen: $showsMenu, isSending: model.isSending, editingId: model.editing?.id, replyingId: model.replyingTo?.id) {
+            if !model.uploads.isEmpty, model.editing == nil {
+                AttachmentTray(uploads: model.uploads, remove: model.removeUpload, retry: model.retryUpload)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            Composer(
+                text: $model.draft,
+                isMenuOpen: $showsMenu,
+                isSending: model.isSending,
+                editingId: model.editing?.id,
+                replyingId: model.replyingTo?.id,
+                placeholder: model.uploads.isEmpty || model.editing != nil ? "Message the group" : "Add a caption",
+                canSend: model.canSend,
+                allowsEmpty: !(model.editing?.files.isEmpty ?? true)
+            ) {
                 Task { await model.send() }
             }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.uploads.map(\.id))
+        .photosPicker(isPresented: $pickingPhotos, selection: $photoSelection, maxSelectionCount: AttachmentFormat.maxPerMessage, matching: .images, preferredItemEncoding: .current)
+        .onChange(of: photoSelection) { _, items in
+            guard !items.isEmpty else { return }
+            photoSelection = []
+            Task { await attachPhotos(items) }
+        }
+        .fileImporter(isPresented: $pickingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { attachFiles(urls) }
+        }
+        .fullScreenCover(item: $viewing) { target in
+            AttachmentViewer(attachments: target.attachments, selection: target.selected)
+        }
+        .quickLookPreview($previewFile)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.editing?.id)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.replyingTo?.id)
         .confirmSheet(item: $pendingDelete) { _ in
@@ -131,6 +183,9 @@ struct ChatView: View {
                             onDelete: { pendingDelete = message },
                             onReply: { reply(to: message) },
                             openQuote: { _ in openThread(message.id) },
+                            openImage: { attachment in openImage(attachment, in: message) },
+                            openFile: { attachment in Task { await openFile(attachment) } },
+                            openingFileId: openingFileId,
                             onOpenThread: message.replyTo != nil || repliedTo.contains(message.id) ? { openThread(message.id) } : nil
                         )
                         .modifier(SwipeToReply(isEnabled: message.canReply) { reply(to: message) })
@@ -197,6 +252,53 @@ struct ChatView: View {
         }
     }
 
+    private func openImage(_ attachment: Attachment, in message: Message) {
+        viewing = ViewerTarget(attachments: message.files.filter(\.isVisual), selected: attachment.id)
+    }
+
+    /// Downloads a file and opens it in QuickLook (which can share or save it too).
+    private func openFile(_ attachment: Attachment) async {
+        guard openingFileId == nil else { return }
+        openingFileId = attachment.id
+        defer { openingFileId = nil }
+        do {
+            previewFile = try await AttachmentFiles.download(attachment)
+        } catch {
+            model.error = "Couldn't open \(attachment.name). Check your connection and try again."
+        }
+    }
+
+    /// Loads picked photos (GIFs as they are, others as JPEG where needed) and starts uploading them.
+    private func attachPhotos(_ items: [PhotosPickerItem]) async {
+        var picked: [(data: Data, name: String, mime: String, preview: UIImage?)] = []
+        var failed = 0
+        for item in items {
+            let type = item.supportedContentTypes.first { $0.conforms(to: .gif) } ?? item.supportedContentTypes.first
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let photo = await Task.detached(priority: .userInitiated, operation: { AttachmentFormat.photo(data: data, type: type) }).value
+            else { failed += 1; continue }
+            picked.append(photo)
+        }
+        model.attach(picked)
+        if failed > 0 { model.error = failed == 1 ? "One photo couldn't be loaded." : "\(failed) photos couldn't be loaded." }
+    }
+
+    /// Reads picked files and starts uploading them (the server says which types it takes).
+    private func attachFiles(_ urls: [URL]) {
+        var picked: [(data: Data, name: String, mime: String, preview: UIImage?)] = []
+        for url in urls {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url) else {
+                model.error = "\(url.lastPathComponent) couldn't be read. Folders and packages can't be sent: zip them first."
+                continue
+            }
+            let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+            picked.append((data, url.lastPathComponent, mime, nil))
+        }
+        model.attach(picked)
+    }
+
     private func openThread(_ messageId: String) {
         showsMenu = false
         sheet = .thread(messageId)
@@ -238,6 +340,8 @@ struct ChatView: View {
             EventEditorSheet(groupId: group.id, target: .new, api: detail.api) { _ in }
         case .info(let message):
             MessageInfoSheet(message: message, group: group, me: app.session.user?.id, model: model)
+        case .photos, .files:
+            EmptyView()
         case .thread(let id):
             ThreadSheet(focusId: id, group: group, me: me, model: model) { target in
                 self.sheet = nil
@@ -355,16 +459,22 @@ struct ReplyingStrip: View {
     }
 }
 
-/// The three big buttons above the composer.
+/// The big buttons above the composer: Photos and Files, then Poll, Propose a time and Add event.
 private struct ComposerMenu: View {
     let choose: (ChatView.ChatSheet) -> Void
     @Environment(\.theme) private var theme
 
     var body: some View {
-        HStack(spacing: 6) {
-            item("Poll", "chart.bar") { choose(.poll) }
-            item("Propose a time", "checkmark.circle") { choose(.propose) }
-            item("Add event", "calendar.badge.plus") { choose(.event) }
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                item("Photos", "photo.on.rectangle") { choose(.photos) }
+                item("Files", "paperclip") { choose(.files) }
+            }
+            HStack(spacing: 6) {
+                item("Poll", "chart.bar") { choose(.poll) }
+                item("Propose a time", "checkmark.circle") { choose(.propose) }
+                item("Add event", "calendar.badge.plus") { choose(.event) }
+            }
         }
         .padding(8)
         .glass(cornerRadius: 22)
@@ -397,6 +507,10 @@ struct Composer: View {
     /// Off in a thread, where there's only text.
     var showsMenu = true
     var placeholder = "Message the group"
+    /// Overrides the usual "has text" rule (e.g. photos with no caption); nil keeps it.
+    var canSend: Bool?
+    /// Saving an edit with no text is allowed (a caption being removed).
+    var allowsEmpty = false
     let send: () -> Void
     @Environment(\.theme) private var theme
     @FocusState private var isFocused: Bool
@@ -415,7 +529,7 @@ struct Composer: View {
                         .background(Circle().fill(isMenuOpen ? theme.solid : theme.surface))
                 }
                 .buttonStyle(.pressable)
-                .accessibilityLabel("Add poll, proposal or event")
+                .accessibilityLabel("Attach photos or files, or add a poll, proposal or event")
                 .accessibilityValue(isMenuOpen ? "Expanded" : "Collapsed")
             }
 
@@ -440,7 +554,7 @@ struct Composer: View {
                     .background(Circle().fill(theme.accent))
             }
             .buttonStyle(.pressable)
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
+            .disabled(!(canSend ?? !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || (editingId != nil && !allowsEmpty && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || isSending)
             .accessibilityLabel(editingId == nil ? "Send" : "Save")
         }
         .padding(6)

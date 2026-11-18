@@ -1,3 +1,4 @@
+import QuickLook
 import SwiftUI
 
 /// A thread: the first message of a chain of replies and every reply under it, oldest first, with
@@ -16,6 +17,9 @@ struct ThreadSheet: View {
     @State private var highlightedId: String?
     /// The message whose Reply / Show in chat options are showing.
     @State private var actionsFor: Message?
+    @State private var viewing: ChatView.ViewerTarget?
+    @State private var previewFile: URL?
+    @State private var openingFileId: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,6 +52,10 @@ struct ThreadSheet: View {
         .presentationBackground(theme.bg)
         .presentationDragIndicator(.hidden)
         .task { await model.openThread(for: focusId) }
+        .fullScreenCover(item: $viewing) { target in
+            AttachmentViewer(attachments: target.attachments, selection: target.selected)
+        }
+        .quickLookPreview($previewFile)
         .onDisappear { model.closeThread() }
         .confirmSheet(item: $actionsFor) { message in
             ReplyNames.name(of: message.authorId, fallback: nil, group: group, me: me) == "You" ? "Your message" : "\(ReplyNames.name(of: message.authorId, fallback: nil, group: group, me: me))\u{2019}s message"
@@ -109,6 +117,9 @@ struct ThreadSheet: View {
                             openProposal: { _ in },
                             onReply: { model.replyInThread(to: message) },
                             openQuote: { id in highlight(id, proxy: proxy) },
+                            openImage: { attachment in viewing = ChatView.ViewerTarget(attachments: message.files.filter(\.isVisual), selected: attachment.id) },
+                            openFile: { attachment in Task { await openFile(attachment) } },
+                            openingFileId: openingFileId,
                             onShowInChat: { showInChat(message.id) },
                             showsInfo: false,
                             tapHint: "Shows reply and show in chat",
@@ -167,6 +178,17 @@ struct ThreadSheet: View {
     }
 
     /// First message in a run from the same person on the same day, so it shows their name.
+    private func openFile(_ attachment: Attachment) async {
+        guard openingFileId == nil else { return }
+        openingFileId = attachment.id
+        defer { openingFileId = nil }
+        do {
+            previewFile = try await AttachmentFiles.download(attachment)
+        } catch {
+            model.threadError = "Couldn't open \(attachment.name). Check your connection and try again."
+        }
+    }
+
     private func startsRun(at index: Int) -> Bool {
         guard index > 0 else { return true }
         let previous = model.thread[index - 1], message = model.thread[index]

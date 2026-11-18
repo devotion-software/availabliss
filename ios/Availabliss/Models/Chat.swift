@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 struct Message: Codable, Sendable, Identifiable, Equatable {
     enum Kind: String, Codable, Sendable { case text, poll, proposal, event, system }
@@ -27,8 +28,15 @@ struct Message: Codable, Sendable, Identifiable, Equatable {
     var receipt: Receipt?
     /// The message this one replies to, as it is now.
     var replyTo: ReplyPreview?
+    /// Photos, GIFs and files sent with it, in order (missing from older servers).
+    var attachments: [Attachment]?
+    /// With attachments: the caption, or nil. (`body` then holds a summary such as "📷 Photo" for older apps.)
+    var caption: String?
 
     var isDeleted: Bool { deleted == true }
+    var files: [Attachment] { isDeleted ? [] : attachments ?? [] }
+    /// The text to show in its bubble: the caption when it has attachments, else the body.
+    var text: String? { files.isEmpty ? body : caption }
     var isEdited: Bool { editedAt != nil && !isDeleted }
 
     /// A quoted message above a reply: who sent it and one line of it.
@@ -58,9 +66,47 @@ struct Message: Codable, Sendable, Identifiable, Equatable {
 
     /// This message as a quote, e.g. for "Replying to …" and to refresh replies after it changes.
     func asReplyPreview(authorName: String?) -> ReplyPreview {
-        let raw = kind == .poll ? poll?.question : body
+        let caption = text.flatMap { $0.isEmpty ? nil : $0 }
+        let raw = kind == .poll ? poll?.question : files.isEmpty ? body : caption ?? Attachment.summary(files)
         let text = raw.map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
         return ReplyPreview(id: id, authorId: authorId, authorName: authorName, kind: kind, text: isDeleted ? nil : text, deleted: isDeleted)
+    }
+}
+
+/// A photo, GIF or file in a chat message. `url` / `thumbnailUrl` are signed links: no auth header needed.
+struct Attachment: Codable, Sendable, Identifiable, Equatable, Hashable {
+    enum Kind: String, Codable, Sendable {
+        case image, gif, file
+        /// A kind this version doesn't know is shown as a file.
+        init(from decoder: Decoder) throws {
+            self = Kind(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .file
+        }
+    }
+
+    let id: String
+    let kind: Kind
+    let name: String
+    let mime: String
+    let size: Int
+    let width: Int?
+    let height: Int?
+    let url: String
+    let thumbnailUrl: String?
+
+    var isVisual: Bool { kind != .file }
+    /// Width over height, when known.
+    var aspectRatio: CGFloat? {
+        guard let width, let height, width > 0, height > 0 else { return nil }
+        return CGFloat(width) / CGFloat(height)
+    }
+
+    /// "Photo", "GIF", "3 photos", "Plan.pdf", "2 files", "2 attachments".
+    static func summary(_ list: [Attachment]) -> String {
+        guard let first = list.first else { return "" }
+        if list.count == 1 { return first.kind == .gif ? "GIF" : first.kind == .image ? "Photo" : first.name }
+        let files = list.filter { $0.kind == .file }.count
+        if files == 0 { return "\(list.count) photos" }
+        return files == list.count ? "\(list.count) files" : "\(list.count) attachments"
     }
 }
 
@@ -119,6 +165,8 @@ struct SendMessageBody: Encodable, Sendable {
     var poll: NewPoll?
     /// The message this one replies to (text only).
     var replyToId: String?
+    /// Uploaded photos and files to send, in order (`body` is then an optional caption).
+    var attachmentIds: [String]?
 }
 
 struct ReceiptBody: Encodable, Sendable {
