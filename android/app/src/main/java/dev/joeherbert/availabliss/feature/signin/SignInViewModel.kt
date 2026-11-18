@@ -6,17 +6,17 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.auth.AuthRepository
 import dev.joeherbert.availabliss.core.auth.SignInResult
+import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.deeplink.DeepLink
 import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
 import dev.joeherbert.availabliss.core.network.ApiResult
+import dev.joeherbert.availabliss.core.network.getOrNull
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import dev.joeherbert.availabliss.core.data.GroupsRepository
-import dev.joeherbert.availabliss.core.network.getOrNull
 import javax.inject.Inject
 
 enum class SignInStep { Email, Code }

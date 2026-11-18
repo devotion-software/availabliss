@@ -41,13 +41,23 @@ class WidgetSnapshotsTest {
         LocalDateTime.of(year, month, day, hour, minute).atZone(zone).toInstant()
 
     private fun myPlan(id: String, start: Instant, end: Instant, allDay: Boolean = false, proposalId: String? = "p-$id") = MyPlan(
-        id = id, groupId = "g-$id", proposalId = proposalId, title = "Plan $id",
-        start = DateTimes.toIso(start), end = DateTimes.toIso(end), allDay = allDay, groupName = "Group $id",
+        id = id,
+        groupId = "g-$id",
+        proposalId = proposalId,
+        title = "Plan $id",
+        start = DateTimes.toIso(start),
+        end = DateTimes.toIso(end),
+        allDay = allDay,
+        groupName = "Group $id",
     )
 
     private fun widgetPlan(start: Instant, end: Instant, allDay: Boolean = false) = WidgetPlan(
-        title = "Dinner", groupName = "Book club", groupId = "g1",
-        start = DateTimes.toIso(start), end = DateTimes.toIso(end), allDay = allDay,
+        title = "Dinner",
+        groupName = "Book club",
+        groupId = "g1",
+        start = DateTimes.toIso(start),
+        end = DateTimes.toIso(end),
+        allDay = allDay,
     )
 
     private fun group(id: String, status: GroupStatus, archived: Boolean = false) = GroupSummary(

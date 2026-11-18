@@ -158,7 +158,11 @@ private fun PlanRow(row: MyPlanRowUi, onClick: () -> Unit, quiet: Boolean = fals
             .alpha(if (quiet) 0.65f else 1f)
             .semantics(mergeDescendants = true) {
                 contentDescription = listOfNotNull(
-                    row.title, "${row.day} ${row.month}", row.time, row.groupName, row.pill,
+                    row.title,
+                    "${row.day} ${row.month}",
+                    row.time,
+                    row.groupName,
+                    row.pill,
                     if (row.inCalendar) "In your calendar" else null,
                 ).joinToString(", ")
             },
@@ -204,7 +208,10 @@ private fun MyPlansPreview() {
                 ),
             ),
             snackbar = SnackbarHostState(),
-            onBack = {}, onOpen = {}, onAddAll = {}, onRetry = {},
+            onBack = {},
+            onOpen = {},
+            onAddAll = {},
+            onRetry = {},
         )
     }
 }

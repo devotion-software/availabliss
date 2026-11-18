@@ -2,22 +2,21 @@ package dev.joeherbert.availabliss.feature.events
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
@@ -35,11 +35,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.TimeRangeDraft
-import dev.joeherbert.availabliss.designsystem.component.DateRangeInput
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.CoverPhoto
+import dev.joeherbert.availabliss.designsystem.component.DateRangeInput
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
@@ -148,7 +148,10 @@ private fun EventEditorContent(state: EventEditorUiState, actions: EventEditorAc
         }
     }
     if (confirmDelete) {
-        DeleteEventDialog(state.title, onConfirm = { confirmDelete = false; actions.onDelete() }, onDismiss = { confirmDelete = false })
+        DeleteEventDialog(state.title, onConfirm = {
+            confirmDelete = false
+            actions.onDelete()
+        }, onDismiss = { confirmDelete = false })
     }
 }
 

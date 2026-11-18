@@ -154,4 +154,3 @@ class ActivityViewModel @Inject constructor(
         ),
     )
 }
-

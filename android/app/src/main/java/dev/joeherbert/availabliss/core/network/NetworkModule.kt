@@ -30,7 +30,6 @@ object NetworkModule {
     private const val PLANNER_DRAFT_PATH_SUFFIX = "/planner/draft"
     private const val PLANNER_TIMEOUT_SECONDS = 90
 
-
     /**
      * Shared JSON config. `encodeDefaults = false` omits optional request fields left at
      * their default (`= null`), while `explicitNulls = true` still sends nulls for

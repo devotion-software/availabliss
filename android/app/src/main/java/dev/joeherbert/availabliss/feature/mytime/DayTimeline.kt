@@ -33,7 +33,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import dev.joeherbert.availabliss.designsystem.component.dashedBorder
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -60,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.BusyInterval
 import dev.joeherbert.availabliss.core.network.model.BusySource
+import dev.joeherbert.availabliss.designsystem.component.dashedBorder
 import dev.joeherbert.availabliss.designsystem.component.stripes
 import dev.joeherbert.availabliss.designsystem.theme.AvWeights
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
@@ -159,7 +159,12 @@ fun AllDayChip(interval: BusyInterval, day: LocalDate, modifier: Modifier = Modi
             .padding(horizontal = 12.dp, vertical = 9.dp)
             .clearAndSetSemantics {
                 contentDescription = "${interval.describe()}, all day ${DateTimes.longDay(day)}"
-                onClick?.let { open -> onClick(label = interval.clickLabel) { open(interval); true } }
+                onClick?.let { open ->
+                    onClick(label = interval.clickLabel) {
+                        open(interval)
+                        true
+                    }
+                }
             },
     )
 }
@@ -270,7 +275,10 @@ private fun IntervalBox(p: PlacedInterval, compact: Boolean, showText: Boolean, 
             .padding(start = if (manual) 5.dp else 6.dp, end = 4.dp, top = 3.dp, bottom = 3.dp)
             .clearAndSetSemantics {
                 contentDescription = "${p.interval.describe()}, ${DateTimes.longDay(p.day)} ${clock(p.from)} to ${clock(p.to)}"
-                if (onClick != null) onClick(label = p.interval.clickLabel) { onClick(); true }
+                if (onClick != null) onClick(label = p.interval.clickLabel) {
+                    onClick()
+                    true
+                }
             },
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {

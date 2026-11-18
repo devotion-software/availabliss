@@ -1,54 +1,80 @@
 package dev.joeherbert.availabliss.feature.chat
 
-import androidx.compose.runtime.remember
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
-import dev.joeherbert.availabliss.designsystem.component.chat.MAX_ATTACHMENTS
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.clickable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.network.model.MessageLocation
 import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
-import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
+import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
+import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import dev.joeherbert.availabliss.designsystem.component.GroupTile
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
@@ -58,26 +84,13 @@ import dev.joeherbert.availabliss.designsystem.component.chat.BubbleAction
 import dev.joeherbert.availabliss.designsystem.component.chat.ChatComposer
 import dev.joeherbert.availabliss.designsystem.component.chat.ChatMeta
 import dev.joeherbert.availabliss.designsystem.component.chat.ConfirmedBanner
+import dev.joeherbert.availabliss.designsystem.component.chat.MAX_ATTACHMENTS
 import dev.joeherbert.availabliss.designsystem.component.chat.MessageBubble
 import dev.joeherbert.availabliss.designsystem.component.chat.PollCard
-import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCard
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardUi
 import dev.joeherbert.availabliss.designsystem.component.chat.ReadReceipt
 import dev.joeherbert.availabliss.designsystem.component.chat.SwipeToReply
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
@@ -86,27 +99,14 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.feature.common.AddToCalendarButton
-import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
-import androidx.compose.ui.zIndex
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.style.TextAlign
-import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
+import dev.joeherbert.availabliss.feature.common.AddToCalendarState
+import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Everything the chat UI can ask for. */
@@ -475,36 +475,36 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
     }
 
     Box(Modifier.fillMaxSize()) {
-    LazyColumn(
-        state = listState,
-        reverseLayout = true,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
-    ) {
-        items(state.items, key = { it.key }, contentType = { it::class }) { item ->
-            val flash by animateColorAsState(
-                if (highlighted != null && highlighted == item.key) AvailablissTheme.colors.accentSoft else Color.Transparent,
-                animationSpec = tween(if (highlighted == item.key) 200 else 600),
-                label = "quote-highlight",
-            )
-            Box(Modifier.drawBehind { drawRoundRect(flash, topLeft = Offset(-6.dp.toPx(), -6.dp.toPx()), size = Size(size.width + 12.dp.toPx(), size.height + 12.dp.toPx()), cornerRadius = CornerRadius(18.dp.toPx())) }) {
-                ChatRow(item, actions, state.calendar, actions.onOpenThread, downloads = state.downloads)
+        LazyColumn(
+            state = listState,
+            reverseLayout = true,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
+        ) {
+            items(state.items, key = { it.key }, contentType = { it::class }) { item ->
+                val flash by animateColorAsState(
+                    if (highlighted != null && highlighted == item.key) AvailablissTheme.colors.accentSoft else Color.Transparent,
+                    animationSpec = tween(if (highlighted == item.key) 200 else 600),
+                    label = "quote-highlight",
+                )
+                Box(Modifier.drawBehind { drawRoundRect(flash, topLeft = Offset(-6.dp.toPx(), -6.dp.toPx()), size = Size(size.width + 12.dp.toPx(), size.height + 12.dp.toPx()), cornerRadius = CornerRadius(18.dp.toPx())) }) {
+                    ChatRow(item, actions, state.calendar, actions.onOpenThread, downloads = state.downloads)
+                }
+            }
+            if (state.loadingOlder) item(key = "loading-older") { LoadingIndicator() }
+        }
+        AnimatedVisibility(
+            visible = scrolledBack,
+            enter = fadeIn() + scaleIn(initialScale = 0.6f),
+            exit = fadeOut() + scaleOut(targetScale = 0.6f),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 14.dp, bottom = 8.dp),
+        ) {
+            JumpToLatestButton(unseen) {
+                unseen = 0
+                scope.launch { listState.animateScrollToItem(0) }
             }
         }
-        if (state.loadingOlder) item(key = "loading-older") { LoadingIndicator() }
-    }
-    AnimatedVisibility(
-        visible = scrolledBack,
-        enter = fadeIn() + scaleIn(initialScale = 0.6f),
-        exit = fadeOut() + scaleOut(targetScale = 0.6f),
-        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 14.dp, bottom = 8.dp),
-    ) {
-        JumpToLatestButton(unseen) {
-            unseen = 0
-            scope.launch { listState.animateScrollToItem(0) }
-        }
-    }
     }
 }
 
@@ -559,33 +559,35 @@ internal fun ChatRow(
     when (item) {
         is ChatItem.Day -> ChatMeta(item.label)
         is ChatItem.System -> ChatMeta(item.text)
-        is ChatItem.Text -> SwipeToReply(enabled = item.canReply, onReply = { actions.onReply(item.id) }) { MessageBubble(
-            text = item.text,
-            own = item.own,
-            author = item.author,
-            showAvatar = item.showAvatar,
-            authorName = item.authorName,
-            onClick = if (item.deleted) null else ({ actions.onOpenInfo(item.id) }),
-            accessibilityLabel = item.accessibilityLabel,
-            edited = item.edited,
-            deleted = item.deleted,
-            menuActions = remember(item.id, item.canEdit, item.canReply, item.inThread, actions) {
-                listOfNotNull(
-                    BubbleAction("Reply") { actions.onReply(item.id) }.takeIf { item.canReply },
-                    BubbleAction("View thread") { actions.onOpenThread(item.id) }.takeIf { item.inThread },
-                    actions.onShowInChat?.let { show -> BubbleAction("Show in chat") { show(item.id) } },
-                    BubbleAction("Edit") { actions.onEditMessage(item.id) }.takeIf { item.canEdit },
-                    BubbleAction("Delete", destructive = true) { actions.onDeleteMessage(item.id) }.takeIf { item.canEdit },
-                )
-            },
-            quote = item.quote,
-            onQuoteClick = { quotedId -> onQuoteClick(if (quoteOpensThread) item.id else quotedId) },
-            attachments = item.attachments,
-            onOpenAttachment = { attachmentId -> actions.onOpenAttachment(item.id, attachmentId) },
-            downloads = if (item.attachments.isEmpty()) emptyMap() else downloads,
-            location = item.location,
-            onOpenLocation = { item.location?.let(actions.onOpenLocation) },
-        ) }
+        is ChatItem.Text -> SwipeToReply(enabled = item.canReply, onReply = { actions.onReply(item.id) }) {
+            MessageBubble(
+                text = item.text,
+                own = item.own,
+                author = item.author,
+                showAvatar = item.showAvatar,
+                authorName = item.authorName,
+                onClick = if (item.deleted) null else ({ actions.onOpenInfo(item.id) }),
+                accessibilityLabel = item.accessibilityLabel,
+                edited = item.edited,
+                deleted = item.deleted,
+                menuActions = remember(item.id, item.canEdit, item.canReply, item.inThread, actions) {
+                    listOfNotNull(
+                        BubbleAction("Reply") { actions.onReply(item.id) }.takeIf { item.canReply },
+                        BubbleAction("View thread") { actions.onOpenThread(item.id) }.takeIf { item.inThread },
+                        actions.onShowInChat?.let { show -> BubbleAction("Show in chat") { show(item.id) } },
+                        BubbleAction("Edit") { actions.onEditMessage(item.id) }.takeIf { item.canEdit },
+                        BubbleAction("Delete", destructive = true) { actions.onDeleteMessage(item.id) }.takeIf { item.canEdit },
+                    )
+                },
+                quote = item.quote,
+                onQuoteClick = { quotedId -> onQuoteClick(if (quoteOpensThread) item.id else quotedId) },
+                attachments = item.attachments,
+                onOpenAttachment = { attachmentId -> actions.onOpenAttachment(item.id, attachmentId) },
+                downloads = if (item.attachments.isEmpty()) emptyMap() else downloads,
+                location = item.location,
+                onOpenLocation = { item.location?.let(actions.onOpenLocation) },
+            )
+        }
         is ChatItem.ProposalCard -> ProposalCard(
             ui = item.card ?: ProposalCardUi("", "", "Proposed a time", "Loading…", ""),
             onClick = { actions.onOpenProposal(item.proposalId) },

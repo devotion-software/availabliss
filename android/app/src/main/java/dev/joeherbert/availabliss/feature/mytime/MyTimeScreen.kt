@@ -237,7 +237,10 @@ private fun ViewSwitch(mode: MyTimeMode, onSwitch: () -> Unit) {
             .clearAndSetSemantics {
                 contentDescription = description
                 role = Role.Button
-                onClick { onSwitch(); true }
+                onClick {
+                    onSwitch()
+                    true
+                }
             }
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,

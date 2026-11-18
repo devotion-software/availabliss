@@ -6,9 +6,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.data.GroupsRepository
-import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
-import dev.joeherbert.availabliss.core.deeplink.DeepLink
 import dev.joeherbert.availabliss.core.data.UserRepository
+import dev.joeherbert.availabliss.core.deeplink.DeepLink
+import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
 import dev.joeherbert.availabliss.core.network.ApiError
 import dev.joeherbert.availabliss.core.network.ApiResult
 import kotlinx.coroutines.flow.MutableStateFlow

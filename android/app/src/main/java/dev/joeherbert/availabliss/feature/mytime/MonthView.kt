@@ -74,8 +74,14 @@ internal fun MonthView(state: MyTimeUiState, scroll: ScrollState, actions: MyTim
         top()
         // Which way the next month slides in: forward (later) comes from the right.
         var forward by remember { mutableStateOf(true) }
-        val previous = { forward = false; actions.onPreviousMonth() }
-        val next = { forward = true; actions.onNextMonth() }
+        val previous = {
+            forward = false
+            actions.onPreviousMonth()
+        }
+        val next = {
+            forward = true
+            actions.onNextMonth()
+        }
         val thisMonth = YearMonth.from(state.today)
         MonthHeading(
             month = state.month,
@@ -84,7 +90,10 @@ internal fun MonthView(state: MyTimeUiState, scroll: ScrollState, actions: MyTim
             awayFromToday = state.month != thisMonth,
             onPrevious = previous,
             onNext = next,
-            onToday = { forward = thisMonth > state.month; actions.onThisMonth() },
+            onToday = {
+                forward = thisMonth > state.month
+                actions.onThisMonth()
+            },
         )
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             WeekdayHeader()
@@ -219,7 +228,10 @@ private fun HeatCell(cell: MonthDayUi, onClick: () -> Unit, modifier: Modifier =
                 contentDescription = cell.accessibility
                 if (!cell.past) {
                     role = Role.Button
-                    onClick(label = "See the day") { onClick(); true }
+                    onClick(label = "See the day") {
+                        onClick()
+                        true
+                    }
                 }
             },
         contentAlignment = Alignment.Center,

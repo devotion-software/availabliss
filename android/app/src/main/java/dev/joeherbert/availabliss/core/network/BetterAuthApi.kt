@@ -1,13 +1,13 @@
 package dev.joeherbert.availabliss.core.network
 
 import dev.joeherbert.availabliss.core.network.model.EmailOtpSignInRequest
+import dev.joeherbert.availabliss.core.network.model.NativeSignInCodeRequest
+import dev.joeherbert.availabliss.core.network.model.NativeSignInTokenResponse
 import dev.joeherbert.availabliss.core.network.model.PasskeyRegisterRequest
 import dev.joeherbert.availabliss.core.network.model.PasskeyVerifyRequest
 import dev.joeherbert.availabliss.core.network.model.SendOtpRequest
 import dev.joeherbert.availabliss.core.network.model.SignInResponse
 import dev.joeherbert.availabliss.core.network.model.SocialIdTokenSignInRequest
-import dev.joeherbert.availabliss.core.network.model.NativeSignInCodeRequest
-import dev.joeherbert.availabliss.core.network.model.NativeSignInTokenResponse
 import kotlinx.serialization.json.JsonObject
 import retrofit2.Response
 import retrofit2.http.Body

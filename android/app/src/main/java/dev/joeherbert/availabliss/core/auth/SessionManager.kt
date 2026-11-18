@@ -1,6 +1,5 @@
 package dev.joeherbert.availabliss.core.auth
 
-import kotlinx.coroutines.CancellationException
 import android.util.Log
 import dev.joeherbert.availabliss.core.billing.PlanRepository
 import dev.joeherbert.availabliss.core.billing.StoreBilling
@@ -20,6 +19,7 @@ import dev.joeherbert.availabliss.core.network.AuthInterceptor
 import dev.joeherbert.availabliss.core.network.PasskeyCookieJar
 import dev.joeherbert.availabliss.core.push.PushRegistrar
 import dev.joeherbert.availabliss.core.widget.Widgets
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

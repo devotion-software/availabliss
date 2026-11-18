@@ -5,14 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.auth.AuthRepository
-import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.billing.PlanRepository
+import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.AccountsRepository
 import dev.joeherbert.availabliss.core.data.AppPreferences
+import dev.joeherbert.availabliss.core.data.Appearance
 import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.LinkResult
 import dev.joeherbert.availabliss.core.data.TemplatesRepository
-import dev.joeherbert.availabliss.core.data.Appearance
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.LinkProviders

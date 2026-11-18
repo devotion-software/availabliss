@@ -1,10 +1,5 @@
 package dev.joeherbert.availabliss.core.calendar
 
-import java.security.MessageDigest
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.Json
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.joeherbert.availabliss.core.auth.TokenStore
@@ -22,6 +17,11 @@ import dev.joeherbert.availabliss.core.push.deviceName
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
+import java.security.MessageDigest
 import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject

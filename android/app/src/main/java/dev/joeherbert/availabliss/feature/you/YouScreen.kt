@@ -1,9 +1,9 @@
 package dev.joeherbert.availabliss.feature.you
 
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -24,14 +24,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.remember
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -52,22 +51,22 @@ import dev.joeherbert.availabliss.core.network.model.LinkProviders
 import dev.joeherbert.availabliss.core.network.model.LinkedAccount
 import dev.joeherbert.availabliss.core.network.model.LinkedAccounts
 import dev.joeherbert.availabliss.core.network.model.User
-import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
-import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
+import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
+import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.PillTone
-import dev.joeherbert.availabliss.designsystem.component.StatusPill
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.RowDivider
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
+import dev.joeherbert.availabliss.designsystem.component.StatusPill
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
@@ -76,9 +75,10 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import dev.joeherbert.availabliss.feature.calendars.IconTile
+import dev.joeherbert.availabliss.feature.common.UsernameField
 import dev.joeherbert.availabliss.feature.common.rememberPhotoPicker
 import dev.joeherbert.availabliss.feature.plan.UpgradeSheet
-import dev.joeherbert.availabliss.feature.common.UsernameField
+import kotlinx.coroutines.launch
 
 @Composable
 fun YouScreen(
@@ -292,8 +292,14 @@ private fun ProfileCard(user: User, onEditName: () -> Unit, uploading: Boolean, 
                     else Icon(AvIcons.Pencil, null, tint = colors.onSolid, modifier = Modifier.size(11.dp))
                 }
                 androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    androidx.compose.material3.DropdownMenuItem(text = { Text("Choose a new photo") }, onClick = { menu = false; onPickPhoto() })
-                    androidx.compose.material3.DropdownMenuItem(text = { Text("Remove photo") }, onClick = { menu = false; onRemovePhoto() })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("Choose a new photo") }, onClick = {
+                        menu = false
+                        onPickPhoto()
+                    })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text("Remove photo") }, onClick = {
+                        menu = false
+                        onRemovePhoto()
+                    })
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -397,7 +403,13 @@ private fun YouPreview() {
                     ),
                     linkableProviders = setOf(LinkProviders.GOOGLE),
                 ),
-                onEditName = {}, onOpenCalendars = {}, onOpenAppearance = {}, onOpenRegion = {}, onAddPasskey = {}, onSignOut = {}, onDelete = {},
+                onEditName = {},
+                onOpenCalendars = {},
+                onOpenAppearance = {},
+                onOpenRegion = {},
+                onAddPasskey = {},
+                onSignOut = {},
+                onDelete = {},
             )
         }
     }

@@ -334,8 +334,9 @@ object AvailabilityUiMapper {
         return if (start == 0) null else "Timing starts %02d:%02d".format(start / 60, start % 60)
     }
 
-    /** Week columns for the visible days: accent "everyone free" blocks and faded busy blocks. */
     /**
+     * Week columns for the visible days: accent "everyone free" blocks and faded busy blocks.
+     *
      * [status] is each date's status from the month availability (null while it's unknown): days
      * that don't work for everyone, and past days, are faded.
      */

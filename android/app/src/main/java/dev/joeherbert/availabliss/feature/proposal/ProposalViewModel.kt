@@ -1,7 +1,5 @@
 package dev.joeherbert.availabliss.feature.proposal
 
-import kotlinx.coroutines.flow.filter
-import dev.joeherbert.availabliss.core.network.model.LiveEvent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,9 +7,9 @@ import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
 import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.common.firstName
 import dev.joeherbert.availabliss.core.common.joinNamesSummary
-import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.ProposalsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
@@ -19,6 +17,7 @@ import dev.joeherbert.availabliss.core.live.LiveEvents
 import dev.joeherbert.availabliss.core.live.LivePayload
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.Group
+import dev.joeherbert.availabliss.core.network.model.LiveEvent
 import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ProposalStatus
 import dev.joeherbert.availabliss.core.network.model.ResponseKind
@@ -32,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch

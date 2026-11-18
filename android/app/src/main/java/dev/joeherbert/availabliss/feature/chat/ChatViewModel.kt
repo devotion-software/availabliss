@@ -21,7 +21,6 @@ import dev.joeherbert.availabliss.core.network.model.Attachment
 import dev.joeherbert.availabliss.core.network.model.MessageLocation
 import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
 import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +32,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * A group's chat. Loading pages and the screen's state live here; the rest is split by job into

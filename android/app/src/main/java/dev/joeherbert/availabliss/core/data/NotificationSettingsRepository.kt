@@ -71,7 +71,12 @@ class NotificationSettingsRepository @Inject constructor(
         update {
             set(
                 "quietHours",
-                quietHours?.let { buildJsonObject { put("from", JsonPrimitive(it.from)); put("to", JsonPrimitive(it.to)) } } ?: JsonNull,
+                quietHours?.let {
+                    buildJsonObject {
+                        put("from", JsonPrimitive(it.from))
+                        put("to", JsonPrimitive(it.to))
+                    }
+                } ?: JsonNull,
             )
         }
 

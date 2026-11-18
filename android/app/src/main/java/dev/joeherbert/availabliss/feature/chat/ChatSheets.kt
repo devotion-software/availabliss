@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.feature.chat
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,18 +16,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
-import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
-import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
+import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
+import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
+import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.DashedChip
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.PlainIconButton

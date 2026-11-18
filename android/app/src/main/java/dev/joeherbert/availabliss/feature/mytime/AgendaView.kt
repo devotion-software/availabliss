@@ -159,7 +159,10 @@ private fun AgendaDay(row: DayRowUi, items: List<AgendaItem>, isToday: Boolean, 
                 .clearAndSetSemantics {
                     contentDescription = row.accessibility
                     role = Role.Button
-                    onClick(label = "See the day") { open(); true }
+                    onClick(label = "See the day") {
+                        open()
+                        true
+                    }
                 }
                 .padding(horizontal = Spacing.xxs, vertical = Spacing.xxs),
             verticalAlignment = Alignment.CenterVertically,
@@ -207,7 +210,10 @@ private fun AgendaItemRow(item: AgendaItem, onClick: () -> Unit) {
             .clearAndSetSemantics {
                 contentDescription = "${item.title}, $spoken, ${item.tag.label}"
                 role = Role.Button
-                onClick(label = if (item.manual) "Edit" else "Details") { onClick(); true }
+                onClick(label = if (item.manual) "Edit" else "Details") {
+                    onClick()
+                    true
+                }
             }
             .padding(horizontal = Spacing.l, vertical = Spacing.s),
         verticalAlignment = Alignment.CenterVertically,
@@ -242,7 +248,10 @@ private fun FreeRow(label: String, onClick: () -> Unit) {
             .clearAndSetSemantics {
                 contentDescription = label
                 role = Role.Button
-                onClick(label = "Block this time") { onClick(); true }
+                onClick(label = "Block this time") {
+                    onClick()
+                    true
+                }
             }
             .padding(horizontal = Spacing.l, vertical = Spacing.s),
         verticalAlignment = Alignment.CenterVertically,

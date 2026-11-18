@@ -6,7 +6,7 @@ IMAGE ?= availabliss-web
 .DEFAULT_GOAL := help
 .PHONY: help setup hooks env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test test-integration smoke e2e openapi \
 	seed-demo clean-demo set-plan apple-secret school-holidays \
-	docker-build docker-run ios-project ios-open ios-build ios-test ios-uitest ios-lint ios-format android-build android-test android-tour clean
+	docker-build docker-run ios-project ios-open ios-build ios-test ios-uitest ios-lint ios-format android-build android-test android-tour lint format clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -88,6 +88,17 @@ set-plan: ## Give an account Pro or free without a purchase: make set-plan EMAIL
 
 school-holidays: ## Import school holidays from a CSV: make school-holidays FILE=path.csv
 	cd $(WEB) && bun scripts/import-school-holidays.ts $(abspath $(FILE))
+
+# ── Lint & format ────────────────────────────────────────────────────────────
+lint: ## Check formatting and lint: Prettier + ESLint (web), ktlint via Spotless (Android), swift-format (iOS)
+	cd $(WEB) && bun run lint
+	cd android && $(ANDROID_ENV) ./gradlew spotlessCheck
+	$(MAKE) ios-lint
+
+format: ## Fix formatting: Prettier (web), ktlint via Spotless (Android), swift-format (iOS)
+	cd $(WEB) && bun run format
+	cd android && $(ANDROID_ENV) ./gradlew spotlessApply
+	$(MAKE) ios-format
 
 # ── Docker (same image Coolify builds) ───────────────────────────────────────
 docker-build: ## Build the production image

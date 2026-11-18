@@ -18,6 +18,7 @@ and Custom Tabs. It talks to the same `/api/v1` API as the web and iOS apps
 ```sh
 make android-build      # debug APK → app/build/outputs/apk/debug/app-debug.apk
 make android-test       # unit tests
+make lint               # ktlint via Spotless (./gradlew spotlessCheck; spotlessApply fixes); rules in .editorconfig
 ```
 
 ### Running against the local dev server

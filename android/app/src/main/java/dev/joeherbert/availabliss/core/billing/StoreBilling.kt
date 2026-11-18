@@ -1,7 +1,5 @@
 package dev.joeherbert.availabliss.core.billing
 
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import android.app.Activity
 import android.content.Context
 import com.revenuecat.purchases.Package
@@ -15,8 +13,10 @@ import com.revenuecat.purchases.awaitOfferings
 import com.revenuecat.purchases.awaitPurchase
 import com.revenuecat.purchases.awaitRestore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 

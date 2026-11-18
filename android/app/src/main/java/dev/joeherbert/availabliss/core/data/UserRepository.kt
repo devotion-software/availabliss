@@ -1,17 +1,15 @@
 package dev.joeherbert.availabliss.core.data
 
-import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.MediaType.Companion.toMediaType
 import dev.joeherbert.availabliss.core.common.ApplicationScope
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.AvailablissApi
 import dev.joeherbert.availabliss.core.network.JsonPatchBuilder
 import dev.joeherbert.availabliss.core.network.jsonPatch
-import dev.joeherbert.availabliss.core.network.onSuccess
 import dev.joeherbert.availabliss.core.network.model.ColorTheme
 import dev.joeherbert.availabliss.core.network.model.ThemeMode
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.core.network.model.UsernameCheck
+import dev.joeherbert.availabliss.core.network.onSuccess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -22,6 +20,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 

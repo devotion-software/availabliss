@@ -2,6 +2,7 @@ package dev.joeherbert.availabliss.feature.chat
 
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.NetworkModule
+import dev.joeherbert.availabliss.core.network.model.DateRange
 import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.Member
 import dev.joeherbert.availabliss.core.network.model.Message
@@ -10,6 +11,8 @@ import dev.joeherbert.availabliss.core.network.model.NewDatePoll
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.PollOption
 import dev.joeherbert.availabliss.core.network.model.PollSlot
+import dev.joeherbert.availabliss.core.network.model.Requirement
+import dev.joeherbert.availabliss.core.network.model.RequirementLength
 import dev.joeherbert.availabliss.core.network.model.Rhythm
 import dev.joeherbert.availabliss.core.network.model.RhythmEvery
 import dev.joeherbert.availabliss.core.network.model.Role
@@ -17,9 +20,6 @@ import dev.joeherbert.availabliss.core.network.model.SendDatePollRequest
 import dev.joeherbert.availabliss.core.network.model.UpdateGroupRequest
 import dev.joeherbert.availabliss.core.network.model.isDatePoll
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
-import dev.joeherbert.availabliss.core.network.model.DateRange
-import dev.joeherbert.availabliss.core.network.model.Requirement
-import dev.joeherbert.availabliss.core.network.model.RequirementLength
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -46,10 +46,16 @@ class DatePollTest {
     private val saturday = PollSlot(DateTimes.toIso(LocalDateTime.of(2026, 11, 21, 0, 0)), DateTimes.toIso(LocalDateTime.of(2026, 11, 22, 0, 0)), allDay = true)
 
     private fun pollMessage(author: String) = Message(
-        id = "m1", groupId = "g", authorId = author, kind = MessageKind.Poll, body = "Which of these works?",
+        id = "m1",
+        groupId = "g",
+        authorId = author,
+        kind = MessageKind.Poll,
+        body = "Which of these works?",
         createdAt = "2026-11-16T12:00:00.000Z",
         poll = Poll(
-            "p1", "Which of these works?", multi = true,
+            "p1",
+            "Which of these works?",
+            multi = true,
             options = listOf(
                 PollOption("o1", "Fri 20 Nov, 18:00", listOf("me", "ana"), friday),
                 PollOption("o2", "Sat 21 Nov", listOf("tom"), saturday),
@@ -59,8 +65,14 @@ class DatePollTest {
 
     private fun pollUi(author: String, isAdmin: Boolean = false, conflicts: Map<String, List<String>> = emptyMap()) =
         buildChatItems(
-            listOf(pollMessage(author)), directory, memberCount = 3, proposals = emptyMap(), events = emptyMap(),
-            today = LocalDate.of(2026, 11, 16), conflicts = conflicts, isAdmin = isAdmin,
+            listOf(pollMessage(author)),
+            directory,
+            memberCount = 3,
+            proposals = emptyMap(),
+            events = emptyMap(),
+            today = LocalDate.of(2026, 11, 16),
+            conflicts = conflicts,
+            isAdmin = isAdmin,
         ).filterIsInstance<ChatItem.PollItem>().single().poll
 
     @Test

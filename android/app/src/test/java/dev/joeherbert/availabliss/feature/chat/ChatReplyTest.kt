@@ -34,15 +34,26 @@ class ChatReplyTest {
     )
 
     private fun msg(id: String, author: String?, body: String? = "Hello $id", replyTo: MessageReply? = null, deleted: Boolean = false) = Message(
-        id = id, groupId = "g", authorId = author, kind = MessageKind.Text, body = body,
-        createdAt = "2026-11-16T12:00:00.000Z", deleted = deleted, replyTo = replyTo,
+        id = id,
+        groupId = "g",
+        authorId = author,
+        kind = MessageKind.Text,
+        body = body,
+        createdAt = "2026-11-16T12:00:00.000Z",
+        deleted = deleted,
+        replyTo = replyTo,
     )
 
     private fun quoteOf(id: String, author: String?, text: String?, authorName: String? = null) =
         MessageReply(id = id, authorId = author, authorName = authorName, kind = MessageKind.Text, text = text)
 
     private fun build(messages: List<Message>) = buildChatItems(
-        messages, directory, memberCount = 2, proposals = emptyMap(), events = emptyMap(), today = LocalDate.of(2026, 11, 16),
+        messages,
+        directory,
+        memberCount = 2,
+        proposals = emptyMap(),
+        events = emptyMap(),
+        today = LocalDate.of(2026, 11, 16),
     )
 
     private fun List<ChatItem>.text(id: String) = filterIsInstance<ChatItem.Text>().single { it.id == id }
@@ -86,7 +97,11 @@ class ChatReplyTest {
         val reply = MessageReply("1", "p", kind = MessageKind.Poll, text = "Which park?")
         assertEquals("Poll: Which park?", reply.snippet)
         val poll = Message(
-            id = "1", groupId = "g", authorId = "p", kind = MessageKind.Poll, createdAt = "2026-11-16T12:00:00.000Z",
+            id = "1",
+            groupId = "g",
+            authorId = "p",
+            kind = MessageKind.Poll,
+            createdAt = "2026-11-16T12:00:00.000Z",
             poll = Poll("q", "Which park?", options = listOf(PollOption("a", "North"))),
         )
         assertTrue(poll.canReply)

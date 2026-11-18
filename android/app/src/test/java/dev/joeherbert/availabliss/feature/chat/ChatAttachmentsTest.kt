@@ -23,10 +23,10 @@ import dev.joeherbert.availabliss.designsystem.component.chat.singleImageSize
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.Assert.assertNotNull
 import java.time.LocalDate
 
 /** Photos, GIFs and files in chat: the wire format, list rows, summaries and the bubble / composer layout rules. */
@@ -50,7 +50,12 @@ class ChatAttachmentsTest {
     )
 
     private fun build(messages: List<Message>) = buildChatItems(
-        messages, directory, memberCount = 2, proposals = emptyMap(), events = emptyMap(), today = LocalDate.of(2026, 11, 16),
+        messages,
+        directory,
+        memberCount = 2,
+        proposals = emptyMap(),
+        events = emptyMap(),
+        today = LocalDate.of(2026, 11, 16),
     ).filterIsInstance<ChatItem.Text>()
 
     @Test

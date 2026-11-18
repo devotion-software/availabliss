@@ -33,8 +33,13 @@ class ChatConfirmedBannerTest {
         createdAt: String = "2026-11-16T11:00:00.000Z",
         body: String = "Everyone's in for Thu 26 Nov · from 18:00",
     ) = Message(
-        id = id, groupId = "g", authorId = null, kind = MessageKind.System,
-        body = body, eventId = eventId, createdAt = createdAt,
+        id = id,
+        groupId = "g",
+        authorId = null,
+        kind = MessageKind.System,
+        body = body,
+        eventId = eventId,
+        createdAt = createdAt,
     )
 
     private fun event(location: String? = null, proposalId: String? = "p1") = GroupEvent(
@@ -117,8 +122,13 @@ class ChatConfirmedBannerTest {
     fun confirmedAnywayCountsMaybesFromTheLoadedProposal() {
         val replies = listOf(ResponseKind.Accepted, ResponseKind.Accepted, ResponseKind.Maybe, ResponseKind.Maybe, ResponseKind.Declined)
         val p = Proposal(
-            id = "p1", groupId = "g", start = "2026-11-26T18:00:00Z", end = "2026-11-26T21:00:00Z", status = ProposalStatus.Confirmed,
-            createdBy = "me", createdAt = "2026-11-16T10:00:00.000Z",
+            id = "p1",
+            groupId = "g",
+            start = "2026-11-26T18:00:00Z",
+            end = "2026-11-26T21:00:00Z",
+            status = ProposalStatus.Confirmed,
+            createdBy = "me",
+            createdAt = "2026-11-16T10:00:00.000Z",
             responses = replies.mapIndexed { i, r -> ProposalResponse("u$i", r, updatedAt = "2026-11-16T10:00:00.000Z") },
         )
         val banner = build(

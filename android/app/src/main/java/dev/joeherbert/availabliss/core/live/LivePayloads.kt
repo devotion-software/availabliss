@@ -71,10 +71,12 @@ fun LiveEvent.decode(json: Json): LivePayload = runCatching {
         )
         LiveEvent.PROPOSAL_CONFIRMED -> json.decodeFromJsonElement(ProposalConfirmedPayload.serializer(), payload)
             .let { LivePayload.ProposalConfirmed(it.proposal, it.event) }
-        LiveEvent.EVENT_CHANGED -> if (flag("deleted")) LivePayload.EventDeleted(str("id").orEmpty())
+        LiveEvent.EVENT_CHANGED ->
+            if (flag("deleted")) LivePayload.EventDeleted(str("id").orEmpty())
             else LivePayload.EventChanged(json.decodeFromJsonElement(GroupEvent.serializer(), payload))
         LiveEvent.GROUP_UPDATED -> LivePayload.GroupUpdated(json.decodeFromJsonElement(Group.serializer(), payload))
-        LiveEvent.MEMBER_CHANGED -> if (flag("removed")) LivePayload.MemberRemoved(str("userId").orEmpty())
+        LiveEvent.MEMBER_CHANGED ->
+            if (flag("removed")) LivePayload.MemberRemoved(str("userId").orEmpty())
             else LivePayload.MemberChanged(json.decodeFromJsonElement(Member.serializer(), payload))
         LiveEvent.AVAILABILITY_CHANGED -> LivePayload.AvailabilityChanged(str("userId").orEmpty())
         LiveEvent.NOTIFICATION_CREATED -> LivePayload.NotificationCreated(json.decodeFromJsonElement(AppNotification.serializer(), payload))

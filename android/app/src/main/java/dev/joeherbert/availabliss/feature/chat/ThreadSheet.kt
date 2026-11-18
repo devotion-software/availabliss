@@ -1,6 +1,5 @@
 package dev.joeherbert.availabliss.feature.chat
 
-import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +39,7 @@ import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.chat.ChatComposer
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
+import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 

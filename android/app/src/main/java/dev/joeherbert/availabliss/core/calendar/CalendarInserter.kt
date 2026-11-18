@@ -96,7 +96,9 @@ class CalendarInserter @Inject constructor(
             context.contentResolver.query(
                 ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId),
                 arrayOf(CalendarContract.Events.CALENDAR_ID, CalendarContract.Events.DELETED),
-                null, null, null,
+                null,
+                null,
+                null,
             )?.use { c -> if (c.moveToFirst() && c.getInt(1) == 0) c.getLong(0) else null }
         }.getOrNull()
     }

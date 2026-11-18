@@ -2,14 +2,14 @@ package dev.joeherbert.availabliss
 
 import android.app.Application
 import android.os.Build
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
-import androidx.hilt.work.HiltWorkerFactory
-import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import dev.joeherbert.availabliss.core.auth.SessionManager
 import dev.joeherbert.availabliss.core.live.LiveConnectionObserver

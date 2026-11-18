@@ -1,21 +1,21 @@
 package dev.joeherbert.availabliss.designsystem.component
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDefaults
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
@@ -81,7 +81,12 @@ fun AvDatePickerDialog(
     val colors = pickerColors()
     DatePickerDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextAction("Done", { state.selectedDateMillis?.let { onPick(it.utcDate()) }; onDismiss() }) },
+        confirmButton = {
+            TextAction("Done", {
+                state.selectedDateMillis?.let { onPick(it.utcDate()) }
+                onDismiss()
+            })
+        },
         dismissButton = { TextAction("Cancel", onDismiss, color = AvailablissTheme.colors.muted) },
         shape = Shapes.cardLarge,
         colors = colors,
@@ -156,7 +161,12 @@ fun AvTimePickerDialog(
                 colors = timePickerColors(),
             )
         },
-        confirmButton = { TextAction("Done", { onPick(LocalTime.of(state.hour, state.minute)); onDismiss() }) },
+        confirmButton = {
+            TextAction("Done", {
+                onPick(LocalTime.of(state.hour, state.minute))
+                onDismiss()
+            })
+        },
         dismissButton = { TextAction("Cancel", onDismiss, color = c.muted) },
     )
 }

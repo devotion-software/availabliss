@@ -17,8 +17,13 @@ import java.time.LocalDate
 /** Threads: which live messages join an open thread, who a reply in it goes to, and View thread. */
 class ChatThreadTest {
     private fun msg(id: String, author: String?, replyTo: String? = null, deleted: Boolean = false) = Message(
-        id = id, groupId = "g", authorId = author, kind = MessageKind.Text, body = if (deleted) null else "Hello $id",
-        createdAt = "2026-11-16T12:00:00.000Z", deleted = deleted,
+        id = id,
+        groupId = "g",
+        authorId = author,
+        kind = MessageKind.Text,
+        body = if (deleted) null else "Hello $id",
+        createdAt = "2026-11-16T12:00:00.000Z",
+        deleted = deleted,
         replyTo = replyTo?.let { MessageReply(id = it, authorId = "p", authorName = null, kind = MessageKind.Text, text = "Hello $it") },
     )
 
@@ -55,7 +60,12 @@ class ChatThreadTest {
             meId = "me",
         )
         val items = buildChatItems(
-            thread + msg("9", "p"), directory, memberCount = 2, proposals = emptyMap(), events = emptyMap(), today = LocalDate.of(2026, 11, 16),
+            thread + msg("9", "p"),
+            directory,
+            memberCount = 2,
+            proposals = emptyMap(),
+            events = emptyMap(),
+            today = LocalDate.of(2026, 11, 16),
         ).filterIsInstance<ChatItem.Text>().associateBy { it.id }
         assertTrue(items.getValue("1").inThread)
         assertTrue(items.getValue("3").inThread)

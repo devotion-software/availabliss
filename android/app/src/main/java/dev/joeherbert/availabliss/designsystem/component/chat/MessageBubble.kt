@@ -3,18 +3,18 @@ package dev.joeherbert.availabliss.designsystem.component.chat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
@@ -25,19 +25,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -147,8 +147,16 @@ fun MessageBubble(
             }
             if (actions.isNotEmpty()) {
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = colors.bg) {
-                    if (onClick != null) MenuItem("Info", destructive = false) { menuOpen = false; onClick() }
-                    actions.forEach { a -> MenuItem(a.label, a.destructive) { menuOpen = false; a.onClick() } }
+                    if (onClick != null) MenuItem("Info", destructive = false) {
+                        menuOpen = false
+                        onClick()
+                    }
+                    actions.forEach { a ->
+                        MenuItem(a.label, a.destructive) {
+                            menuOpen = false
+                            a.onClick()
+                        }
+                    }
                 }
             }
         }
@@ -275,15 +283,22 @@ private fun interactions(
             role = Role.Button,
             onClickLabel = if (onClick != null) "Message info" else null,
             onLongClickLabel = if (actions.isNotEmpty()) "Message options" else null,
-            onLongClick = if (actions.isNotEmpty()) ({
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onLongClick()
-            }) else null,
+            onLongClick = if (actions.isNotEmpty()) (
+                {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongClick()
+                }
+                ) else null,
             onClick = onClick ?: onLongClick,
         )
         .semantics {
             if (label != null) contentDescription = label
-            if (actions.isNotEmpty()) customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.onClick(); true } }
+            if (actions.isNotEmpty()) customActions = actions.map { a ->
+                CustomAccessibilityAction(a.label) {
+                    a.onClick()
+                    true
+                }
+            }
         }
 }
 

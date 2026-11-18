@@ -1,0 +1,44 @@
+# Kotlin style, enforced by ktlint through Spotless (`./gradlew spotlessCheck`, `./gradlew spotlessApply`).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+# The Kotlin coding conventions (gradle.properties sets kotlin.code.style=official), as IntelliJ / Android Studio format them.
+ktlint_code_style = intellij_idea
+max_line_length = 150
+# Composables are PascalCase functions.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+# Rules turned off because they would rewrite most files for no real gain:
+# - Constructor and function signatures are wrapped by hand (one parameter per line once they get long,
+#   expression bodies on the next line); these two would rejoin or re-split almost every one.
+ktlint_standard_class-signature = disabled
+ktlint_standard_function-signature = disabled
+# Short annotations stay on the same line as what they annotate (`@SerialName("x") X,`, `@Inject constructor`).
+ktlint_standard_annotation = disabled
+# Blank lines are left to the author: related declarations (grouped enum entries, a run of @Inject properties,
+# a commented sealed subtype) and short `when` branches are kept together.
+ktlint_standard_blank-line-before-declaration = disabled
+ktlint_standard_blank-line-between-when-conditions = disabled
+ktlint_standard_spacing-between-declarations-with-annotations = disabled
+ktlint_standard_spacing-between-declarations-with-comments = disabled
+# One-line `if (x) a` / `else b` branches without braces are fine; this would brace hundreds of them.
+ktlint_standard_multiline-if-else = disabled
+# Long conditions and expressions are wrapped by hand; these break `if (a != b)` mid-condition to fit max_line_length.
+ktlint_standard_binary-expression-wrapping = disabled
+ktlint_standard_condition-wrapping = disabled
+# Trailing commas are used in most, not all, multi-line lists; enforcing either way churns hundreds of lines.
+ktlint_standard_trailing-comma-on-call-site = disabled
+ktlint_standard_trailing-comma-on-declaration-site = disabled
+# Lines ktlint can't wrap itself (long string literals, test JSON fixtures, preview data) are allowed;
+# max_line_length above still sets where the wrapping rules break code.
+ktlint_standard_max-line-length = disabled
+# A few files are named for their topic rather than their single class (UiText.kt holds UserMessage).
+ktlint_standard_filename = disabled

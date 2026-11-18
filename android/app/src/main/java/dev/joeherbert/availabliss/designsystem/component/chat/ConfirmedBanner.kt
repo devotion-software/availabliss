@@ -225,9 +225,14 @@ private fun DrawScope.drawBurst(pieces: List<Piece>, progress: Float, palette: L
 
 /** Eight small rotated bits, fixed positions relative to the top-right corner (dp from right, dp from top). */
 private val staticBits = listOf(
-    floatArrayOf(10f, 2f, 20f, 0f), floatArrayOf(26f, 10f, -30f, 1f), floatArrayOf(42f, 0f, 55f, 2f),
-    floatArrayOf(58f, 8f, 15f, 3f), floatArrayOf(14f, 16f, 70f, 2f), floatArrayOf(76f, 1f, -45f, 1f),
-    floatArrayOf(40f, 14f, 0f, 0f), floatArrayOf(92f, 9f, 35f, 3f),
+    floatArrayOf(10f, 2f, 20f, 0f),
+    floatArrayOf(26f, 10f, -30f, 1f),
+    floatArrayOf(42f, 0f, 55f, 2f),
+    floatArrayOf(58f, 8f, 15f, 3f),
+    floatArrayOf(14f, 16f, 70f, 2f),
+    floatArrayOf(76f, 1f, -45f, 1f),
+    floatArrayOf(40f, 14f, 0f, 0f),
+    floatArrayOf(92f, 9f, 35f, 3f),
 )
 
 private fun DrawScope.drawStaticConfetti(palette: List<Color>) {

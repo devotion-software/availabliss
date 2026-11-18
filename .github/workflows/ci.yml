@@ -60,6 +60,8 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('web/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
+      - name: Lint (Prettier + ESLint)
+        run: bun run lint
       - name: Type-check
         run: bun run check
       - name: OpenAPI contract is up to date
@@ -207,6 +209,8 @@ jobs:
           # The default ('tools platform-tools') fails: current cmdline-tools no longer ship 'tools'.
           packages: platform-tools platforms;android-37.0
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Lint (ktlint via Spotless)
+        run: ./gradlew spotlessCheck
       - name: Unit tests
         run: ./gradlew testDebugUnitTest
       - name: Build debug APK

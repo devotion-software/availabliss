@@ -23,7 +23,6 @@ import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.color.ColorProviders as GlanceColors
 import androidx.glance.material3.ColorProviders
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -34,6 +33,7 @@ import dev.joeherbert.availabliss.core.deeplink.DeepLink
 import dev.joeherbert.availabliss.core.network.model.ThemeMode
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissColors
 import dev.joeherbert.availabliss.designsystem.theme.availablissColors
+import androidx.glance.color.ColorProviders as GlanceColors
 
 /**
  * The app's colours for a widget: the colour theme you chose, in light or dark as you set the

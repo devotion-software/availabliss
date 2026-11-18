@@ -38,6 +38,7 @@ Run `make help` for every task. The useful ones:
 | `make seed-demo` / `make clean-demo` | Create / delete demo users, groups, busy time and chat to explore the apps |
 | `make apple-secret KEY=AuthKey_….p8 CLIENT_ID=<Services ID>` | Make `APPLE_CLIENT_SECRET` for Sign in with Apple (expires after 6 months; `TEAM_ID` defaults to `APPLE_TEAM_ID`) |
 | `make check` | Type-check |
+| `make lint` / `make format` | Check / fix formatting and lint: Prettier + ESLint for the web (`web/.prettierrc`, `web/eslint.config.js`), ktlint via Spotless for Android (`android/.editorconfig`). CI runs the same checks |
 | `make openapi` | Regenerate [`docs/openapi.json`](docs/openapi.json) from `web/src/lib/api-contract.ts` after changing an endpoint (generated: don't edit it by hand) |
 | `make db-generate` / `make db-migrate` | Create / apply a migration after schema changes |
 | `make school-holidays FILE=…csv` | Import school holiday dates per local authority |
@@ -54,10 +55,10 @@ and every pull request, and only builds the platforms a change touches:
 
 | Job | Runs |
 | --- | ---- |
-| Web | type-check, `docs/openapi.json` is up to date, unit tests with coverage (one fails when a route isn't in the API contract) |
+| Web | lint (Prettier + ESLint), type-check, `docs/openapi.json` is up to date, unit tests with coverage (one fails when a route isn't in the API contract) |
 | Smoke | the production build (the only web build in CI); DB integration tests against MariaDB; the server in production mode with Redis + Mailpit; Redis integration tests; then `scripts/smoke.ts` end to end |
 | Docker | builds the Coolify image |
-| Android | unit tests and the debug APK |
+| Android | lint (ktlint via Spotless), unit tests and the debug APK |
 | iOS | XcodeGen + a simulator build |
 
 ## How it fits together

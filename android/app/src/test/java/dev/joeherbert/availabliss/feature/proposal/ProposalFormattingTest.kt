@@ -12,8 +12,13 @@ import org.junit.Test
 /** Maybes (soft yeses) are counted apart from firm yeses wherever replies are counted. */
 class ProposalFormattingTest {
     private fun proposal(vararg replies: ResponseKind, status: ProposalStatus = ProposalStatus.Open) = Proposal(
-        id = "p", groupId = "g", start = "2026-11-20T18:00:00Z", end = "2026-11-20T21:00:00Z",
-        status = status, createdBy = "u0", createdAt = "2026-11-18T10:00:00Z",
+        id = "p",
+        groupId = "g",
+        start = "2026-11-20T18:00:00Z",
+        end = "2026-11-20T21:00:00Z",
+        status = status,
+        createdBy = "u0",
+        createdAt = "2026-11-18T10:00:00Z",
         responses = replies.mapIndexed { i, r -> ProposalResponse("u$i", r, updatedAt = "2026-11-18T10:00:00Z") },
     )
 

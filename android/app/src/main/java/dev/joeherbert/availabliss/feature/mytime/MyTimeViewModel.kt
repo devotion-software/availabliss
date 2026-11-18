@@ -19,8 +19,8 @@ import dev.joeherbert.availabliss.core.network.model.Repeat
 import dev.joeherbert.availabliss.core.network.model.wireName
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,8 +29,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 import java.time.YearMonth
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
 /** Days fetched per page as the agenda scrolls (each request stays well under the 120-day limit). */

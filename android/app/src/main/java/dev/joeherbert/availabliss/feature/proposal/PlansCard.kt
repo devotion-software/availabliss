@@ -109,7 +109,8 @@ private fun PlansCardPreview() {
                     detail = "Confirmed",
                 ),
             ),
-            {}, {},
+            {},
+            {},
         )
     }
 }

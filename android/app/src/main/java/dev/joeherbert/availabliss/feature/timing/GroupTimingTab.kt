@@ -39,8 +39,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -66,8 +66,8 @@ import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.RemovableChip
 import dev.joeherbert.availabliss.designsystem.component.RowDivider
-import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
+import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
 import dev.joeherbert.availabliss.designsystem.component.Segment
 import dev.joeherbert.availabliss.designsystem.component.SegmentedControl
@@ -545,16 +545,20 @@ private fun TimingPickers(state: TimingEditorUiState, picker: TimingPicker, acti
         TimingPicker.None -> Unit
         TimingPicker.StartTime -> AvTimePickerDialog("Starts", state.startTime, actions.onStartTime, close)
         TimingPicker.EndTime -> AvTimePickerDialog("Ends", state.endTime, actions.onEndTime, close)
-        TimingPicker.SpanStart -> SpanEndSheet("Starts", state.spanStart, onDone = { actions.onSpanStart(it); close() }, onDismiss = close)
-        TimingPicker.SpanEnd -> SpanEndSheet("Ends", state.spanEnd, onDone = { actions.onSpanEnd(it); close() }, onDismiss = close)
+        TimingPicker.SpanStart -> SpanEndSheet("Starts", state.spanStart, onDone = {
+            actions.onSpanStart(it)
+            close()
+        }, onDismiss = close)
+        TimingPicker.SpanEnd -> SpanEndSheet("Ends", state.spanEnd, onDone = {
+            actions.onSpanEnd(it)
+            close()
+        }, onDismiss = close)
         TimingPicker.SearchRange -> AvDateRangePickerDialog(state.rangeFrom, state.rangeTo, actions.onRange, close)
         TimingPicker.Dates -> RangePicker(state.draft, RangeList.Dates, actions, close)
         TimingPicker.SchoolHolidays -> RangePicker(state.draft, RangeList.SchoolHolidays, actions, close)
     }
 }
 
-/** Picks the weekday and time for one end of a span. */
-@OptIn(ExperimentalLayoutApi::class)
 /** Picks a range to add to [list]; one the list already covers can't be added, and one that overlaps says it'll be joined. */
 @Composable
 private fun RangePicker(draft: TimingDraft, list: RangeList, actions: TimingActions, close: () -> Unit) {
@@ -570,6 +574,8 @@ private fun RangePicker(draft: TimingDraft, list: RangeList, actions: TimingActi
     )
 }
 
+/** Picks the weekday and time for one end of a span. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SpanEndSheet(title: String, initial: SpanEnd, onDone: (SpanEnd) -> Unit, onDismiss: () -> Unit) {
     var day by remember { mutableStateOf(initial.day) }

@@ -1,10 +1,10 @@
 package dev.joeherbert.availabliss.core.calendar
 
-import java.time.Duration
-import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Duration
+import java.time.Instant
 
 class DeviceSyncActionTest {
     @Test

@@ -1,60 +1,53 @@
 package dev.joeherbert.availabliss.feature.availability
 
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.runtime.remember
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.foundation.selection.toggleable
-import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
-import dev.joeherbert.availabliss.designsystem.component.AvTextField
-import dev.joeherbert.availabliss.designsystem.component.SectionLabel
 import androidx.compose.ui.Alignment
-import android.content.res.Configuration
-import androidx.compose.ui.platform.LocalConfiguration
-import dev.joeherbert.availabliss.designsystem.component.availability.WeekCards
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.Spacer
-import dev.joeherbert.availabliss.feature.group.GroupTopBarHeight
-import dev.joeherbert.availabliss.designsystem.component.swipeToStep
-import dev.joeherbert.availabliss.core.common.DateTimes
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -64,8 +57,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.Slot
+import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
+import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
@@ -76,6 +72,7 @@ import dev.joeherbert.availabliss.designsystem.component.PillTone
 import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
+import dev.joeherbert.availabliss.designsystem.component.SectionLabel
 import dev.joeherbert.availabliss.designsystem.component.Segment
 import dev.joeherbert.availabliss.designsystem.component.SegmentedControl
 import dev.joeherbert.availabliss.designsystem.component.StatusPill
@@ -85,19 +82,22 @@ import dev.joeherbert.availabliss.designsystem.component.availability.DayTimelin
 import dev.joeherbert.availabliss.designsystem.component.availability.DayTimelineRows
 import dev.joeherbert.availabliss.designsystem.component.availability.MonthGrid
 import dev.joeherbert.availabliss.designsystem.component.availability.MonthLegend
+import dev.joeherbert.availabliss.designsystem.component.availability.WeekCards
 import dev.joeherbert.availabliss.designsystem.component.availability.WeekGrid
 import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
+import dev.joeherbert.availabliss.designsystem.component.swipeToStep
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
+import dev.joeherbert.availabliss.feature.group.GroupTopBarHeight
 import dev.joeherbert.availabliss.feature.plan.UpgradeSheet
 import dev.joeherbert.availabliss.feature.planner.PlannerSheet
 import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
-import java.time.LocalDate
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 /** Why the upgrade sheet opens from "Plan with AI". */
 private const val PLANNER_UPGRADE_REASON = "AI planning is part of Pro: it picks the best time, suggests things to do and drafts the plan."
@@ -226,11 +226,23 @@ fun GroupCalendarContent(
                 }
                 // Which way the next page slides in: forward (later) comes from the right.
                 var forward by remember { mutableStateOf(true) }
-                val previous = { forward = false; onPrevious() }
-                val next = { forward = true; onNext() }
-                val today = { forward = state.todayIsLater; onToday() }
+                val previous = {
+                    forward = false
+                    onPrevious()
+                }
+                val next = {
+                    forward = true
+                    onNext()
+                }
+                val today = {
+                    forward = state.todayIsLater
+                    onToday()
+                }
                 HeadingRow(state, onSelectView, previous, next, today)
-                FreeJumps(state) { date -> forward = date.isAfter(state.selectedDate); onJumpTo(date) }
+                FreeJumps(state) { date ->
+                    forward = date.isAfter(state.selectedDate)
+                    onJumpTo(date)
+                }
                 state.coverageNote?.let { CoverageNote(it) }
                 state.error?.let { ErrorBanner(it, onRetry = onRetry) }
                 AnimatedContent(

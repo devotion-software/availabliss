@@ -55,7 +55,14 @@ fun SwipeToReply(enabled: Boolean, onReply: () -> Unit, modifier: Modifier = Mod
     val currentOnReply by rememberUpdatedState(onReply)
     Box(
         modifier
-            .semantics { customActions = listOf(CustomAccessibilityAction("Reply") { currentOnReply(); true }) }
+            .semantics {
+                customActions = listOf(
+                    CustomAccessibilityAction("Reply") {
+                        currentOnReply()
+                        true
+                    }
+                )
+            }
             .pointerInput(threshold) {
                 var raw = 0f
                 detectHorizontalDragGestures(

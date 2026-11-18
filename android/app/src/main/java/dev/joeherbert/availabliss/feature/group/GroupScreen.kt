@@ -103,7 +103,10 @@ fun GroupScreen(
             title = "Mute notifications",
             message = "No pushes from ${state.groupName.ifEmpty { "this group" }}. It's all still in Activity.",
             options = MuteDuration.entries.map { duration ->
-                ConfirmOption(duration.label, { choosingMute = false; viewModel.mute(duration) }, kind = ConfirmOption.Kind.Secondary)
+                ConfirmOption(duration.label, {
+                    choosingMute = false
+                    viewModel.mute(duration)
+                }, kind = ConfirmOption.Kind.Secondary)
             },
             onDismiss = { choosingMute = false },
         )
@@ -186,7 +189,12 @@ private fun MoreMenu(isAdmin: Boolean, hasOthers: Boolean, muted: Boolean, actio
                 if (muted) Triple("Unmute", AvIcons.Bell, actions.onUnmute)
                 else Triple("Mute notifications", AvIcons.BellOff, actions.onMute),
                 Triple("Group settings", AvIcons.Settings, actions.onOpenSettings),
-            ).forEach { (label, icon, onClick) -> MenuItem(label, icon) { open = false; onClick() } }
+            ).forEach { (label, icon, onClick) ->
+                MenuItem(label, icon) {
+                    open = false
+                    onClick()
+                }
+            }
         }
     }
 }

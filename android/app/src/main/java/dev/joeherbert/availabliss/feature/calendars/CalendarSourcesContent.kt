@@ -420,7 +420,8 @@ private fun CalendarSourcesPreview() {
                 hasPermission = true,
                 deviceSources = listOf(
                     DeviceSource(
-                        "On this phone", "Personal",
+                        "On this phone",
+                        "Personal",
                         listOf(
                             DeviceCalendarRow("1", "Personal", "#FF8A5E", true),
                             DeviceCalendarRow("2", "Family", "#6FD8BB", true),
@@ -430,7 +431,9 @@ private fun CalendarSourcesPreview() {
                 ),
                 connections = listOf(
                     CalendarConnection(
-                        id = "c1", provider = CalendarProvider.Microsoft, label = "Work",
+                        id = "c1",
+                        provider = CalendarProvider.Microsoft,
+                        label = "Work",
                         calendars = listOf(ConnectedCalendar("a", "Calendar", "#5B8DEF", true), ConnectedCalendar("b", "Team holidays", "#F2C14E", false)),
                     ),
                 ),

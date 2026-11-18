@@ -2,6 +2,7 @@ package dev.joeherbert.availabliss.designsystem.component.availability
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,10 +21,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -84,7 +84,10 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
             columns.forEach {
                 Box(Modifier.weight(1f).alpha(it.dateAlpha()), contentAlignment = Alignment.Center) {
                     Text(
-                        it.label, style = type.micro, color = if (it.today) colors.onAccent else colors.muted, textAlign = TextAlign.Center,
+                        it.label,
+                        style = type.micro,
+                        color = if (it.today) colors.onAccent else colors.muted,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.todayPill(it.today, colors.accent),
                     )
                 }
@@ -184,7 +187,9 @@ fun WeekCards(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSele
             ) {
                 Box(Modifier.width(56.dp).alpha(column.dateAlpha())) {
                     Text(
-                        column.label, style = type.bodySmallStrong, color = if (column.today) colors.onAccent else colors.ink,
+                        column.label,
+                        style = type.bodySmallStrong,
+                        color = if (column.today) colors.onAccent else colors.ink,
                         modifier = Modifier.padding(start = if (column.today) 6.dp else 0.dp).todayPill(column.today, colors.accent),
                     )
                 }

@@ -11,8 +11,8 @@ import dev.joeherbert.availabliss.BuildConfig
 import dev.joeherbert.availabliss.core.auth.TokenStore
 import dev.joeherbert.availabliss.core.data.ApiCaller
 import dev.joeherbert.availabliss.core.data.AppPreferences
-import dev.joeherbert.availabliss.core.network.AvailablissApi
 import dev.joeherbert.availabliss.core.network.ApiResult
+import dev.joeherbert.availabliss.core.network.AvailablissApi
 import dev.joeherbert.availabliss.core.network.model.RegisterDeviceRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await

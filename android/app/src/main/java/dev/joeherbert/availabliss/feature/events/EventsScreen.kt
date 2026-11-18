@@ -25,10 +25,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
-import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
+import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
+import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.CoverPhoto
 import dev.joeherbert.availabliss.designsystem.component.EmptyState
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
@@ -48,8 +48,8 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.feature.common.AddToCalendarButton
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
-import dev.joeherbert.availabliss.feature.common.CalendarStatus
 import dev.joeherbert.availabliss.feature.common.AddToCalendarState
+import dev.joeherbert.availabliss.feature.common.CalendarStatus
 
 @Composable
 fun EventsScreen(onBack: () -> Unit, onAddEvent: () -> Unit, onOpenEvent: (String) -> Unit, viewModel: EventsViewModel = hiltViewModel()) {
@@ -123,7 +123,10 @@ private fun EventsContent(
         }
     }
     confirmDelete?.let { row ->
-        DeleteEventDialog(row.title, onConfirm = { onDelete(row.id); confirmDelete = null }, onDismiss = { confirmDelete = null })
+        DeleteEventDialog(row.title, onConfirm = {
+            onDelete(row.id)
+            confirmDelete = null
+        }, onDismiss = { confirmDelete = null })
     }
 }
 
@@ -169,7 +172,12 @@ private fun EventsPreview() {
                 upcoming = listOf(EventRowUi("1", "Book club", "Wed 11 Nov · 18:30 – 21:00", "At Hana's", "NOV", "11", canDelete = true, calendar = CalendarStatus())),
                 calendar = AddToCalendarState(),
             ),
-            onBack = {}, onAddEvent = {}, onOpenEvent = {}, onRetry = {}, onAddToCalendar = {}, onDelete = {},
+            onBack = {},
+            onAddEvent = {},
+            onOpenEvent = {},
+            onRetry = {},
+            onAddToCalendar = {},
+            onDelete = {},
         )
     }
 }

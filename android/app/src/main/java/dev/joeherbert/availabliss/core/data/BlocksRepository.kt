@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.core.data
 
+import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.AvailablissApi
 import dev.joeherbert.availabliss.core.network.JsonPatchBuilder
@@ -8,7 +9,6 @@ import dev.joeherbert.availabliss.core.network.map
 import dev.joeherbert.availabliss.core.network.model.BusyInterval
 import dev.joeherbert.availabliss.core.network.model.CreateBlockRequest
 import dev.joeherbert.availabliss.core.network.model.ManualBlock
-import dev.joeherbert.availabliss.core.common.DateTimes
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton

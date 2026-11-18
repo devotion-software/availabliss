@@ -231,6 +231,9 @@ private fun AddPreferenceSheet(saving: Boolean, error: String?, onDismiss: () ->
         )
     }
     if (pickingDates) {
-        AvDateRangePickerDialog(fromDate, toDate, { from, to -> fromDate = from; toDate = to }, { pickingDates = false })
+        AvDateRangePickerDialog(fromDate, toDate, { from, to ->
+            fromDate = from
+            toDate = to
+        }, { pickingDates = false })
     }
 }

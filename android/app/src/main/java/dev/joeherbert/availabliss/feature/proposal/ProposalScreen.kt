@@ -1,9 +1,5 @@
 package dev.joeherbert.availabliss.feature.proposal
 
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.foundation.clickable
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.semantics.Role
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
@@ -13,6 +9,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,12 +34,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -57,10 +57,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.network.model.ProposalStatus
 import dev.joeherbert.availabliss.core.network.model.ResponseKind
-import dev.joeherbert.availabliss.designsystem.component.Avatar
-import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
+import dev.joeherbert.availabliss.designsystem.component.Avatar
+import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
 import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
@@ -165,86 +165,86 @@ private fun PendingContent(state: ProposalUiState, actions: ProposalActions) {
             state.error?.let { ErrorBanner(it, onRetry = actions.onRetry) }
             if (state.loading && state.range.isEmpty()) LoadingIndicator()
             if (state.range.isNotEmpty()) {
-            GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.cardLarge, contentPadding = PaddingValues(18.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(state.proposedBy, style = AvailablissTheme.type.captionStrong, color = colors.muted)
-                        state.title?.let { Text(it, style = AvailablissTheme.type.bodyMedium, color = colors.ink) }
-                        Text(state.range, style = AvailablissTheme.type.headlineLarge, color = colors.ink, modifier = Modifier.semantics { heading() })
-                        if (state.detail.isNotEmpty()) Text(state.detail, style = AvailablissTheme.type.labelRegular.copy(fontWeight = FontWeight.Normal), color = colors.muted)
-                    }
-                    val total = state.total.coerceAtLeast(1)
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SyncRing(
-                            progress = state.accepted / total.toFloat(),
-                            size = 76.dp,
-                            strokeWidth = 7.dp,
-                            color = colors.ok,
-                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("${state.accepted}/${state.total}", style = AvailablissTheme.type.titleMedium, color = colors.ink)
-                                Text("accepted", style = AvailablissTheme.type.nano.copy(fontWeight = FontWeight.Normal), color = colors.muted)
-                            }
+                GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.cardLarge, contentPadding = PaddingValues(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(state.proposedBy, style = AvailablissTheme.type.captionStrong, color = colors.muted)
+                            state.title?.let { Text(it, style = AvailablissTheme.type.bodyMedium, color = colors.ink) }
+                            Text(state.range, style = AvailablissTheme.type.headlineLarge, color = colors.ink, modifier = Modifier.semantics { heading() })
+                            if (state.detail.isNotEmpty()) Text(state.detail, style = AvailablissTheme.type.labelRegular.copy(fontWeight = FontWeight.Normal), color = colors.muted)
                         }
-                        // Maybes are counted apart from the firm yeses in the ring.
-                        if (state.maybe > 0) StatusPill("${state.maybe} maybe", PillTone.Indigo)
+                        val total = state.total.coerceAtLeast(1)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SyncRing(
+                                progress = state.accepted / total.toFloat(),
+                                size = 76.dp,
+                                strokeWidth = 7.dp,
+                                color = colors.ok,
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("${state.accepted}/${state.total}", style = AvailablissTheme.type.titleMedium, color = colors.ink)
+                                    Text("accepted", style = AvailablissTheme.type.nano.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                                }
+                            }
+                            // Maybes are counted apart from the firm yeses in the ring.
+                            if (state.maybe > 0) StatusPill("${state.maybe} maybe", PillTone.Indigo)
+                        }
                     }
                 }
-            }
 
-            state.clash?.let { ClashPanel(it, state.clashDetail) }
+                state.clash?.let { ClashPanel(it, state.clashDetail) }
 
-            if (state.members.isNotEmpty()) {
-                GlassPanel(
-                    Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.Top,
-                ) {
-                    state.members.forEachIndexed { index, member ->
-                        if (index > 0) RowDivider()
-                        MemberRow(member, onOverride = { actions.onOverride(member.userId, it) })
+                if (state.members.isNotEmpty()) {
+                    GlassPanel(
+                        Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.Top,
+                    ) {
+                        state.members.forEachIndexed { index, member ->
+                            if (index > 0) RowDivider()
+                            MemberRow(member, onOverride = { actions.onOverride(member.userId, it) })
+                        }
                     }
                 }
-            }
 
-            if (state.canConfirmAnyway) {
-                var confirming by remember { mutableStateOf(false) }
-                SecondaryButton(
-                    text = "Confirm anyway",
-                    onClick = { confirming = true },
-                    icon = AvIcons.Check,
-                    enabled = !state.responding,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    "Not everyone can make it? Go ahead with who can.",
-                    style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
-                    color = colors.muted,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (confirming) {
-                    ConfirmSheet(
-                        title = "Confirm anyway?",
-                        message = state.confirmAnywayMessage,
-                        options = listOf(
-                            ConfirmOption("Confirm the plan", onClick = {
-                                confirming = false
-                                actions.onConfirmAnyway()
-                            }, icon = AvIcons.Check),
-                        ),
-                        onDismiss = { confirming = false },
+                if (state.canConfirmAnyway) {
+                    var confirming by remember { mutableStateOf(false) }
+                    SecondaryButton(
+                        text = "Confirm anyway",
+                        onClick = { confirming = true },
+                        icon = AvIcons.Check,
+                        enabled = !state.responding,
+                        modifier = Modifier.fillMaxWidth(),
                     )
+                    Text(
+                        "Not everyone can make it? Go ahead with who can.",
+                        style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
+                        color = colors.muted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (confirming) {
+                        ConfirmSheet(
+                            title = "Confirm anyway?",
+                            message = state.confirmAnywayMessage,
+                            options = listOf(
+                                ConfirmOption("Confirm the plan", onClick = {
+                                    confirming = false
+                                    actions.onConfirmAnyway()
+                                }, icon = AvIcons.Check),
+                            ),
+                            onDismiss = { confirming = false },
+                        )
+                    }
                 }
-            }
 
-            if (state.isAdmin) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(AvIcons.Shield, null, tint = colors.muted, modifier = Modifier.size(14.dp))
-                    Text("As an admin you can set anyone's reply.", style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                if (state.isAdmin) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(AvIcons.Shield, null, tint = colors.muted, modifier = Modifier.size(14.dp))
+                        Text("As an admin you can set anyone's reply.", style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                    }
                 }
-            }
             }
         }
 
@@ -661,8 +661,10 @@ private fun ProposalPendingPreview() {
 private fun ProposalConfirmedPreview() {
     AvailablissPreviewTheme(dark = true) {
         ProposalContent(
-            ProposalUiState(loading = false, groupName = "Lake District crew", range = "Sat 14 Nov · 18:30 – 21:00", rangeDate = "Sat 14 Nov", rangeTime = "18:30 – 21:00", total = 4, location = "Keswick", status = ProposalStatus.Confirmed,
-                coming = previewMembers.take(2), maybes = previewMembers.slice(2..2), joinedLater = previewMembers.drop(3), everyoneIn = false, invited = 3),
+            ProposalUiState(
+                loading = false, groupName = "Lake District crew", range = "Sat 14 Nov · 18:30 – 21:00", rangeDate = "Sat 14 Nov", rangeTime = "18:30 – 21:00", total = 4, location = "Keswick", status = ProposalStatus.Confirmed,
+                coming = previewMembers.take(2), maybes = previewMembers.slice(2..2), joinedLater = previewMembers.drop(3), everyoneIn = false, invited = 3
+            ),
             ProposalActions(),
         )
     }

@@ -7,12 +7,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import dev.joeherbert.availabliss.core.network.model.BusyInterval
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -24,8 +21,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.network.model.BusyInterval
 import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.component.swipeToStep
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
@@ -212,7 +212,10 @@ private fun BackChip(label: String, onClick: () -> Unit) {
             .clearAndSetSemantics {
                 contentDescription = "Back to ${label.lowercase()}"
                 role = Role.Button
-                onClick { onClick(); true }
+                onClick {
+                    onClick()
+                    true
+                }
             }
             .padding(start = Spacing.xs, end = Spacing.m),
         verticalAlignment = Alignment.CenterVertically,
@@ -236,7 +239,10 @@ private fun BlockChip(onClick: () -> Unit) {
             .clearAndSetSemantics {
                 contentDescription = "Block time on this day"
                 role = Role.Button
-                onClick { onClick(); true }
+                onClick {
+                    onClick()
+                    true
+                }
             }
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -283,7 +289,10 @@ private fun StripDay(date: LocalDate, row: DayRowUi?, selected: Boolean, today: 
             .clearAndSetSemantics {
                 contentDescription = label
                 this.selected = selected
-                if (enabled) onClick { onClick(); true }
+                if (enabled) onClick {
+                    onClick()
+                    true
+                }
             }
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

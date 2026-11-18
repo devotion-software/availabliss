@@ -1,7 +1,5 @@
 package dev.joeherbert.availabliss.feature.plan
 
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -19,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +45,7 @@ import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
+import kotlinx.coroutines.launch
 
 /**
  * "Availabliss Pro" sheet: what Pro adds and how to get it on Google Play. Pro bought on

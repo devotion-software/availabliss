@@ -174,54 +174,57 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
     val plainToday = cell.today && cell.state != CellState.Match
     val fade = if (cell.state == CellState.Busy) BUSY_FADE else 1f
     Box(modifier) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .height(54.dp)
-            .then(if (solid) Modifier.softShadow(shape, colors.accent, offsetY = 12.dp, blur = 24.dp, spread = (-14).dp) else Modifier)
-            .alpha(if (plainToday) 1f else fade)
-            .clip(shape)
-            .background(if (plainToday) bg.copy(alpha = bg.alpha * fade) else bg)
-            // The selected day: a ring inside the cell, so it never reaches the neighbouring days. It takes over
-            // from today's outline (only ever one ring); on a day that works, a light inner ring reads on the fill.
-            .then(
-                when {
-                    cell.selected && solid -> Modifier.insetRing(shape, colors.onAccent, inset = 2.dp)
-                    cell.selected -> Modifier.border(2.dp, colors.ink, shape)
-                    plainToday -> Modifier.todayOutline(true, shape, border)
-                    partial -> Modifier.border(1.5.dp, border, shape)
-                    else -> Modifier.border(1.dp, border, shape)
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .then(if (solid) Modifier.softShadow(shape, colors.accent, offsetY = 12.dp, blur = 24.dp, spread = (-14).dp) else Modifier)
+                .alpha(if (plainToday) 1f else fade)
+                .clip(shape)
+                .background(if (plainToday) bg.copy(alpha = bg.alpha * fade) else bg)
+                // The selected day: a ring inside the cell, so it never reaches the neighbouring days. It takes over
+                // from today's outline (only ever one ring); on a day that works, a light inner ring reads on the fill.
+                .then(
+                    when {
+                        cell.selected && solid -> Modifier.insetRing(shape, colors.onAccent, inset = 2.dp)
+                        cell.selected -> Modifier.border(2.dp, colors.ink, shape)
+                        plainToday -> Modifier.todayOutline(true, shape, border)
+                        partial -> Modifier.border(1.5.dp, border, shape)
+                        else -> Modifier.border(1.dp, border, shape)
+                    },
+                )
+                .clickable(role = Role.Button, onClick = onClick)
+                .semantics {
+                    contentDescription = cell.accessibilityLabel
+                    selected = cell.selected
+                }
+                .padding(horizontal = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+        ) {
+            // Today's pill is inverted on a cell already filled with the accent.
+            val onAccent = solid
+            Text(
+                cell.date.dayOfMonth.toString(),
+                fontSize = 17.sp,
+                fontWeight = AvWeights.Display650,
+                lineHeight = 17.sp,
+                // Today on a partial day sits on an accent pill (the cell's own fill is soft).
+                color = when {
+                    plainToday -> colors.accentInk
+                    !cell.today -> fg
+                    onAccent -> colors.accent
+                    else -> colors.onAccent
                 },
+                modifier = Modifier.todayPill(cell.today && cell.state == CellState.Match, if (onAccent) colors.onAccent else colors.accent),
             )
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics {
-                contentDescription = cell.accessibilityLabel
-                selected = cell.selected
-            }
-            .padding(horizontal = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-    ) {
-        // Today's pill is inverted on a cell already filled with the accent.
-        val onAccent = solid
-        Text(
-            cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp,
-            // Today on a partial day sits on an accent pill (the cell's own fill is soft).
-            color = when {
-                plainToday -> colors.accentInk
-                !cell.today -> fg
-                onAccent -> colors.accent
-                else -> colors.onAccent
-            },
-            modifier = Modifier.todayPill(cell.today && cell.state == CellState.Match, if (onAccent) colors.onAccent else colors.accent),
-        )
-        Text(cell.note, style = AvailablissTheme.type.micro, color = if (plainToday) colors.muted else fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-    if (cell.state == CellState.Match && cell.preferredCount > 0) {
-        Row(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.Icon(dev.joeherbert.availabliss.designsystem.icon.AvIcons.Heart, null, tint = fg, modifier = Modifier.size(9.dp))
-            Text(cell.preferredCount.toString(), fontSize = 9.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = fg)
+            Text(cell.note, style = AvailablissTheme.type.micro, color = if (plainToday) colors.muted else fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-    }
+        if (cell.state == CellState.Match && cell.preferredCount > 0) {
+            Row(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Icon(dev.joeherbert.availabliss.designsystem.icon.AvIcons.Heart, null, tint = fg, modifier = Modifier.size(9.dp))
+                Text(cell.preferredCount.toString(), fontSize = 9.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = fg)
+            }
+        }
     }
 }
 
@@ -245,7 +248,10 @@ private fun HiddenCell(cell: MonthCellUi, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
         Text(
-            cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp,
+            cell.date.dayOfMonth.toString(),
+            fontSize = 17.sp,
+            fontWeight = AvWeights.Display650,
+            lineHeight = 17.sp,
             color = if (cell.today) colors.accentInk else colors.ink,
         )
         Text(cell.note, style = AvailablissTheme.type.micro, color = if (cell.today) colors.muted else colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)

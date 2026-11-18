@@ -1,7 +1,5 @@
 package dev.joeherbert.availabliss.feature.onboarding
 
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.remember
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -28,28 +26,28 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import dev.joeherbert.availabliss.feature.timing.CustomLengthEditor
-import dev.joeherbert.availabliss.feature.timing.TimingPreset
-import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
-import dev.joeherbert.availabliss.designsystem.component.Chip
-import dev.joeherbert.availabliss.designsystem.component.AvTextField
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
+import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
+import dev.joeherbert.availabliss.designsystem.component.Chip
 import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
+import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.StepIndicator
 import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
@@ -65,6 +63,8 @@ import dev.joeherbert.availabliss.feature.calendars.rememberCalendarPermissionRe
 import dev.joeherbert.availabliss.feature.common.InviteLinkSection
 import dev.joeherbert.availabliss.feature.common.InviteRecipientsField
 import dev.joeherbert.availabliss.feature.common.UsernameField
+import dev.joeherbert.availabliss.feature.timing.CustomLengthEditor
+import dev.joeherbert.availabliss.feature.timing.TimingPreset
 
 /** The sign-up wizard: about you, calendars, your first group, invite people. */
 @Composable

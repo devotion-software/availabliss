@@ -1,6 +1,5 @@
 package dev.joeherbert.availabliss.feature.availability
 
-import kotlinx.coroutines.delay
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,9 +16,9 @@ import dev.joeherbert.availabliss.core.live.LivePayload
 import dev.joeherbert.availabliss.core.network.ApiError
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.getOrNull
+import dev.joeherbert.availabliss.core.network.model.AiPlannerAccess
 import dev.joeherbert.availabliss.core.network.model.Availability
 import dev.joeherbert.availabliss.core.network.model.DayAvailability
-import dev.joeherbert.availabliss.core.network.model.AiPlannerAccess
 import dev.joeherbert.availabliss.core.network.model.DayStatus
 import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.NextSuggestion
@@ -37,6 +36,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -588,7 +588,7 @@ class GroupCalendarViewModel @Inject constructor(
             val next = freeDay(maxOf(end.plusDays(1), DateTimes.today()), range.second, forward = true)
             val previous = freeDay(earliest, start.minusDays(1), forward = false)
             val now = raw.value
-            if (now.view != r.view || now.month != r.month || DateTimes.startOfWeek(now.selected) != DateTimes.startOfWeek(r.selected) && r.view == CalendarView.Week) return@launch
+            if (now.view != r.view || now.month != r.month || (DateTimes.startOfWeek(now.selected) != DateTimes.startOfWeek(r.selected) && r.view == CalendarView.Week)) return@launch
             raw.update { it.copy(previousFree = previous, nextFree = next, findingFree = false) }
         }
     }

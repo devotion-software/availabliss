@@ -8,10 +8,10 @@ import dev.joeherbert.availabliss.core.network.model.Attachment
 import dev.joeherbert.availabliss.core.network.model.AttachmentKind
 import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUiKind
 import dev.joeherbert.availabliss.designsystem.component.chat.MAX_ATTACHMENTS
-import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 /** Photos and files: picked and uploaded in the composer, and opened, shared or saved from messages. */
 internal class ChatAttachments(

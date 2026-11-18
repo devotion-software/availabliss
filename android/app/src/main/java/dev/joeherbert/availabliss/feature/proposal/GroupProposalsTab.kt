@@ -1,30 +1,14 @@
 package dev.joeherbert.availabliss.feature.proposal
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
-import dev.joeherbert.availabliss.designsystem.component.GlassPillButton
-import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
-import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
-import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
-import dev.joeherbert.availabliss.feature.common.CalendarStatus
-import dev.joeherbert.availabliss.feature.events.DeleteEventDialog
-import dev.joeherbert.availabliss.feature.events.EventRow
-import dev.joeherbert.availabliss.feature.events.EventRowUi
-import dev.joeherbert.availabliss.feature.events.EventsUiState
-import dev.joeherbert.availabliss.feature.events.EventsViewModel
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -34,28 +18,44 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.EmptyState
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
+import dev.joeherbert.availabliss.designsystem.component.GlassPillButton
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
+import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCard
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardTone
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardUi
+import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
+import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
+import dev.joeherbert.availabliss.feature.common.CalendarStatus
+import dev.joeherbert.availabliss.feature.events.DeleteEventDialog
+import dev.joeherbert.availabliss.feature.events.EventRow
+import dev.joeherbert.availabliss.feature.events.EventRowUi
+import dev.joeherbert.availabliss.feature.events.EventsUiState
+import dev.joeherbert.availabliss.feature.events.EventsViewModel
 
 /**
  * The group's Plans screen, matching iOS: what's coming up first (events, with Add to calendar),
@@ -159,7 +159,10 @@ private fun GroupProposalsContent(
         }
     }
     confirmDelete?.let { row ->
-        DeleteEventDialog(row.title, onConfirm = { onDeleteEvent(row.id); confirmDelete = null }, onDismiss = { confirmDelete = null })
+        DeleteEventDialog(row.title, onConfirm = {
+            onDeleteEvent(row.id)
+            confirmDelete = null
+        }, onDismiss = { confirmDelete = null })
     }
 }
 

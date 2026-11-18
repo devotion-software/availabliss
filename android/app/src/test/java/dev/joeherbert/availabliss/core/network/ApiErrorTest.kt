@@ -1,10 +1,10 @@
 package dev.joeherbert.availabliss.core.network
 
+import dev.joeherbert.availabliss.core.network.model.DateRange
 import dev.joeherbert.availabliss.core.network.model.GroupStatus
 import dev.joeherbert.availabliss.core.network.model.GroupSummary
 import dev.joeherbert.availabliss.core.network.model.Requirement
 import dev.joeherbert.availabliss.core.network.model.RequirementLength
-import dev.joeherbert.availabliss.core.network.model.DateRange
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

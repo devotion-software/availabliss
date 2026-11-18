@@ -51,30 +51,29 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.joeherbert.availabliss.core.network.model.Role as GroupRole
 import dev.joeherbert.availabliss.core.network.model.Member
 import dev.joeherbert.availabliss.core.network.model.RhythmEvery
 import dev.joeherbert.availabliss.core.network.model.TileColor
-import dev.joeherbert.availabliss.designsystem.component.Avatar
-import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
-import dev.joeherbert.availabliss.designsystem.component.PillTone
-import dev.joeherbert.availabliss.designsystem.component.RowDivider
-import dev.joeherbert.availabliss.designsystem.component.StatusPill
-import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
+import dev.joeherbert.availabliss.designsystem.component.Avatar
+import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.GroupTile
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
+import dev.joeherbert.availabliss.designsystem.component.PillTone
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
+import dev.joeherbert.availabliss.designsystem.component.RowDivider
 import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
 import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
+import dev.joeherbert.availabliss.designsystem.component.StatusPill
+import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.ToggleRow
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
@@ -85,6 +84,7 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import dev.joeherbert.availabliss.feature.common.rememberPhotoPicker
 import dev.joeherbert.availabliss.feature.newgroup.GroupColorPicker
+import dev.joeherbert.availabliss.core.network.model.Role as GroupRole
 
 /**
  * Group settings, from the group's More menu: its photo, name and colour, Archive / Unarchive, Leave
@@ -243,10 +243,16 @@ private fun PhotoCard(state: GroupSettingsUiState, actions: GroupSettingsActions
                     }
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = colors.bg) {
-                    DropdownMenuItem(text = { Text("Choose a new photo", style = type.bodySmallStrong) }, onClick = { menu = false; actions.onPickPhoto() })
+                    DropdownMenuItem(text = { Text("Choose a new photo", style = type.bodySmallStrong) }, onClick = {
+                        menu = false
+                        actions.onPickPhoto()
+                    })
                     DropdownMenuItem(
                         text = { Text("Remove photo", style = type.bodySmallStrong, color = colors.warnInk) },
-                        onClick = { menu = false; actions.onRemovePhoto() },
+                        onClick = {
+                            menu = false
+                            actions.onRemovePhoto()
+                        },
                     )
                 }
             }

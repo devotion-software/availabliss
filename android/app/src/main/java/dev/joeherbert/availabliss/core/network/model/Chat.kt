@@ -206,7 +206,7 @@ fun Message.asReply(authorName: String? = null): MessageReply = MessageReply(
             attachments.isNotEmpty() -> displayText ?: attachmentsSummary(attachments)
             else -> body
         }
-    )?.split(Regex("\\s+"))?.joinToString(" ")?.trim(),
+        )?.split(Regex("\\s+"))?.joinToString(" ")?.trim(),
     deleted = deleted,
 )
 

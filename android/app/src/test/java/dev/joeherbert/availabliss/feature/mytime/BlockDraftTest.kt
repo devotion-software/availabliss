@@ -4,12 +4,12 @@ import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.ManualBlock
 import dev.joeherbert.availabliss.core.network.model.Repeat
 import dev.joeherbert.availabliss.core.network.model.wireName
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -139,7 +139,10 @@ class BlockDraftTest {
 
     @Test
     fun repeat_decodesNewValuesAndUnknownOnesSafely() {
-        val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
+        val json = Json {
+            ignoreUnknownKeys = true
+            coerceInputValues = true
+        }
         fun decode(repeat: String) = json.decodeFromString(ManualBlock.serializer(), """{"id":"b","start":"s","end":"e","repeat":"$repeat"}""").repeat
         assertEquals(Repeat.MonthlyWeekday, decode("monthlyWeekday"))
         assertEquals(Repeat.Weekdays, decode("weekdays"))

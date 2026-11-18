@@ -173,7 +173,12 @@ private fun PollCardPreview() {
         Box(Modifier.background(AvailablissTheme.colors.bg).padding(16.dp)) {
             PollCard(
                 PollUi(
-                    id = "p", question = "Where should we stay?", totalVotes = 5, multi = false, closed = false, title = "Poll by Ana",
+                    id = "p",
+                    question = "Where should we stay?",
+                    totalVotes = 5,
+                    multi = false,
+                    closed = false,
+                    title = "Poll by Ana",
                     options = listOf(
                         PollOptionUi("a", "Keswick cottage", 3, mine = true, leading = true),
                         PollOptionUi("b", "Ambleside YHA", 1, mine = false, leading = false),

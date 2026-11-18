@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.feature.members
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,16 +18,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.background
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
-import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
@@ -35,6 +34,7 @@ import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
+import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.VennLogo
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
@@ -196,7 +196,9 @@ private fun InvitePreview() {
     AvailablissPreviewTheme {
         InviteContent(
             InviteUiState(loading = false, preview = InvitePreviewUi("Lake District crew", "Ana", 6, "Expires 14 Nov")),
-            onBack = {}, onJoin = {}, onRetry = {},
+            onBack = {},
+            onJoin = {},
+            onRetry = {},
         )
     }
 }

@@ -76,23 +76,25 @@ fun OsmMap(lat: Double, lng: Double, modifier: Modifier = Modifier, zoom: Int = 
         val lastX = floor((left + maxWidth.value) / t).toInt()
         val firstY = floor(top / t).toInt()
         val lastY = floor((top + maxHeight.value) / t).toInt()
-        for (x in firstX..lastX) for (y in firstY..lastY) {
-            if (y < 0 || y >= n.toInt()) continue
-            val wrappedX = Math.floorMod(x, n.toInt())
-            val request = remember(zoom, wrappedX, y) {
-                ImageRequest.Builder(context)
-                    .data("https://tile.openstreetmap.org/$zoom/$wrappedX/$y.png")
-                    .httpHeaders(headers)
-                    .build()
+        for (x in firstX..lastX) {
+            for (y in firstY..lastY) {
+                if (y < 0 || y >= n.toInt()) continue
+                val wrappedX = Math.floorMod(x, n.toInt())
+                val request = remember(zoom, wrappedX, y) {
+                    ImageRequest.Builder(context)
+                        .data("https://tile.openstreetmap.org/$zoom/$wrappedX/$y.png")
+                        .httpHeaders(headers)
+                        .build()
+                }
+                AsyncImage(
+                    model = request,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier
+                        .offset(x = (x * t - left).toFloat().dp, y = (y * t - top).toFloat().dp)
+                        .size(tileSize),
+                )
             }
-            AsyncImage(
-                model = request,
-                contentDescription = null,
-                contentScale = ContentScale.FillBounds,
-                modifier = Modifier
-                    .offset(x = (x * t - left).toFloat().dp, y = (y * t - top).toFloat().dp)
-                    .size(tileSize),
-            )
         }
         if (showPin) MapPin(Modifier.align(Alignment.Center))
         Text(

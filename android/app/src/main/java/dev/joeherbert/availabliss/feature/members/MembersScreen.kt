@@ -1,6 +1,5 @@
 package dev.joeherbert.availabliss.feature.members
 
-import androidx.compose.runtime.rememberUpdatedState
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,11 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,11 +25,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -39,13 +39,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.network.model.Role
-import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
-import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
+import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
-import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
+import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
+import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
@@ -66,8 +66,8 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
-import dev.joeherbert.availabliss.feature.common.InviteRecipient
 import dev.joeherbert.availabliss.feature.common.InviteLinkSection
+import dev.joeherbert.availabliss.feature.common.InviteRecipient
 import dev.joeherbert.availabliss.feature.common.InviteRecipientsField
 
 /** Members & invites for one group. (The group's photo, Leave group and Delete group are in Group settings.) */
@@ -213,15 +213,24 @@ private fun MemberRow(member: MemberUi, actions: MembersActions) {
                 PlainIconButton(AvIcons.More, "Manage ${member.name}", { menuOpen = true }, size = 40.dp, iconSize = 18.dp, tint = colors.muted)
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = colors.bg) {
                     if (member.canPromote) {
-                        DropdownMenuItem(text = { Text("Make admin", style = type.bodySmallStrong) }, onClick = { menuOpen = false; actions.onPromote(member) })
+                        DropdownMenuItem(text = { Text("Make admin", style = type.bodySmallStrong) }, onClick = {
+                            menuOpen = false
+                            actions.onPromote(member)
+                        })
                     }
                     if (member.canDemote) {
-                        DropdownMenuItem(text = { Text("Make member", style = type.bodySmallStrong) }, onClick = { menuOpen = false; actions.onDemote(member) })
+                        DropdownMenuItem(text = { Text("Make member", style = type.bodySmallStrong) }, onClick = {
+                            menuOpen = false
+                            actions.onDemote(member)
+                        })
                     }
                     if (member.canRemove) {
                         DropdownMenuItem(
                             text = { Text("Remove from group", style = type.bodySmallStrong, color = colors.warnInk) },
-                            onClick = { menuOpen = false; actions.onRemove(member) },
+                            onClick = {
+                                menuOpen = false
+                                actions.onRemove(member)
+                            },
                         )
                     }
                 }

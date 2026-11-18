@@ -25,6 +25,8 @@ browser = "1.10.0"
 coil = "3.6.3"
 revenuecat = "10.30.1"
 junit = "4.13.2"
+spotless = "8.11.0"
+ktlint = "1.8.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -89,3 +91,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

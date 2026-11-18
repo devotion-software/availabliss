@@ -76,11 +76,13 @@ const val WINDOW_MINUTES = DAY_MINUTES - STRIP_FROM
 
 /** Free minutes between 06:00 and 24:00 given the day's [busy] spans (any order, may overlap). */
 fun freeMinutes(busy: List<BusySpan>): Int {
-    val inWindow = mergeSpans(busy.mapNotNull { s ->
-        val from = maxOf(s.from, STRIP_FROM)
-        val to = minOf(s.to, DAY_MINUTES)
-        if (to > from) BusySpan(from, to) else null
-    })
+    val inWindow = mergeSpans(
+        busy.mapNotNull { s ->
+            val from = maxOf(s.from, STRIP_FROM)
+            val to = minOf(s.to, DAY_MINUTES)
+            if (to > from) BusySpan(from, to) else null
+        }
+    )
     return WINDOW_MINUTES - inWindow.sumOf { it.minutes }
 }
 
@@ -111,11 +113,13 @@ fun mergeSpans(spans: List<BusySpan>): List<BusySpan> {
  * Ties go to the later stretch (evenings matter most when making plans).
  */
 fun summarise(busy: List<BusySpan>): DaySummary {
-    val inWindow = mergeSpans(busy.mapNotNull { s ->
-        val from = maxOf(s.from, STRIP_FROM)
-        val to = minOf(s.to, DAY_MINUTES)
-        if (to > from) BusySpan(from, to) else null
-    })
+    val inWindow = mergeSpans(
+        busy.mapNotNull { s ->
+            val from = maxOf(s.from, STRIP_FROM)
+            val to = minOf(s.to, DAY_MINUTES)
+            if (to > from) BusySpan(from, to) else null
+        }
+    )
     if (inWindow.isEmpty()) return DaySummary.FreeAllDay
     val free = ArrayList<BusySpan>()
     var cursor = STRIP_FROM

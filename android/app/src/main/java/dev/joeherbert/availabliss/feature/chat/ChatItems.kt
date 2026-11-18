@@ -4,31 +4,31 @@ import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.Attachment
 import dev.joeherbert.availabliss.core.network.model.AttachmentKind
 import dev.joeherbert.availabliss.core.network.model.GroupEvent
-import dev.joeherbert.availabliss.core.network.model.attachmentsSummary
-import dev.joeherbert.availabliss.core.network.model.displayText
-import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUi
-import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUiKind
-import dev.joeherbert.availabliss.designsystem.component.chat.PassUi
-import dev.joeherbert.availabliss.designsystem.component.chat.passColor
-import dev.joeherbert.availabliss.core.network.model.WalletPass
-import dev.joeherbert.availabliss.designsystem.component.chat.fileIconFor
-import dev.joeherbert.availabliss.designsystem.component.chat.formatFileSize
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageKind
 import dev.joeherbert.availabliss.core.network.model.MessageLocation
 import dev.joeherbert.availabliss.core.network.model.MessageReply
-import dev.joeherbert.availabliss.core.network.model.asReply
-import dev.joeherbert.availabliss.core.network.model.canReply
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.PollSlot
-import dev.joeherbert.availabliss.core.network.model.isDatePoll
 import dev.joeherbert.availabliss.core.network.model.Proposal
+import dev.joeherbert.availabliss.core.network.model.WalletPass
+import dev.joeherbert.availabliss.core.network.model.asReply
+import dev.joeherbert.availabliss.core.network.model.attachmentsSummary
+import dev.joeherbert.availabliss.core.network.model.canReply
+import dev.joeherbert.availabliss.core.network.model.displayText
+import dev.joeherbert.availabliss.core.network.model.isDatePoll
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
+import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUi
+import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUiKind
 import dev.joeherbert.availabliss.designsystem.component.chat.BubbleQuote
+import dev.joeherbert.availabliss.designsystem.component.chat.PassUi
 import dev.joeherbert.availabliss.designsystem.component.chat.PollOptionUi
 import dev.joeherbert.availabliss.designsystem.component.chat.PollUi
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardTone
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardUi
+import dev.joeherbert.availabliss.designsystem.component.chat.fileIconFor
+import dev.joeherbert.availabliss.designsystem.component.chat.formatFileSize
+import dev.joeherbert.availabliss.designsystem.component.chat.passColor
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
 import dev.joeherbert.availabliss.feature.proposal.ProposalFormatting
 import java.time.Duration
@@ -152,7 +152,7 @@ fun buildChatItems(
             m.kind == MessageKind.System && m.eventId != null && events[m.eventId] != null ->
                 items += confirmedItem(m, events.getValue(m.eventId), proposals, now)
 
-            m.kind == MessageKind.System || m.authorId == null && m.kind == MessageKind.Text ->
+            m.kind == MessageKind.System || (m.authorId == null && m.kind == MessageKind.Text) ->
                 items += ChatItem.System(m.id, m.body.orEmpty())
 
             m.kind == MessageKind.Poll && m.poll != null ->

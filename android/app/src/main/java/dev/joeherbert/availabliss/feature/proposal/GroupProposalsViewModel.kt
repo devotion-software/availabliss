@@ -13,9 +13,9 @@ import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ProposalStatus
+import dev.joeherbert.availabliss.core.network.model.ResponseKind
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardUi
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
-import dev.joeherbert.availabliss.core.network.model.ResponseKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

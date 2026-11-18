@@ -10,13 +10,13 @@ import dev.joeherbert.availabliss.core.network.PasskeyCookieJar
 import dev.joeherbert.availabliss.core.network.apiCall
 import dev.joeherbert.availabliss.core.network.map
 import dev.joeherbert.availabliss.core.network.model.EmailOtpSignInRequest
+import dev.joeherbert.availabliss.core.network.model.NativeSignInCodeRequest
 import dev.joeherbert.availabliss.core.network.model.PasskeyRegisterRequest
 import dev.joeherbert.availabliss.core.network.model.PasskeyVerifyRequest
 import dev.joeherbert.availabliss.core.network.model.SendOtpRequest
 import dev.joeherbert.availabliss.core.network.model.SignInResponse
 import dev.joeherbert.availabliss.core.network.model.SocialIdToken
 import dev.joeherbert.availabliss.core.network.model.SocialIdTokenSignInRequest
-import dev.joeherbert.availabliss.core.network.model.NativeSignInCodeRequest
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.core.network.toApiError
 import kotlinx.serialization.json.Json

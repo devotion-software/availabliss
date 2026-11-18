@@ -72,7 +72,9 @@ fun DateRangeInput(
     val shown = open?.takeUnless { draft.allDay && (it == RangePart.StartTime || it == RangePart.EndTime) }
     val current by rememberUpdatedState(draft)
     val change by rememberUpdatedState(onChange)
-    fun toggle(part: RangePart) { open = if (shown == part) null else part }
+    fun toggle(part: RangePart) {
+        open = if (shown == part) null else part
+    }
 
     Column(modifier.fillMaxWidth().animateContentSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         ToggleRow(title = "All day", checked = draft.allDay, onCheckedChange = { onChange(draft.withAllDay(it)) }, minHeight = 44.dp)
