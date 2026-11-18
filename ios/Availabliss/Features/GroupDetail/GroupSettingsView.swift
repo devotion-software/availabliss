@@ -41,7 +41,7 @@ struct GroupSettingsView: View {
                 detailsCard
                 if canEdit { archiveCard }
                 leaveCard
-                if isOwner { deleteButton }
+                if isOwner { deleteCard }
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -286,11 +286,21 @@ struct GroupSettingsView: View {
 
     // MARK: Delete
 
-    private var deleteButton: some View {
-        Button("Delete group") { confirmsDelete = true }
-            .buttonStyle(.textAction)
-            .foregroundStyle(theme.warnInk)
-            .frame(maxWidth: .infinity)
+    /// Only the owner sees it. Its own card, like Leave group, so it reads as a deliberate step rather than a stray link.
+    private var deleteCard: some View {
+        GlassPanel(cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Delete group").bodyFont(15, .semibold)
+                Text("Deletes it for everyone in it, with its chat, plans and photos.")
+                    .bodyFont(13, relativeTo: .subheadline)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button { confirmsDelete = true } label: {
+                Label("Delete group", systemImage: "trash")
+            }
+            .buttonStyle(.filled(.warning, height: 44, cornerRadius: 14, fontSize: 14))
+        }
     }
 
     private var deleteSheet: some View {
