@@ -23,6 +23,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
+import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
@@ -59,6 +63,40 @@ fun InviteScreen(
             onSignOut()
         },
     )
+    if (state.askingName) {
+        GroupNameSheet(state, onNameChange = viewModel::onNameChange, onUse = viewModel::useName, onKeep = viewModel::keepAccountName)
+    }
+}
+
+/** After joining: how the group should see you, prefilled with your account name. Skippable (keeping it, or dismissing). */
+@Composable
+private fun GroupNameSheet(state: InviteUiState, onNameChange: (String) -> Unit, onUse: () -> Unit, onKeep: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    AvBottomSheet(title = "How should ${state.preview?.groupName ?: "the group"} see you?", onDismissRequest = onKeep) {
+        Text(
+            "You can go by a different name in this group, like a nickname. Only this group sees it, and you can change it any time in Group settings.",
+            style = type.body,
+            color = colors.muted,
+        )
+        AvTextField(
+            value = state.nameDraft,
+            onValueChange = onNameChange,
+            placeholder = state.accountName,
+            capitalization = KeyboardCapitalization.Words,
+            imeAction = ImeAction.Done,
+            onImeAction = onUse,
+        )
+        state.error?.let { ErrorBanner(it) }
+        PrimaryButton(
+            "Use this name",
+            onUse,
+            loading = state.savingName,
+            enabled = state.nameDraft.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        TextAction("Keep ${state.accountName}", onKeep, enabled = !state.savingName, modifier = Modifier.align(Alignment.CenterHorizontally))
+    }
 }
 
 @Composable

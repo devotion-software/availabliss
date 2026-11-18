@@ -59,6 +59,7 @@ import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.PillTone
 import dev.joeherbert.availabliss.designsystem.component.RowDivider
 import dev.joeherbert.availabliss.designsystem.component.StatusPill
+import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
@@ -109,6 +110,9 @@ fun GroupSettingsScreen(onBack: () -> Unit, onDeleted: () -> Unit, viewModel: Gr
             onNameChange = viewModel::onNameChange,
             onSaveName = viewModel::saveName,
             onColor = viewModel::setColor,
+            onMyNameChange = viewModel::onMyNameChange,
+            onSaveMyName = { viewModel.saveMyName() },
+            onUseAccountName = { viewModel.saveMyName(null) },
             onToggleArchived = viewModel::toggleArchived,
             onAutoArchive = viewModel::setAutoArchive,
             onDelete = viewModel::requestDelete,
@@ -140,6 +144,9 @@ data class GroupSettingsActions(
     val onNameChange: (String) -> Unit = {},
     val onSaveName: () -> Unit = {},
     val onColor: (TileColor) -> Unit = {},
+    val onMyNameChange: (String) -> Unit = {},
+    val onSaveMyName: () -> Unit = {},
+    val onUseAccountName: () -> Unit = {},
     val onToggleArchived: () -> Unit = {},
     val onAutoArchive: (Boolean) -> Unit = {},
     val onDelete: () -> Unit = {},
@@ -171,6 +178,7 @@ fun GroupSettingsContent(state: GroupSettingsUiState, snackbar: SnackbarHostStat
                 } else if (state.groupName.isNotBlank()) {
                     PhotoCard(state, actions)
                     DetailsCard(state, actions)
+                    MyNameCard(state, actions)
                     if (state.canEdit) ArchiveCard(state, actions)
                     LeaveCard(state, actions)
                     if (state.canDelete) DeleteCard(actions)
@@ -280,6 +288,48 @@ private fun DetailsCard(state: GroupSettingsUiState, actions: GroupSettingsActio
             modifier = if (state.canEdit) Modifier else Modifier.alpha(0.6f),
             enabled = state.canEdit,
         )
+    }
+}
+
+/** Everyone can choose the name they go by in this group (a nickname, say); blank goes back to the account name. */
+@Composable
+private fun MyNameCard(state: GroupSettingsUiState, actions: GroupSettingsActions) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    GlassPanel(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Your name in this group", style = type.bodySmallStrong, color = colors.ink)
+            Text(
+                if (state.myNameInGroup == null) {
+                    "${state.groupName} sees you as ${state.accountName}, your account name. Choose another name just for this group."
+                } else {
+                    "Only ${state.groupName} sees this. Everywhere else you're ${state.accountName}."
+                },
+                style = type.caption.copy(fontWeight = FontWeight.Normal),
+                color = colors.muted,
+            )
+        }
+        AvTextField(
+            value = state.myNameDraft,
+            onValueChange = actions.onMyNameChange,
+            placeholder = state.accountName,
+            capitalization = KeyboardCapitalization.Words,
+            imeAction = ImeAction.Done,
+            onImeAction = actions.onSaveMyName,
+        )
+        if (state.myNameChanged) {
+            PrimaryButton(
+                text = "Save name",
+                onClick = actions.onSaveMyName,
+                style = ButtonStyle.Accent,
+                height = 48.dp,
+                shape = Shapes.control,
+                loading = state.savingMyName,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else if (state.myNameInGroup != null) {
+            TextAction("Use ${state.accountName} instead", actions.onUseAccountName, enabled = !state.savingMyName)
+        }
     }
 }
 

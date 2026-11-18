@@ -223,6 +223,10 @@ interface AvailablissApi {
         @Body body: MemberRoleRequest,
     ): Member
 
+    /** Sets (or with null, clears) the name you go by in the group. */
+    @PATCH("api/v1/groups/{id}/members/me")
+    suspend fun setMyName(@Path("id") groupId: String, @Body body: dev.joeherbert.availabliss.core.network.model.MemberNameRequest): Member
+
     /** Removes a member (an admin removing someone else). */
     @DELETE("api/v1/groups/{id}/members/{userId}")
     suspend fun removeMember(@Path("id") groupId: String, @Path("userId") userId: String)

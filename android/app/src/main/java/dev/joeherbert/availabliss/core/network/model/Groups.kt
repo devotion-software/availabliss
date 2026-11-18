@@ -79,6 +79,8 @@ data class Group(
     /** Archive it automatically once its event has passed and nothing else is planned (older servers omit it). */
     val autoArchive: Boolean = false,
     val createdAt: String,
+    /** Only from accepting an invite: false when you were already in the group (null from older servers). */
+    val joined: Boolean? = null,
 )
 
 /** `POST /requirements/preview` body. */
@@ -112,6 +114,10 @@ data class UpdateGroupRequest(
 
 @Serializable
 data class MemberRoleRequest(val role: Role)
+
+/** The name you go by in one group; null goes back to your account name (sent as `null`, which the server needs). */
+@Serializable
+data class MemberNameRequest(val displayName: String?)
 
 /** Leaving: the owner names the admin who becomes the owner (null otherwise, left out of the JSON). */
 @Serializable

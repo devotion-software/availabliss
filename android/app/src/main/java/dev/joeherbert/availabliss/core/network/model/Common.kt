@@ -72,7 +72,10 @@ data class User(
     val schoolAuthority: String? = null,
     val timezone: String = "Europe/London",
     val onboarded: Boolean = false,
-)
+) {
+    /** The name other people see (outside a group that has its own name for them): their name, or their email. */
+    val accountName: String get() = name.trim().ifEmpty { email }
+}
 
 /** Someone found by username, to invite them. */
 @Serializable
@@ -99,7 +102,10 @@ data class UsernameCheck(
 @Serializable
 data class Member(
     val userId: String,
+    /** The name they go by in this group: [nameInGroup] when they've set one, else their account name. */
     val name: String,
+    /** The name they chose for this group, or null for their account name (older servers omit it). */
+    val nameInGroup: String? = null,
     val image: String? = null,
     val role: Role,
     val synced: Boolean,

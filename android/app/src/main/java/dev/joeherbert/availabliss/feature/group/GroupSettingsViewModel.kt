@@ -36,6 +36,12 @@ data class GroupSettingsUiState(
     val role: Role? = null,
     /** The name being edited (starts as the group's name). */
     val nameDraft: String = "",
+    /** Your account name, and the name you go by in this group (null: the account name). */
+    val accountName: String = "",
+    val myNameInGroup: String? = null,
+    /** The name you go by in this group, as typed (empty: your account name). */
+    val myNameDraft: String = "",
+    val savingMyName: Boolean = false,
     val uploadingPhoto: Boolean = false,
     val savingName: Boolean = false,
     val archiving: Boolean = false,
@@ -60,6 +66,9 @@ data class GroupSettingsUiState(
     /** Only the owner can delete the group. */
     val canDelete: Boolean get() = role == Role.Owner
     val nameChanged: Boolean get() = nameDraft.isNotBlank() && nameDraft.trim() != groupName
+    /** Blank, or the account name itself, means going by the account name. */
+    val myNameToSave: String? get() = myNameDraft.trim().takeIf { it.isNotEmpty() && it != accountName }
+    val myNameChanged: Boolean get() = myNameToSave != myNameInGroup
 
     // Leaving. A group always keeps an owner (and so an admin), following the server's rules.
     val otherMembers: List<Member> get() = members.filter { it.userId != meId }
@@ -120,6 +129,29 @@ class GroupSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = groups.update(groupId, name = s.nameDraft.trim())
             _state.update { it.copy(savingName = false, message = UserMessage(result.messageOr("Name updated"))) }
+        }
+    }
+
+    fun onMyNameChange(name: String) = _state.update { it.copy(myNameDraft = name) }
+
+    /** Saves the name you go by in this group ([name] null: back to your account name). */
+    fun saveMyName(name: String? = _state.value.myNameToSave) {
+        val s = _state.value
+        if (s.savingMyName || name == s.myNameInGroup) return
+        _state.update { it.copy(savingMyName = true) }
+        viewModelScope.launch {
+            val result = groups.setMyName(groupId, name)
+            _state.update {
+                when (result) {
+                    is ApiResult.Success -> it.copy(
+                        savingMyName = false,
+                        myNameInGroup = result.value.nameInGroup,
+                        myNameDraft = result.value.nameInGroup.orEmpty(),
+                        message = UserMessage(if (name == null) "Back to ${it.accountName}" else "Name updated"),
+                    )
+                    is ApiResult.Failure -> it.copy(savingMyName = false, message = UserMessage(result.error.message))
+                }
+            }
         }
     }
 
@@ -248,7 +280,13 @@ class GroupSettingsViewModel @Inject constructor(
         val me = users.user.value?.id
         // Keep what's being typed; follow renames (here or elsewhere) when the field still shows the old name.
         val draft = if (nameDraft.isEmpty() || nameDraft.trim() == groupName) group.name else nameDraft
+        val mine = group.members.firstOrNull { it.userId == me }?.nameInGroup
+        // Likewise for your name in the group: follow changes unless you're typing a different one.
+        val myDraft = if (myNameDraft.trim() == myNameInGroup.orEmpty()) mine.orEmpty() else myNameDraft
         return copy(
+            accountName = users.user.value?.accountName.orEmpty(),
+            myNameInGroup = mine,
+            myNameDraft = myDraft,
             loading = false,
             groupName = group.name,
             monogram = group.monogram,

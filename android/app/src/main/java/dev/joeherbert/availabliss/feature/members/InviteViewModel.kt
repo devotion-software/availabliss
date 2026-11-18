@@ -34,8 +34,16 @@ data class InviteUiState(
     val invalid: Boolean = false,
     val error: String? = null,
     val joining: Boolean = false,
-    /** Set once joined; the screen navigates to the group. */
+    /** Set once joined (and the name sheet is done); the screen navigates to the group. */
     val joinedGroupId: String? = null,
+    /** Just joined: the sheet asking what name to go by in the group is open for it. */
+    val askingName: Boolean = false,
+    val accountName: String = "",
+    /** The name to go by in the group, as typed (starts as the account name). */
+    val nameDraft: String = "",
+    val savingName: Boolean = false,
+    /** The id of the group just joined, while the name sheet is open. */
+    val newGroupId: String? = null,
     /** The invite was emailed to this address, and you're signed in as [signedInEmail]: you can't use it. */
     val invitedOtherEmail: String? = null,
     val signedInEmail: String = "",
@@ -96,6 +104,30 @@ class InviteViewModel @Inject constructor(
         }
     }
 
+    fun onNameChange(name: String) = _state.update { it.copy(nameDraft = name) }
+
+    /** "Use this name": sets the name to go by in the group just joined (unless it's the account name), then opens it. */
+    fun useName() {
+        val s = _state.value
+        val groupId = s.newGroupId ?: return
+        val name = s.nameDraft.trim()
+        if (s.savingName || name.isEmpty()) return
+        if (name == s.accountName) return keepAccountName()
+        _state.update { it.copy(savingName = true, error = null) }
+        viewModelScope.launch {
+            when (val result = groups.setMyName(groupId, name)) {
+                is ApiResult.Success -> _state.update { it.copy(savingName = false, askingName = false, joinedGroupId = groupId) }
+                is ApiResult.Failure -> _state.update { it.copy(savingName = false, error = result.error.message) }
+            }
+        }
+    }
+
+    /** "Keep <account name>", or the sheet dismissed: opens the group just joined. */
+    fun keepAccountName() {
+        if (_state.value.savingName) return
+        _state.update { it.copy(askingName = false, joinedGroupId = it.newGroupId) }
+    }
+
     /** Keeps the invite for after sign-in (where its email is prefilled); the caller then signs out. */
     fun rememberInviteForSignIn() = deepLinks.post(DeepLink.Invite(token))
 
@@ -106,7 +138,16 @@ class InviteViewModel @Inject constructor(
             when (val result = groups.acceptInvite(token)) {
                 is ApiResult.Success -> {
                     groups.refreshGroups()
-                    _state.update { it.copy(joining = false, joinedGroupId = result.value.id) }
+                    val group = result.value
+                    _state.update {
+                        if (group.joined == false) {
+                            // Already in it: nothing to ask, just open it.
+                            it.copy(joining = false, joinedGroupId = group.id)
+                        } else {
+                            val account = users.user.value?.accountName.orEmpty()
+                            it.copy(joining = false, askingName = true, newGroupId = group.id, accountName = account, nameDraft = account)
+                        }
+                    }
                 }
                 is ApiResult.Failure -> _state.update {
                     when (result.error) {

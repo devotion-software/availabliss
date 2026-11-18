@@ -14,6 +14,7 @@ import dev.joeherbert.availabliss.core.network.model.InviteLink
 import dev.joeherbert.availabliss.core.network.model.InvitePreview
 import dev.joeherbert.availabliss.core.network.model.Member
 import dev.joeherbert.availabliss.core.network.model.LeaveGroupRequest
+import dev.joeherbert.availabliss.core.network.model.MemberNameRequest
 import dev.joeherbert.availabliss.core.network.model.MemberRoleRequest
 import dev.joeherbert.availabliss.core.network.model.Requirement
 import dev.joeherbert.availabliss.core.network.model.RequirementPreview
@@ -82,6 +83,15 @@ class GroupsRepository @Inject constructor(
             details.update { map ->
                 val group = map[groupId] ?: return@update map
                 map + (groupId to group.copy(members = group.members.map { if (it.userId == userId) member else it }))
+            }
+        }
+
+    /** Sets (or with null, clears) the name you go by in the group. */
+    suspend fun setMyName(groupId: String, name: String?): ApiResult<Member> =
+        call { api.setMyName(groupId, MemberNameRequest(name)) }.onSuccess { member ->
+            details.update { map ->
+                val group = map[groupId] ?: return@update map
+                map + (groupId to group.copy(members = group.members.map { if (it.userId == member.userId) member else it }))
             }
         }
 
