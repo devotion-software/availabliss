@@ -68,12 +68,14 @@ fun ConfirmedBanner(
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     burstKey: String? = null,
+    /** "Everyone's in", or "It's on" when it was confirmed before everyone accepted. */
+    headline: String = "Everyone's in",
     footer: @Composable () -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
     val shape = Shapes.row
     val confetti = listOf(colors.accent, colors.ok, colors.warn, colors.t4)
-    val label = "Everyone's in. $title, $detail"
+    val label = "$headline. $title, $detail"
 
     var placed by remember { mutableStateOf(false) }
     val reduceMotion = rememberReduceMotion()
@@ -121,7 +123,7 @@ fun ConfirmedBanner(
                         Icon(AvIcons.Check, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(22.dp))
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("Everyone's in", style = AvailablissTheme.type.captionStrong, color = colors.okInk, maxLines = 1)
+                        Text(headline, style = AvailablissTheme.type.captionStrong, color = colors.okInk, maxLines = 1)
                         Text(
                             title,
                             style = AvailablissTheme.type.bodyStrong.copy(fontWeight = AvWeights.Display650),

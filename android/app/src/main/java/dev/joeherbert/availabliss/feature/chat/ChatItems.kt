@@ -77,6 +77,7 @@ sealed interface ChatItem {
     /**
      * "Everyone's in": the system message posted when a proposal is confirmed, once its
      * event has loaded. [recent] (sent within the last day) lets it play the confetti burst.
+     * [headline] is "It's on" when it was confirmed before everyone accepted.
      */
     data class Confirmed(
         val id: String,
@@ -86,6 +87,7 @@ sealed interface ChatItem {
         /** "Thu 26 Nov · from 18:00 · Priya's flat" */
         val detail: String,
         val recent: Boolean,
+        val headline: String = "Everyone's in",
     ) : ChatItem {
         override val key get() = id
     }
@@ -291,6 +293,7 @@ private fun confirmedItem(m: Message, e: GroupEvent, now: Instant): ChatItem.Con
         title = e.title,
         detail = detail,
         recent = sent != null && !sent.isBefore(now.minus(BURST_WINDOW)) && !sent.isAfter(now.plus(BURST_WINDOW)),
+        headline = if (m.body?.startsWith("It's on") == true) "It's on" else "Everyone's in",
     )
 }
 

@@ -57,6 +57,8 @@ import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
+import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
+import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
@@ -86,6 +88,7 @@ data class ProposalActions(
     val onRespond: (ResponseKind) -> Unit = {},
     val onOverride: (userId: String, ResponseKind) -> Unit = { _, _ -> },
     val onCancel: () -> Unit = {},
+    val onConfirmAnyway: () -> Unit = {},
     val onAddToCalendar: () -> Unit = {},
     val onOpenChat: (groupId: String) -> Unit = {},
 )
@@ -107,6 +110,7 @@ fun ProposalScreen(onBack: () -> Unit, onOpenChat: (groupId: String) -> Unit, vi
             onRespond = viewModel::respond,
             onOverride = viewModel::override,
             onCancel = viewModel::cancel,
+            onConfirmAnyway = viewModel::confirmAnyway,
             onAddToCalendar = viewModel::addToCalendar,
             onOpenChat = { currentOnOpenChat(it) },
         )
@@ -178,6 +182,37 @@ private fun PendingContent(state: ProposalUiState, actions: ProposalActions) {
                         if (index > 0) RowDivider()
                         MemberRow(member, onOverride = { actions.onOverride(member.userId, it) })
                     }
+                }
+            }
+
+            if (state.canConfirmAnyway) {
+                var confirming by remember { mutableStateOf(false) }
+                SecondaryButton(
+                    text = "Confirm anyway",
+                    onClick = { confirming = true },
+                    icon = AvIcons.Check,
+                    enabled = !state.responding,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "Not everyone can make it? Go ahead with who can.",
+                    style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
+                    color = colors.muted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (confirming) {
+                    ConfirmSheet(
+                        title = "Confirm anyway?",
+                        message = state.confirmAnywayMessage,
+                        options = listOf(
+                            ConfirmOption("Confirm the plan", onClick = {
+                                confirming = false
+                                actions.onConfirmAnyway()
+                            }, icon = AvIcons.Check),
+                        ),
+                        onDismiss = { confirming = false },
+                    )
                 }
             }
 
@@ -313,7 +348,7 @@ private fun ReplyBar(state: ProposalUiState, onRespond: (ResponseKind) -> Unit, 
     }
 }
 
-/** The confirmed "Everyone's in." celebration. */
+/** The confirmed "Everyone's in." celebration ("It's on." when confirmed before everyone accepted). */
 @Composable
 private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
     val colors = AvailablissTheme.colors
@@ -348,7 +383,7 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
                         color = colors.ink,
                     )
                     Text(
-                        "Everyone accepted ${state.range}" + if (state.groupName.isNotBlank()) " for ${state.groupName}" else "",
+                        (if (state.everyoneIn) "Everyone accepted ${state.range}" else "It's on: ${state.range}") + if (state.groupName.isNotBlank()) " for ${state.groupName}" else "",
                         style = AvailablissTheme.type.labelRegular.copy(fontWeight = FontWeight.Normal),
                         color = colors.ink,
                     )
@@ -365,15 +400,16 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
                 contentDescription = null,
                 modifier = Modifier.scale(bloom.value * breathe).alpha(((bloom.value - 0.6f) / 0.4f).coerceIn(0f, 1f)),
             )
-            Text("Everyone's in.", style = AvailablissTheme.type.displayLarge, color = colors.ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
-            // "All 4 of you can make", then the date and time large on their own lines, then the place.
+            Text(if (state.everyoneIn) "Everyone's in." else "It's on.", style = AvailablissTheme.type.displayLarge, color = colors.ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
+            // "All 4 of you can make" (or "3 of 4 can make"), then the date and time large on their own lines, then the place.
             Column(
                 Modifier.padding(horizontal = 10.dp).semantics(mergeDescendants = true) {},
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    "All ${state.coming.size.takeIf { it > 0 } ?: state.total} of you can make",
+                    if (state.everyoneIn) "All ${state.coming.size.takeIf { it > 0 } ?: state.total} of you can make"
+                    else "${state.coming.size} of ${state.invited} can make",
                     style = AvailablissTheme.type.bodyLarge,
                     color = colors.muted,
                     textAlign = TextAlign.Center,
@@ -395,6 +431,12 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
             }
             if (state.coming.isNotEmpty()) {
                 PeoplePanel("Who's coming", state.coming.size.toString(), state.coming, Modifier.padding(top = 6.dp))
+            }
+            if (state.cantMakeIt.isNotEmpty()) {
+                PeoplePanel("Can't make it", state.cantMakeIt.size.toString(), state.cantMakeIt, quiet = true)
+            }
+            if (state.notReplied.isNotEmpty()) {
+                PeoplePanel("Not replied", state.notReplied.size.toString(), state.notReplied, quiet = true)
             }
             if (state.joinedLater.isNotEmpty()) {
                 PeoplePanel("Joined since", null, state.joinedLater, quiet = true)
@@ -418,7 +460,7 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
     }
 }
 
-/** Who's coming (or, [quiet], who joined the group since): a titled glass list of people. */
+/** Who's coming (or, [quiet], who can't, never replied or joined the group since): a titled glass list of people. */
 @Composable
 private fun PeoplePanel(title: String, trailing: String?, people: List<ProposalMemberUi>, modifier: Modifier = Modifier, quiet: Boolean = false) {
     val colors = AvailablissTheme.colors

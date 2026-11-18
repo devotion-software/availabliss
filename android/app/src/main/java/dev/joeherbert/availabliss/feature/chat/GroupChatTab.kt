@@ -596,6 +596,7 @@ internal fun ChatRow(
             // Above its neighbours, so the confetti burst can spill over them.
             modifier = Modifier.zIndex(1f),
             burstKey = item.id.takeIf { item.recent },
+            headline = item.headline,
         ) {
             AddToCalendarButton(
                 calendar.status(item.eventId),

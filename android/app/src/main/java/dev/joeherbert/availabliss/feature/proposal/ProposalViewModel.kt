@@ -9,6 +9,8 @@ import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
 import dev.joeherbert.availabliss.core.common.DateTimes
+import dev.joeherbert.availabliss.core.common.firstName
+import dev.joeherbert.availabliss.core.common.joinNamesSummary
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.ProposalsRepository
@@ -62,13 +64,25 @@ data class ProposalUiState(
     val accepted: Int = 0,
     val total: Int = 0,
     val members: List<ProposalMemberUi> = emptyList(),
-    /** Confirmed: the members who accepted (everyone at the time), proposer first. */
+    /** Confirmed: the members who accepted, proposer first. */
     val coming: List<ProposalMemberUi> = emptyList(),
+    /** Confirmed: members who said they can't make it (confirmed anyway without them). */
+    val cantMakeIt: List<ProposalMemberUi> = emptyList(),
+    /** Confirmed: members who never replied (confirmed anyway before they did). */
+    val notReplied: List<ProposalMemberUi> = emptyList(),
     /**
-     * Confirmed: members without an acceptance. Only people who joined the group after it was
-     * confirmed (it confirms once every member has accepted, and replies then close).
+     * Confirmed: members with no reply at all, i.e. people who joined the group after it was
+     * confirmed (replies are only asked of the members at the time).
      */
     val joinedLater: List<ProposalMemberUi> = emptyList(),
+    /** Everyone it was put to can make it ("Everyone's in."), rather than confirmed anyway ("It's on."). */
+    val everyoneIn: Boolean = true,
+    /** How many it was put to: who's coming, who can't and who never replied. */
+    val invited: Int = 0,
+    /** The proposer or an admin, on an open proposal someone else has accepted: "Confirm anyway". */
+    val canConfirmAnyway: Boolean = false,
+    /** For the Confirm anyway sheet: "Priya can't make it and Tom hasn't replied. …" */
+    val confirmAnywayMessage: String = "",
     /** Open proposals that clash with someone's busy time: "Priya is busy then". */
     val clash: String? = null,
     /** "Their calendars or blocked time overlap. …" */
@@ -173,6 +187,20 @@ class ProposalViewModel @Inject constructor(
         }
     }
 
+    fun confirmAnyway() {
+        if (data.value.responding) return
+        viewModelScope.launch {
+            data.update { it.copy(responding = true) }
+            when (val result = proposals.confirm(proposalId)) {
+                is ApiResult.Success -> {
+                    setProposal(result.value)
+                    data.update { it.copy(responding = false) }
+                }
+                is ApiResult.Failure -> data.update { it.copy(responding = false, message = UserMessage(result.error.message)) }
+            }
+        }
+    }
+
     fun cancel() {
         viewModelScope.launch {
             when (val result = proposals.cancel(proposalId)) {
@@ -203,6 +231,21 @@ class ProposalViewModel @Inject constructor(
         val cached = if (force) null else groups.cachedGroup(groupId)
         val group = cached ?: (groups.refreshGroup(groupId) as? ApiResult.Success)?.value
         if (group != null) data.update { it.copy(group = group) }
+    }
+
+    /** "Priya can't make it and Tom hasn't replied. Everyone will be told it's on, with 2 of 4 coming." */
+    private fun confirmAnywayMessage(p: Proposal, members: List<ProposalMemberUi>, meId: String?, directory: MemberDirectory): String {
+        val replied = p.responses.map { it.userId }.toSet()
+        fun names(kind: ResponseKind) = members.filter { it.response == kind && it.userId in replied }
+            .map { if (it.userId == meId) "You" else directory[it.userId]?.name?.firstName() ?: "Someone" }
+        val declined = names(ResponseKind.Declined)
+        val pending = names(ResponseKind.Pending)
+        val parts = buildList {
+            if (declined.isNotEmpty()) add("${declined.joinNamesSummary(4)} can't make it")
+            if (pending.isNotEmpty()) add("${pending.joinNamesSummary(4)} ${if (pending.size == 1) "hasn't" else "haven't"} replied")
+        }
+        val who = parts.joinToString(" and ").let { if (it.isEmpty()) "" else "$it. " }
+        return "${who}Everyone will be told it's on, with ${ProposalFormatting.acceptedCount(p)} of ${p.responses.size} coming."
     }
 
     private fun ProposalData.toUi(cal: AddToCalendarState, meId: String?): ProposalUiState {
@@ -261,9 +304,20 @@ class ProposalViewModel @Inject constructor(
             coming = if (!confirmed) emptyList() else members
                 .filter { it.response == ResponseKind.Accepted && inGroup(it.userId) }
                 .map { it.copy(note = if (it.userId == p.createdBy) "Proposed this" else "") },
+            cantMakeIt = if (!confirmed) emptyList() else members
+                .filter { it.userId in responses && it.response == ResponseKind.Declined && inGroup(it.userId) }
+                .map { it.copy(note = "") },
+            notReplied = if (!confirmed) emptyList() else members
+                .filter { it.userId in responses && it.response == ResponseKind.Pending && inGroup(it.userId) }
+                .map { it.copy(note = "") },
             joinedLater = if (!confirmed || g == null) emptyList() else members
-                .filter { it.response != ResponseKind.Accepted && inGroup(it.userId) }
+                .filter { it.userId !in responses && inGroup(it.userId) }
                 .map { it.copy(note = "Joined after this was confirmed") },
+            everyoneIn = p.everyoneIn,
+            invited = p.responses.size,
+            canConfirmAnyway = p.status == ProposalStatus.Open && meId != null && (p.createdBy == meId || isAdmin) &&
+                p.responses.any { it.response == ResponseKind.Accepted && it.userId != meId },
+            confirmAnywayMessage = confirmAnywayMessage(p, members, meId, directory),
             clash = Clash.text(busyIds, { directory[it]?.name }, meId),
             clashDetail = Clash.detail(busyIds, meId),
             iAmBusy = meId != null && meId in busyIds,

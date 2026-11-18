@@ -293,7 +293,7 @@ private fun UpNextCard(upNext: UpNextUi, onOpen: () -> Unit, onAddToCalendar: ()
             upNext.image?.let { CoverPhoto(it) }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 StatusPill(
-                    "Everyone's in",
+                    "It's on",
                     PillTone.Mint,
                     icon = AvIcons.Check,
                     style = AvailablissTheme.type.captionStrong,

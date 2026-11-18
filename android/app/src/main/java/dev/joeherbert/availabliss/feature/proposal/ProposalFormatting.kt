@@ -37,13 +37,18 @@ object ProposalFormatting {
     fun clashShort(proposal: Proposal, directory: MemberDirectory?): String? =
         Clash.short(busyIds(proposal)) { directory?.get(it)?.name }
 
+    /** "Everyone's in", or "It's on · 3 of 4 coming" when confirmed without everyone. */
+    fun confirmedStatus(proposal: Proposal): String =
+        if (proposal.everyoneIn) "Everyone's in"
+        else "It's on · ${acceptedCount(proposal)} of ${proposal.responses.size} coming"
+
     fun card(proposal: Proposal, directory: MemberDirectory?, memberCount: Int, caption: String? = null): ProposalCardUi {
         val date = DateTimes.localDate(proposal.start)
         val accepted = acceptedCount(proposal)
         val total = totalCount(proposal, memberCount)
         val proposer = directory?.displayName(proposal.createdBy, youSuffix = false) ?: "Someone"
         val (status, tone) = when (proposal.status) {
-            ProposalStatus.Confirmed -> "Everyone's in" to ProposalCardTone.Confirmed
+            ProposalStatus.Confirmed -> confirmedStatus(proposal) to ProposalCardTone.Confirmed
             ProposalStatus.Cancelled -> "Cancelled" to ProposalCardTone.Muted
             ProposalStatus.Open -> "$accepted of $total accepted" to ProposalCardTone.Open
         }

@@ -44,6 +44,9 @@ class ProposalsRepository @Inject constructor(
         call { api.overrideResponse(id, OverrideRequest(userId, response)) }
 
     suspend fun cancel(id: String): ApiResult<Unit> = call { api.cancelProposal(id) }
+
+    /** "Confirm anyway" before everyone has accepted. */
+    suspend fun confirm(id: String): ApiResult<Proposal> = call { api.confirmProposal(id) }
 }
 
 /** Group events (`/groups/:id/events`, `/events/:id`, `/me/upcoming`). */

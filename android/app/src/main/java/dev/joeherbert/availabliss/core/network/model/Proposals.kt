@@ -31,10 +31,15 @@ data class Proposal(
     val createdBy: String,
     val createdAt: String,
     val eventId: String? = null,
+    /** Confirmed before everyone accepted ("Confirm anyway"): who did it. Null otherwise, and on older servers. */
+    val confirmedBy: String? = null,
     val responses: List<ProposalResponse> = emptyList(),
     /** Open proposals: members whose calendars or blocked time clash with it (ids only). */
     val busyMemberIds: List<String> = emptyList(),
-)
+) {
+    /** Everyone it was put to accepted; false once confirmed anyway with someone who can't make it or never replied. */
+    val everyoneIn: Boolean get() = responses.all { it.response == ResponseKind.Accepted }
+}
 
 @Serializable
 data class ConflictsResponse(val busyMemberIds: List<String> = emptyList())

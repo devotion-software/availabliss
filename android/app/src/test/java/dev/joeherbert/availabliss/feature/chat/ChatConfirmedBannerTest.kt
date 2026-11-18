@@ -23,9 +23,14 @@ class ChatConfirmedBannerTest {
     private val today = LocalDate.of(2026, 11, 16)
     private val now = Instant.parse("2026-11-16T12:00:00Z")
 
-    private fun system(id: String, eventId: String?, createdAt: String = "2026-11-16T11:00:00.000Z") = Message(
+    private fun system(
+        id: String,
+        eventId: String?,
+        createdAt: String = "2026-11-16T11:00:00.000Z",
+        body: String = "Everyone's in for Thu 26 Nov · from 18:00",
+    ) = Message(
         id = id, groupId = "g", authorId = null, kind = MessageKind.System,
-        body = "Everyone's in for Thu 26 Nov · from 18:00", eventId = eventId, createdAt = createdAt,
+        body = body, eventId = eventId, createdAt = createdAt,
     )
 
     private fun event(location: String? = null, proposalId: String? = "p1") = GroupEvent(
@@ -47,6 +52,15 @@ class ChatConfirmedBannerTest {
         assertTrue(banner.detail.endsWith(" · Priya's flat"))
         assertTrue(banner.detail.startsWith("Thu 26 Nov"))
         assertTrue(banner.recent)
+    }
+
+    @Test
+    fun confirmedAnywaySaysItsOn() {
+        val everyone = build(listOf(system("m1", "e1")), mapOf("e1" to event())).filterIsInstance<ChatItem.Confirmed>().single()
+        assertEquals("Everyone's in", everyone.headline)
+        val anyway = build(listOf(system("m1", "e1", body = "It's on for Thu 26 Nov · from 18:00 (3 of 4 can make it)")), mapOf("e1" to event()))
+            .filterIsInstance<ChatItem.Confirmed>().single()
+        assertEquals("It's on", anyway.headline)
     }
 
     @Test

@@ -329,6 +329,10 @@ interface AvailablissApi {
     @POST("api/v1/proposals/{id}/respond")
     suspend fun respond(@Path("id") id: String, @Body body: RespondRequest): Proposal
 
+    /** "Confirm anyway": the proposer or an admin confirms before everyone has accepted. */
+    @POST("api/v1/proposals/{id}/confirm")
+    suspend fun confirmProposal(@Path("id") id: String): Proposal
+
     @POST("api/v1/proposals/{id}/override")
     suspend fun overrideResponse(@Path("id") id: String, @Body body: OverrideRequest): Proposal
 
