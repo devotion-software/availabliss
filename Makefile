@@ -6,7 +6,7 @@ IMAGE ?= availabliss-web
 .DEFAULT_GOAL := help
 .PHONY: help setup hooks env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test test-integration smoke e2e openapi \
 	seed-demo clean-demo set-plan apple-secret school-holidays \
-	docker-build docker-run ios-project ios-open ios-build ios-uitest android-build android-test android-tour clean
+	docker-build docker-run ios-project ios-open ios-build ios-test ios-uitest android-build android-test android-tour clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -126,12 +126,16 @@ ios-open: ios-project ## Generate and open the Xcode project
 ios-build: ios-project ## Build the iOS app for the simulator (IOS_SIM="iPhone 18 Pro")
 	$(IOS_BUILD) build
 
+# In English (UK), so the tests that check dates and times word for word run (see AvailablissTests/Support/TestLocale.swift).
+ios-test: ios-project ## Run the iOS unit tests in the simulator (IOS_SIM="iPhone 18 Pro")
+	$(IOS_BUILD) -only-testing:AvailablissTests -testLanguage en -testRegion GB test
+
 ios-uitest: ios-project ## Sign in and tour the iOS app in the simulator (after make seed-demo)
 	rm -rf ios/build/uitest.xcresult ios/build/uitest-screens
 	@# Start signed out: the simulator keeps Keychain items across reinstalls.
 	-$(XCODE_ENV) xcrun simctl uninstall booted dev.joeherbert.availabliss 2>/dev/null
 	-$(XCODE_ENV) xcrun simctl keychain booted reset 2>/dev/null
-	TEST_RUNNER_AV_EMAIL=$(EMAIL) $(IOS_BUILD) -resultBundlePath ios/build/uitest.xcresult test; \
+	TEST_RUNNER_AV_EMAIL=$(EMAIL) $(IOS_BUILD) -only-testing:AvailablissUITests -resultBundlePath ios/build/uitest.xcresult test; \
 	status=$$?; $(XCODE_ENV) xcrun xcresulttool export attachments --path ios/build/uitest.xcresult \
 		--output-path ios/build/uitest-screens >/dev/null 2>&1; python3 scripts/name-ui-test-screens.py ios/build/uitest-screens; \
 	echo "Screenshots: ios/build/uitest-screens"; exit $$status

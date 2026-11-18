@@ -242,3 +242,23 @@ jobs:
           -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/build
           -clonedSourcePackagesDirPath ios/build/SourcePackages
           CODE_SIGNING_ALLOWED=NO build
+      # On the newest iPhone simulator the runner has, in English (UK) like `make ios-test`.
+      - name: Unit tests
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, re, sys
+          runtimes = json.load(sys.stdin)["devices"]
+          version = lambda r: [int(n) for n in re.findall(r"\d+", r.split("iOS")[-1])]
+          ios = sorted((r for r in runtimes if ".iOS-" in r), key=version, reverse=True)
+          print(next(d["udid"] for r in ios for d in runtimes[r] if re.match(r"iPhone \d", d["name"])))')
+          xcodebuild -project ios/Availabliss.xcodeproj -scheme Availabliss \
+            -destination "platform=iOS Simulator,id=$udid" -derivedDataPath ios/build \
+            -clonedSourcePackagesDirPath ios/build/SourcePackages \
+            -only-testing:AvailablissTests -testLanguage en -testRegion GB \
+            -resultBundlePath ios/build/unit-tests.xcresult \
+            CODE_SIGNING_ALLOWED=NO test
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: ios-unit-test-results
+          path: ios/build/unit-tests.xcresult

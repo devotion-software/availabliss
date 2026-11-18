@@ -34,6 +34,7 @@ targets:
     deploymentTarget: "17.0"
     scheme:
       testTargets:
+        - AvailablissTests
         - AvailablissUITests
     sources:
       - path: Availabliss
@@ -117,6 +118,20 @@ targets:
           - BricolageGrotesque-VariableFont_opsz,wdth,wght.ttf
           - InstrumentSans-VariableFont_wdth,wght.ttf
           - InstrumentSans-Italic-VariableFont_wdth,wght.ttf
+
+  # Unit tests for the app's logic, hosted by the app (`make ios-test`). Swift Testing.
+  AvailablissTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: AvailablissTests
+    dependencies:
+      - target: Availabliss
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.joeherbert.availabliss.tests
+        GENERATE_INFOPLIST_FILE: YES
 
   # End-to-end UI tour against a running dev server (see AvailablissUITests/README.md).
   AvailablissUITests:
