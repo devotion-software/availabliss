@@ -2,7 +2,10 @@ import Foundation
 
 struct Member: Codable, Sendable, Identifiable, Hashable {
     let userId: String
+    /// The name they go by in this group: `nameInGroup` when they've set one, else their account name.
     var name: String
+    /// The name they chose for this group, or nil for their account name (older servers omit it).
+    var nameInGroup: String?
     var image: String?
     var role: Role
     var synced: Bool
@@ -141,6 +144,26 @@ struct UpdateGroupBody: Encodable, Sendable {
 struct RoleBody: Encodable, Sendable { let role: Role }
 
 struct LeaveGroupBody: Encodable, Sendable { let newOwnerId: String? }
+
+/// The name you go by in one group; nil goes back to your account name (sent as `null`, which the server needs).
+struct MemberNameBody: Encodable, Sendable {
+    let displayName: String?
+
+    enum CodingKeys: String, CodingKey { case displayName }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(displayName, forKey: .displayName)
+    }
+}
+
+/// What accepting an invite returns: the group, and whether you've just joined it (false when you were
+/// already in it; older servers omit it).
+struct JoinedGroup: Decodable, Sendable {
+    let id: String
+    let name: String
+    let joined: Bool?
+}
 
 struct NudgeResponse: Decodable, Sendable { let nudged: Int }
 

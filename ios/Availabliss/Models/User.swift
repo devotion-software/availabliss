@@ -63,6 +63,14 @@ struct User: Codable, Sendable, Identifiable, Equatable {
     }
 }
 
+extension User {
+    /// The name other people see (outside a group that has its own name for them): their name, or their email.
+    var accountName: String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? email : trimmed
+    }
+}
+
 /// Body for `PATCH /me`. Only non-nil fields are sent, except in a region update (see `region`).
 struct UserPatch: Encodable, Sendable {
     var name: String?

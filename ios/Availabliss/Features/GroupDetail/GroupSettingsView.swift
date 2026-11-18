@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Group settings, from the group's More menu: its photo, name and colour, Archive / Unarchive, Leave
+/// Group settings, from the group's More menu: its photo, name and colour, the name you go by in it, Archive / Unarchive, Leave
 /// group and Delete group. Everyone can open it and leave; only the owner and admins can change things
 /// (the server's rules), and only the owner can delete the group. Each part is its own section. Admins
 /// can also have the group archive itself once its event has passed.
@@ -10,6 +10,9 @@ struct GroupSettingsView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var name: String
+    /// The name you go by in this group, as typed (empty: your account name).
+    @State private var myName: String
+    @State private var isSavingMyName = false
     @State private var showsPhotoPicker = false
     @State private var confirmsDelete = false
     @State private var confirmsLeave = false
@@ -27,6 +30,7 @@ struct GroupSettingsView: View {
         self.detail = detail
         self.group = group
         _name = State(initialValue: group.name)
+        _myName = State(initialValue: "")
     }
 
     private var canEdit: Bool { group.role.isAdmin }
@@ -39,6 +43,7 @@ struct GroupSettingsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 photoCard
                 detailsCard
+                myNameCard
                 if canEdit { archiveCard }
                 leaveCard
                 if isOwner { deleteCard }
@@ -51,6 +56,8 @@ struct GroupSettingsView: View {
         .foregroundStyle(theme.ink)
         // Renamed elsewhere (or by someone else): show the new name unless you're mid-edit.
         .onChange(of: group.name) { old, new in if name == old { name = new } }
+        .onAppear { myName = myNameInGroup ?? "" }
+        .onChange(of: myNameInGroup) { old, new in if myName == (old ?? "") { myName = new ?? "" } }
         .sheet(isPresented: $confirmsDelete) { deleteSheet }
         .sheet(isPresented: $confirmsLeave, onDismiss: {
             if deletesAfterLeaveSheet {
@@ -191,6 +198,66 @@ struct GroupSettingsView: View {
         } catch {
             self.error = error.userMessage
             return false
+        }
+    }
+
+    // MARK: Your name in this group
+
+    private var accountName: String { app.session.user?.accountName ?? "" }
+    private var myNameInGroup: String? { group.member(app.session.user?.id ?? "")?.nameInGroup }
+    private var trimmedMyName: String { myName.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// Blank, or the account name itself, means going by the account name.
+    private var myNameToSave: String? { trimmedMyName.isEmpty || trimmedMyName == accountName ? nil : trimmedMyName }
+    private var myNameChanged: Bool { myNameToSave != myNameInGroup }
+
+    /// Everyone can choose the name they go by in this group (a nickname, say); blank goes back to the account name.
+    private var myNameCard: some View {
+        GlassPanel(cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Your name in this group").bodyFont(15, .semibold)
+                Text(myNameInGroup == nil
+                     ? "\(group.name) sees you as \(accountName), your account name. Choose another name just for this group."
+                     : "Only \(group.name) sees this. Everywhere else you\u{2019}re \(accountName).")
+                    .bodyFont(13, relativeTo: .subheadline)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                InputField(placeholder: accountName, text: $myName)
+                    .textContentType(.nickname)
+                    .submitLabel(.done)
+                    .onSubmit { saveMyName(myNameToSave) }
+                if myNameChanged {
+                    Button { saveMyName(myNameToSave) } label: {
+                        LoadingLabel(title: "Save", isLoading: isSavingMyName)
+                    }
+                    .buttonStyle(.filled(.accent, height: 50, cornerRadius: 16, fontSize: 15, fullWidth: false))
+                    .disabled(isSavingMyName)
+                }
+            }
+            if myNameInGroup != nil {
+                Button("Use \(accountName) instead") { saveMyName(nil) }
+                    .buttonStyle(.textAction)
+                    .disabled(isSavingMyName)
+            }
+        }
+    }
+
+    private func saveMyName(_ value: String?) {
+        guard value != myNameInGroup, !isSavingMyName else { return }
+        Task {
+            isSavingMyName = true
+            defer { isSavingMyName = false }
+            do {
+                let member = try await detail.api.send(API.Groups.setMyName(groupId: group.id, displayName: value))
+                var updated = group
+                if let index = updated.members.firstIndex(where: { $0.userId == member.userId }) { updated.members[index] = member }
+                detail.update(updated)
+                myName = member.nameInGroup ?? ""
+                toast = value == nil ? "Back to \(accountName)" : "Name updated"
+            } catch {
+                self.error = error.userMessage
+            }
         }
     }
 

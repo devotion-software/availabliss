@@ -106,6 +106,10 @@ enum API {
         static func setRole(groupId: String, userId: String, role: Role) -> Endpoint<Member> {
             .init(.patch, "/groups/\(groupId.pathEncoded)/members/\(userId.pathEncoded)", body: RoleBody(role: role))
         }
+        /// Sets (or with nil, clears) the name you go by in the group.
+        static func setMyName(groupId: String, displayName: String?) -> Endpoint<Member> {
+            .init(.patch, "/groups/\(groupId.pathEncoded)/members/me", body: MemberNameBody(displayName: displayName))
+        }
         /// Removes a member (an admin removing someone else).
         static func removeMember(groupId: String, userId: String) -> Endpoint<EmptyResponse> {
             .init(.delete, "/groups/\(groupId.pathEncoded)/members/\(userId.pathEncoded)")
@@ -147,7 +151,7 @@ enum API {
     // MARK: Invites
     enum Invites {
         static func preview(token: String) -> Endpoint<InvitePreview> { .init(.get, "/invites/\(token.pathEncoded)") }
-        static func accept(token: String) -> Endpoint<Group> { .init(.post, "/invites/\(token.pathEncoded)/accept") }
+        static func accept(token: String) -> Endpoint<JoinedGroup> { .init(.post, "/invites/\(token.pathEncoded)/accept") }
     }
 
     // MARK: Availability

@@ -12,6 +12,13 @@ struct InviteAcceptView: View {
     @State private var isJoining = false
     @State private var isSwitching = false
     @State private var error: String?
+    /// Joined: the sheet then asks what name to go by in the group, and opens it once it goes.
+    @State private var joinedGroup: JoinedGroup?
+    @State private var nameInGroup = ""
+    @State private var isSavingName = false
+
+    private var accountName: String { app.session.user?.accountName ?? "" }
+    private var trimmedNameInGroup: String { nameInGroup.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     /// An emailed invite is only for that address; someone signed in as anyone else can't use it.
     private var invitedOtherEmail: String? {
@@ -28,8 +35,10 @@ struct InviteAcceptView: View {
     }
 
     var body: some View {
-        BottomSheet(title: "You're invited") {
-            if let preview {
+        BottomSheet(title: joinedGroup.map { "How should \($0.name) see you?" } ?? "You're invited") {
+            if joinedGroup != nil {
+                nameStep
+            } else if let preview {
                 HStack(spacing: 14) {
                     VennLogo(size: 52)
                     VStack(alignment: .leading, spacing: 2) {
@@ -89,7 +98,48 @@ struct InviteAcceptView: View {
             }
         }
         .task { await load() }
+        // However the sheet goes (a choice, the close button or a swipe), open the group just joined.
+        .onDisappear {
+            if let joinedGroup { app.router.open(.group(id: joinedGroup.id)) }
+        }
         .errorAlert($error)
+    }
+
+    /// After joining: the name to go by in this group, prefilled with the account name. Skippable.
+    @ViewBuilder private var nameStep: some View {
+        Text("You can go by a different name in this group, like a nickname. Only this group sees it, and you can change it any time in Group settings.")
+            .bodyFont(14)
+            .foregroundStyle(theme.muted)
+            .fixedSize(horizontal: false, vertical: true)
+        InputField(placeholder: accountName, text: $nameInGroup)
+            .textContentType(.nickname)
+            .submitLabel(.done)
+            .onSubmit { Task { await useName() } }
+        Button {
+            Task { await useName() }
+        } label: {
+            LoadingLabel(title: "Use this name", isLoading: isSavingName)
+        }
+        .buttonStyle(.primary)
+        .disabled(isSavingName || trimmedNameInGroup.isEmpty)
+        Button("Keep \(accountName)") { dismiss() }
+            .buttonStyle(.textAction)
+            .frame(maxWidth: .infinity)
+            .disabled(isSavingName)
+    }
+
+    private func useName() async {
+        guard let joinedGroup, !trimmedNameInGroup.isEmpty, !isSavingName else { return }
+        // The account name already: nothing to set.
+        guard trimmedNameInGroup != accountName else { return dismiss() }
+        isSavingName = true
+        defer { isSavingName = false }
+        do {
+            _ = try await api.send(API.Groups.setMyName(groupId: joinedGroup.id, displayName: trimmedNameInGroup))
+            dismiss()
+        } catch {
+            self.error = error.userMessage
+        }
     }
 
     private func load() async {
@@ -119,8 +169,14 @@ struct InviteAcceptView: View {
         defer { isJoining = false }
         do {
             let group = try await api.send(API.Invites.accept(token: token))
-            dismiss()
-            app.router.open(.group(id: group.id))
+            if group.joined == false {
+                // Already in it: nothing to ask, just open it.
+                dismiss()
+                app.router.open(.group(id: group.id))
+            } else {
+                nameInGroup = accountName
+                withAnimation(.smooth(duration: 0.25)) { joinedGroup = group }
+            }
         } catch {
             self.error = error.userMessage
         }
