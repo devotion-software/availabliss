@@ -158,6 +158,7 @@ private struct NotificationRow: View {
         case .message: "bubble.left"
         case .eventCreated: "calendar.badge.plus"
         case .roleChanged: "checkmark.shield"
+        case .reminder: "alarm"
         case .unknown: "bell"
         }
     }

@@ -19,6 +19,7 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 14) {
                 account
                 settingsList
+                PlanRemindersCard(error: $error)
                 PlanSection(toast: $toast)
                 SignInMethodsSection(toast: $toast, error: $error)
                 TemplatesSection(api: app.api, toast: $toast, error: $error)
@@ -170,6 +171,51 @@ struct ProfileView: View {
         } catch where error.isCancellation {
         } catch {
             self.error = error.userMessage
+        }
+    }
+}
+
+/// "Plan reminders": pushes a day and/or an hour before confirmed plans you're going to.
+/// Saves to the account at once, and goes back to the old choice if that fails.
+private struct PlanRemindersCard: View {
+    @Binding var error: String?
+    @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
+    @State private var selection = EventReminders.both
+    @State private var loaded = false
+
+    private static let options = EventReminders.allCases.map { SegmentOption(value: $0, label: $0.label) }
+
+    private var saved: EventReminders { app.session.user?.eventReminders ?? .both }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Plan reminders").bodyFont(14, .semibold).accessibilityAddTraits(.isHeader)
+                Text("Pushes before plans you\u{2019}re going to.")
+                    .bodyFont(12, relativeTo: .caption)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            SegmentedControl(selection: $selection, options: Self.options, accessibilityLabel: "Plan reminders")
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(cornerRadius: 24)
+        .onAppear {
+            selection = saved
+            loaded = true
+        }
+        .onChange(of: selection) { old, new in
+            guard loaded, new != saved else { return }
+            Task {
+                do {
+                    _ = try await app.session.update(UserPatch(eventReminders: new))
+                } catch {
+                    selection = old
+                    self.error = error.userMessage
+                }
+            }
         }
     }
 }

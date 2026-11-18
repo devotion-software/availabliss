@@ -43,6 +43,22 @@ enum ColorTheme: String, Codable, Sendable, CaseIterable, TolerantDecodable {
     var label: String { rawValue.capitalized }
 }
 
+/// When to get a push before a confirmed plan you're going to: a day before, an hour before, both or neither.
+enum EventReminders: String, Codable, Sendable, CaseIterable, TolerantDecodable {
+    case both, day, hour, off
+
+    static let fallback = EventReminders.both
+
+    var label: String {
+        switch self {
+        case .both: "Both"
+        case .day: "Day before"
+        case .hour: "Hour before"
+        case .off: "Off"
+        }
+    }
+}
+
 struct User: Codable, Sendable, Identifiable, Equatable {
     let id: String
     var name: String
@@ -60,6 +76,9 @@ struct User: Codable, Sendable, Identifiable, Equatable {
     /// Minutes counted as busy before and after each busy time when the server finds free slots
     /// (0, 15, 30, 60 or 120). Optional so an older server's `User` still decodes.
     var busyBufferMinutes: Int? = nil
+    /// Pushes before confirmed plans you're going to. Optional so an older server's `User` still decodes
+    /// (treat nil as `.both`, the server's default).
+    var eventReminders: EventReminders? = nil
 
     var firstName: String {
         name.split(separator: " ").first.map(String.init) ?? name
@@ -87,6 +106,7 @@ struct UserPatch: Encodable, Sendable {
     var timezone: String?
     var onboarded: Bool?
     var busyBufferMinutes: Int?
+    var eventReminders: EventReminders?
     /// Sends nil region fields as `null`. Omitting them would keep the old values, so moving from
     /// GB-ENG to Ireland would leave the subdivision (and its holidays) behind.
     private var replacesRegion = false
@@ -101,7 +121,8 @@ struct UserPatch: Encodable, Sendable {
         schoolAuthority: String? = nil,
         timezone: String? = nil,
         onboarded: Bool? = nil,
-        busyBufferMinutes: Int? = nil
+        busyBufferMinutes: Int? = nil,
+        eventReminders: EventReminders? = nil
     ) {
         self.name = name
         self.username = username
@@ -113,6 +134,7 @@ struct UserPatch: Encodable, Sendable {
         self.timezone = timezone
         self.onboarded = onboarded
         self.busyBufferMinutes = busyBufferMinutes
+        self.eventReminders = eventReminders
     }
 
     /// Replaces the whole region: a nil subdivision or school authority clears it on the server.
@@ -140,10 +162,11 @@ struct UserPatch: Encodable, Sendable {
         try container.encodeIfPresent(timezone, forKey: .timezone)
         try container.encodeIfPresent(onboarded, forKey: .onboarded)
         try container.encodeIfPresent(busyBufferMinutes, forKey: .busyBufferMinutes)
+        try container.encodeIfPresent(eventReminders, forKey: .eventReminders)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case name, username, themeMode, colorTheme, country, subdivision, schoolAuthority, timezone, onboarded, busyBufferMinutes
+        case name, username, themeMode, colorTheme, country, subdivision, schoolAuthority, timezone, onboarded, busyBufferMinutes, eventReminders
     }
 }
 

@@ -15,6 +15,9 @@ struct AppNotification: Decodable, Sendable, Identifiable, Equatable {
         case eventCreated = "event.created"
         /// Your role in a group changed (made an admin, no longer one, or handed ownership): `data.role` is the new one.
         case roleChanged = "role.changed"
+        /// Before a plan: `data.reminder` is `day` or `hour` (a confirmed plan, `data.eventId`, plus
+        /// `data.proposalId` when it came from one) or `reply` (an open proposal you haven't answered).
+        case reminder
         case unknown
 
         init(from decoder: Decoder) throws {
