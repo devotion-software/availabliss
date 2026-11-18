@@ -187,6 +187,10 @@
 			? new Map(dates.map((d) => [d, daysReady.get(d) ?? null]))
 			: new Map();
 		const results = await Promise.all(dates.map((d) => (wanted(d) ? fetchDay(d).catch(() => null) : null)));
+		// A week running into the next (or previous) month needs that month's days too, to fade the ones that don't work.
+		await Promise.all(
+			[...new Set(dates.map(startOfMonth))].filter((m) => m !== month).map((m) => fetchMonth(m).catch(() => null))
+		);
 		if (id === weekRequest) weekDays = new Map(dates.map((d, i) => [d, results[i]]));
 		// The next week the user is likely to swipe to.
 		for (const d of dates) fetchDay(addDays(d, 7 * lastStep)).catch(() => {});
@@ -239,6 +243,13 @@
 			offReconnect();
 		};
 	});
+
+	/** Whether a day works for everyone (and isn't over); unknown days count as working, so nothing fades while it loads. */
+	function works(date: string): boolean {
+		if (date < todayKey) return false;
+		const status = (days.get(date) ?? monthsReady.get(startOfMonth(date))?.days.find((d) => d.date === date))?.status;
+		return status === undefined || status === 'match';
+	}
 
 	function select(date: string) {
 		selected = date;
@@ -435,7 +446,7 @@
 				{/if}
 			{:else}
 				<!-- Phones get a card per day; the time grid needs a wider screen. -->
-				<WeekGrid dates={week} days={weekDays} {members} {selected} onselect={select} cards={!desk && phoneWidth} />
+				<WeekGrid dates={week} days={weekDays} {members} {selected} onselect={select} cards={!desk && phoneWidth} {works} />
 			{/if}
 			</div>
 			{/key}

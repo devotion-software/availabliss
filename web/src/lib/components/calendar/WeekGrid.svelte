@@ -16,8 +16,10 @@
 		selected?: string;
 		/** Phones in portrait: a card per day instead of the time grid, which needs the width. */
 		cards?: boolean;
+		/** Whether a day works for everyone (true while unknown). Days that don't are faded. */
+		works?: (date: string) => boolean;
 	}
-	let { dates, days, members, onselect, selected, cards = false }: Props = $props();
+	let { dates, days, members, onselect, selected, cards = false, works = () => true }: Props = $props();
 
 	const fmt = useFormat();
 	const today = $derived(fmt.current.today());
@@ -85,8 +87,8 @@
 			{@const free = parts.filter((b) => b.free)}
 			{@const busy = parts.filter((b) => !b.free)}
 			<li>
-				<button type="button" class="card glass" class:on={d === selected} aria-pressed={d === selected} onclick={() => onselect?.(d)}>
-					<span class="date"><span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span></span>
+				<button type="button" class="card glass" class:on={d === selected} class:faded={!works(d)} aria-pressed={d === selected} onclick={() => onselect?.(d)}>
+					<span class="date" class:keep={d === today}><span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span></span>
 					<span class="info">
 						<span class="what" class:free={free.length > 0}>
 							{#if day === undefined}Loading…{:else if day === null}Outside the timing{:else}{free[0]?.label ?? "No time when everyone's free"}{/if}
@@ -111,6 +113,7 @@
 				type="button"
 				class="head"
 				class:on={d === selected}
+				class:faded={!works(d) && d !== today}
 				aria-pressed={d === selected}
 				onclick={() => onselect?.(d)}
 				aria-label="See who's free on {d === today ? 'today, ' : ''}{formatDayKey(d)}"
@@ -128,7 +131,7 @@
 			{@const day = days.get(d)}
 			<!-- Tapping a column picks the day too; the header button above is the keyboard route. -->
 			<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-			<div class="col" class:on={d === selected} role="list" aria-label={formatDayKey(d)} onclick={() => onselect?.(d)}>
+			<div class="col" class:on={d === selected} class:faded={!works(d)} role="list" aria-label={formatDayKey(d)} onclick={() => onselect?.(d)}>
 				{#if day === undefined}
 					<span class="state"><Spinner size={16} /></span>
 				{:else if day === null}
@@ -169,6 +172,14 @@
 		border-radius: 18px;
 		text-align: left;
 		color: var(--ink);
+	}
+	/* Days that don't work for everyone step back, like the month's plain cells; today's date and
+	   the selection ring stay at full strength. */
+	.card.faded .date:not(.keep),
+	.card.faded .info,
+	.head.faded:not(.on),
+	.col.faded > * {
+		filter: opacity(0.5);
 	}
 	.card.on {
 		outline: 2px solid var(--ink);
