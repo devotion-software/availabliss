@@ -15,7 +15,7 @@
 	import type { MessageMenuAnchor } from './MessageMenu.svelte';
 
 	/**
-	 * A text message. Others' are glass with an avatar; yours are solid. A tap opens message info.
+	 * A text message. Others' are glass with an avatar; yours are the theme accent. A tap opens message info.
 	 * A menu (Reply / Info, plus Edit / Delete on yours) opens on long-press, right-click or the ⋯ button;
 	 * hovering also shows a Reply button. A reply shows the message it quotes above its text: tapping that goes to it.
 	 * Deleted messages are a dashed outline with no actions.
@@ -285,8 +285,8 @@
 	}
 	.mine {
 		border-radius: 18px 18px 6px 18px;
-		background: var(--solid);
-		color: var(--on-solid);
+		background: var(--accent);
+		color: var(--on-accent);
 		transition:
 			opacity 0.2s ease,
 			transform 0.15s ease;
@@ -335,16 +335,20 @@
 		cursor: pointer;
 	}
 	.mine .quote {
-		border-left-color: color-mix(in srgb, var(--on-solid) 55%, transparent);
-		background: color-mix(in srgb, var(--on-solid) 12%, transparent);
-		color: color-mix(in srgb, var(--on-solid) 75%, transparent);
+		border-left-color: color-mix(in srgb, var(--on-accent) 60%, transparent);
+		background: color-mix(in srgb, var(--on-accent) 16%, transparent);
+		color: color-mix(in srgb, var(--on-accent) 82%, transparent);
 	}
 	.quote-name {
 		font-weight: 600;
 		color: var(--accent-ink);
 	}
 	.mine .quote-name {
-		color: var(--on-solid);
+		color: var(--on-accent);
+	}
+	.mine .quote:focus-visible {
+		outline-color: var(--on-accent);
+		outline-offset: -2px;
 	}
 	.quote-name,
 	.quote-text {

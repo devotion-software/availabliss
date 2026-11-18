@@ -97,8 +97,8 @@
 		padding: 9px 12px;
 		font-size: 14px;
 		line-height: 1.4;
-		background: var(--solid);
-		color: var(--on-solid);
+		background: var(--accent);
+		color: var(--on-accent);
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 	}
