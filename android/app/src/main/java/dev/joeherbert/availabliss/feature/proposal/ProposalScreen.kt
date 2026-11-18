@@ -78,7 +78,6 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.feature.common.AddToCalendarButton
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
-import dev.joeherbert.availabliss.feature.common.CalendarPickerRow
 
 /** Callbacks for [ProposalContent], bundled to keep signatures readable. */
 data class ProposalActions(
@@ -88,7 +87,6 @@ data class ProposalActions(
     val onOverride: (userId: String, ResponseKind) -> Unit = { _, _ -> },
     val onCancel: () -> Unit = {},
     val onAddToCalendar: () -> Unit = {},
-    val onSelectCalendar: (Long) -> Unit = {},
 )
 
 @Composable
@@ -96,7 +94,7 @@ fun ProposalScreen(onBack: () -> Unit, viewModel: ProposalViewModel = hiltViewMo
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
-    AddToCalendarEffect(state.calendar, viewModel::onIntentHandled)
+    AddToCalendarEffect(state.calendar, viewModel::onIntentHandled, viewModel::chooseCalendar, viewModel::cancelCalendarChoice)
     LaunchedEffect(state.closed) { if (state.closed) onBack() }
     val currentOnBack by rememberUpdatedState(onBack)
     // One instance for the screen's lifetime so unchanged parts skip recomposition.
@@ -108,7 +106,6 @@ fun ProposalScreen(onBack: () -> Unit, viewModel: ProposalViewModel = hiltViewMo
             onOverride = viewModel::override,
             onCancel = viewModel::cancel,
             onAddToCalendar = viewModel::addToCalendar,
-            onSelectCalendar = viewModel::onSelectCalendar,
         )
     }
     ProposalContent(state = state, actions = actions)
@@ -395,7 +392,6 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
             }
         }
         GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.cardLarge, contentPadding = PaddingValues(14.dp)) {
-            CalendarPickerRow(state.calendar, actions.onSelectCalendar)
             AddToCalendarButton(added = state.addedToCalendar, onClick = actions.onAddToCalendar)
         }
     }

@@ -15,7 +15,6 @@ import dev.joeherbert.availabliss.designsystem.component.GlassPillButton
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
-import dev.joeherbert.availabliss.feature.common.CalendarPickerRow
 import dev.joeherbert.availabliss.feature.events.DeleteEventDialog
 import dev.joeherbert.availabliss.feature.events.EventRow
 import dev.joeherbert.availabliss.feature.events.EventRowUi
@@ -75,7 +74,7 @@ fun GroupProposalsTab(
     val events by eventsViewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(events.message, snackbar, eventsViewModel::onMessageShown)
-    AddToCalendarEffect(events.calendar, eventsViewModel::onIntentHandled)
+    AddToCalendarEffect(events.calendar, eventsViewModel::onIntentHandled, eventsViewModel::chooseCalendar, eventsViewModel::cancelCalendarChoice)
     GroupProposalsContent(
         state = state,
         events = events,
@@ -88,7 +87,6 @@ fun GroupProposalsTab(
             eventsViewModel.refresh()
         },
         onAddToCalendar = eventsViewModel::onAddToCalendar,
-        onSelectCalendar = eventsViewModel::onSelectCalendar,
         onDeleteEvent = eventsViewModel::onDelete,
     )
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) { AvSnackbarHost(snackbar, Modifier.navigationBarsPadding()) }
@@ -104,7 +102,6 @@ private fun GroupProposalsContent(
     onAddEvent: () -> Unit,
     onRetry: () -> Unit,
     onAddToCalendar: (String) -> Unit,
-    onSelectCalendar: (Long) -> Unit,
     onDeleteEvent: (String) -> Unit,
 ) {
     var confirmDelete by remember { mutableStateOf<EventRowUi?>(null) }
@@ -131,14 +128,6 @@ private fun GroupProposalsContent(
                 // Coming up.
                 if (events.upcoming.isNotEmpty()) {
                     item { Heading("Coming up") }
-                    if (events.calendar.selectedCalendar != null) {
-                        item {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                SectionLabel("Add to")
-                                CalendarPickerRow(events.calendar, onSelectCalendar)
-                            }
-                        }
-                    }
                     items(events.upcoming, key = { "event-" + it.id }) { row ->
                         EventRow(row, past = false, onOpen = { onOpenEvent(row.id) }, onAddToCalendar = { onAddToCalendar(row.id) }, onDelete = { confirmDelete = row })
                     }
@@ -215,7 +204,7 @@ private fun GroupProposalsPreview() {
                 upcoming = listOf(EventRowUi("e1", "Book club", "Thu 26 Nov · from 18:00", "Hana's", "NOV", "26", canDelete = true, added = false)),
             ),
             onBack = {}, onOpenProposal = {}, onOpenEvent = {}, onAddEvent = {}, onRetry = {},
-            onAddToCalendar = {}, onSelectCalendar = {}, onDeleteEvent = {},
+            onAddToCalendar = {}, onDeleteEvent = {},
         )
     }
 }

@@ -108,6 +108,13 @@ class AppPreferences @Inject constructor(
         }
     }
 
+    /** The device calendar plans were last added to, offered first next time. */
+    val addToCalendarId: Flow<Long?> = store.data.map { it[KEY_ADD_TO_CALENDAR] }
+
+    suspend fun setAddToCalendarId(id: Long) {
+        store.edit { it[KEY_ADD_TO_CALENDAR] = id }
+    }
+
     /** My time's last view ("Month" / "Agenda"), remembered per device. */
     val myTimeView: Flow<String?> = store.data.map { it[KEY_MY_TIME_VIEW] }
 
@@ -137,6 +144,7 @@ class AppPreferences @Inject constructor(
             it.remove(KEY_DEVICE_SYNC_RANGES)
             it.remove(KEY_DEVICE_SYNC_HORIZON)
             it.remove(KEY_PUSH_TOKEN)
+            it.remove(KEY_ADD_TO_CALENDAR)
         }
     }
 
@@ -153,5 +161,6 @@ class AppPreferences @Inject constructor(
         val KEY_DEVICE_SYNC_HORIZON = longPreferencesKey("device_sync_horizon")
         val KEY_PUSH_TOKEN = stringPreferencesKey("push_token")
         val KEY_MY_TIME_VIEW = stringPreferencesKey("my_time_view")
+        val KEY_ADD_TO_CALENDAR = longPreferencesKey("add_to_calendar_id")
     }
 }

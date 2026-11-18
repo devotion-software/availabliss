@@ -50,14 +50,13 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
 import dev.joeherbert.availabliss.feature.common.AddToCalendarState
-import dev.joeherbert.availabliss.feature.common.CalendarPickerRow
 
 @Composable
 fun EventsScreen(onBack: () -> Unit, onAddEvent: () -> Unit, onOpenEvent: (String) -> Unit, viewModel: EventsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
-    AddToCalendarEffect(state.calendar, viewModel::onIntentHandled)
+    AddToCalendarEffect(state.calendar, viewModel::onIntentHandled, viewModel::chooseCalendar, viewModel::cancelCalendarChoice)
     EventsContent(
         state = state,
         onBack = onBack,
@@ -65,7 +64,6 @@ fun EventsScreen(onBack: () -> Unit, onAddEvent: () -> Unit, onOpenEvent: (Strin
         onOpenEvent = onOpenEvent,
         onRetry = viewModel::refresh,
         onAddToCalendar = viewModel::onAddToCalendar,
-        onSelectCalendar = viewModel::onSelectCalendar,
         onDelete = viewModel::onDelete,
     )
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) { AvSnackbarHost(snackbar, Modifier.navigationBarsPadding()) }
@@ -79,7 +77,6 @@ private fun EventsContent(
     onOpenEvent: (String) -> Unit,
     onRetry: () -> Unit,
     onAddToCalendar: (String) -> Unit,
-    onSelectCalendar: (Long) -> Unit,
     onDelete: (String) -> Unit,
 ) {
     var confirmDelete by remember { mutableStateOf<EventRowUi?>(null) }
@@ -99,14 +96,6 @@ private fun EventsContent(
             ) {
                 state.error?.let { item { ErrorBanner(it, onRetry = onRetry) } }
                 if (state.loading && state.upcoming.isEmpty() && state.past.isEmpty()) item { LoadingIndicator() }
-                if (state.calendar.selectedCalendar != null && state.upcoming.isNotEmpty()) {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            SectionLabel("Add to")
-                            CalendarPickerRow(state.calendar, onSelectCalendar)
-                        }
-                    }
-                }
                 if (!state.loading && state.error == null && state.upcoming.isEmpty() && state.past.isEmpty()) {
                     item {
                         EmptyState(
@@ -196,7 +185,7 @@ private fun EventsPreview() {
                 upcoming = listOf(EventRowUi("1", "Book club", "Wed 11 Nov · 18:30 – 21:00", "At Hana's", "NOV", "11", canDelete = true, added = false)),
                 calendar = AddToCalendarState(),
             ),
-            onBack = {}, onAddEvent = {}, onOpenEvent = {}, onRetry = {}, onAddToCalendar = {}, onSelectCalendar = {}, onDelete = {},
+            onBack = {}, onAddEvent = {}, onOpenEvent = {}, onRetry = {}, onAddToCalendar = {}, onDelete = {},
         )
     }
 }

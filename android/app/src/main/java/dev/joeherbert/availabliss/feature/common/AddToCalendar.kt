@@ -3,17 +3,13 @@ package dev.joeherbert.availabliss.feature.common
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,38 +20,45 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
 import dev.joeherbert.availabliss.core.calendar.CalendarInserter
 import dev.joeherbert.availabliss.core.calendar.DeviceCalendarInfo
 import dev.joeherbert.availabliss.core.calendar.InsertResult
+import dev.joeherbert.availabliss.core.data.AppPreferences
+import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
 import dev.joeherbert.availabliss.designsystem.component.ColorSwatch
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
+import dev.joeherbert.availabliss.designsystem.component.RowDivider
+import dev.joeherbert.availabliss.designsystem.component.SurfacePanel
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
-/** State of one-tap "Add to calendar" for a screen. */
+/** A plan waiting for the user to choose which calendar it goes in. */
+data class PendingCalendarAdd(val key: String, val draft: CalendarEventDraft)
+
+/** State of "Add to calendar" for a screen. */
 data class AddToCalendarState(
     /** Writable device calendars (empty without calendar permission → intent fallback). */
     val calendars: List<DeviceCalendarInfo> = emptyList(),
+    /** The calendar offered first: the one last added to, else the primary one. */
     val selectedCalendarId: Long? = null,
     /** Keys (event / proposal ids) already added during this session. */
     val added: Set<String> = emptySet(),
+    /** Set while the calendar choice sheet is open. */
+    val choosing: PendingCalendarAdd? = null,
     /** Set when the calendar app must handle the insert; the UI launches it then calls [AddToCalendarDelegate.onIntentHandled]. */
     val pendingIntent: Intent? = null,
 ) {
@@ -63,31 +66,52 @@ data class AddToCalendarState(
 }
 
 /**
- * Reusable "Add to calendar" logic for ViewModels: inserts directly into the chosen
- * device calendar when WRITE_CALENDAR is granted, otherwise hands off to the
- * calendar app with an `ACTION_INSERT` intent. Not a singleton: one per ViewModel.
+ * Reusable "Add to calendar" logic for ViewModels: with more than one writable calendar it asks
+ * which one first ([AddToCalendarState.choosing], shown by [AddToCalendarEffect]), then inserts
+ * directly when WRITE_CALENDAR is granted, otherwise hands off to the calendar app with an
+ * `ACTION_INSERT` intent. The calendar chosen is remembered for next time. Not a singleton: one per ViewModel.
  */
 class AddToCalendarDelegate @Inject constructor(
     private val inserter: CalendarInserter,
+    private val preferences: AppPreferences,
 ) {
     private val _state = MutableStateFlow(AddToCalendarState())
     val state: StateFlow<AddToCalendarState> = _state.asStateFlow()
 
     suspend fun loadCalendars() {
         val calendars = runCatching { inserter.writableCalendars() }.getOrDefault(emptyList())
+        val last = preferences.addToCalendarId.first()
         _state.update { s ->
             s.copy(
                 calendars = calendars,
                 selectedCalendarId = s.selectedCalendarId?.takeIf { id -> calendars.any { it.id == id } }
+                    ?: last?.takeIf { id -> calendars.any { it.id == id } }
                     ?: calendars.firstOrNull { it.isPrimary }?.id ?: calendars.firstOrNull()?.id,
             )
         }
     }
 
-    fun select(calendarId: Long) = _state.update { it.copy(selectedCalendarId = calendarId) }
-
+    /** Adds the plan, first asking which calendar when there's a choice. */
     suspend fun add(key: String, draft: CalendarEventDraft) {
-        when (val result = inserter.insert(draft, _state.value.selectedCalendarId)) {
+        if (_state.value.calendars.size > 1) {
+            _state.update { it.copy(choosing = PendingCalendarAdd(key, draft)) }
+        } else {
+            insert(key, draft, _state.value.selectedCalendarId)
+        }
+    }
+
+    /** The calendar was chosen in the sheet: remember it and add the waiting plan there. */
+    suspend fun choose(calendarId: Long) {
+        val pending = _state.value.choosing ?: return
+        _state.update { it.copy(choosing = null, selectedCalendarId = calendarId) }
+        preferences.setAddToCalendarId(calendarId)
+        insert(pending.key, pending.draft, calendarId)
+    }
+
+    fun cancelChoice() = _state.update { it.copy(choosing = null) }
+
+    private suspend fun insert(key: String, draft: CalendarEventDraft, calendarId: Long?) {
+        when (val result = inserter.insert(draft, calendarId)) {
             InsertResult.Inserted -> _state.update { it.copy(added = it.added + key) }
             is InsertResult.NeedsIntent -> _state.update { it.copy(pendingIntent = result.intent, added = it.added + key) }
         }
@@ -96,9 +120,17 @@ class AddToCalendarDelegate @Inject constructor(
     fun onIntentHandled() = _state.update { it.copy(pendingIntent = null) }
 }
 
-/** Launches [AddToCalendarState.pendingIntent] when set. Place once per screen. */
+/**
+ * Launches [AddToCalendarState.pendingIntent] when set, and shows the calendar choice sheet while
+ * [AddToCalendarState.choosing] is set. Place once per screen.
+ */
 @Composable
-fun AddToCalendarEffect(state: AddToCalendarState, onHandled: () -> Unit) {
+fun AddToCalendarEffect(
+    state: AddToCalendarState,
+    onHandled: () -> Unit,
+    onChoose: (Long) -> Unit,
+    onCancelChoice: () -> Unit,
+) {
     val context = LocalContext.current
     LaunchedEffect(state.pendingIntent) {
         val intent = state.pendingIntent ?: return@LaunchedEffect
@@ -109,50 +141,64 @@ fun AddToCalendarEffect(state: AddToCalendarState, onHandled: () -> Unit) {
         }
         onHandled()
     }
+    state.choosing?.let { pending ->
+        CalendarChoiceSheet(
+            title = "Add to calendar",
+            message = "Which calendar should ${pending.draft.title} go in?",
+            calendars = state.calendars,
+            selectedId = state.selectedCalendarId,
+            onChoose = onChoose,
+            onDismiss = onCancelChoice,
+        )
+    }
 }
 
-/** Calendar chooser row ("● Personal · iCloud ⌄") shown when direct insert is possible. */
+/**
+ * Chooses which of the phone's calendars a plan goes in: writable calendars grouped by account,
+ * each with its colour, the current choice ticked. Picking one calls [onChoose].
+ */
 @Composable
-fun CalendarPickerRow(state: AddToCalendarState, onSelect: (Long) -> Unit, modifier: Modifier = Modifier) {
-    val selected = state.selectedCalendar ?: return
+fun CalendarChoiceSheet(
+    title: String,
+    message: String?,
+    calendars: List<DeviceCalendarInfo>,
+    selectedId: Long?,
+    onChoose: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
     val colors = AvailablissTheme.colors
-    var open by remember { mutableStateOf(false) }
-    Box(modifier) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = 52.dp)
-                .clip(Shapes.control)
-                .background(colors.surface)
-                .border(1.dp, colors.glassBorder, Shapes.control)
-                .clickable(role = Role.DropdownList, onClickLabel = "Choose calendar") { open = true }
-                .padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            ColorSwatch(selected.color?.let(::parseHex) ?: colors.warn)
-            Text(
-                buildAnnotatedString {
-                    append(selected.name)
-                    withStyle(SpanStyle(fontWeight = FontWeight.Medium, color = colors.muted)) { append(" · ${selected.accountName}") }
-                },
-                style = AvailablissTheme.type.bodySmallStrong,
-                color = colors.ink,
-                maxLines = 1,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(AvIcons.ChevronDown, null, tint = colors.muted, modifier = Modifier.size(16.dp))
+    AvBottomSheet(title = title, onDismissRequest = onDismiss) {
+        if (!message.isNullOrBlank()) {
+            Text(message, style = AvailablissTheme.type.body, color = colors.muted)
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bg) {
-            state.calendars.forEach { cal ->
-                DropdownMenuItem(
-                    text = { Text("${cal.name} · ${cal.accountName}", style = AvailablissTheme.type.bodySmallStrong) },
-                    leadingIcon = { ColorSwatch(cal.color?.let(::parseHex) ?: colors.warn) },
-                    onClick = {
-                        onSelect(cal.id)
-                        open = false
-                    },
-                )
+        calendars.groupBy { it.accountName }.toSortedMap(String.CASE_INSENSITIVE_ORDER).forEach { (account, list) ->
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(account, style = AvailablissTheme.type.captionStrong, color = colors.muted, modifier = Modifier.padding(start = 4.dp))
+                SurfacePanel(Modifier.fillMaxWidth()) {
+                    list.forEachIndexed { index, cal ->
+                        if (index > 0) RowDivider()
+                        val selected = cal.id == selectedId
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 52.dp)
+                                .selectable(selected = selected, role = Role.RadioButton) { onChoose(cal.id) },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            ColorSwatch(cal.color?.let(::parseHex) ?: colors.warn, size = 12.dp, radius = 6.dp)
+                            Text(
+                                cal.name,
+                                style = if (selected) AvailablissTheme.type.bodySmallStrong else AvailablissTheme.type.body,
+                                color = colors.ink,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (selected) Icon(AvIcons.Check, null, tint = colors.accentInk, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
             }
         }
     }

@@ -157,7 +157,11 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { addToCalendar.add(event.id, draft) }
     }
 
-    fun selectCalendar(id: Long) = addToCalendar.select(id)
+    fun chooseCalendar(id: Long) {
+        viewModelScope.launch { addToCalendar.choose(id) }
+    }
+
+    fun cancelCalendarChoice() = addToCalendar.cancelChoice()
 
     fun calendarIntentHandled() = addToCalendar.onIntentHandled()
 

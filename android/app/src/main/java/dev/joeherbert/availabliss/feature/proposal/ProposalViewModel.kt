@@ -180,7 +180,11 @@ class ProposalViewModel @Inject constructor(
         viewModelScope.launch { addToCalendar.add(proposal.eventId ?: proposal.id, draft) }
     }
 
-    fun onSelectCalendar(id: Long) = addToCalendar.select(id)
+    fun chooseCalendar(id: Long) {
+        viewModelScope.launch { addToCalendar.choose(id) }
+    }
+
+    fun cancelCalendarChoice() = addToCalendar.cancelChoice()
     fun onIntentHandled() = addToCalendar.onIntentHandled()
     fun onMessageShown(message: UserMessage) = data.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 

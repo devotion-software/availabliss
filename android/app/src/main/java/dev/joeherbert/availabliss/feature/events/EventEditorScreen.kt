@@ -63,7 +63,7 @@ fun EventEditorScreen(onBack: () -> Unit, onSaved: () -> Unit, viewModel: EventE
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
-    AddToCalendarEffect(state.calendar, viewModel::onCalendarIntentHandled)
+    AddToCalendarEffect(state.calendar, viewModel::onCalendarIntentHandled, viewModel::chooseCalendar, viewModel::cancelCalendarChoice)
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onSaved() }
     // Covers are shown wide, so keep more pixels than an avatar (the server fits them to 1600 px).
     val pickCover = rememberPhotoPicker(maxSide = 1600, onUnreadable = viewModel::coverUnreadable, onPicked = viewModel::setCover)

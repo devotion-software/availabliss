@@ -169,7 +169,7 @@ fun GroupChatTab(
     // The system photo picker (photos and GIFs, no permission needed) and file picker; the app keeps at most 10 per message.
     val photoPicker = rememberLauncherForActivityResult(PickMultipleVisualMedia(MAX_ATTACHMENTS)) { uris -> viewModel.onPicked(uris) }
     val filePicker = rememberLauncherForActivityResult(OpenMultipleDocuments()) { uris -> viewModel.onPicked(uris) }
-    AddToCalendarEffect(state.calendar, viewModel::onCalendarIntentHandled)
+    AddToCalendarEffect(state.calendar, viewModel::onCalendarIntentHandled, viewModel::chooseCalendar, viewModel::cancelCalendarChoice)
     LifecycleResumeEffect(Unit) {
         viewModel.onVisibilityChanged(true)
         onPauseOrDispose { viewModel.onVisibilityChanged(false) }

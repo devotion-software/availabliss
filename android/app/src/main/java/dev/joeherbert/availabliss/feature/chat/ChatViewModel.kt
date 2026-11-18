@@ -967,6 +967,12 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onCalendarIntentHandled() = addToCalendar.onIntentHandled()
+
+    fun chooseCalendar(id: Long) {
+        viewModelScope.launch { addToCalendar.choose(id) }
+    }
+
+    fun cancelCalendarChoice() = addToCalendar.cancelChoice()
     // endregion
 
     fun onMessageShown(message: UserMessage) = data.update { if (it.message?.id == message.id) it.copy(message = null) else it }

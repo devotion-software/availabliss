@@ -227,5 +227,11 @@ class EventEditorViewModel @Inject constructor(
 
     fun onCalendarIntentHandled() = addToCalendar.onIntentHandled()
 
+    fun chooseCalendar(id: Long) {
+        viewModelScope.launch { addToCalendar.choose(id) }
+    }
+
+    fun cancelCalendarChoice() = addToCalendar.cancelChoice()
+
     fun onMessageShown(message: UserMessage) = _state.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 }

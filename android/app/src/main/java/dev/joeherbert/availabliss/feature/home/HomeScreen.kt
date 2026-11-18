@@ -67,7 +67,6 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import dev.joeherbert.availabliss.feature.common.AddToCalendarButton
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
-import dev.joeherbert.availabliss.feature.common.CalendarPickerRow
 
 /** Groups home (Main.dc.html). */
 @Composable
@@ -81,7 +80,7 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::messageShown)
-    AddToCalendarEffect(state.calendar, viewModel::calendarIntentHandled)
+    AddToCalendarEffect(state.calendar, viewModel::calendarIntentHandled, viewModel::chooseCalendar, viewModel::cancelCalendarChoice)
     HomeContent(
         state = state,
         onOpenGroup = onOpenGroup,
@@ -89,7 +88,6 @@ fun HomeScreen(
         onNewGroup = onNewGroup,
         onOpenProfile = onOpenProfile,
         onAddToCalendar = viewModel::addUpNextToCalendar,
-        onSelectCalendar = viewModel::selectCalendar,
         onRetry = { viewModel.refresh() },
         snackbar = { AvSnackbarHost(snackbar) },
     )
@@ -103,7 +101,6 @@ fun HomeContent(
     onNewGroup: () -> Unit,
     onOpenProfile: () -> Unit,
     onAddToCalendar: () -> Unit,
-    onSelectCalendar: (Long) -> Unit,
     onRetry: () -> Unit,
     snackbar: @Composable () -> Unit = {},
 ) {
@@ -119,7 +116,7 @@ fun HomeContent(
         ) {
             item(key = "header") { Header(state, onOpenProfile) }
             state.upNext?.let { upNext ->
-                item(key = "upnext") { UpNextCard(upNext, state, onAddToCalendar, onSelectCalendar) }
+                item(key = "upnext") { UpNextCard(upNext, onAddToCalendar) }
             }
             state.error?.let { error -> item(key = "error") { ErrorBanner(error, onRetry = onRetry) } }
             item(key = "groups-title") {
@@ -188,7 +185,7 @@ private fun Header(state: HomeUiState, onOpenProfile: () -> Unit) {
 }
 
 @Composable
-private fun UpNextCard(upNext: UpNextUi, state: HomeUiState, onAddToCalendar: () -> Unit, onSelectCalendar: (Long) -> Unit) {
+private fun UpNextCard(upNext: UpNextUi, onAddToCalendar: () -> Unit) {
     val colors = AvailablissTheme.colors
     Column(
         Modifier.fillMaxWidth().glass(Shapes.cardLarge).padding(18.dp).semantics(mergeDescendants = false) { contentDescription = "Up next" },
@@ -209,9 +206,6 @@ private fun UpNextCard(upNext: UpNextUi, state: HomeUiState, onAddToCalendar: ()
             Text(upNext.whenLabel, style = AvailablissTheme.type.titleLarge, color = colors.ink)
             val detail = listOf(upNext.title, upNext.detail).filter { it.isNotBlank() }.joinToString(" · ")
             if (detail.isNotBlank()) Text(detail, style = AvailablissTheme.type.body, color = colors.muted)
-        }
-        if (!upNext.added && state.calendar.calendars.size > 1) {
-            CalendarPickerRow(state.calendar, onSelectCalendar)
         }
         AddToCalendarButton(added = upNext.added, onClick = onAddToCalendar, height = 48.dp)
     }
@@ -310,7 +304,7 @@ private fun HomePreview() {
                     GroupTileUi("2", "Mum's 60th", "60", TileColor.T4, "Needs your reply", PillTone.Apricot, "One day · school holidays only", people, 1f, "All synced", 0),
                 ),
             ),
-            onOpenGroup = {}, onOpenGroupChat = {}, onNewGroup = {}, onOpenProfile = {}, onAddToCalendar = {}, onSelectCalendar = {}, onRetry = {},
+            onOpenGroup = {}, onOpenGroupChat = {}, onNewGroup = {}, onOpenProfile = {}, onAddToCalendar = {}, onRetry = {},
         )
     }
 }
