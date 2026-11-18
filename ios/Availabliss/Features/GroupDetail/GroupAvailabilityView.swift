@@ -492,21 +492,36 @@ private struct DayCell: View {
 
     /// Past days look like days outside the group's timing.
     private var isPast: Bool { date < .today() }
+    private var isToday: Bool { date == .today() }
 
     var body: some View {
         let status = isPast ? .hidden : (info?.status ?? .hidden)
+        // Days that don't work fade; today's doesn't, so it never turns into a washed-out pill.
+        let fade = status == .busy ? 0.5 : (status == .hidden ? 0.35 : 1)
+        // Today on a day that doesn't work: an accent outline and accent date instead of a pill.
+        let plainToday = isToday && status != .match
         Button(action: action) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(date.day)").font(AppFont.body(compact ? 15 : 17, .semibold, relativeTo: .body))
-                    .todayMark(date, onAccent: status == .match)
+                if plainToday {
+                    Text("\(date.day)").font(AppFont.body(compact ? 15 : 17, .bold, relativeTo: .body))
+                        .foregroundStyle(theme.accentInk)
+                } else {
+                    Text("\(date.day)").font(AppFont.body(compact ? 15 : 17, .semibold, relativeTo: .body))
+                        .todayMark(date, onAccent: status == .match)
+                }
                 if !compact || status == .match || isPast {
                     Text(note).bodyFont(compact ? 9 : 11, .semibold, relativeTo: .caption2).lineLimit(1)
+                        .foregroundStyle(plainToday ? theme.muted : (status == .match ? theme.onAccent : theme.ink))
                 }
             }
             .foregroundStyle(status == .match ? theme.onAccent : theme.ink)
+            .opacity(plainToday ? 1 : fade)
             .padding(.horizontal, compact ? 6 : 10)
             .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
-            .background(background(status))
+            .background(background(status).opacity(fade))
+            .overlay {
+                if plainToday { shape.strokeBorder(theme.accent, lineWidth: 1.5) }
+            }
             .overlay(alignment: .topTrailing) {
                 if status == .match, let count = info?.preferredBy?.count, count > 0 {
                     HStack(spacing: 1) {
@@ -519,7 +534,6 @@ private struct DayCell: View {
                     .accessibilityHidden(true)
                 }
             }
-            .opacity(status == .busy ? 0.5 : (status == .hidden ? 0.35 : 1))
             .overlay {
                 if isSelected {
                     shape.stroke(theme.ink, lineWidth: 2).padding(-4)
