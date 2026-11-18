@@ -23,6 +23,7 @@ import {
 	RESPONSE_KINDS,
 	ROLES,
 	type Requirement,
+	type WalletPass,
 	type Weekday
 } from '../../types';
 
@@ -407,6 +408,8 @@ export const messageAttachments = mysqlTable(
 		height: int('height'),
 		storageKey: varchar('storage_key', { length: 255 }).notNull(),
 		thumbKey: varchar('thumb_key', { length: 255 }),
+		// A Wallet pass's card details (kind 'pass'); null otherwise.
+		pass: json('pass').$type<WalletPass>(),
 		// Order within its message.
 		position: int('position').default(0).notNull(),
 		createdAt: createdAt()

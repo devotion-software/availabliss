@@ -349,7 +349,7 @@ interface PostInput {
 	eventId?: string | null;
 	replyToId?: string | null;
 	/** Checked unsent uploads (see pendingUploads), attached in this order. */
-	attachments?: { id: string; kind: Attachment['kind']; name: string }[];
+	attachments?: { id: string; kind: Attachment['kind']; name: string; pass?: Attachment['pass'] }[];
 }
 
 /** Messages can be 4000 characters, but APNs and FCM reject payloads over 4 KB. */

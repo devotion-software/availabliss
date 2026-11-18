@@ -582,16 +582,35 @@ interface Message {
 }
 // A text message can carry attachments with or without a caption. Its `body` is then the caption, or
 // (with none) a one-line summary for older apps: "📷 Photo", "GIF", "📷 3 photos", "📎 Plan.pdf",
-// "📎 2 files", "📎 2 attachments". Apps that know `attachments` show those and `caption` instead.
+// "📎 2 files", "📎 2 attachments", "🎟️ Concert ticket", "🎟️ 2 passes". Apps that know `attachments`
+// show those and `caption` instead.
 interface Attachment {
   id: string;
-  kind: 'image' | 'gif' | 'file';       // gif = animated (show `url` so it moves)
+  kind: 'image' | 'gif' | 'file' | 'pass'; // gif = animated (show `url` so it moves); pass = Apple Wallet pass.
+                                        // More kinds may come: show an unknown kind as a file
   name: string;                         // file name, e.g. "Plan.pdf" or "IMG_0001.jpg"
   mime: string;
   size: number;                         // bytes stored
   width: number | null; height: number | null; // pixels, images and GIFs only
   url: string;                          // signed link to the file (no auth header needed); see below
-  thumbnailUrl: string | null;          // smaller preview (at most 720 px) for photos; null for GIFs and files
+  thumbnailUrl: string | null;          // smaller preview (at most 720 px) for photos, or a pass's logo (PNG, at most
+                                        // 480×160); null for GIFs and files
+  pass: WalletPass | null;              // kind 'pass' only: what to show on its card without downloading it
+}
+// An Apple Wallet pass (.pkpass, or a .pkpasses bundle of up to 10: details are the first one's). Read from
+// its pass.json (English strings where it is localised); the file itself is kept exactly as sent (it's signed).
+interface WalletPass {
+  style: 'boardingPass' | 'eventTicket' | 'coupon' | 'storeCard' | 'generic';
+  organizationName: string; description: string; // either may be ""
+  logoText: string | null;
+  passTypeIdentifier: string; serialNumber: string; // identify the pass (e.g. to tell whether it's already in Wallet)
+  relevantDate: string | null;          // when it's for (event, departure), ISO 8601 UTC
+  expirationDate: string | null; voided: boolean;
+  eventName: string | null; venue: string | null;
+  fields: { label: string | null; value: string; date: boolean }[]; // up to 4, most important first; with
+                                        // `date` the value is an ISO 8601 UTC date-time to format locally
+  backgroundColor: string | null; foregroundColor: string | null; labelColor: string | null; // "#rrggbb"
+  count: number;                        // passes in the file (1 unless a .pkpasses bundle)
 }
 interface MessageReply {                // the quoted message, as it is now
   id: string;
@@ -616,12 +635,12 @@ interface MessageInfo {
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/groups/:id/messages?before=<messageId>&limit=50` | | `{ messages: Message[]; hasMore: boolean }` (newest last) |
-| POST 🔒 | `/groups/:id/attachments` | `multipart/form-data` with one file in the field `file` | `201` `Attachment`, not yet in any message: send its id in `attachmentIds`. Photos (JPEG, PNG, WebP, GIF, HEIC where the server can read it; up to 15 MB) are turned upright, stripped of metadata (location included), shrunk to at most 2560 px and stored as JPEG (PNG if transparent), so `name`, `mime` and `size` can differ from what was sent; an animated GIF is kept as it is. Files (up to 25 MB) must be one of: pdf, txt, md, csv, rtf, ics, vcf, doc(x), xls(x), ppt(x), odt, ods, odp, pages, numbers, key, epub, zip, mp3, m4a, wav, mp4, mov (by extension); anything else is `400`. Uploads not sent within a day are deleted |
+| POST 🔒 | `/groups/:id/attachments` | `multipart/form-data` with one file in the field `file` | `201` `Attachment`, not yet in any message: send its id in `attachmentIds`. Photos (JPEG, PNG, WebP, GIF, HEIC where the server can read it; up to 15 MB) are turned upright, stripped of metadata (location included), shrunk to at most 2560 px and stored as JPEG (PNG if transparent), so `name`, `mime` and `size` can differ from what was sent; an animated GIF is kept as it is. Files (up to 25 MB) must be one of: pdf, txt, md, csv, rtf, ics, vcf, doc(x), xls(x), ppt(x), odt, ods, odp, pages, numbers, key, epub, zip, mp3, m4a, wav, mp4, mov, pkpass, pkpasses (by extension; a file sent as `application/vnd.apple.pkpass` without one gets `.pkpass`); anything else is `400`. A Wallet pass whose pass.json can be read comes back as `kind: 'pass'` with `pass` details (else as a plain `file`). Uploads not sent within a day are deleted |
 | POST 🔒 | `/groups/:id/messages` | `{ body, replyToId? }`, or `{ attachmentIds: string[] (1–10), body?: caption, replyToId? }`, or `{ poll: { question, options: string[], multi? } }` | `Message`. `replyToId` must be a message in the same chat (else `400`), not a group update (`400`) and not deleted (`409`). `attachmentIds` must be your own unsent uploads to this group (else `400`) |
 | POST 🔒 | `/groups/:id/messages/receipts` | `{ upTo: messageId, state: 'delivered' \| 'seen' }` | `204` |
 | PATCH 🔒 | `/messages/:id` | `{ body }` | `Message` (the sender's own text messages only). With attachments `body` is the caption and may be `""` to remove it |
 | DELETE 🔒 | `/messages/:id` | | `204` (the sender's own text messages only; it stays in the chat as deleted, and its attachments are deleted for good) |
-| GET | `/attachments/:id?e=…&s=…`, `/attachments/:id/thumb?e=…&s=…` | | The file (or a photo's preview). These are the signed `url` / `thumbnailUrl` links from `Attachment`: no session needed, valid for 7–8 days and unchanged within a day (cacheable); refetch the message for fresh ones. Without a valid signature, only a signed-in member of the group gets it (else `404`). Photos and GIFs are served `inline`; files as a download (`Content-Disposition: attachment` with the name); add `&download=1` to download a photo. Not rate limited. Deleting the group deletes every attachment sent in it |
+| GET | `/attachments/:id?e=…&s=…`, `/attachments/:id/thumb?e=…&s=…` | | The file (or a photo's preview). These are the signed `url` / `thumbnailUrl` links from `Attachment`: no session needed, valid for 7–8 days and unchanged within a day (cacheable); refetch the message for fresh ones. Without a valid signature, only a signed-in member of the group gets it (else `404`). Photos, GIFs and Wallet passes are served `inline` (a pass as `application/vnd.apple.pkpass`, so Safari offers to add it to Wallet); files as a download (`Content-Disposition: attachment` with the name); add `&download=1` to download a photo. Not rate limited. Deleting the group deletes every attachment sent in it |
 | GET 🔒 | `/messages/:id/info` | | `MessageInfo` (any member of the group) |
 | GET 🔒 | `/messages/:id/thread` | | `{ rootId: string; messages: Message[]; truncated: boolean }`: the thread the message is in. `rootId` is the first message of its chain of replies (following `replyTo` up); `messages` is that message and every reply to it, and replies to those, oldest first (deleted ones included), at most 200 (the earliest; `truncated` when there were more). Any member of the group |
 | POST 🔒 | `/polls/:id/vote` | `{ optionIds: string[] }` (empty = remove vote) | `Poll` |

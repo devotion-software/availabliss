@@ -26,6 +26,7 @@ const att = (over: Partial<Attachment> = {}): Attachment => ({
 	height: 900,
 	url: 'https://x.test/attachments/a1?e=1&s=2',
 	thumbnailUrl: 'https://x.test/attachments/a1/thumb?e=1&s=2',
+	pass: null,
 	...over
 });
 

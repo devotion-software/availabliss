@@ -8,7 +8,7 @@
 import { createHmac, hkdfSync, timingSafeEqual } from 'node:crypto';
 import { and, asc, eq, inArray, isNull, lt } from 'drizzle-orm';
 import sharp from 'sharp';
-import type { Attachment, AttachmentKind } from '#lib/types';
+import type { Attachment, AttachmentKind, WalletPass } from '#lib/types';
 import { db } from './db';
 import { messageAttachments } from './db/schema';
 import { env } from './env';
@@ -16,6 +16,7 @@ import { ApiError, badRequest, notFound } from './http';
 import { newId, newToken } from './ids';
 import { deleteKeys, getObject, putObject } from './media';
 import { requireMember, roleIn } from './groups';
+import { passTitle, readWalletPass } from './wallet-pass';
 
 type AttachmentRow = typeof messageAttachments.$inferSelect;
 
@@ -71,8 +72,13 @@ export const FILE_TYPES: Record<string, string> = {
 	m4a: 'audio/mp4',
 	wav: 'audio/wav',
 	mp4: 'video/mp4',
-	mov: 'video/quicktime'
+	mov: 'video/quicktime',
+	// Apple Wallet passes: shown as a card (kind 'pass') when their pass.json can be read.
+	pkpass: 'application/vnd.apple.pkpass',
+	pkpasses: 'application/vnd.apple.pkpasses'
 };
+
+const PASS_MIMES = new Set(['application/vnd.apple.pkpass', 'application/vnd.apple.pkpasses']);
 
 // ─── Signed links ─────────────────────────────────────────────────────────
 
@@ -118,7 +124,8 @@ function toAttachment(row: AttachmentRow): Attachment {
 		width: row.width,
 		height: row.height,
 		url: signedUrl(row.id, 'file'),
-		thumbnailUrl: row.thumbKey ? signedUrl(row.id, 'thumb') : null
+		thumbnailUrl: row.thumbKey ? signedUrl(row.id, 'thumb') : null,
+		pass: row.kind === 'pass' ? row.pass : null
 	};
 }
 
@@ -141,16 +148,20 @@ export async function attachmentsFor(messageIds: string[]): Promise<Map<string, 
 
 /**
  * A one-line stand-in for attachments without a caption: the body older apps show, the
- * quote above a reply and the push text. "📷 Photo", "GIF", "📷 3 photos", "📎 Plan.pdf", "📎 2 files".
+ * quote above a reply and the push text. "📷 Photo", "GIF", "📷 3 photos", "📎 Plan.pdf",
+ * "📎 2 files", "🎟️ Concert ticket", "🎟️ 2 passes".
  */
-export function attachmentSummary(list: Pick<Attachment, 'kind' | 'name'>[]): string {
+export function attachmentSummary(list: (Pick<Attachment, 'kind' | 'name'> & { pass?: WalletPass | null })[]): string {
 	if (!list.length) return '';
-	const files = list.filter((a) => a.kind === 'file');
+	const files = list.filter((a) => a.kind === 'file' || a.kind === 'pass');
+	const passes = list.filter((a) => a.kind === 'pass');
 	if (list.length === 1) {
 		const [only] = list;
+		if (only.kind === 'pass') return `🎟️ ${passTitle(only.pass ?? null)}`;
 		return only.kind === 'gif' ? 'GIF' : only.kind === 'image' ? '📷 Photo' : `📎 ${only.name}`;
 	}
 	if (!files.length) return `📷 ${list.length} photos`;
+	if (passes.length === list.length) return `🎟️ ${list.length} passes`;
 	return files.length === list.length ? `📎 ${list.length} files` : `📎 ${list.length} attachments`;
 }
 
@@ -175,6 +186,7 @@ export async function serveAttachment(
 
 	const object = await getObject(key, range);
 	if (!object) throw notFound('Attachment not found');
+	// A pass is served as one so Safari offers to add it to Wallet (other browsers download it).
 	const inline = row.kind !== 'file' && url.searchParams.get('download') !== '1';
 	const mime = variant === 'thumb' ? (key.endsWith('.png') ? 'image/png' : 'image/jpeg') : row.mime;
 	const headers = object.headers;
@@ -182,8 +194,8 @@ export async function serveAttachment(
 	headers.set('content-disposition', `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(row.name)}`);
 	headers.set('cache-control', 'private, max-age=604800, immutable');
 	headers.set('x-content-type-options', 'nosniff');
-	// Never run as a page, whatever the bytes are.
-	headers.set('content-security-policy', "default-src 'none'; sandbox");
+	// Never run as a page, whatever the bytes are. (Not sandboxed for a pass: Safari hands it to Wallet.)
+	headers.set('content-security-policy', row.kind === 'pass' && variant === 'file' ? "default-src 'none'" : "default-src 'none'; sandbox");
 	return new Response(object.body as BodyInit, { status: object.status, headers });
 }
 
@@ -212,6 +224,7 @@ interface Prepared {
 	height: number | null;
 	thumb: Uint8Array | null;
 	ext: string;
+	pass?: WalletPass | null;
 }
 
 async function prepareImage(input: Buffer, name: string): Promise<Prepared> {
@@ -256,15 +269,39 @@ async function prepareImage(input: Buffer, name: string): Promise<Prepared> {
 }
 
 /**
+ * A Wallet pass: kept byte for byte (it is signed), with its card details and logo read from
+ * inside. One that can't be read stays a plain file.
+ */
+async function preparePass(file: Prepared): Promise<Prepared> {
+	const read = readWalletPass(file.bytes, file.ext === 'pkpasses');
+	if (!read) return file;
+	let thumb: Uint8Array | null = null;
+	if (read.logo) {
+		try {
+			const logo = await sharp(read.logo, { limitInputPixels: 25_000_000 })
+				.resize(480, 160, { fit: 'inside', withoutEnlargement: true })
+				.png({ compressionLevel: 9 })
+				.toBuffer();
+			thumb = new Uint8Array(logo);
+		} catch {
+			// A broken logo: the card shows without one.
+		}
+	}
+	return { ...file, kind: 'pass', pass: read.pass, thumb };
+}
+
+/**
  * Stores one upload for the group's chat and returns it (not yet in any message). Photos
  * are resized and stripped of metadata (location included); files must be an allowed type.
  */
 export async function uploadAttachment(groupId: string, userId: string, file: File): Promise<Attachment> {
 	await requireMember(groupId, userId);
 	if (file.size === 0) throw badRequest('That file is empty');
-	const name = cleanName(file.name || 'file');
-	const ext = extensionOf(name);
 	const declared = (file.type || '').toLowerCase();
+	let name = cleanName(file.name || 'file');
+	// A pass shared without its extension (some apps send "pass" or "ticket").
+	if (PASS_MIMES.has(declared) && !(extensionOf(name) in FILE_TYPES)) name = `${name}.${declared.endsWith('pkpasses') ? 'pkpasses' : 'pkpass'}`;
+	const ext = extensionOf(name);
 	const looksLikeImage = ext in IMAGE_TYPES || Object.values(IMAGE_TYPES).includes(declared);
 
 	let prepared: Prepared;
@@ -276,13 +313,15 @@ export async function uploadAttachment(groupId: string, userId: string, file: Fi
 		if (!mime) throw badRequest("That type of file can't be sent. Try a PDF, document, spreadsheet, slides, ZIP, audio or video file.");
 		if (file.size > MAX_FILE_BYTES) throw badRequest('Files can be up to 25 MB');
 		prepared = { kind: 'file', name, mime, bytes: new Uint8Array(await file.arrayBuffer()), width: null, height: null, thumb: null, ext };
+		if (PASS_MIMES.has(mime)) prepared = await preparePass(prepared);
 	}
 
 	const token = newToken();
 	const storageKey = `chat/${groupId}/${token}.${prepared.ext}`;
-	const thumbKey = prepared.thumb ? `chat/${groupId}/${token}-thumb.${prepared.mime === 'image/png' ? 'png' : 'jpg'}` : null;
+	const thumbPng = prepared.mime === 'image/png' || prepared.kind === 'pass';
+	const thumbKey = prepared.thumb ? `chat/${groupId}/${token}-thumb.${thumbPng ? 'png' : 'jpg'}` : null;
 	await putObject(storageKey, prepared.bytes, prepared.mime);
-	if (thumbKey && prepared.thumb) await putObject(thumbKey, prepared.thumb, prepared.mime === 'image/png' ? 'image/png' : 'image/jpeg');
+	if (thumbKey && prepared.thumb) await putObject(thumbKey, prepared.thumb, thumbPng ? 'image/png' : 'image/jpeg');
 
 	const id = newId();
 	await db.insert(messageAttachments).values({
@@ -296,7 +335,8 @@ export async function uploadAttachment(groupId: string, userId: string, file: Fi
 		width: prepared.width,
 		height: prepared.height,
 		storageKey,
-		thumbKey
+		thumbKey,
+		pass: prepared.pass ?? null
 	});
 	return toAttachment((await db.query.messageAttachments.findFirst({ where: eq(messageAttachments.id, id) }))!);
 }
@@ -305,13 +345,13 @@ export async function uploadAttachment(groupId: string, userId: string, file: Fi
  * Checks that every id is the sender's own unsent upload in this group, in the order given.
  * Throws if any isn't.
  */
-export async function pendingUploads(groupId: string, userId: string, ids: string[]): Promise<Pick<AttachmentRow, 'id' | 'kind' | 'name'>[]> {
+export async function pendingUploads(groupId: string, userId: string, ids: string[]): Promise<Pick<AttachmentRow, 'id' | 'kind' | 'name' | 'pass'>[]> {
 	const unique = [...new Set(ids)];
 	if (unique.length !== ids.length) throw badRequest('An attachment is listed twice');
 	if (ids.length > MAX_ATTACHMENTS) throw badRequest(`A message can have up to ${MAX_ATTACHMENTS} attachments`);
 	const rows = ids.length
 		? await db
-				.select({ id: messageAttachments.id, kind: messageAttachments.kind, name: messageAttachments.name })
+				.select({ id: messageAttachments.id, kind: messageAttachments.kind, name: messageAttachments.name, pass: messageAttachments.pass })
 				.from(messageAttachments)
 				.where(
 					and(

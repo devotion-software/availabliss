@@ -9,6 +9,7 @@ import { deleteMessage, editMessage, listMessages, messageThread, sendText } fro
 import { deleteAbandonedUploads, PENDING_TTL_MS, serveAttachment, uploadAttachment } from '#lib/server/attachments';
 import { getObject } from '#lib/server/media';
 import { listNotifications } from '#lib/server/notifications';
+import { makePass } from '#lib/server/wallet-pass.fixture';
 import { apiError, everyDay, fixture } from './fixtures';
 
 const fx = fixture('attachments');
@@ -135,6 +136,37 @@ describe('access', () => {
 		const unsigned = p.url.split('?')[0];
 		expect((await fetchAs(unsigned, member)).status).toBe(200);
 		expect((await apiError(fetchAs(unsigned, owner))).code).toBe('not_found');
+	});
+});
+
+describe('Wallet passes', () => {
+	const logo = () => sharp({ create: { width: 320, height: 100, channels: 4, background: '#ffffff00' } }).png().toBuffer();
+
+	test('a .pkpass becomes a pass card, kept byte for byte, served for Wallet', async () => {
+		const bytes = makePass(undefined, new Uint8Array(await logo()));
+		const p = await uploadAttachment(groupId, member, new File([bytes], 'Winter Gig.pkpass', { type: 'application/vnd.apple.pkpass' }));
+		expect(p).toMatchObject({ kind: 'pass', name: 'Winter Gig.pkpass', mime: 'application/vnd.apple.pkpass', size: bytes.byteLength });
+		expect(p.pass).toMatchObject({ description: 'Concert ticket', organizationName: 'Roundhouse', serialNumber: 'SEAT-12A', backgroundColor: '#201840' });
+		// The logo, shrunk, as its thumbnail.
+		expect(p.thumbnailUrl).toContain('/thumb?');
+
+		const sent = await sendText(groupId, member, null, null, [p.id]);
+		expect(sent).toMatchObject({ body: '🎟️ Concert ticket', caption: null });
+		const res = await fetchAs(sent.attachments[0].url, null);
+		expect(res.headers.get('content-type')).toBe('application/vnd.apple.pkpass');
+		expect(res.headers.get('content-disposition')).toStartWith('inline');
+		expect(res.headers.get('content-security-policy')).not.toContain('sandbox');
+		expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
+		const thumb = await fetchAs(sent.attachments[0].thumbnailUrl!, null);
+		expect(thumb.headers.get('content-type')).toBe('image/png');
+		expect((await listMessages(groupId, owner, null, 50)).messages.find((m) => m.id === sent.id)?.attachments[0].pass?.eventName).toBe('Winter Gig');
+	});
+
+	test("a pass shared without its extension still counts; one that can't be read is a plain file", async () => {
+		const shared = await uploadAttachment(groupId, member, new File([makePass()], 'ticket', { type: 'application/vnd.apple.pkpass' }));
+		expect(shared).toMatchObject({ kind: 'pass', name: 'ticket.pkpass', thumbnailUrl: null });
+		const broken = await uploadAttachment(groupId, member, new File(['not a zip'], 'broken.pkpass'));
+		expect(broken).toMatchObject({ kind: 'file', mime: 'application/vnd.apple.pkpass', pass: null });
 	});
 });
 

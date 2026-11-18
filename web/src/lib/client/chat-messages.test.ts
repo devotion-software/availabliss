@@ -135,7 +135,7 @@ describe('threads', () => {
 });
 
 describe('replyPreview with attachments', () => {
-	const photo = { id: 'a1', kind: 'image' as const, name: 'p.jpg', mime: 'image/jpeg', size: 1, width: 1, height: 1, url: 'u', thumbnailUrl: null };
+	const photo = { id: 'a1', kind: 'image' as const, name: 'p.jpg', mime: 'image/jpeg', size: 1, width: 1, height: 1, url: 'u', thumbnailUrl: null, pass: null };
 	test('the caption when there is one', () => {
 		expect(replyPreview(msg({ body: 'Look', caption: 'Look', attachments: [photo] })).text).toBe('Look');
 	});

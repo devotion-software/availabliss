@@ -313,7 +313,7 @@ export interface Message {
 	caption: string | null;
 }
 
-export const ATTACHMENT_KINDS = ['image', 'gif', 'file'] as const;
+export const ATTACHMENT_KINDS = ['image', 'gif', 'file', 'pass'] as const;
 export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
 
 /** A photo, GIF or file in a chat message. URLs are signed and expire after about a week: refetch the message for fresh ones. */
@@ -328,8 +328,44 @@ export interface Attachment {
 	width: number | null;
 	height: number | null;
 	url: string;
-	/** A smaller JPEG/PNG preview for photos; null for GIFs (show `url`, animated) and files. */
+	/** A smaller JPEG/PNG preview for photos, or a Wallet pass's logo; null for GIFs (show `url`, animated) and files. */
 	thumbnailUrl: string | null;
+	/** For `kind: 'pass'` (an Apple Wallet .pkpass / .pkpasses): what to show on its card. Null otherwise. */
+	pass: WalletPass | null;
+}
+
+export type WalletPassStyle = 'boardingPass' | 'eventTicket' | 'coupon' | 'storeCard' | 'generic';
+
+export interface WalletPassField {
+	label: string | null;
+	/** The text, or with `date` an ISO 8601 UTC date-time to show in the reader's own format. */
+	value: string;
+	date: boolean;
+}
+
+/** Details read from a Wallet pass's pass.json (English text where it is localised). */
+export interface WalletPass {
+	style: WalletPassStyle;
+	organizationName: string;
+	description: string;
+	logoText: string | null;
+	/** With serialNumber, identifies the pass (e.g. to tell whether it is already in Wallet). */
+	passTypeIdentifier: string;
+	serialNumber: string;
+	/** When it is for (the event, the flight…), ISO 8601 UTC, or null. */
+	relevantDate: string | null;
+	expirationDate: string | null;
+	voided: boolean;
+	eventName: string | null;
+	venue: string | null;
+	/** Up to four of its fields, most important first. */
+	fields: WalletPassField[];
+	/** "#rrggbb", or null for Wallet's default. */
+	backgroundColor: string | null;
+	foregroundColor: string | null;
+	labelColor: string | null;
+	/** How many passes the file holds (a .pkpasses bundle; details are the first one's). */
+	count: number;
 }
 
 /** A message's thread: the first message of its chain of replies, then every reply under it, oldest first. */
