@@ -47,5 +47,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class InviteRoute(val token: String)
 @Serializable data object AppearanceRoute
+@Serializable data object NotificationSettingsRoute
 @Serializable data object CalendarsRoute
 @Serializable data object RegionRoute

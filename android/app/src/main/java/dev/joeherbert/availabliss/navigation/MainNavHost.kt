@@ -56,6 +56,7 @@ import dev.joeherbert.availabliss.feature.proposal.GroupProposalsTab
 import dev.joeherbert.availabliss.feature.proposal.GroupProposalsViewModel
 import dev.joeherbert.availabliss.feature.proposal.ProposalScreen
 import dev.joeherbert.availabliss.feature.timing.GroupTimingTab
+import dev.joeherbert.availabliss.feature.you.NotificationSettingsScreen
 import dev.joeherbert.availabliss.feature.you.YouScreen
 
 private enum class MainTab { Groups, MyTime, Activity, You }
@@ -135,6 +136,7 @@ fun MainNavHost(root: RootViewModel) {
                     onOpenAppearance = { nav.navigate(AppearanceRoute) },
                     onOpenCalendars = { nav.navigate(CalendarsRoute) },
                     onOpenRegion = { nav.navigate(RegionRoute) },
+                    onOpenNotifications = { nav.navigate(NotificationSettingsRoute) },
                     onSignOut = root::signOut,
                 )
             }
@@ -264,6 +266,7 @@ fun MainNavHost(root: RootViewModel) {
             }
             composable<EventEditorRoute> { EventEditorScreen(onBack = { nav.popBackStack() }, onSaved = { nav.popBackStack() }) }
             composable<AppearanceRoute> { AppearanceScreen(onBack = { nav.popBackStack() }) }
+            composable<NotificationSettingsRoute> { NotificationSettingsScreen(onBack = { nav.popBackStack() }) }
             composable<CalendarsRoute> { CalendarsScreen(onBack = { nav.popBackStack() }) }
             composable<RegionRoute> { RegionScreen(onBack = { nav.popBackStack() }) }
         }

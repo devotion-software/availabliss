@@ -10,6 +10,7 @@ import dev.joeherbert.availabliss.core.common.ApplicationScope
 import dev.joeherbert.availabliss.core.data.AppPreferences
 import dev.joeherbert.availabliss.core.data.CalendarsRepository
 import dev.joeherbert.availabliss.core.data.GroupsRepository
+import dev.joeherbert.availabliss.core.data.NotificationSettingsRepository
 import dev.joeherbert.availabliss.core.data.NotificationsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.live.LiveConnectionObserver
@@ -45,6 +46,7 @@ class SessionManager @Inject constructor(
     private val groups: GroupsRepository,
     private val calendars: CalendarsRepository,
     private val notifications: NotificationsRepository,
+    private val notificationSettings: NotificationSettingsRepository,
     private val prefs: AppPreferences,
     private val push: PushRegistrar,
     private val liveEvents: LiveEvents,
@@ -157,6 +159,7 @@ class SessionManager @Inject constructor(
         groups.clear()
         calendars.clear()
         notifications.clear()
+        notificationSettings.clear()
         prefs.clearSession()
     }
 

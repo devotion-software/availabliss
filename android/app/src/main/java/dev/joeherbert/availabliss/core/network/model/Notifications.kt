@@ -3,6 +3,7 @@ package dev.joeherbert.availabliss.core.network.model
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import java.time.Instant
 
 /** [wire] matches the server's `kind` and the push payload. Unknown kinds decode as [Unknown]. */
 @Serializable(with = NotificationKindSerializer::class)
@@ -80,3 +81,60 @@ data class LiveEvent(
         const val NOTIFICATION_CREATED = "notification.created"
     }
 }
+
+/**
+ * A kind of push you can turn off (`NotificationSettings.off`). Invites and role changes always
+ * push, so they have no category.
+ */
+enum class NotificationCategory(override val wire: String) : WireEnum {
+    /** New messages in a group's chat. */
+    Chat("chat"),
+    /** A new proposal, or a change to one (someone can't make it, it was cancelled). */
+    Proposals("proposals"),
+    /** A proposal was confirmed, or an event was added. */
+    Plans("plans"),
+    /** Before plans you're going to, and proposals you haven't answered. */
+    Reminders("reminders"),
+    /** Someone asked you to add your busy times. */
+    Nudges("nudges"),
+}
+
+/** No pushes between [from] and [to] (`HH:MM` in your time zone; may wrap midnight). */
+@Serializable
+data class QuietHours(val from: String, val to: String)
+
+/** A group you've muted, [until] an ISO instant or for good when null. */
+@Serializable
+data class GroupMute(val groupId: String, val until: String? = null)
+
+/**
+ * `GET /me/notification-settings`. [off] holds category wire values as sent, so one added on the
+ * server after this build survives a save; read it through [isOff].
+ */
+@Serializable
+data class NotificationSettings(
+    val off: List<String> = emptyList(),
+    val quietHours: QuietHours? = null,
+    /** Active mutes only. */
+    val mutes: List<GroupMute> = emptyList(),
+) {
+    fun isOff(category: NotificationCategory): Boolean = category.wire in off
+
+    /** [off] with [category] turned [on] or off, keeping anything this build doesn't know. */
+    fun offWith(category: NotificationCategory, on: Boolean): List<String> =
+        if (on) off - category.wire else (off + category.wire).distinct()
+
+    /**
+     * Whether [groupId] is muted at [now]. The server only returns active mutes, but a cached copy
+     * can outlive one that has since run out.
+     */
+    fun isMuted(groupId: String, now: Instant = Instant.now()): Boolean =
+        mutes.any { mute ->
+            mute.groupId == groupId &&
+                (mute.until == null || runCatching { Instant.parse(mute.until) }.getOrNull()?.isAfter(now) != false)
+        }
+}
+
+/** `PUT /groups/:id/mute`: [until] an ISO instant, or null to mute until unmuted. */
+@Serializable
+data class MuteGroupRequest(val until: String?)

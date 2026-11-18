@@ -85,6 +85,7 @@ fun YouScreen(
     onOpenAppearance: () -> Unit,
     onOpenCalendars: () -> Unit,
     onOpenRegion: () -> Unit,
+    onOpenNotifications: () -> Unit,
     onSignOut: () -> Unit,
     viewModel: YouViewModel = hiltViewModel(),
     remindersViewModel: PlanRemindersViewModel = hiltViewModel(),
@@ -119,6 +120,7 @@ fun YouScreen(
             onOpenCalendars = onOpenCalendars,
             onOpenAppearance = onOpenAppearance,
             onOpenRegion = onOpenRegion,
+            onOpenNotifications = onOpenNotifications,
             onAddPasskey = { scope.launch { viewModel.addPasskey(context) } },
             onLink = { provider -> scope.launch { viewModel.link(provider, context) } },
             onSignOut = onSignOut,
@@ -190,6 +192,7 @@ fun YouContent(
     onDelete: () -> Unit,
     onLink: (provider: String) -> Unit = {},
     onOpenPro: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
     reminders: EventReminders = EventReminders.Both,
     onSelectReminders: (EventReminders) -> Unit = {},
     templateActions: TemplateActions = TemplateActions(),
@@ -224,6 +227,10 @@ fun YouContent(
                 onAddPasskey,
                 loading = state.addingPasskey,
             )
+        }
+
+        GlassPanel(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp), verticalArrangement = Arrangement.Top) {
+            SettingsRow(AvIcons.Bell, "Notifications", "What sends a push, and quiet hours", onOpenNotifications)
         }
 
         PlanRemindersCard(reminders, onSelectReminders)

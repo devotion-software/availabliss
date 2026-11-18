@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.core.network
 
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -33,6 +34,11 @@ class JsonPatchBuilder internal constructor(private val builder: JsonObjectBuild
 
     fun set(key: String, value: Int) {
         builder.put(key, JsonPrimitive(value))
+    }
+
+    /** Sets [key] to an array or object; pass [JsonNull] to clear it. */
+    fun set(key: String, value: JsonElement) {
+        builder.put(key, value)
     }
 
     fun string(key: String, value: Patch<String?>) {

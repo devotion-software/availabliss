@@ -32,6 +32,13 @@ object AvIcons {
     val CalendarAdd = line("CalendarAdd", rect(3f, 5f, 18f, 16f, 3f), "M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5")
     val Groups = line("Groups", circle(9f, 10f, 5.5f), circle(15f, 10f, 5.5f), circle(12f, 15f, 5.5f))
     val Bell = line("Bell", "M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0")
+    val BellOff = line(
+        "BellOff",
+        "M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5",
+        "M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7",
+        "M10.3 21a1.94 1.94 0 0 0 3.4 0",
+        "M2 2l20 20",
+    )
     val Person = line("Person", circle(12f, 8f, 4f), "M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6")
     val Chat = line("Chat", "M4 5h16v11H9l-5 4V5z")
     val ProposalCheck = line("ProposalCheck", circle(12f, 12f, 9f), "M8 12l3 3 5-6")

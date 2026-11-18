@@ -46,6 +46,8 @@ import dev.joeherbert.availabliss.core.network.model.SendAttachmentsRequest
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
 import dev.joeherbert.availabliss.core.network.model.MessageThread
 import dev.joeherbert.availabliss.core.network.model.MessagesResponse
+import dev.joeherbert.availabliss.core.network.model.MuteGroupRequest
+import dev.joeherbert.availabliss.core.network.model.NotificationSettings
 import dev.joeherbert.availabliss.core.network.model.NotificationsResponse
 import dev.joeherbert.availabliss.core.network.model.NudgeResponse
 import dev.joeherbert.availabliss.core.network.model.OAuthCompleteRequest
@@ -86,7 +88,8 @@ import retrofit2.http.Query
  * The `/api/v1` JSON API, one method per row of docs/API.md "Endpoints".
  * Paths are relative to the Retrofit base URL (`<host>/`).
  *
- * Partial-update bodies (`PATCH /me`, `PATCH /blocks/:id`, `PATCH /events/:id`) are
+ * Partial-update bodies (`PATCH /me`, `PATCH /blocks/:id`, `PATCH /events/:id`,
+ * `PATCH /me/notification-settings`) are
  * [JsonObject]s so callers can distinguish "leave unchanged" (absent) from "clear" (null);
  * see [JsonPatch].
  */
@@ -446,6 +449,20 @@ interface AvailablissApi {
 
     @POST("api/v1/notifications/read")
     suspend fun markNotificationsRead(@Body body: ReadNotificationsRequest)
+
+    @GET("api/v1/me/notification-settings")
+    suspend fun getNotificationSettings(): NotificationSettings
+
+    /** `off` and / or `quietHours` (null turns quiet hours off); absent fields are unchanged. */
+    @PATCH("api/v1/me/notification-settings")
+    suspend fun updateNotificationSettings(@Body patch: JsonObject): NotificationSettings
+
+    /** Mutes a group's pushes until an instant, or until unmuted. */
+    @PUT("api/v1/groups/{id}/mute")
+    suspend fun muteGroup(@Path("id") groupId: String, @Body body: MuteGroupRequest): NotificationSettings
+
+    @DELETE("api/v1/groups/{id}/mute")
+    suspend fun unmuteGroup(@Path("id") groupId: String): NotificationSettings
 
     @POST("api/v1/devices")
     suspend fun registerDevice(@Body body: RegisterDeviceRequest)
