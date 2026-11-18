@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.feature.chat
 
+import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -63,7 +64,7 @@ fun ThreadSheet(
     thread: ThreadUi,
     draft: String,
     rowActions: ChatActions,
-    addedToCalendar: Set<String>,
+    calendar: AddToCalendarState,
     sheetActions: ThreadSheetActions,
     /** Attachments downloading to open, by id. */
     downloads: Map<String, Float> = emptyMap(),
@@ -122,7 +123,7 @@ fun ThreadSheet(
                             label = "thread-highlight",
                         )
                         Box(Modifier.drawBehind { drawRoundRect(flash, topLeft = Offset(-6.dp.toPx(), -6.dp.toPx()), size = Size(size.width + 12.dp.toPx(), size.height + 12.dp.toPx()), cornerRadius = CornerRadius(18.dp.toPx())) }) {
-                            ChatRow(item, rowActions, addedToCalendar, onQuoteClick = highlight, quoteOpensThread = false, downloads = downloads)
+                            ChatRow(item, rowActions, calendar, onQuoteClick = highlight, quoteOpensThread = false, downloads = downloads)
                         }
                     }
                     if (thread.truncated) item(key = "truncated") {

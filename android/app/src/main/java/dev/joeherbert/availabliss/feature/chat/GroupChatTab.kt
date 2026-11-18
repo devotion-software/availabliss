@@ -85,6 +85,7 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.feature.common.AddToCalendarButton
+import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
 import androidx.compose.ui.zIndex
 import androidx.compose.animation.AnimatedVisibility
@@ -254,7 +255,7 @@ fun GroupChatTab(
             thread = thread,
             draft = viewModel.threadDraft,
             rowActions = threadActions,
-            addedToCalendar = state.calendar.added,
+            calendar = state.calendar,
             downloads = state.downloads,
             sheetActions = ThreadSheetActions(
                 onDraftChange = viewModel::onThreadDraftChange,
@@ -481,7 +482,7 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
                 label = "quote-highlight",
             )
             Box(Modifier.drawBehind { drawRoundRect(flash, topLeft = Offset(-6.dp.toPx(), -6.dp.toPx()), size = Size(size.width + 12.dp.toPx(), size.height + 12.dp.toPx()), cornerRadius = CornerRadius(18.dp.toPx())) }) {
-                ChatRow(item, actions, state.calendar.added, actions.onOpenThread, downloads = state.downloads)
+                ChatRow(item, actions, state.calendar, actions.onOpenThread, downloads = state.downloads)
             }
         }
         if (state.loadingOlder) item(key = "loading-older") { LoadingIndicator() }
@@ -543,7 +544,7 @@ private val JUMP_THRESHOLD = 200.dp
 internal fun ChatRow(
     item: ChatItem,
     actions: ChatActions,
-    addedToCalendar: Set<String>,
+    calendar: AddToCalendarState,
     onQuoteClick: (String) -> Unit,
     quoteOpensThread: Boolean = true,
     downloads: Map<String, Float> = emptyMap(),
@@ -597,7 +598,7 @@ internal fun ChatRow(
             burstKey = item.id.takeIf { item.recent },
         ) {
             AddToCalendarButton(
-                added = item.eventId in addedToCalendar,
+                calendar.status(item.eventId),
                 onClick = { actions.onAddToCalendar(item.eventId) },
                 height = 40.dp,
             )

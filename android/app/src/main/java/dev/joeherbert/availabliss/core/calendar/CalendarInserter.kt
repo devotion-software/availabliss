@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.core.calendar
 
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -43,7 +44,8 @@ data class CalendarEventDraft(
 
 /** Result of [CalendarInserter.insert]. */
 sealed interface InsertResult {
-    data object Inserted : InsertResult
+    /** In the calendar as row [eventId] of `CalendarContract.Events`. */
+    data class Inserted(val eventId: Long) : InsertResult
     /** No write access or no target calendar: hand off to the calendar app with this intent. */
     data class NeedsIntent(val intent: Intent) : InsertResult
 }
@@ -59,6 +61,8 @@ class CalendarInserter @Inject constructor(
     @IoDispatcher private val io: CoroutineDispatcher,
 ) {
     /** Calendars the user can add events to (requires READ_CALENDAR). */
+    fun canReadCalendars(): Boolean = reader.hasReadPermission()
+
     suspend fun writableCalendars(): List<DeviceCalendarInfo> = reader.calendars().filter { it.writable }
 
     suspend fun insert(draft: CalendarEventDraft, calendarId: Long?): InsertResult {
@@ -77,8 +81,64 @@ class CalendarInserter @Inject constructor(
                 put(CalendarContract.Events.AVAILABILITY, CalendarContract.Events.AVAILABILITY_BUSY)
             }
             val uri = runCatching { context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values) }.getOrNull()
-            if (uri != null) InsertResult.Inserted else InsertResult.NeedsIntent(insertIntent(draft))
+            val id = uri?.let { runCatching { ContentUris.parseId(it) }.getOrNull() }
+            if (id != null) InsertResult.Inserted(id) else InsertResult.NeedsIntent(insertIntent(draft))
         }
+    }
+
+    /**
+     * The calendar event [eventId] is in, or null when it's gone (deleted in the calendar app)
+     * or can't be read without permission.
+     */
+    suspend fun calendarOf(eventId: Long): Long? = withContext(io) {
+        if (!reader.hasReadPermission()) return@withContext null
+        runCatching {
+            context.contentResolver.query(
+                ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId),
+                arrayOf(CalendarContract.Events.CALENDAR_ID, CalendarContract.Events.DELETED),
+                null, null, null,
+            )?.use { c -> if (c.moveToFirst() && c.getInt(1) == 0) c.getLong(0) else null }
+        }.getOrNull()
+    }
+
+    /**
+     * Moves event [eventId] to [calendarId]. Calendar providers don't reliably move an event
+     * between accounts in place, so it's copied into the new calendar and the old one deleted.
+     * Returns the new event's id, or null if it couldn't be moved.
+     */
+    suspend fun move(eventId: Long, calendarId: Long): Long? = withContext(io) {
+        if (!reader.hasWritePermission()) return@withContext null
+        val columns = arrayOf(
+            CalendarContract.Events.TITLE,
+            CalendarContract.Events.EVENT_LOCATION,
+            CalendarContract.Events.DESCRIPTION,
+            CalendarContract.Events.DTSTART,
+            CalendarContract.Events.DTEND,
+            CalendarContract.Events.ALL_DAY,
+            CalendarContract.Events.EVENT_TIMEZONE,
+            CalendarContract.Events.AVAILABILITY,
+        )
+        val resolver = context.contentResolver
+        val oldUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId)
+        runCatching {
+            val values = resolver.query(oldUri, columns, null, null, null)?.use { c ->
+                if (!c.moveToFirst()) return@use null
+                ContentValues().apply {
+                    put(CalendarContract.Events.CALENDAR_ID, calendarId)
+                    put(CalendarContract.Events.TITLE, c.getString(0))
+                    c.getString(1)?.let { put(CalendarContract.Events.EVENT_LOCATION, it) }
+                    c.getString(2)?.let { put(CalendarContract.Events.DESCRIPTION, it) }
+                    put(CalendarContract.Events.DTSTART, c.getLong(3))
+                    put(CalendarContract.Events.DTEND, c.getLong(4))
+                    put(CalendarContract.Events.ALL_DAY, c.getInt(5))
+                    put(CalendarContract.Events.EVENT_TIMEZONE, c.getString(6) ?: TimeZone.getDefault().id)
+                    put(CalendarContract.Events.AVAILABILITY, c.getInt(7))
+                }
+            } ?: return@runCatching null
+            val newId = resolver.insert(CalendarContract.Events.CONTENT_URI, values)?.let(ContentUris::parseId) ?: return@runCatching null
+            resolver.delete(oldUri, null, null)
+            newId
+        }.getOrNull()
     }
 
     fun insertIntent(draft: CalendarEventDraft): Intent =

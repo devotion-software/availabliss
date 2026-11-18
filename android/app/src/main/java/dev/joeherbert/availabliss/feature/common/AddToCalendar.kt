@@ -14,17 +14,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.joeherbert.availabliss.core.calendar.AddedCalendarEvent
+import dev.joeherbert.availabliss.core.calendar.AddedCalendarEvents
 import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
 import dev.joeherbert.availabliss.core.calendar.CalendarInserter
 import dev.joeherbert.availabliss.core.calendar.DeviceCalendarInfo
@@ -36,6 +37,7 @@ import dev.joeherbert.availabliss.designsystem.component.ColorSwatch
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.RowDivider
 import dev.joeherbert.availabliss.designsystem.component.SurfacePanel
+import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
@@ -46,8 +48,28 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
-/** A plan waiting for the user to choose which calendar it goes in. */
-data class PendingCalendarAdd(val key: String, val draft: CalendarEventDraft)
+/** What the calendar choice sheet is open for. */
+sealed interface CalendarChoice {
+    val key: String
+
+    /** A plan waiting for the user to choose which calendar it goes in. */
+    data class Add(override val key: String, val draft: CalendarEventDraft) : CalendarChoice
+
+    /** A plan already in [currentCalendarId], to move to another calendar. */
+    data class Move(override val key: String, val currentCalendarId: Long) : CalendarChoice
+}
+
+/** Where one plan stands in the phone's calendars, for [AddToCalendarButton]. */
+data class CalendarStatus(
+    /** In a calendar (added from this phone and still there). */
+    val inCalendar: Boolean = false,
+    /** Added just now, on this screen. */
+    val justAdded: Boolean = false,
+    /** The calendar it's in, when known. */
+    val calendar: DeviceCalendarInfo? = null,
+    /** Whether it can be moved to another calendar. */
+    val canChange: Boolean = false,
+)
 
 /** State of "Add to calendar" for a screen. */
 data class AddToCalendarState(
@@ -55,25 +77,41 @@ data class AddToCalendarState(
     val calendars: List<DeviceCalendarInfo> = emptyList(),
     /** The calendar offered first: the one last added to, else the primary one. */
     val selectedCalendarId: Long? = null,
-    /** Keys (event / proposal ids) already added during this session. */
+    /** Keys (event / proposal ids) added on this screen. */
     val added: Set<String> = emptySet(),
+    /** Keys in a calendar → the calendar they're in (null when not known, e.g. added by the calendar app). */
+    val inCalendar: Map<String, Long?> = emptyMap(),
     /** Set while the calendar choice sheet is open. */
-    val choosing: PendingCalendarAdd? = null,
+    val choosing: CalendarChoice? = null,
     /** Set when the calendar app must handle the insert; the UI launches it then calls [AddToCalendarDelegate.onIntentHandled]. */
     val pendingIntent: Intent? = null,
 ) {
     val selectedCalendar: DeviceCalendarInfo? get() = calendars.firstOrNull { it.id == selectedCalendarId }
+
+    fun status(key: String): CalendarStatus {
+        if (key !in inCalendar) return CalendarStatus()
+        val calendar = inCalendar[key]?.let { id -> calendars.firstOrNull { it.id == id } }
+        return CalendarStatus(
+            inCalendar = true,
+            justAdded = key in added,
+            calendar = calendar,
+            canChange = calendar != null && calendars.size > 1,
+        )
+    }
 }
 
 /**
  * Reusable "Add to calendar" logic for ViewModels: with more than one writable calendar it asks
  * which one first ([AddToCalendarState.choosing], shown by [AddToCalendarEffect]), then inserts
  * directly when WRITE_CALENDAR is granted, otherwise hands off to the calendar app with an
- * `ACTION_INSERT` intent. The calendar chosen is remembered for next time. Not a singleton: one per ViewModel.
+ * `ACTION_INSERT` intent. The calendar chosen is remembered for next time, and plans added are
+ * remembered across launches ([AddedCalendarEvents]): asked again for one already in a calendar,
+ * it offers to move it to another. Not a singleton: one per ViewModel.
  */
 class AddToCalendarDelegate @Inject constructor(
     private val inserter: CalendarInserter,
     private val preferences: AppPreferences,
+    private val addedEvents: AddedCalendarEvents,
 ) {
     private val _state = MutableStateFlow(AddToCalendarState())
     val state: StateFlow<AddToCalendarState> = _state.asStateFlow()
@@ -89,32 +127,74 @@ class AddToCalendarDelegate @Inject constructor(
                     ?: calendars.firstOrNull { it.isPrimary }?.id ?: calendars.firstOrNull()?.id,
             )
         }
+        refreshAdded()
     }
 
-    /** Adds the plan, first asking which calendar when there's a choice. */
+    /**
+     * Re-checks which remembered plans are still in a calendar, and which one: a plan deleted in
+     * the calendar app since is offered again. Without permission to read calendars they can't be
+     * checked, so they count as still there.
+     */
+    private suspend fun refreshAdded() {
+        val canRead = inserter.canReadCalendars()
+        val found = addedEvents.all().mapNotNull { (key, added) ->
+            val calendarId = inserter.calendarOf(added.eventId)
+            when {
+                calendarId != null -> key to calendarId
+                !canRead -> key to null
+                else -> null
+            }
+        }.toMap()
+        // Keys added by the calendar app this session aren't remembered, so keep them.
+        _state.update { s -> s.copy(inCalendar = s.inCalendar.filterKeys { it in s.added && it !in found } + found) }
+    }
+
+    /**
+     * Adds the plan, first asking which calendar when there's a choice. For a plan already in a
+     * calendar, asks which calendar to move it to instead.
+     */
     suspend fun add(key: String, draft: CalendarEventDraft) {
-        if (_state.value.calendars.size > 1) {
-            _state.update { it.copy(choosing = PendingCalendarAdd(key, draft)) }
-        } else {
-            insert(key, draft, _state.value.selectedCalendarId)
+        val s = _state.value
+        val current = s.inCalendar[key]
+        when {
+            current != null -> if (s.calendars.size > 1) _state.update { it.copy(choosing = CalendarChoice.Move(key, current)) }
+            key in s.inCalendar -> Unit
+            s.calendars.size > 1 -> _state.update { it.copy(choosing = CalendarChoice.Add(key, draft)) }
+            else -> insert(key, draft, s.selectedCalendarId)
         }
     }
 
-    /** The calendar was chosen in the sheet: remember it and add the waiting plan there. */
+    /** A calendar was chosen in the sheet: remember it, and add the waiting plan there or move it there. */
     suspend fun choose(calendarId: Long) {
-        val pending = _state.value.choosing ?: return
+        val choice = _state.value.choosing ?: return
         _state.update { it.copy(choosing = null, selectedCalendarId = calendarId) }
         preferences.setAddToCalendarId(calendarId)
-        insert(pending.key, pending.draft, calendarId)
+        when (choice) {
+            is CalendarChoice.Add -> insert(choice.key, choice.draft, calendarId)
+            is CalendarChoice.Move -> move(choice.key, calendarId)
+        }
     }
 
     fun cancelChoice() = _state.update { it.copy(choosing = null) }
 
     private suspend fun insert(key: String, draft: CalendarEventDraft, calendarId: Long?) {
         when (val result = inserter.insert(draft, calendarId)) {
-            InsertResult.Inserted -> _state.update { it.copy(added = it.added + key) }
-            is InsertResult.NeedsIntent -> _state.update { it.copy(pendingIntent = result.intent, added = it.added + key) }
+            is InsertResult.Inserted -> {
+                addedEvents.set(key, AddedCalendarEvent(result.eventId))
+                _state.update { it.copy(added = it.added + key, inCalendar = it.inCalendar + (key to calendarId)) }
+            }
+            is InsertResult.NeedsIntent -> _state.update {
+                it.copy(pendingIntent = result.intent, added = it.added + key, inCalendar = it.inCalendar + (key to null))
+            }
         }
+    }
+
+    private suspend fun move(key: String, calendarId: Long) {
+        val added = addedEvents.all()[key] ?: return
+        if (_state.value.inCalendar[key] == calendarId) return
+        val newId = inserter.move(added.eventId, calendarId) ?: return
+        addedEvents.set(key, AddedCalendarEvent(newId))
+        _state.update { it.copy(inCalendar = it.inCalendar + (key to calendarId)) }
     }
 
     fun onIntentHandled() = _state.update { it.copy(pendingIntent = null) }
@@ -141,15 +221,24 @@ fun AddToCalendarEffect(
         }
         onHandled()
     }
-    state.choosing?.let { pending ->
-        CalendarChoiceSheet(
+    when (val choice = state.choosing) {
+        is CalendarChoice.Add -> CalendarChoiceSheet(
             title = "Add to calendar",
-            message = "Which calendar should ${pending.draft.title} go in?",
+            message = "Which calendar should ${choice.draft.title} go in?",
             calendars = state.calendars,
             selectedId = state.selectedCalendarId,
             onChoose = onChoose,
             onDismiss = onCancelChoice,
         )
+        is CalendarChoice.Move -> CalendarChoiceSheet(
+            title = "Move to calendar",
+            message = "Choose another calendar and the plan moves there.",
+            calendars = state.calendars,
+            selectedId = choice.currentCalendarId,
+            onChoose = onChoose,
+            onDismiss = onCancelChoice,
+        )
+        null -> Unit
     }
 }
 
@@ -205,25 +294,55 @@ fun CalendarChoiceSheet(
 }
 
 /**
- * The "Add to calendar" button, which says "Added to your calendar" just after you add it. An event
- * already added before this screen opened isn't offered again: nothing shows.
+ * The "Add to calendar" button, which says "Added to your calendar" just after you add it. Once a
+ * plan is in a calendar it says which one, with Change to move it (both call [onClick]; the
+ * delegate decides). A plan deleted from the calendar since is offered again.
  */
 @Composable
-fun AddToCalendarButton(added: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, height: androidx.compose.ui.unit.Dp = 54.dp) {
-    var tapped by remember { mutableStateOf(false) }
-    if (added && !tapped) return
-    PrimaryButton(
-        text = if (added) "Added to your calendar" else "Add to calendar",
-        onClick = {
-            tapped = true
-            onClick()
-        },
-        icon = if (added) AvIcons.Check else AvIcons.CalendarAdd,
-        style = if (added) ButtonStyle.Success else ButtonStyle.Solid,
-        height = height,
-        shape = if (height >= 52.dp) Shapes.controlLarge else Shapes.control,
-        modifier = modifier.fillMaxWidth(),
-    )
+fun AddToCalendarButton(status: CalendarStatus, onClick: () -> Unit, modifier: Modifier = Modifier, height: Dp = 54.dp) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!status.inCalendar || status.justAdded) {
+            PrimaryButton(
+                text = if (status.justAdded) "Added to your calendar" else "Add to calendar",
+                onClick = { if (!status.inCalendar) onClick() },
+                icon = if (status.justAdded) AvIcons.Check else AvIcons.CalendarAdd,
+                style = if (status.justAdded) ButtonStyle.Success else ButtonStyle.Solid,
+                height = height,
+                shape = if (height >= 52.dp) Shapes.controlLarge else Shapes.control,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (status.inCalendar) AddedToCalendarRow(status, onChange = onClick)
+    }
+}
+
+/** "● In Work · Change": the quiet line once a plan is in the user's calendar. */
+@Composable
+private fun AddedToCalendarRow(status: CalendarStatus, onChange: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    Row(
+        Modifier.fillMaxWidth().defaultMinSize(minHeight = 32.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val calendar = status.calendar
+        if (calendar != null) {
+            ColorSwatch(calendar.color?.let(::parseHex) ?: colors.warn, size = 10.dp, radius = 5.dp)
+        } else {
+            Icon(AvIcons.Check, null, tint = colors.okInk, modifier = Modifier.size(14.dp))
+        }
+        Text(
+            calendar?.let { "In ${it.name}" } ?: "In your calendar",
+            style = AvailablissTheme.type.caption,
+            color = colors.muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (status.canChange) {
+            TextAction("Change", onChange, Modifier.semantics { contentDescription = "Change calendar" })
+        }
+    }
 }
 
 /** Parses `#RRGGBB` / `#AARRGGBB`. */

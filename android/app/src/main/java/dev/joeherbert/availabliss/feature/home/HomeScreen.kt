@@ -67,6 +67,7 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import dev.joeherbert.availabliss.feature.common.AddToCalendarButton
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
+import dev.joeherbert.availabliss.feature.common.CalendarStatus
 
 /** Groups home (Main.dc.html). */
 @Composable
@@ -207,7 +208,7 @@ private fun UpNextCard(upNext: UpNextUi, onAddToCalendar: () -> Unit) {
             val detail = listOf(upNext.title, upNext.detail).filter { it.isNotBlank() }.joinToString(" · ")
             if (detail.isNotBlank()) Text(detail, style = AvailablissTheme.type.body, color = colors.muted)
         }
-        AddToCalendarButton(added = upNext.added, onClick = onAddToCalendar, height = 48.dp)
+        AddToCalendarButton(upNext.calendar, onClick = onAddToCalendar, height = 48.dp)
     }
 }
 
@@ -298,7 +299,7 @@ private fun HomePreview() {
                 dateLabel = "Sunday 1 November",
                 greeting = "Hi, Sam",
                 profileInitial = "S",
-                upNext = UpNextUi("e1", "Book club", "Book club", "Wed 11 Nov · 18:30", "At Hana's · 8 going", added = false),
+                upNext = UpNextUi("e1", "Book club", "Book club", "Wed 11 Nov · 18:30", "At Hana's · 8 going", calendar = CalendarStatus()),
                 groups = listOf(
                     GroupTileUi("1", "Lake District crew", "LD", TileColor.T1, "2 weekends work", PillTone.Indigo, "A weekend · Fri 6pm → Sun · Nov–Jan", people, 4 / 6f, "2 of 6 to sync", 3),
                     GroupTileUi("2", "Mum's 60th", "60", TileColor.T4, "Needs your reply", PillTone.Apricot, "One day · school holidays only", people, 1f, "All synced", 0),

@@ -392,7 +392,7 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
             }
         }
         GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.cardLarge, contentPadding = PaddingValues(14.dp)) {
-            AddToCalendarButton(added = state.addedToCalendar, onClick = actions.onAddToCalendar)
+            AddToCalendarButton(state.calendarStatus, onClick = actions.onAddToCalendar)
         }
     }
 }

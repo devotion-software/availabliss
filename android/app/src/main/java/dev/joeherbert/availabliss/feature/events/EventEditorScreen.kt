@@ -124,7 +124,7 @@ private fun EventEditorContent(state: EventEditorUiState, actions: EventEditorAc
             ) {
                 if (state.canEdit) EditableFields(state, actions) else ReadOnlyDetails(state)
                 if (state.isExisting) {
-                    AddToCalendarButton(added = state.addedToCalendar, onClick = actions.onAddToCalendar, modifier = Modifier.fillMaxWidth())
+                    AddToCalendarButton(state.calendarStatus, onClick = actions.onAddToCalendar, modifier = Modifier.fillMaxWidth())
                 }
                 if (state.isExisting && state.canEdit) {
                     TextAction(

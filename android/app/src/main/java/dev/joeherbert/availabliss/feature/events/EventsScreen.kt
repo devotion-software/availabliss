@@ -29,7 +29,6 @@ import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
 import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
-import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
 import dev.joeherbert.availabliss.designsystem.component.CoverPhoto
 import dev.joeherbert.availabliss.designsystem.component.EmptyState
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
@@ -38,7 +37,6 @@ import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
-import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
@@ -48,7 +46,9 @@ import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
+import dev.joeherbert.availabliss.feature.common.AddToCalendarButton
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
+import dev.joeherbert.availabliss.feature.common.CalendarStatus
 import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 
 @Composable
@@ -154,23 +154,7 @@ internal fun EventRow(row: EventRowUi, past: Boolean, onOpen: () -> Unit, onAddT
             }
             if (row.canDelete) PlainIconButton(AvIcons.Trash, "Delete ${row.title}", onDelete, size = 40.dp, iconSize = 18.dp, tint = colors.muted)
         }
-        // Offered until it's added; "Added to your calendar" only just after you add it.
-        var tapped by remember(row.id) { mutableStateOf(false) }
-        if (!past && (!row.added || tapped)) {
-            PrimaryButton(
-                text = if (row.added) "Added to your calendar" else "Add to calendar",
-                onClick = {
-                    tapped = true
-                    onAddToCalendar()
-                },
-                icon = if (row.added) AvIcons.Check else AvIcons.CalendarAdd,
-                style = if (row.added) ButtonStyle.Success else ButtonStyle.Solid,
-                height = 44.dp,
-                shape = Shapes.controlSmall,
-                textStyle = AvailablissTheme.type.bodySmallStrong,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+        if (!past) AddToCalendarButton(row.calendar, onClick = onAddToCalendar, height = 44.dp)
     }
 }
 
@@ -182,7 +166,7 @@ private fun EventsPreview() {
             state = EventsUiState(
                 groupName = "Book club",
                 loading = false,
-                upcoming = listOf(EventRowUi("1", "Book club", "Wed 11 Nov · 18:30 – 21:00", "At Hana's", "NOV", "11", canDelete = true, added = false)),
+                upcoming = listOf(EventRowUi("1", "Book club", "Wed 11 Nov · 18:30 – 21:00", "At Hana's", "NOV", "11", canDelete = true, calendar = CalendarStatus())),
                 calendar = AddToCalendarState(),
             ),
             onBack = {}, onAddEvent = {}, onOpenEvent = {}, onRetry = {}, onAddToCalendar = {}, onDelete = {},

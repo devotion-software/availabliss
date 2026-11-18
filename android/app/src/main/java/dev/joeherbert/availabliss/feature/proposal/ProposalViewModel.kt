@@ -23,6 +23,7 @@ import dev.joeherbert.availabliss.core.network.model.ResponseKind
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
 import dev.joeherbert.availabliss.feature.common.AddToCalendarState
+import dev.joeherbert.availabliss.feature.common.CalendarStatus
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
 import dev.joeherbert.availabliss.navigation.ProposalRoute
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,7 +74,7 @@ data class ProposalUiState(
     val canCancel: Boolean = false,
     val location: String? = null,
     val calendar: AddToCalendarState = AddToCalendarState(),
-    val addedToCalendar: Boolean = false,
+    val calendarStatus: CalendarStatus = CalendarStatus(),
     /** Cancelled by this user: leave the screen. */
     val closed: Boolean = false,
     val message: UserMessage? = null,
@@ -256,7 +257,7 @@ class ProposalViewModel @Inject constructor(
             canCancel = p.status == ProposalStatus.Open && (p.createdBy == meId || isAdmin),
             location = p.location?.takeIf { it.isNotBlank() },
             calendar = cal,
-            addedToCalendar = key in cal.added,
+            calendarStatus = cal.status(key),
             closed = closed,
             message = message,
         )

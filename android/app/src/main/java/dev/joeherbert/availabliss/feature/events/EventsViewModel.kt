@@ -17,6 +17,7 @@ import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.core.network.model.Role
 import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
 import dev.joeherbert.availabliss.feature.common.AddToCalendarState
+import dev.joeherbert.availabliss.feature.common.CalendarStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -35,7 +36,7 @@ data class EventRowUi(
     val month: String,
     val day: String,
     val canDelete: Boolean,
-    val added: Boolean,
+    val calendar: CalendarStatus,
     /** Cover photo. */
     val image: String? = null,
 )
@@ -153,7 +154,7 @@ class EventsViewModel @Inject constructor(
                     month = date?.let(DateTimes::monthAbbrev).orEmpty(),
                     day = date?.dayOfMonth?.toString().orEmpty(),
                     canDelete = e.createdBy == meId || role?.isAdmin == true,
-                    added = e.id in cal.added,
+                    calendar = cal.status(e.id),
                     image = e.image,
                 )
             }

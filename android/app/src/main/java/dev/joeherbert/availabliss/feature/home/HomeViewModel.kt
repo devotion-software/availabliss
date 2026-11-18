@@ -22,6 +22,7 @@ import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.PillTone
 import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
 import dev.joeherbert.availabliss.feature.common.AddToCalendarState
+import dev.joeherbert.availabliss.feature.common.CalendarStatus
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,7 +61,7 @@ data class UpNextUi(
     val title: String,
     val whenLabel: String,
     val detail: String,
-    val added: Boolean,
+    val calendar: CalendarStatus,
     /** The event's cover photo. */
     val image: String? = null,
 )
@@ -107,7 +108,7 @@ class HomeViewModel @Inject constructor(
                 greeting = user?.name?.firstName()?.takeIf { it.isNotBlank() }?.let { "Hi, $it" } ?: "Hi",
                 profileInitial = user?.name?.initial().orEmpty(),
                 profileImage = user?.image,
-                upNext = upNext?.let { toUpNext(it, list.orEmpty(), it.id in calendar.added) },
+                upNext = upNext?.let { toUpNext(it, list.orEmpty(), calendar.status(it.id)) },
                 groups = list.orEmpty().map(::toTile),
                 calendar = calendar,
                 error = r.error,
@@ -167,7 +168,7 @@ class HomeViewModel @Inject constructor(
 
     fun messageShown(message: UserMessage) = raw.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 
-    private fun toUpNext(event: GroupEvent, list: List<GroupSummary>, added: Boolean): UpNextUi {
+    private fun toUpNext(event: GroupEvent, list: List<GroupSummary>, calendar: CalendarStatus): UpNextUi {
         val summary = list.firstOrNull { it.id == event.groupId }
         val going = summary?.memberCount?.let { "$it going" }
         return UpNextUi(
@@ -176,7 +177,7 @@ class HomeViewModel @Inject constructor(
             title = event.title,
             whenLabel = DateTimes.dayAndTime(event.start, event.allDay),
             detail = listOfNotNull(event.location?.takeIf { it.isNotBlank() }?.let { "At $it" }, going).joinToString(" · "),
-            added = added,
+            calendar = calendar,
             image = event.image,
         )
     }

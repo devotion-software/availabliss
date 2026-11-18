@@ -115,6 +115,16 @@ class AppPreferences @Inject constructor(
         store.edit { it[KEY_ADD_TO_CALENDAR] = id }
     }
 
+    /**
+     * Plans added to a device calendar from this phone (JSON, owned by
+     * [dev.joeherbert.availabliss.core.calendar.AddedCalendarEvents]).
+     */
+    val addedCalendarEvents: Flow<String?> = store.data.map { it[KEY_ADDED_CALENDAR_EVENTS] }
+
+    suspend fun setAddedCalendarEvents(json: String) {
+        store.edit { it[KEY_ADDED_CALENDAR_EVENTS] = json }
+    }
+
     /** My time's last view ("Month" / "Agenda"), remembered per device. */
     val myTimeView: Flow<String?> = store.data.map { it[KEY_MY_TIME_VIEW] }
 
@@ -145,6 +155,7 @@ class AppPreferences @Inject constructor(
             it.remove(KEY_DEVICE_SYNC_HORIZON)
             it.remove(KEY_PUSH_TOKEN)
             it.remove(KEY_ADD_TO_CALENDAR)
+            it.remove(KEY_ADDED_CALENDAR_EVENTS)
         }
     }
 
@@ -162,5 +173,6 @@ class AppPreferences @Inject constructor(
         val KEY_PUSH_TOKEN = stringPreferencesKey("push_token")
         val KEY_MY_TIME_VIEW = stringPreferencesKey("my_time_view")
         val KEY_ADD_TO_CALENDAR = longPreferencesKey("add_to_calendar_id")
+        val KEY_ADDED_CALENDAR_EVENTS = stringPreferencesKey("added_calendar_events")
     }
 }

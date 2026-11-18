@@ -15,6 +15,7 @@ import dev.joeherbert.availabliss.designsystem.component.GlassPillButton
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
+import dev.joeherbert.availabliss.feature.common.CalendarStatus
 import dev.joeherbert.availabliss.feature.events.DeleteEventDialog
 import dev.joeherbert.availabliss.feature.events.EventRow
 import dev.joeherbert.availabliss.feature.events.EventRowUi
@@ -201,7 +202,7 @@ private fun GroupProposalsPreview() {
             ),
             events = EventsUiState(
                 loading = false,
-                upcoming = listOf(EventRowUi("e1", "Book club", "Thu 26 Nov · from 18:00", "Hana's", "NOV", "26", canDelete = true, added = false)),
+                upcoming = listOf(EventRowUi("e1", "Book club", "Thu 26 Nov · from 18:00", "Hana's", "NOV", "26", canDelete = true, calendar = CalendarStatus())),
             ),
             onBack = {}, onOpenProposal = {}, onOpenEvent = {}, onAddEvent = {}, onRetry = {},
             onAddToCalendar = {}, onDeleteEvent = {},

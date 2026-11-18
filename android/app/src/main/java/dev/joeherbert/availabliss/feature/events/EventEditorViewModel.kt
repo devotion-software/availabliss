@@ -17,6 +17,7 @@ import dev.joeherbert.availabliss.core.network.model.CreateEventRequest
 import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
 import dev.joeherbert.availabliss.feature.common.AddToCalendarState
+import dev.joeherbert.availabliss.feature.common.CalendarStatus
 import dev.joeherbert.availabliss.navigation.EventEditorRoute
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,7 +51,7 @@ data class EventEditorUiState(
 ) {
     val isExisting: Boolean get() = eventId != null
     val canSave: Boolean get() = canEdit && title.isNotBlank() && range.isValid && !saving
-    val addedToCalendar: Boolean get() = eventId != null && eventId in calendar.added
+    val calendarStatus: CalendarStatus get() = eventId?.let(calendar::status) ?: CalendarStatus()
     /** What the cover shows: the picked bytes before they're uploaded, else the saved URL. */
     val cover: Any? get() = pendingImage ?: image
 }
