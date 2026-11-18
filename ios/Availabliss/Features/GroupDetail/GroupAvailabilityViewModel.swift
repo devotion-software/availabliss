@@ -90,6 +90,18 @@ final class GroupAvailabilityViewModel {
     }
     func slot(for date: CalendarDay) -> Slot? { availability?.slot(containing: date) }
 
+    /// The month's upcoming slots, best first: fewer members missing, then the Pro "best date" score
+    /// (higher first; none counts lowest), then the earliest.
+    func bestOptions(limit: Int = 3, now: Date = .now) -> [Slot] {
+        let upcoming = (availability?.slots ?? []).filter { $0.start > now }
+        return Array(upcoming.sorted { a, b in
+            if a.missingCount != b.missingCount { return a.missingCount < b.missingCount }
+            let scoreA = a.score ?? -.infinity, scoreB = b.score ?? -.infinity
+            if scoreA != scoreB { return scoreA > scoreB }
+            return a.start < b.start
+        }.prefix(limit))
+    }
+
     // MARK: Loading
 
     func load() async {

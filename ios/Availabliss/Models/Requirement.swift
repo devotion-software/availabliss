@@ -12,6 +12,11 @@ struct Requirement: Codable, Sendable, Equatable {
     var range: DateRange
     var dates: [DateRange]
     var timezone: String
+    /// "Most of us are free": a time works when at least this many required (non-optional) members are free.
+    /// Nil means everyone (older servers omit it).
+    var quorum: Int? = nil
+    /// Members who never stop a time from working. Nil or empty means nobody is optional.
+    var optionalMemberIds: [String]? = nil
 
     /// `window` must be encoded as an explicit `null` ("whole day"), not omitted.
     func encode(to encoder: Encoder) throws {
@@ -26,6 +31,9 @@ struct Requirement: Codable, Sendable, Equatable {
         try container.encode(range, forKey: .range)
         try container.encode(dates, forKey: .dates)
         try container.encode(timezone, forKey: .timezone)
+        // An explicit null clears a quorum; an empty list clears optional members.
+        try container.encode(quorum, forKey: .quorum)
+        try container.encode(optionalMemberIds ?? [], forKey: .optionalMemberIds)
     }
 }
 

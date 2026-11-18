@@ -132,6 +132,10 @@ enum API {
         static func planner(groupId: String, notes: String?) -> Endpoint<PlannerResult> {
             .init(.post, "/groups/\(groupId.pathEncoded)/planner", body: PlannerBody(notes: notes), timeout: 90)
         }
+        /// Pro: an AI-drafted title and message for a proposal at `start`–`end` (404 when AI isn't set up).
+        static func draftProposal(groupId: String, start: Date, end: Date, notes: String? = nil) -> Endpoint<ProposalDraftText> {
+            .init(.post, "/groups/\(groupId.pathEncoded)/planner/draft", body: ProposalDraftBody(start: start, end: end, notes: notes), timeout: 60)
+        }
         /// Members whose calendars or blocked time clash with `start`–`end`.
         static func conflicts(groupId: String, start: Date, end: Date) -> Endpoint<ConflictsResponse> {
             .init(.get, "/groups/\(groupId.pathEncoded)/conflicts", query: ["start": iso(start), "end": iso(end)])

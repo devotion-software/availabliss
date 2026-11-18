@@ -21,6 +21,22 @@ enum Clash {
         return "\(firstName(first, group)) busy then"
     }
 
+    /// For a time that works for most of the group: "Priya can't make it", "You can't make it",
+    /// "You and Priya can't make it".
+    static func cantMake(_ missingIds: [String], group: Group?, me: String?) -> String {
+        let mine = me.map(missingIds.contains) ?? false
+        let others = missingIds.filter { $0 != me }.map { firstName($0, group) }
+        return "\(listNames(mine ? ["You"] + others : others)) can\u{2019}t make it"
+    }
+
+    /// Pro: "Fair for Ana, who missed out last time", "Fair for you and Ana, who missed out last time".
+    static func fairFor(_ ids: [String], group: Group?, me: String?) -> String? {
+        guard !ids.isEmpty else { return nil }
+        let mine = me.map(ids.contains) ?? false
+        let others = ids.filter { $0 != me }.map { firstName($0, group) }
+        return "Fair for \(listNames(mine ? ["you"] + others : others)), who missed out last time"
+    }
+
     /// "Priya", "Priya and Alex", "Priya, Alex and Jo", "Priya, Alex, Jo and 2 others".
     static func listNames(_ names: [String], max: Int = 3) -> String {
         guard names.count > 1 else { return names.first ?? "" }

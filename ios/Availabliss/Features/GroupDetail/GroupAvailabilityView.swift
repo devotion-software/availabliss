@@ -14,6 +14,8 @@ struct GroupAvailabilityView: View {
     @State private var pageEdge: Edge = .trailing
     /// The optional AI planner: offered only when the server has it set up; Pro to use.
     @State private var aiPlanner: Plan.AIPlanner?
+    /// Pro viewers get "Best options" ranked by the server's best-date score.
+    @State private var isPro = false
     @State private var showsPlanner = false
     @State private var showsUpgrade = false
     /// Picked in the planner; opened as a proposal once the planner sheet has gone.
@@ -51,7 +53,7 @@ struct GroupAvailabilityView: View {
         }
         .screenBackground(OrbLayout.groupCalendar)
         .task { await model.load() }
-        .task { aiPlanner = (try? await detail.api.send(API.Me.plan()))?.aiPlanner }
+        .task { await loadPlan() }
         .refreshable { await model.invalidate() }
         .onChange(of: model.mode) { _, _ in Task { await model.load() } }
         .onChange(of: model.selectedDay) { _, _ in Task { await model.loadSelectedDay() } }
@@ -87,13 +89,19 @@ struct GroupAvailabilityView: View {
                 plannedDraft = draft
             }
         }
-        .sheet(isPresented: $showsUpgrade, onDismiss: { Task { aiPlanner = (try? await detail.api.send(API.Me.plan()))?.aiPlanner } }) {
+        .sheet(isPresented: $showsUpgrade, onDismiss: { Task { await loadPlan() } }) {
             UpgradeSheet(reason: "AI planning is part of Pro: it picks the best time, suggests things to do and drafts the plan.") { _ in
                 model.toast = "Welcome to Pro"
             }
         }
         .errorAlert($model.error)
         .toast($model.toast)
+    }
+
+    private func loadPlan() async {
+        guard let plan = try? await detail.api.send(API.Me.plan()) else { return }
+        aiPlanner = plan.aiPlanner
+        isPro = plan.isPro
     }
 
     /// "Plan with AI", when the planner is set up and some times already work for everyone.
@@ -252,7 +260,12 @@ struct GroupAvailabilityView: View {
             DayDetailCard(model: model, group: group, me: app.session.user?.id) { draft in
                 proposalDraft = draft
             }
-            if model.mode == .month { planWithAI }
+            if model.mode == .month {
+                BestOptionsCard(model: model, group: group, me: app.session.user?.id, isPro: isPro) { draft in
+                    proposalDraft = draft
+                }
+                planWithAI
+            }
         }
     }
 }
@@ -527,6 +540,11 @@ private struct MonthGrid: View {
     private var legend: some View {
         HStack(spacing: 14) {
             LegendItem(label: "Works for everyone") { theme.accent }
+            if showsPartial {
+                LegendItem(label: "Most of us free") {
+                    theme.accentSoft.overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(theme.accent, lineWidth: 1))
+                }
+            }
             LegendItem(label: "Someone's busy") {
                 theme.busyBg.opacity(0.5).overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(theme.busyLine, lineWidth: 1))
             }
@@ -540,10 +558,23 @@ private struct MonthGrid: View {
         .padding(.horizontal, 2)
     }
 
+    /// A day this month works only because of the group's quorum or optional members.
+    private var showsPartial: Bool {
+        model.monthRows.joined().contains { date in
+            guard let date, date >= .today() else { return false }
+            return model.day(date).map { $0.status == .match && $0.isPartial } ?? false
+        }
+    }
+
     private func note(for date: CalendarDay) -> String {
         if date < .today() { return "Past" }
         guard let info = model.day(date) else { return "" }
         switch info.status {
+        case .match where info.isPartial:
+            // "2 missing": the slot names who's busy then; the day's busy list stands in without it.
+            let missing = model.slot(for: date)?.missingMemberIds ?? info.busyMemberIds
+            if missing.count == 1, missing.first == me { return "You're out" }
+            return missing.isEmpty ? "most free" : "\(missing.count) missing"
         case .match:
             if let slot = model.slot(for: date), info.slotPosition == .start || info.slotPosition == .single {
                 let startsMidday = !Calendar.current.isDate(slot.start, equalTo: date.startDate(), toGranularity: .minute)
@@ -574,12 +605,17 @@ private struct DayCell: View {
     private var isPast: Bool { date < .today() }
     private var isToday: Bool { date == .today() }
 
+    /// A day that works only for most of the group (quorum or optional members): drawn lighter.
+    private var isPartial: Bool { !isPast && info?.status == .match && info?.isPartial == true }
+
     var body: some View {
         let status = isPast ? .hidden : (info?.status ?? .hidden)
         // Days that don't work fade; today's doesn't, so it never turns into a washed-out pill.
         let fade = status == .busy ? 0.5 : (status == .hidden ? 0.35 : 1)
         // Today on a day that doesn't work: an accent outline and accent date instead of a pill.
         let plainToday = isToday && status != .match
+        // Filled with the accent: a day that works for everyone. Partial days are soft, with accent text.
+        let onAccent = status == .match && !isPartial
         Button(action: action) {
             VStack(alignment: .leading, spacing: 4) {
                 if plainToday {
@@ -587,14 +623,14 @@ private struct DayCell: View {
                         .foregroundStyle(theme.accentInk)
                 } else {
                     Text("\(date.day)").font(AppFont.body(compact ? 15 : 17, .semibold, relativeTo: .body))
-                        .todayMark(date, onAccent: status == .match)
+                        .todayMark(date, onAccent: onAccent)
                 }
                 if !compact || status == .match || isPast {
                     Text(note).bodyFont(compact ? 9 : 11, .semibold, relativeTo: .caption2).lineLimit(1)
-                        .foregroundStyle(plainToday ? theme.muted : (status == .match ? theme.onAccent : theme.ink))
+                        .foregroundStyle(plainToday ? theme.muted : (onAccent ? theme.onAccent : (isPartial ? theme.accentInk : theme.ink)))
                 }
             }
-            .foregroundStyle(status == .match ? theme.onAccent : theme.ink)
+            .foregroundStyle(onAccent ? theme.onAccent : (isPartial ? theme.accentInk : theme.ink))
             .opacity(plainToday ? 1 : fade)
             .padding(.horizontal, compact ? 6 : 10)
             .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
@@ -609,7 +645,7 @@ private struct DayCell: View {
                         Image(systemName: "heart.fill").font(.system(size: 8, weight: .bold))
                         if !compact { Text("\(count)").font(.system(size: 9, weight: .bold)) }
                     }
-                    .foregroundStyle(theme.onAccent)
+                    .foregroundStyle(onAccent ? theme.onAccent : theme.accentInk)
                     .padding(.top, 5)
                     .padding(.trailing, compact ? 5 : 7)
                     .accessibilityHidden(true)
@@ -619,7 +655,7 @@ private struct DayCell: View {
                 // The selected day: a ring inside the cell, so it never reaches the neighbouring days.
                 // On a day that works (filled with the accent), a light inner ring reads on the fill.
                 if isSelected {
-                    if status == .match {
+                    if onAccent {
                         shape.inset(by: 2).strokeBorder(theme.onAccent, lineWidth: 2)
                     } else {
                         shape.strokeBorder(theme.ink, lineWidth: 2)
@@ -646,6 +682,8 @@ private struct DayCell: View {
     @ViewBuilder
     private func background(_ status: AvailabilityDay.Status) -> some View {
         switch status {
+        case .match where isPartial:
+            shape.fill(theme.accentSoft).overlay(shape.strokeBorder(theme.accent, lineWidth: 1.5))
         case .match:
             shape.fill(theme.accent).shadow(color: theme.accent.opacity(0.55), radius: 10, y: 10)
         case .busy:
@@ -660,11 +698,74 @@ private struct DayCell: View {
         switch status {
         case .match:
             let prefers = (info?.preferredBy?.count ?? 0) > 0 ? ", \(Formatting.plural(info?.preferredBy?.count ?? 0, "person", "people")) prefer it" : ""
+            if isPartial { return "\(base), works for most of the group, \(note)\(prefers)" }
             return "\(base), works for everyone\(prefers)"
         case .busy: return "\(base), \(note)"
         case .free: return note.isEmpty ? base : "\(base), \(note)"
         case .hidden: return isPast ? "\(base), in the past" : "\(base), outside the group's timing"
         }
+    }
+}
+
+/// "Best options" under the month: the top three upcoming times, fewest missing first, then by the
+/// Pro best-date score, each with Propose. Shown to Pro viewers, and to anyone once the group's
+/// timing lets a time work without everyone (so who's missing is worth ranking).
+private struct BestOptionsCard: View {
+    let model: GroupAvailabilityViewModel
+    let group: Group
+    let me: String?
+    let isPro: Bool
+    let propose: (ProposalDraft) -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let options = model.bestOptions()
+        let hasMissing = model.availability?.slots.contains { $0.missingMemberIds != nil } ?? false
+        if !options.isEmpty, isPro || hasMissing {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Best options").sectionLabelStyle()
+                ForEach(Array(options.enumerated()), id: \.element.id) { index, slot in
+                    if index > 0 { Rectangle().fill(theme.line).frame(height: 1) }
+                    row(slot, isTop: index == 0)
+                }
+            }
+            .padding(14)
+            .glass(cornerRadius: 22)
+        }
+    }
+
+    private func row(_ slot: Slot, isTop: Bool) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                if isTop, slot.score != nil {
+                    StatusPill(text: "Best for the group", tone: .indigo, systemImage: "star.fill")
+                }
+                Text(slot.label).bodyFont(15, .semibold).lineLimit(2)
+                ForEach(notes(slot), id: \.self) { line in
+                    Text(line)
+                        .bodyFont(12, relativeTo: .caption)
+                        .foregroundStyle(theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 4)
+            Button("Propose") { propose(ProposalDraft(slot: slot, requirement: group.requirement)) }
+                .buttonStyle(.filled(slot.missingCount == 0 ? .accent : .secondary, height: 36, cornerRadius: 12, fontSize: 13, fullWidth: false))
+                .accessibilityLabel("Propose \(slot.label)")
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    /// "Fair for Ana, who missed out last time", "Ana can't make it", or "Everyone's free".
+    private func notes(_ slot: Slot) -> [String] {
+        var lines: [String] = []
+        if let fair = Clash.fairFor(slot.fairFor ?? [], group: group, me: me) { lines.append(fair) }
+        if let missing = slot.missingMemberIds, !missing.isEmpty {
+            lines.append(Clash.cantMake(missing, group: group, me: me))
+        } else {
+            lines.append("Everyone\u{2019}s free")
+        }
+        return lines
     }
 }
 
@@ -688,7 +789,7 @@ private struct DayDetailCard: View {
                     Text(subtitle(works: works, slot: slot)).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
                 }
                 Spacer()
-                StatusPill(text: works ? "Works" : (isPast ? "Past" : "Doesn\u{2019}t fit"), tone: works ? .mint : .neutral)
+                StatusPill(text: works ? (slot?.missingCount ?? 0 > 0 ? "Most of us" : "Works") : (isPast ? "Past" : "Doesn\u{2019}t fit"), tone: works ? .mint : .neutral)
             }
             if works, let who = model.day(model.selectedDay)?.preferredBy, !who.isEmpty {
                 Label {
@@ -744,7 +845,11 @@ private struct DayDetailCard: View {
     private func subtitle(works: Bool, slot: Slot?) -> String {
         if isPast { return "This day is in the past" }
         guard let info = model.day(model.selectedDay) else { return "Outside the search range" }
-        if works, let slot { return "Everyone synced is free from \(Formatting.shortDay(slot.start)) \(Formatting.time(slot.start))" }
+        if works, let slot {
+            let from = "\(Formatting.shortDay(slot.start)) \(Formatting.time(slot.start))"
+            guard let missing = slot.missingMemberIds, !missing.isEmpty else { return "Everyone synced is free from \(from)" }
+            return "Most of us are free from \(from) · \(Clash.cantMake(missing, group: group, me: me))"
+        }
         switch info.status {
         case .busy:
             let names = info.busyMemberIds.map { $0 == me ? "You" : (group.member($0)?.firstName ?? "Someone") }

@@ -24,3 +24,16 @@ struct PlannerResult: Decodable, Sendable, Equatable {
 struct PlannerBody: Encodable, Sendable {
     let notes: String?
 }
+
+/// `POST /groups/:id/planner/draft` body: the time picked, and anything the AI should know.
+struct ProposalDraftBody: Encodable, Sendable {
+    let start: Date
+    let end: Date
+    let notes: String?
+}
+
+/// An AI-drafted proposal title and message (Pro).
+struct ProposalDraftText: Decodable, Sendable, Equatable {
+    let title: String
+    let note: String
+}

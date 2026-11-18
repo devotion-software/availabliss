@@ -89,6 +89,10 @@ private struct WeekColumn: View {
             ZStack(alignment: .top) {
                 RoundedRectangle(cornerRadius: 12).fill(theme.line)
                 if let detail {
+                    // Most of us free: lighter, under the busy runs and the time everyone's free.
+                    ForEach(detail.mostFreeSpans, id: \.self) { span in
+                        mostFreeBlock(start: span.start, end: span.end, height: proxy.size.height)
+                    }
                     ForEach(detail.everyoneFree, id: \.self) { span in
                         block(start: span.start, end: span.end, height: proxy.size.height, label: freeLabel(span), free: true)
                     }
@@ -127,6 +131,17 @@ private struct WeekColumn: View {
             .offset(y: top)
     }
 
+    /// A soft accent run with an accent outline, for when most of the group is free.
+    private func mostFreeBlock(start: Date, end: Date, height: CGFloat) -> some View {
+        let top = axis.fraction(start, on: day) * height
+        let bottom = axis.fraction(end, on: day) * height
+        return RoundedRectangle(cornerRadius: 10).fill(theme.accentSoft)
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(theme.accent, lineWidth: 1))
+            .frame(height: max(0, bottom - top))
+            .padding(.horizontal, 3)
+            .offset(y: top)
+    }
+
     private func freeLabel(_ span: TimeSpan) -> String {
         let fullDay = axis.fraction(span.start, on: day) == 0 && axis.fraction(span.end, on: day) == 1
         return fullDay ? "Everyone free all day" : "Free from \(Formatting.time(span.start))"
@@ -139,7 +154,11 @@ private struct WeekColumn: View {
     private var accessibilityText: String {
         let base = Formatting.longDay(day.startDate())
         guard let detail else { return "\(base), loading" }
-        if detail.everyoneFree.isEmpty { return "\(base), no time when everyone is free" }
+        if detail.everyoneFree.isEmpty {
+            guard !detail.mostFreeSpans.isEmpty else { return "\(base), no time when everyone is free" }
+            let spans = detail.mostFreeSpans.map { "\(Formatting.time($0.start)) to \(Formatting.time($0.end))" }
+            return "\(base), most of the group free \(Formatting.list(spans))"
+        }
         let spans = detail.everyoneFree.map { "\(Formatting.time($0.start)) to \(Formatting.time($0.end))" }
         return "\(base), everyone free \(Formatting.list(spans))"
     }
@@ -211,12 +230,17 @@ private struct WeekDayCard: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var hasFree: Bool { !(detail?.everyoneFree.isEmpty ?? true) && !isPast }
+    private var hasFree: Bool { (!(detail?.everyoneFree.isEmpty ?? true) || !(detail?.mostFreeSpans.isEmpty ?? true)) && !isPast }
 
     private var summary: String {
         if isPast { return "Past" }
         guard let detail else { return status == .hidden ? "Outside the timing" : "Loading\u{2026}" }
         guard let first = detail.everyoneFree.first else {
+            if let most = detail.mostFreeSpans.first {
+                let end = most.end >= day.adding(days: 1).startDate() ? "late" : Formatting.time(most.end)
+                let more = detail.mostFreeSpans.count > 1 ? " +\(detail.mostFreeSpans.count - 1) more" : ""
+                return "Most of us free \(Formatting.time(most.start)) – \(end)\(more)"
+            }
             return status == .hidden ? "Outside the timing" : "No time when everyone\u{2019}s free"
         }
         let wholeDay = axis.fraction(first.start, on: day) == 0 && axis.fraction(first.end, on: day) == 1
@@ -233,13 +257,16 @@ private struct WeekDayCard: View {
         return "\(Formatting.list(names)) busy some of the day"
     }
 
-    /// The day's 24 hours: someone busy in grey, everyone free in accent.
+    /// The day's 24 hours: someone busy in grey, most of us free in soft accent, everyone free in accent.
     private var strip: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
             ZStack(alignment: .leading) {
                 Capsule().fill(theme.line)
                 if let detail {
+                    ForEach(detail.mostFreeSpans, id: \.self) { span in
+                        bar(span.start, span.end, width: width, color: theme.accentSoft, outline: theme.accent)
+                    }
                     ForEach(BusyMerge.segments(detail.members), id: \.self) { segment in
                         bar(segment.start, segment.end, width: width, color: theme.busyFill)
                     }
@@ -253,10 +280,12 @@ private struct WeekDayCard: View {
         .accessibilityHidden(true)
     }
 
-    private func bar(_ start: Date, _ end: Date, width: CGFloat, color: Color) -> some View {
+    private func bar(_ start: Date, _ end: Date, width: CGFloat, color: Color, outline: Color? = nil) -> some View {
         let left = axis.fraction(start, on: day) * width
         let right = axis.fraction(end, on: day) * width
-        return Capsule().fill(color).frame(width: max(3, right - left)).offset(x: left)
+        return Capsule().fill(color)
+            .overlay { if let outline { Capsule().strokeBorder(outline, lineWidth: 1) } }
+            .frame(width: max(3, right - left)).offset(x: left)
     }
 }
 
@@ -285,6 +314,11 @@ struct DayTimeline: View {
             LegendItem(label: "Free") { theme.okBg.overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(theme.ok.opacity(0.5), lineWidth: 1)) }
             LegendItem(label: "Busy") { theme.busyFill }
             LegendItem(label: "Everyone free") { theme.accent }
+            if !detail.mostFreeSpans.isEmpty {
+                LegendItem(label: "Most of us") {
+                    theme.accentSoft.overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(theme.accent, lineWidth: 1))
+                }
+            }
         }
         .bodyFont(11, relativeTo: .caption2)
         .foregroundStyle(theme.muted)
@@ -295,6 +329,20 @@ struct DayTimeline: View {
             GridRow {
                 Text("Everyone").bodyFont(12, .bold, relativeTo: .caption).foregroundStyle(theme.accentInk)
                 Track(height: 30, radius: 9, background: AnyShapeStyle(theme.line)) { width in
+                    // Most of us free: lighter, under the time everyone's free (labelled only where it stands alone).
+                    ForEach(detail.mostFreeSpans, id: \.self) { span in
+                        let left = axis.fraction(span.start, on: date) * width
+                        let right = axis.fraction(span.end, on: date) * width
+                        Text(detail.mostFreeOnly.contains(span) ? spanText(span) : "")
+                            .bodyFont(11, .semibold, relativeTo: .caption2)
+                            .foregroundStyle(theme.accentInk)
+                            .lineLimit(1)
+                            .padding(.leading, 8)
+                            .frame(width: max(0, right - left), height: 30, alignment: .leading)
+                            .background(RoundedRectangle(cornerRadius: 9).fill(theme.accentSoft))
+                            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(theme.accent, lineWidth: 1))
+                            .offset(x: left)
+                    }
                     ForEach(detail.everyoneFree, id: \.self) { span in
                         let left = axis.fraction(span.start, on: date) * width
                         let right = axis.fraction(span.end, on: date) * width
@@ -308,7 +356,7 @@ struct DayTimeline: View {
                             .offset(x: left)
                     }
                 }
-                .accessibilityLabel("Everyone free: " + Formatting.list(detail.everyoneFree.map { "\(Formatting.time($0.start)) to \(Formatting.time($0.end))" }))
+                .accessibilityLabel(everyoneAccessibilityText)
             }
             ForEach(detail.members) { member in
                 GridRow {
@@ -329,6 +377,17 @@ struct DayTimeline: View {
                 .accessibilityHidden(true)
             }
         }
+    }
+
+    private func spanText(_ span: TimeSpan) -> String {
+        span.end >= date.adding(days: 1).startDate() ? "\(Formatting.time(span.start)) – late" : "\(Formatting.time(span.start)) – \(Formatting.time(span.end))"
+    }
+
+    private var everyoneAccessibilityText: String {
+        let spans = { (list: [TimeSpan]) in Formatting.list(list.map { "\(Formatting.time($0.start)) to \(Formatting.time($0.end))" }) }
+        var text = "Everyone free: " + spans(detail.everyoneFree)
+        if !detail.mostFreeOnly.isEmpty { text += ". Most of the group free: " + spans(detail.mostFreeOnly) }
+        return text
     }
 
     private func name(_ userId: String) -> String {
@@ -391,6 +450,17 @@ private struct Track<Content: View>: View {
         }
         .frame(height: height)
         .accessibilityElement(children: .ignore)
+    }
+}
+
+extension DayAvailability {
+    /// "Most of us are free" stretches with a quorum or optional members; empty without one.
+    /// They include `everyoneFree`, so draw them underneath it.
+    var mostFreeSpans: [TimeSpan] { mostFree ?? [] }
+
+    /// Most-free stretches that don't overlap any time everyone's free: the ones worth labelling.
+    var mostFreeOnly: [TimeSpan] {
+        mostFreeSpans.filter { span in !everyoneFree.contains { $0.start < span.end && $0.end > span.start } }
     }
 }
 

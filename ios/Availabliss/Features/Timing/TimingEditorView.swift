@@ -28,6 +28,8 @@ struct TimingEditorView: View {
                 header
                 TimingForm(model: model)
                     .disabled(!canEdit)
+                WhoNeedsToBeFreeSection(model: model, members: group.members)
+                    .disabled(!canEdit)
                 // Anyone can keep a copy of a group's timing to reuse, admin or not.
                 SaveTemplateRow(requirement: model.draft, suggestion: group.name, api: detail.api, toast: $model.toast)
                 // Everyone's preferred times (anyone can add their own).
@@ -102,6 +104,56 @@ struct TimingEditorView: View {
         .glass(cornerRadius: 26)
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
+    }
+}
+
+/// "Who needs to be free": everyone, or at least N of the required members, plus members who are optional
+/// (never stop a time from working). Saved as the requirement's `quorum` and `optionalMemberIds`.
+struct WhoNeedsToBeFreeSection: View {
+    @Bindable var model: TimingEditorViewModel
+    let members: [Member]
+    @Environment(\.theme) private var theme
+
+    private var required: Int { model.requiredCount(of: members) }
+
+    var body: some View {
+        GlassPanel {
+            Text("Who needs to be free").sectionLabelStyle()
+            SegmentedControl(
+                selection: Binding(get: { model.usesQuorum }, set: { model.setUsesQuorum($0, members: members) }),
+                options: [SegmentOption(value: false, label: "Everyone"), SegmentOption(value: true, label: "Most of us")],
+                accessibilityLabel: "Who needs to be free"
+            )
+            if let quorum = model.draft.quorum {
+                Stepper(value: Binding(get: { quorum }, set: { model.setQuorum($0, members: members) }), in: 1...max(1, required)) {
+                    Text("At least \(quorum) of \(required)").bodyFont(15, .semibold)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            Text(model.usesQuorum
+                 ? "A time works when enough of you are free. We'll show who's missing."
+                 : "A time works only when everyone who isn't optional is free.")
+                .bodyFont(12, relativeTo: .caption)
+                .foregroundStyle(theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            if !members.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
+                        if index > 0 { Rectangle().fill(theme.line).frame(height: 1) }
+                        Toggle(isOn: Binding(get: { model.isOptional(member) }, set: { model.setOptional($0, for: member, members: members) })) {
+                            HStack(spacing: 10) {
+                                Avatar(name: member.name, imageURL: member.image, color: theme.tile(forUser: member.userId), size: 32)
+                                ToggleLabel(title: member.name, subtitle: model.isOptional(member) ? "Optional · never stops a time" : "Needs to be free")
+                            }
+                        }
+                        .toggleStyle(.glassSwitch)
+                        .frame(minHeight: 56)
+                        .accessibilityLabel("\(member.name) is optional")
+                    }
+                }
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: model.usesQuorum)
     }
 }
 

@@ -57,6 +57,10 @@ struct NewProposalSheet: View {
     @State private var busyIds: [String] = []
     /// The end as the input shows it: all day, the last day rather than the midnight after it.
     @State private var inputEnd: Date
+    /// The optional AI planner: "Draft with AI" shows only when the server has it set up; Pro to use.
+    @State private var aiPlanner: Plan.AIPlanner?
+    @State private var isDrafting = false
+    @State private var showsUpgrade = false
 
     private var groupId: String { group.id }
     private var clash: String? { Clash.text(busyIds, group: group, me: me) }
@@ -86,6 +90,7 @@ struct NewProposalSheet: View {
             InputField(placeholder: "Title", text: $title)
             InputField(placeholder: "Where? (optional)", text: $location)
             InputField(placeholder: "Note (optional)", text: $note)
+            draftWithAI
             Text("You'll accept automatically, and a card is posted in the group chat.")
                 .bodyFont(12, relativeTo: .caption)
                 .foregroundStyle(theme.muted)
@@ -103,7 +108,61 @@ struct NewProposalSheet: View {
         }
         .animation(.easeInOut(duration: 0.2), value: clash)
         .task(id: TimesKey(start: span.start, end: span.end, allDay: draft.allDay)) { await checkConflicts() }
+        .task { aiPlanner = (try? await api.send(API.Me.plan()))?.aiPlanner }
+        .sheet(isPresented: $showsUpgrade, onDismiss: { Task { aiPlanner = (try? await api.send(API.Me.plan()))?.aiPlanner } }) {
+            UpgradeSheet(reason: "AI planning is part of Pro: it picks the best time, suggests things to do and drafts the plan.")
+        }
         .errorAlert($error)
+    }
+
+    /// "Draft with AI": fills the title and note for the time picked. Like "Plan with AI", it shows
+    /// whenever the server has AI set up, marked Pro (and opening the upgrade) for those without it.
+    @ViewBuilder
+    private var draftWithAI: some View {
+        if aiPlanner?.available == true {
+            Button {
+                if aiPlanner?.included == true { Task { await draftText() } } else { showsUpgrade = true }
+            } label: {
+                HStack(spacing: 8) {
+                    if isDrafting {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: "sparkles").font(.system(size: 13, weight: .semibold))
+                    }
+                    Text(isDrafting ? "Drafting\u{2026}" : "Draft with AI").bodyFont(14, .semibold, relativeTo: .subheadline)
+                    if aiPlanner?.included != true { StatusPill(text: "Pro", tone: .indigo) }
+                }
+                .foregroundStyle(theme.accentInk)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 36)
+                .background(Capsule().fill(theme.accentSoft))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.pressable)
+            .disabled(isDrafting || span.end <= span.start)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityHint("Writes a title and note for this time")
+        }
+    }
+
+    /// Asks the AI for a title and note for the picked time, replacing what's in those fields.
+    private func draftText() async {
+        isDrafting = true
+        defer { isDrafting = false }
+        let span = span
+        do {
+            let text = try await api.send(API.Groups.draftProposal(groupId: groupId, start: span.start, end: span.end))
+            if !text.title.isEmpty { title = text.title }
+            if !text.note.isEmpty { note = text.note }
+        } catch APIError.upgradeRequired {
+            showsUpgrade = true
+        } catch APIError.notFound {
+            // AI isn't set up on this server after all: stop offering it.
+            aiPlanner = nil
+        } catch {
+            self.error = error.userMessage
+        }
     }
 
     /// What's proposed. All day runs from the first day's midnight to the midnight after the last.

@@ -174,6 +174,38 @@ final class TimingEditorViewModel {
         draft.dates.removeAll { $0 == range }
     }
 
+    // MARK: Who needs to be free
+
+    /// Synced and unsynced members who aren't optional: the "M" in "at least N of M".
+    func requiredCount(of members: [Member]) -> Int {
+        let optional = Set(draft.optionalMemberIds ?? [])
+        return members.filter { !optional.contains($0.userId) }.count
+    }
+
+    /// Everyone (no quorum) or at least some of the required members.
+    var usesQuorum: Bool { draft.quorum != nil }
+
+    /// Switches between everyone and "at least N of M", starting one short of everyone.
+    func setUsesQuorum(_ on: Bool, members: [Member]) {
+        draft.quorum = on ? max(1, requiredCount(of: members) - 1) : nil
+    }
+
+    /// Keeps the quorum within 1…M.
+    func setQuorum(_ value: Int, members: [Member]) {
+        draft.quorum = max(1, min(max(1, requiredCount(of: members)), value))
+    }
+
+    func isOptional(_ member: Member) -> Bool { draft.optionalMemberIds?.contains(member.userId) == true }
+
+    /// Marks a member optional (or required again), keeping any quorum within the new number of required members.
+    func setOptional(_ optional: Bool, for member: Member, members: [Member]) {
+        var ids = draft.optionalMemberIds ?? []
+        ids.removeAll { $0 == member.userId }
+        if optional { ids.append(member.userId) }
+        draft.optionalMemberIds = ids.isEmpty ? nil : ids
+        if let quorum = draft.quorum { setQuorum(quorum, members: members) }
+    }
+
     // MARK: Preview
 
     /// Call from `.task(id: draft)`: waits briefly so quick edits send one request.

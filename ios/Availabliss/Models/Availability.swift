@@ -38,6 +38,10 @@ struct AvailabilityDay: Decodable, Sendable, Hashable {
     let holiday: String?
     /// Members whose preferred times this day's time that works fits.
     var preferredBy: [String]?
+    /// A `match` day whose best time only meets the group's quorum: someone's missing.
+    var partial: Bool?
+
+    var isPartial: Bool { partial == true }
 }
 
 struct Slot: Decodable, Sendable, Hashable, Identifiable {
@@ -46,7 +50,16 @@ struct Slot: Decodable, Sendable, Hashable, Identifiable {
     let label: String
     /// Members whose preferred times this slot fits.
     var preferredBy: [String]?
+    /// Synced members busy at this time (with a quorum or optional members); empty when everyone's free.
+    var missingMemberIds: [String]?
+    /// Pro: the "best date" score (higher is better), weighing preferences and who's compromised before.
+    var score: Double?
+    /// Pro: people this time suits who've compromised in the group's recent plans.
+    var fairFor: [String]?
     var id: Date { start }
+
+    /// How many synced members can't make it (0 without a quorum).
+    var missingCount: Int { missingMemberIds?.count ?? 0 }
 }
 
 /// A member's preferred time for a group. A guideline: it never blocks a date.
@@ -98,4 +111,6 @@ struct DayAvailability: Decodable, Sendable {
     let window: TimeSpan?
     let members: [MemberDay]
     let everyoneFree: [TimeSpan]
+    /// With a quorum or optional members: when enough of the group is free (includes `everyoneFree`).
+    var mostFree: [TimeSpan]?
 }
