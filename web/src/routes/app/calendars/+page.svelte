@@ -9,6 +9,7 @@
 	import ConnectionSection from '#lib/components/calendars/ConnectionSection.svelte';
 	import ConnectButton from '#lib/components/calendars/ConnectButton.svelte';
 	import BusyBufferSection from '#lib/components/calendars/BusyBufferSection.svelte';
+	import CalendarFeedSection from '#lib/components/calendars/CalendarFeedSection.svelte';
 	import ConnectCalendarSheet from '#lib/components/calendars/ConnectCalendarSheet.svelte';
 	import { reportOAuthResult } from '#lib/components/calendars/oauth-result';
 
@@ -69,6 +70,7 @@
 				</div>
 			</aside>
 			{#if page.data.user}<BusyBufferSection minutes={page.data.user.busyBufferMinutes} />{/if}
+			<CalendarFeedSection />
 		</div>
 	</div>
 </div>

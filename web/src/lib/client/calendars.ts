@@ -19,3 +19,15 @@ export const setCalendarBusy = (connectionId: string, calendarId: string, busy: 
 export const syncConnection = (connectionId: string) => api.post<CalendarConnection>(`/calendars/${connectionId}/sync`);
 
 export const removeConnection = (connectionId: string) => api.del(`/calendars/${connectionId}`);
+
+/** Your secret calendar feed link: `url` to copy, `webcalUrl` for calendar apps to subscribe to. */
+export interface CalendarFeed {
+	url: string;
+	webcalUrl: string;
+}
+
+/** Made the first time it's asked for. */
+export const getCalendarFeed = (fetch?: Fetch) => api.get<CalendarFeed>('/me/calendar-feed', { fetch });
+
+/** A new link; the old one stops working. */
+export const resetCalendarFeed = () => api.post<CalendarFeed>('/me/calendar-feed/reset');
