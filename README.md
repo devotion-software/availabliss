@@ -11,7 +11,7 @@ it lands in your calendar with one tap.
 | Web app + JSON API | SvelteKit 3 (Svelte 5), Better Auth, Drizzle ORM, MariaDB, Redis, Bun | [`web/`](web/) |
 | iOS app | SwiftUI, EventKit, APNs (XcodeGen project) | [`ios/`](ios/) |
 | Android app | Kotlin, Jetpack Compose, CalendarContract, FCM | [`android/`](android/) |
-| Docs | API contract, design system, signed-off design concept | [`docs/`](docs/) |
+| Docs | API contract, design system, signed-off design concept, [feature checklist](docs/FEATURE_CHECKLIST.md) | [`docs/`](docs/) |
 
 ## Getting started (web + API)
 
