@@ -225,6 +225,13 @@
       "when": 1795007027658,
       "tag": "0031_woozy_cobalt_man",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1795007675836,
+      "tag": "0032_daffy_wasp",
+      "breakpoints": true
     }
   ]
 }

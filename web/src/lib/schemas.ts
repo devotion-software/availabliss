@@ -239,7 +239,7 @@ export const createProposalSchema = z
 	.object({ ...eventShape, title: optionalText(120) })
 	.refine(endsAfterStart, { message: 'Ends before it starts' });
 
-export const respondSchema = z.object({ response: z.enum(['accepted', 'declined']) });
+export const respondSchema = z.object({ response: z.enum(['accepted', 'maybe', 'declined']) });
 export const overrideSchema = z.object({ userId: z.string().min(1), response: z.enum(RESPONSE_KINDS) });
 
 export const createEventSchema = z.object(eventShape).refine(endsAfterStart, { message: 'Ends before it starts' });

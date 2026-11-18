@@ -1,0 +1,1 @@
+ALTER TABLE `proposal_responses` MODIFY COLUMN `response` enum('pending','accepted','maybe','declined') NOT NULL DEFAULT 'pending';

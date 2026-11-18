@@ -177,6 +177,29 @@ describe('responding', () => {
 		expect((await respond(p.id, g.member, 'accepted')).status).toBe('confirmed');
 	});
 
+	test('a maybe keeps it open; the proposer can still confirm anyway, and the message counts the maybes', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(12));
+		await respond(p.id, g.admin, 'accepted');
+		const open = await respond(p.id, g.member, 'maybe');
+		expect(open.status).toBe('open');
+		expect(open.responses.find((r) => r.userId === g.member)?.response).toBe('maybe');
+		const confirmed = await confirmAnyway(p.id, g.owner);
+		expect(confirmed).toMatchObject({ status: 'confirmed', confirmedBy: g.owner });
+		const [note] = await db.select().from(messages).where(and(eq(messages.groupId, g.groupId), eq(messages.kind, 'system')));
+		expect(note.body).toContain('2 of 3 can make it, 1 maybe');
+		// A maybe changing to a firm yes later just updates; to no isn't dropping out (they never said yes).
+		expect((await respond(p.id, g.member, 'declined')).needsReview).toBe(false);
+	});
+
+	test('everyone saying a firm yes after a maybe confirms it', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(13));
+		await respond(p.id, g.admin, 'maybe');
+		await respond(p.id, g.member, 'accepted');
+		expect((await respond(p.id, g.admin, 'accepted')).status).toBe('confirmed');
+	});
+
 	test('outsiders cannot respond', async () => {
 		const g = await setup();
 		const p = await createProposal(g.groupId, g.owner, slot(9));

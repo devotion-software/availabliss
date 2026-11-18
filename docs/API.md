@@ -549,7 +549,7 @@ interface DayAvailability {
 ### Proposals
 
 ```ts
-type ResponseKind = 'pending' | 'accepted' | 'declined';
+type ResponseKind = 'pending' | 'accepted' | 'maybe' | 'declined'; // maybe = a soft yes ("if I must"); clients must treat unknown values as pending
 interface Proposal {
   id: string; groupId: string;
   title: string | null; location: string | null; note: string | null;
@@ -574,11 +574,16 @@ A time doesn't have to work for everyone to be proposed. Clients warn first
 | POST 🔒 | `/groups/:id/proposals` | `{ start, end, allDay?, title?, location?, note? }` | `Proposal` (creator auto-accepts; posts a chat card) |
 | GET 🔒 | `/groups/:id/conflicts?start=&end=` | | `{ busyMemberIds: string[] }` (who's busy then; ISO instants, `end` after `start`, at most 120 days apart) |
 | GET 🔒 | `/proposals/:id` | | `Proposal` |
-| POST 🔒 | `/proposals/:id/respond` | `{ response: 'accepted' \| 'declined' }` | `Proposal` (open, or confirmed: see below) |
+| POST 🔒 | `/proposals/:id/respond` | `{ response: 'accepted' \| 'maybe' \| 'declined' }` | `Proposal` (open, or confirmed: see below) |
 | POST 👑 | `/proposals/:id/override` | `{ userId, response: ResponseKind }` | `Proposal` |
 | POST 🔒 | `/proposals/:id/confirm` | | `Proposal` ("Confirm anyway": creator or admin; open only; `409` until someone besides the caller has accepted) |
 | POST 🔒 | `/proposals/:id/keep` | | `Proposal` ("Keep the plan": creator or admin; confirmed only; clears `needsReview`) |
 | DELETE 🔒 | `/proposals/:id` | | `204` (creator or admin; marks cancelled; a confirmed plan's event is deleted too) |
+
+A `maybe` is counted apart from `accepted` and doesn't confirm a proposal: only when every member
+has firmly accepted does it confirm itself (the creator or an admin can still "Confirm anyway";
+the chat message then says e.g. "3 of 5 can make it, 1 maybe"). Show maybes beside the yeses
+("3 in · 1 maybe") and rank dates by firm yeses first.
 
 When every member has accepted, the proposal becomes `confirmed`, an `Event` is
 created, and every member gets a push notification and a `proposal.confirmed`

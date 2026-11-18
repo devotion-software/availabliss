@@ -212,7 +212,7 @@ async function requireOpen(proposalId: string): Promise<ProposalRow> {
 	return row;
 }
 
-export async function respond(proposalId: string, userId: string, response: 'accepted' | 'declined'): Promise<Proposal> {
+export async function respond(proposalId: string, userId: string, response: 'accepted' | 'maybe' | 'declined'): Promise<Proposal> {
 	const row = await getRow(proposalId);
 	await requireMember(row.groupId, userId);
 	if (row.status === 'confirmed') return changeConfirmedResponse(row, userId, response);
@@ -226,7 +226,7 @@ export async function respond(proposalId: string, userId: string, response: 'acc
  * admins, who keep it or cancel it; anyone else's change (including coming after all) just
  * updates. Only people asked at the time can reply: members who joined since can't.
  */
-async function changeConfirmedResponse(row: ProposalRow, userId: string, response: 'accepted' | 'declined'): Promise<Proposal> {
+async function changeConfirmedResponse(row: ProposalRow, userId: string, response: 'accepted' | 'maybe' | 'declined'): Promise<Proposal> {
 	const current = await db.query.proposalResponses.findFirst({
 		where: and(eq(proposalResponses.proposalId, row.id), eq(proposalResponses.userId, userId))
 	});
@@ -342,7 +342,8 @@ async function cancelPlan(row: ProposalRow, userId: string): Promise<void> {
 }
 
 /**
- * Confirms the proposal when every current member has accepted. Returns it if
+ * Confirms the proposal when every current member has accepted (a "maybe" isn't enough: the
+ * proposer or an admin can confirm anyway). Returns it if
  * confirmed. Takes the freshly loaded proposal so callers don't load it twice.
  */
 async function confirmIfEveryoneAccepted(proposal: Proposal): Promise<Proposal | null> {
@@ -411,8 +412,9 @@ async function confirm(proposal: Proposal, members: string[], confirmedBy: strin
 	const when = slotLabel({ start: Date.parse(proposal.start), end: Date.parse(proposal.end) }, group.requirement);
 	const event = toGroupEvent((await db.query.events.findFirst({ where: eq(events.id, eventId) }))!);
 	const coming = proposal.responses.filter((r) => r.response === 'accepted').length;
+	const maybe = proposal.responses.filter((r) => r.response === 'maybe').length;
 	const total = proposal.responses.length;
-	const count = `${coming} of ${total} can make it`;
+	const count = `${coming} of ${total} can make it${maybe ? `, ${maybe} maybe` : ''}`;
 
 	await postMessage(proposal.groupId, null, {
 		kind: 'system',

@@ -26,7 +26,12 @@ export type CalendarProvider = (typeof CALENDAR_PROVIDERS)[number];
 export const REPEATS = ['none', 'daily', 'weekdays', 'weekly', 'fortnightly', 'monthly', 'monthlyWeekday', 'yearly'] as const;
 export type Repeat = (typeof REPEATS)[number];
 
-export const RESPONSE_KINDS = ['pending', 'accepted', 'declined'] as const;
+/**
+ * A reply to a proposal. `maybe` is a soft yes ("I can make it if I must"): counted apart from
+ * `accepted`, and it doesn't count towards everyone being in, so a proposal only confirms itself
+ * when every reply is a firm yes (the proposer or an admin can still confirm anyway).
+ */
+export const RESPONSE_KINDS = ['pending', 'accepted', 'maybe', 'declined'] as const;
 export type ResponseKind = (typeof RESPONSE_KINDS)[number];
 
 /** Weekday index, 0 = Monday … 6 = Sunday. */
