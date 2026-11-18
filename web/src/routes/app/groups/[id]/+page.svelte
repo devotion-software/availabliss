@@ -17,7 +17,7 @@
 	import MonthGrid from '#lib/components/calendar/MonthGrid.svelte';
 	import WeekGrid from '#lib/components/calendar/WeekGrid.svelte';
 	import DayDetailCard from '#lib/components/calendar/DayDetailCard.svelte';
-	import { dayMap, slotOn, visibleColumns, weekDates } from '#lib/components/calendar/grid';
+	import { dayMap, findFreeDay, slotOn, visibleColumns, weekDates } from '#lib/components/calendar/grid';
 	import SyncBanner from '#lib/components/group/SyncBanner.svelte';
 	import CoverageNote from '#lib/components/group/CoverageNote.svelte';
 	import BestOptions from '#lib/components/group/BestOptions.svelte';
@@ -65,6 +65,7 @@
 			availability = next;
 			selected = defaultSelection(next, data.month);
 			seedCache(data.month, next);
+			findFreeNeighbours();
 		});
 	});
 	let loadingMonth = $state(false);
@@ -232,6 +233,7 @@
 				forgetCached();
 				loadMonth(month);
 				loadDetails(true);
+				findFreeNeighbours();
 			});
 		const off = live.on(['availability.changed', 'group.updated'], (e) => {
 			if (e.groupId === null || e.groupId === id) refresh();
@@ -267,6 +269,42 @@
 		lastStep = today > selected ? 1 : -1;
 		if (startOfMonth(today) !== month) loadMonth(startOfMonth(today));
 		selected = today;
+	}
+
+	// The nearest dates that work for everyone before / after the month or week on screen (the
+	// first day of a run that works, from today on, within the group's search range). Null when
+	// there's none that way; `findingFree` while it's still looking.
+	let previousFree = $state<string | null>(null);
+	let nextFree = $state<string | null>(null);
+	let findingFree = $state(true);
+	let freeRequest = 0;
+	async function findFreeNeighbours() {
+		const id = ++freeRequest;
+		const { from, to } = group.requirement.range;
+		const start = view === 'month' ? month : startOfWeek(selected);
+		const end = view === 'month' ? endOfMonth(month) : addDays(start, 6);
+		const today = todayKey;
+		const after = addDays(end, 1);
+		const [next, previous] = await Promise.all([
+			findFreeDay(fetchMonth, after > today ? after : today, to, true),
+			findFreeDay(fetchMonth, from > today ? from : today, addDays(start, -1), false)
+		]);
+		if (id !== freeRequest) return;
+		nextFree = next;
+		previousFree = previous;
+		findingFree = false;
+	}
+	$effect(() => {
+		void pageKey;
+		void group.requirement.range.from;
+		void group.requirement.range.to;
+		untrack(() => findFreeNeighbours());
+	});
+	/** To the month or week holding a free date either side, with it selected. */
+	function jumpTo(date: string) {
+		lastStep = date > selected ? 1 : -1;
+		if (startOfMonth(date) !== month) loadMonth(startOfMonth(date));
+		selected = date;
 	}
 
 	let lastStep: 1 | -1 = 1;
@@ -415,6 +453,31 @@
 				<span class="phone-only">
 					<SegmentedControl options={VIEWS} bind:value={view} label="Calendar view" size="sm" />
 				</span>
+			</div>
+
+			<!-- "‹ Fri 25 Dec · Free dates · Fri 5 Feb ›": skips months or weeks where nothing works. -->
+			<div class="free-jumps">
+				<button
+					type="button"
+					class="free-jump"
+					disabled={!previousFree}
+					onclick={() => previousFree && jumpTo(previousFree)}
+					aria-label={previousFree ? `Previous free date, ${formatDayKey(previousFree)}` : findingFree ? 'Previous free date, looking' : 'No earlier free dates'}
+				>
+					<Icon name="chevron-left" size={13} />
+					{previousFree ? formatDayKey(previousFree) : findingFree ? 'Earlier' : 'None earlier'}
+				</button>
+				<span class="free-label" aria-hidden="true">Free dates</span>
+				<button
+					type="button"
+					class="free-jump"
+					disabled={!nextFree}
+					onclick={() => nextFree && jumpTo(nextFree)}
+					aria-label={nextFree ? `Next free date, ${formatDayKey(nextFree)}` : findingFree ? 'Next free date, looking' : 'No later free dates'}
+				>
+					{nextFree ? formatDayKey(nextFree) : findingFree ? 'Later' : 'None later'}
+					<Icon name="chevron-right" size={13} />
+				</button>
 			</div>
 
 			<CoverageNote gaps={availability.checkedUntil ?? []} {members} meId={data.user.id} />
@@ -725,5 +788,48 @@
 	}
 	.today-btn:hover {
 		filter: brightness(0.97);
+	}
+	/* "‹ Fri 25 Dec · Free dates · Fri 5 Feb ›": greyed out when there's none that way. */
+	.free-jumps {
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		align-items: center;
+		gap: 8px;
+	}
+	.free-jump {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-height: 30px;
+		padding: 4px 10px;
+		border: 0;
+		border-radius: 999px;
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		font: inherit;
+		font-size: 13px;
+		font-weight: 650;
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.free-jump:first-child {
+		justify-self: start;
+	}
+	.free-jump:last-child {
+		justify-self: end;
+	}
+	.free-jump:hover:not(:disabled) {
+		filter: brightness(0.97);
+	}
+	.free-jump:disabled {
+		background: var(--line);
+		color: var(--muted);
+		opacity: 0.7;
+		cursor: default;
+	}
+	.free-label {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--muted);
 	}
 </style>

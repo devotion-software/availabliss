@@ -1,6 +1,6 @@
 /** Pure helpers shared by the calendar views. */
 import type { Availability, AvailabilityDay, Member, Slot, Weekday } from '#lib/types';
-import { addDays, endOfMonth, startOfMonth, startOfWeek, weekdayOf } from '#lib/client/dates';
+import { addDays, addMonths, endOfMonth, startOfMonth, startOfWeek, weekdayOf } from '#lib/client/dates';
 import { firstName, listNames } from '#lib/client/format';
 
 /** The weekday columns to draw (all seven when the server gives none). */
@@ -45,3 +45,38 @@ export function busyNames(ids: readonly string[], members: Map<string, Member>, 
 export const dayMap = (days: readonly AvailabilityDay[]) => new Map(days.map((d) => [d.date, d]));
 
 export { weekdayOf };
+
+/** Where a run of days that works for everyone starts (not the middle of a weekend). */
+export const startsFreeRun = (day: Pick<AvailabilityDay, 'status' | 'slotPosition'>): boolean =>
+	day.status === 'match' && day.slotPosition !== 'middle' && day.slotPosition !== 'end';
+
+/**
+ * The first (forward) or last (back) day in [from, to] where a run that works for everyone starts,
+ * fetching a month at a time (`fetchMonth` takes the month's first day). Null when there's none,
+ * or a month couldn't be fetched. A search range is a few months; `maxMonths` just keeps a very
+ * long one from fetching for ever.
+ */
+export async function findFreeDay(
+	fetchMonth: (month: string) => Promise<Pick<Availability, 'days'>>,
+	from: string,
+	to: string,
+	forward: boolean,
+	maxMonths = 24
+): Promise<string | null> {
+	if (to < from) return null;
+	let month = startOfMonth(forward ? from : to);
+	for (let i = 0; i < maxMonths; i++) {
+		if (forward ? month > to : endOfMonth(month) < from) return null;
+		let loaded: Pick<Availability, 'days'>;
+		try {
+			loaded = await fetchMonth(month);
+		} catch {
+			return null;
+		}
+		const starts = loaded.days.filter((d) => d.date >= from && d.date <= to && startsFreeRun(d));
+		const found = forward ? starts[0] : starts[starts.length - 1];
+		if (found) return found.date;
+		month = addMonths(month, forward ? 1 : -1);
+	}
+	return null;
+}
