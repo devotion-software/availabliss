@@ -80,6 +80,21 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.feature.common.AddToCalendarButton
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
 import androidx.compose.ui.zIndex
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextAlign
+import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
@@ -285,15 +300,41 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
             .filter { it }
             .collect { loadOlder() }
     }
-    // Keep the newest message in view when one arrives while you're at the bottom.
-    val newestKey = state.items.firstOrNull()?.key
+    val scope = rememberCoroutineScope()
+    val items by rememberUpdatedState(state.items)
+    // Scrolled back from the latest message (past its read receipt row): the jump button shows.
+    val thresholdPx = with(LocalDensity.current) { JUMP_THRESHOLD.toPx() }
+    val scrolledBack by remember(listState) {
+        derivedStateOf {
+            val newest = if (items.firstOrNull() is ChatItem.Receipt) 1 else 0
+            val first = listState.firstVisibleItemIndex
+            first > newest || (first == newest && listState.firstVisibleItemScrollOffset > thresholdPx)
+        }
+    }
+    // Messages from others that arrived while you were scrolled back, counted on the jump button.
+    var unseen by remember { mutableIntStateOf(0) }
+    LaunchedEffect(scrolledBack) { if (!scrolledBack) unseen = 0 }
+    // A new newest message: at the bottom, keep it in view; scrolled back, count it and stay put
+    // (unless you sent it, then go to it).
+    val newestKey = state.items.firstOrNull { it !is ChatItem.Day && it !is ChatItem.Receipt }?.key
+    var previousNewest by remember { mutableStateOf(newestKey) }
     LaunchedEffect(newestKey) {
-        if (listState.firstVisibleItemIndex <= 2) listState.animateScrollToItem(0)
+        val before = previousNewest
+        previousNewest = newestKey
+        if (before == null || newestKey == null || before == newestKey) return@LaunchedEffect
+        val oldIndex = items.indexOfFirst { it.key == before }
+        val added = if (oldIndex < 0) emptyList() else items.subList(0, oldIndex).filter { it.isMessage }
+        // Judged by the previous newest message (the list may already have laid out the new one):
+        // still in view means you were at the bottom.
+        val wasAtBottom = listState.layoutInfo.visibleItemsInfo.any { it.key == before } &&
+            listState.firstVisibleItemScrollOffset <= thresholdPx
+        when {
+            added.any { it.isOwn } || wasAtBottom -> listState.animateScrollToItem(0)
+            else -> unseen += added.size
+        }
     }
     // Tapping a quote scrolls to the original (when it's loaded) and flashes it.
     var highlighted by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    val items by rememberUpdatedState(state.items)
     val showOriginal: (String) -> Unit = remember(listState) {
         { id ->
             val index = items.indexOfFirst { it.key == id }
@@ -311,6 +352,7 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
         }
     }
 
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(
         state = listState,
         reverseLayout = true,
@@ -330,7 +372,57 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
         }
         if (state.loadingOlder) item(key = "loading-older") { LoadingIndicator() }
     }
+    AnimatedVisibility(
+        visible = scrolledBack,
+        enter = fadeIn() + scaleIn(initialScale = 0.6f),
+        exit = fadeOut() + scaleOut(targetScale = 0.6f),
+        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 14.dp, bottom = 8.dp),
+    ) {
+        JumpToLatestButton(unseen) {
+            unseen = 0
+            scope.launch { listState.animateScrollToItem(0) }
+        }
+    }
+    }
 }
+
+/** Floats over the bottom of the chat while you're scrolled back: a down arrow back to the latest message, with how many new ones arrived meanwhile. */
+@Composable
+private fun JumpToLatestButton(count: Int, onClick: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    Box {
+        GlassIconButton(
+            AvIcons.ArrowDown,
+            if (count > 0) "Jump to latest message, $count new" else "Jump to latest message",
+            onClick,
+        )
+        if (count > 0) {
+            Text(
+                if (count > 99) "99+" else "$count",
+                style = AvailablissTheme.type.micro.copy(fontWeight = FontWeight.Bold),
+                color = colors.onAccent,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 4.dp, y = (-4).dp)
+                    .clip(CircleShape)
+                    .background(colors.accent)
+                    .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                    .clearAndSetSemantics {},
+            )
+        }
+    }
+}
+
+/** A message from someone (not a day label, read receipt or system line). */
+private val ChatItem.isMessage: Boolean
+    get() = this is ChatItem.Text || this is ChatItem.PollItem || this is ChatItem.ProposalCard || this is ChatItem.EventCard || this is ChatItem.Confirmed
+
+private val ChatItem.isOwn: Boolean
+    get() = (this is ChatItem.Text && own) || (this is ChatItem.PollItem && own)
+
+private val JUMP_THRESHOLD = 200.dp
 
 @Composable
 private fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<String>, showOriginal: (String) -> Unit) {

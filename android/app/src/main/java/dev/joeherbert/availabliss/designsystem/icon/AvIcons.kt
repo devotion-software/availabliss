@@ -50,6 +50,7 @@ object AvIcons {
     val Location = line("Location", "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z", circle(12f, 9.5f, 2.5f))
     val Poll = line("Poll", "M5 20V10M12 20V4M19 20v-7", stroke = 2.2f)
     val ArrowRight = line("ArrowRight", "M5 12h14M13 6l6 6-6 6", stroke = 2.2f)
+    val ArrowDown = line("ArrowDown", "M12 5v14M6 13l6 6 6-6", stroke = 2.2f)
     val Sun = line("Sun", "M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6L4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z")
     val Moon = line("Moon", "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z")
     val Monitor = line("Monitor", "M3 5h18v11H3zM8 20h8M12 16v4")
