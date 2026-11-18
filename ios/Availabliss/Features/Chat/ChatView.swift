@@ -13,6 +13,17 @@ struct ChatView: View {
     @State private var pendingDelete: Message?
     /// The original of a tapped quote, briefly highlighted after scrolling to it.
     @State private var highlightedId: String?
+    /// Where the bottom of the messages sits in the list's frame, and the list's height: together,
+    /// how far you've scrolled back from the latest message.
+    @State private var contentBottom: CGFloat = 0
+    @State private var viewportHeight: CGFloat = 0
+    /// Messages from others that arrived while you were scrolled back, shown on the jump button.
+    @State private var unseenCount = 0
+
+    /// Scrolled back further than this, the jump-to-latest button shows.
+    private static let jumpThreshold: CGFloat = 200
+    private static let scrollSpace = "chat-scroll"
+    private var isScrolledBack: Bool { viewportHeight > 0 && contentBottom - viewportHeight > Self.jumpThreshold }
 
     enum ChatSheet: Identifiable {
         case poll, propose, event, info(Message)
@@ -129,9 +140,44 @@ struct ChatView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 8)
+                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.scrollSpace)).maxY } action: { contentBottom = $0 }
             }
+            .coordinateSpace(name: Self.scrollSpace)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
+            .overlay(alignment: .bottomTrailing) {
+                if isScrolledBack {
+                    JumpToLatestButton(count: unseenCount) { scrollToLatest(proxy: proxy) }
+                        .padding(.trailing, 14)
+                        .padding(.bottom, 8)
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isScrolledBack)
+            .onChange(of: model.messages.last?.id) { oldId, newId in
+                newestChanged(from: oldId, to: newId, proxy: proxy)
+            }
+            .onChange(of: isScrolledBack) { _, back in if !back { unseenCount = 0 } }
+        }
+    }
+
+    private func scrollToLatest(proxy: ScrollViewProxy) {
+        guard let last = model.messages.last?.id else { return }
+        withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo(last, anchor: .bottom) }
+        unseenCount = 0
+    }
+
+    /// A new newest message: counted on the jump button while you're scrolled back (no jump),
+    /// or, if you sent it, the list goes to it.
+    private func newestChanged(from oldId: String?, to newId: String?, proxy: ScrollViewProxy) {
+        guard let oldId, let newId, oldId != newId,
+              let oldIndex = model.messages.firstIndex(where: { $0.id == oldId }) else { return }
+        let added = model.messages[(oldIndex + 1)...]
+        if added.contains(where: { $0.authorId != nil && $0.authorId == me }) {
+            scrollToLatest(proxy: proxy)
+        } else if isScrolledBack {
+            unseenCount += added.filter { $0.kind != .system }.count
         }
     }
 
@@ -172,6 +218,31 @@ struct ChatView: View {
         case .info(let message):
             MessageInfoSheet(message: message, group: group, me: app.session.user?.id, model: model)
         }
+    }
+}
+
+/// Floats over the bottom of the chat while you're scrolled back: a down arrow back to the latest
+/// message, with how many new ones arrived meanwhile.
+private struct JumpToLatestButton: View {
+    let count: Int
+    let action: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        IconButton(systemImage: "arrow.down", label: "Jump to latest message", action: action)
+            .overlay(alignment: .topTrailing) {
+                if count > 0 {
+                    Text(count > 99 ? "99+" : "\(count)")
+                        .bodyFont(11, .bold, relativeTo: .caption2)
+                        .foregroundStyle(theme.onAccent)
+                        .padding(.horizontal, 6)
+                        .frame(minWidth: 20, minHeight: 20)
+                        .background(Capsule().fill(theme.accent))
+                        .offset(x: 4, y: -4)
+                        .accessibilityHidden(true)
+                }
+            }
+            .accessibilityValue(count > 0 ? "\(count) new" : "")
     }
 }
 
