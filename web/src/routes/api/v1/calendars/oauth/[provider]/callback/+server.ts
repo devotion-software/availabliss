@@ -1,6 +1,7 @@
 import { handler, notFound, redirectTo } from '#lib/server/http';
 import { consumeState, decodeState, isOAuthProvider, parkPendingLink } from '#lib/server/calendars/oauth';
 import { connectOAuth } from '#lib/server/calendars';
+import { log } from '#lib/server/log';
 
 /** Appends a query parameter to an app path or native deep link. */
 const withParam = (target: string, key: string, value: string) =>
@@ -32,7 +33,7 @@ export const GET = handler<{ provider: string }>(async ({ params, url, locals })
 	try {
 		target = withParam(state.redirect, 'connected', await connectOAuth(state.userId, params.provider, code));
 	} catch (err) {
-		console.warn('[calendars] oauth callback failed', err);
+		log.warn('calendars', 'oauth callback failed', { err });
 		target = withParam(state.redirect, 'error', 'connection_failed');
 	}
 	redirectTo(target);

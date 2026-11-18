@@ -10,6 +10,7 @@ import { calendars } from '../db/schema';
 import { kv } from '../redis';
 import { syncConnection } from './index';
 import { verifyPushToken } from './push';
+import { recordFailure } from '../failures';
 
 /** Wait this long after the first notification, so the rest of a burst is included (tests shorten it). */
 export const pushTiming = { debounceMs: 3000 };
@@ -51,7 +52,7 @@ async function runSyncs(connectionId: string): Promise<void> {
 			if (Number((await kv.get(lastKey(connectionId))) ?? 0) < startedAt) break;
 		}
 	} catch (err) {
-		console.warn('[calendars] push sync failed', connectionId, err);
+		await recordFailure('calendars', 'calendar-push-sync', 'push sync failed', { connectionId, err });
 	} finally {
 		await kv.delete(runningKey(connectionId));
 	}

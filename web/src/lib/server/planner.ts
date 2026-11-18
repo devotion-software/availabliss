@@ -17,6 +17,7 @@ import { getGroupRow, requireMember } from './groups';
 import { isPro } from './billing';
 import { planningContext } from './availability/service';
 import { requirementSummary } from './availability/labels';
+import { log } from './log';
 
 export const aiPlannerConfigured = () => !!env.ai.apiKey;
 
@@ -122,11 +123,11 @@ export async function planWithAi(groupId: string, userId: string, notes: string 
 	} catch (err) {
 		if (err instanceof Anthropic.RateLimitError) throw new ApiError('rate_limited', 'The planner is busy. Try again in a minute.');
 		if (err instanceof Anthropic.BadRequestError) {
-			console.error('[planner] bad request', err.message);
+			log.error('planner', 'bad request', { err });
 			throw new ApiError('server_error', 'The planner couldn’t take that request. Please try again.');
 		}
 		if (err instanceof Anthropic.APIError) {
-			console.error('[planner] API error', err.status, err.message);
+			log.error('planner', 'API error', { err });
 			throw new ApiError('server_error', 'The planner is unavailable right now. Please try again shortly.');
 		}
 		throw err;
@@ -134,7 +135,7 @@ export async function planWithAi(groupId: string, userId: string, notes: string 
 
 	if (response.stop_reason === 'refusal') throw badRequest('The planner can’t help with that. Try different notes.');
 	if (response.stop_reason === 'max_tokens' || !response.parsed_output) {
-		console.error('[planner] no structured output', response.stop_reason);
+		log.error('planner', 'no structured output', { stopReason: response.stop_reason });
 		throw new ApiError('server_error', 'The planner didn’t finish. Please try again.');
 	}
 	return resolvePlan(response.parsed_output, context.slots);

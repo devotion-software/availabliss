@@ -6,6 +6,7 @@ import { isHttpError, isRedirect, json, redirect, type RequestEvent, type Reques
 import { APIError } from 'better-auth';
 import { z } from 'zod';
 import type { ApiErrorBody } from '#lib/types';
+import { log } from './log';
 
 type Code = ApiErrorBody['code'];
 
@@ -58,7 +59,7 @@ function toResponse(err: unknown): Response {
 		const body: ApiErrorBody = { message: issues[0]?.message ?? 'Invalid request', code: 'validation_error', issues };
 		return json(body, { status: 400 });
 	}
-	console.error('[api] unhandled error', err);
+	log.error('api', 'unhandled error', { err });
 	return json({ message: 'Something went wrong', code: 'server_error' } satisfies ApiErrorBody, { status: 500 });
 }
 

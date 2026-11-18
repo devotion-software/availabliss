@@ -1,4 +1,5 @@
 import type { RequestHandler } from './$types';
+import { log } from '#lib/server/log';
 
 /** The fields of a CSP violation worth logging, from either report format. */
 function summarise(report: Record<string, unknown>) {
@@ -28,7 +29,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			const reports = Array.isArray(body)
 				? body.map((r) => (r as { body?: Record<string, unknown> })?.body).filter(Boolean)
 				: [(body as { 'csp-report'?: Record<string, unknown> })?.['csp-report']].filter(Boolean);
-			for (const report of reports.slice(0, 10)) console.warn('[csp] violation', JSON.stringify(summarise(report!)));
+			for (const report of reports.slice(0, 10)) log.warn('csp', 'violation', summarise(report!));
 		}
 	} catch {
 		// Malformed reports are ignored.

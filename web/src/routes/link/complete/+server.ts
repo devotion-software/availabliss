@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { completeMerge, MERGE_COOKIE } from '#lib/server/accounts';
 import type { RequestHandler } from './$types';
+import { log } from '#lib/server/log';
 
 /**
  * Web merge, step 2: back from signing in to the other account. Merges it into the
@@ -16,7 +17,7 @@ export const GET: RequestHandler = async ({ cookies, locals }) => {
 			locals.user && locals.session ? { userId: locals.user.id, sessionCreatedAt: new Date(locals.session.createdAt) } : null
 		);
 	} catch (err) {
-		console.error('[link] merge failed', err);
+		log.error('link', 'merge failed', { err });
 		result = { ok: false, reason: 'merge_failed' };
 	}
 	if (!result.ok) redirect(303, `/app/settings?link_error=${result.reason}`);

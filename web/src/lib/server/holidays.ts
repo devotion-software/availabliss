@@ -13,6 +13,7 @@ import { holidayCache, schoolHolidays } from './db/schema';
 import { inRange } from './availability/time';
 import { badRequest } from './http';
 import { isValidZone } from '#lib/timezone';
+import { log } from './log';
 
 const NAGER = 'https://date.nager.at/api/v3';
 const CACHE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -49,7 +50,7 @@ async function holidaysForYear(country: string, year: number): Promise<CachedHol
 		return holidays;
 	} catch (err) {
 		// Serve stale data rather than failing availability when the API is down.
-		console.warn('[holidays] fetch failed', country, year, err);
+		log.warn('holidays', 'fetch failed', { country, year, err });
 		return cached?.holidays ?? [];
 	}
 }

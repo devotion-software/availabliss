@@ -12,6 +12,7 @@ import { env } from './env';
 import { badRequest } from './http';
 import { newToken } from './ids';
 import { MEDIA_KEY, keyOf, storedUrlOf } from './media-urls';
+import { log } from './log';
 
 export { keyOf, mediaUrl } from './media-urls';
 
@@ -104,7 +105,7 @@ export async function deleteKeys(keys: string[]): Promise<void> {
 				if (r2) await r2.client.fetch(r2.objectUrl(key), { method: 'DELETE' });
 				else await rm(join(LOCAL_DIR, key), { force: true });
 			} catch (err) {
-				console.warn('[media] delete failed', key, err);
+				log.warn('media', 'delete failed', { key, err });
 			}
 		})
 	);

@@ -32,6 +32,8 @@ import {
 	type RemoteBusy,
 	type RemoteCalendar
 } from './types';
+import { log } from '../log';
+import { recordFailure } from '../failures';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Busy time is kept from this far back (for today's view). */
@@ -165,7 +167,7 @@ export async function refreshCoverage(userIds: string[]): Promise<void> {
 		}
 	} catch (err) {
 		// Only hurries a sync along: the regular one still extends coverage.
-		console.warn('[calendars] refreshCoverage failed', err);
+		log.warn('calendars', 'refreshCoverage failed', { err });
 	}
 }
 
@@ -464,7 +466,7 @@ export async function syncConnection(connectionId: string, options: SyncOptions 
 			.where(eq(calendarConnections.id, row.id));
 	} catch (err) {
 		const status = err instanceof ReauthRequired ? 'reauth_required' : 'error';
-		console.warn('[calendars] sync failed', row.provider, row.id, err);
+		await recordFailure('calendars', `calendar-sync:${row.provider}`, 'sync failed', { provider: row.provider, connectionId: row.id, err });
 		await db
 			.update(calendarConnections)
 			.set({
@@ -605,7 +607,7 @@ export async function checkConnection(connectionId: string): Promise<boolean> {
 			remote.length !== stored.size ||
 			remote.some((c) => !stored.has(c.externalId) || (c.changes === 'version' && c.version !== stored.get(c.externalId)));
 	} catch (err) {
-		console.warn('[calendars] change check failed', row.id, err);
+		await recordFailure('calendars', 'caldav-check', 'change check failed', { connectionId: row.id, err });
 	}
 	await db.update(calendarConnections).set({ checkedAt: new Date() }).where(eq(calendarConnections.id, row.id));
 	if (changed) await syncConnection(row.id);
@@ -723,7 +725,7 @@ export async function removeConnection(userId: string, connectionId: string): Pr
 			const cals = await db.select().from(calendars).where(eq(calendars.connectionId, row.id));
 			await stopPush(adapters[row.provider], (await adapters[row.provider].refresh?.(creds)) ?? creds, cals);
 		} catch (err) {
-			console.warn('[calendars] stopping notifications failed', row.id, err);
+			log.warn('calendars', 'stopping notifications failed', { connectionId: row.id, err });
 		}
 	}
 	await db.delete(calendarConnections).where(eq(calendarConnections.id, connectionId));

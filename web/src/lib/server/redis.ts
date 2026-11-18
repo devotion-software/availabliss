@@ -13,6 +13,7 @@
  */
 import { Redis } from 'ioredis';
 import { env } from './env';
+import { log } from './log';
 
 export interface KeyValueStore {
 	get(key: string): Promise<string | null>;
@@ -160,7 +161,7 @@ export class RedisBus implements Bus {
 				try {
 					handler(message);
 				} catch (err) {
-					console.warn('[redis] subscriber handler failed', err);
+					log.error('redis', 'subscriber handler failed', { err });
 				}
 			}
 		});
@@ -195,12 +196,12 @@ function outageLog() {
 		failed(err?: unknown) {
 			if (down) return;
 			down = true;
-			console.warn('[redis] unavailable, using in-memory state until it reconnects', err instanceof Error ? err.message : '');
+			log.warn('redis', 'unavailable, using in-memory state until it reconnects', { reason: err instanceof Error ? err.message : String(err) });
 		},
 		ok() {
 			if (!down) return;
 			down = false;
-			console.warn('[redis] reconnected');
+			log.info('redis', 'reconnected');
 		}
 	};
 }
@@ -297,7 +298,7 @@ interface Shared {
 function connect(): Shared {
 	if (!env.redisUrl) {
 		if (process.env.NODE_ENV === 'production') {
-			console.warn('[redis] REDIS_URL is not set: using in-memory state, which only works with a single instance');
+			log.warn('redis', 'REDIS_URL is not set: using in-memory state, which only works with a single instance');
 		}
 		return { client: null, store: new MemoryStore(), bus: new MemoryBus() };
 	}

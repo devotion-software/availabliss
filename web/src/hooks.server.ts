@@ -12,6 +12,7 @@ import { isForbiddenCrossSite, selfOrigins } from '#lib/server/csrf';
 import { env } from '#lib/server/env';
 import { kv } from '#lib/server/redis';
 import { checkOtpEmail, checkRateLimit, tooManyRequests } from '#lib/server/rate-limit';
+import { log, requestContext, withRequestContext } from '#lib/server/log';
 
 const ALLOWED_ORIGINS = selfOrigins(env.baseUrl, env.trustedOrigins);
 
@@ -38,7 +39,7 @@ export const init: ServerInit = () => {
 			// a minute (several provider calls with 15–20 s timeouts each).
 			await syncStaleConnections(Date.now() + (lockSeconds - 90) * 1000);
 		} catch (err) {
-			console.warn('[calendars] background sync failed', err);
+			log.error('calendars', 'background sync failed', { err });
 		}
 	}, CALENDAR_SYNC_INTERVAL_MS).unref();
 	setInterval(async () => {
@@ -48,7 +49,7 @@ export const init: ServerInit = () => {
 			// A check is one request; one that finds a change runs a full sync, so leave room for that.
 			await checkCaldavConnections(Date.now() + (lockSeconds - 45) * 1000);
 		} catch (err) {
-			console.warn('[calendars] CalDAV change check failed', err);
+			log.error('calendars', 'CalDAV change check failed', { err });
 		}
 	}, CALDAV_CHECK_INTERVAL_MS).unref();
 	setInterval(async () => {
@@ -56,7 +57,7 @@ export const init: ServerInit = () => {
 			if (!(await kv.setIfAbsent('lock:abandoned-uploads', String(process.pid), ABANDONED_UPLOADS_INTERVAL_MS / 1000 - 10))) return;
 			await deleteAbandonedUploads();
 		} catch (err) {
-			console.warn('[chat] deleting abandoned uploads failed', err);
+			log.error('chat', 'deleting abandoned uploads failed', { err });
 		}
 	}, ABANDONED_UPLOADS_INTERVAL_MS).unref();
 	setInterval(async () => {
@@ -64,7 +65,7 @@ export const init: ServerInit = () => {
 			if (!(await kv.setIfAbsent('lock:auto-archive', String(process.pid), AUTO_ARCHIVE_INTERVAL_MS / 1000 - 10))) return;
 			await autoArchiveGroups();
 		} catch (err) {
-			console.warn('[groups] auto-archive failed', err);
+			log.error('groups', 'auto-archive failed', { err });
 		}
 	}, AUTO_ARCHIVE_INTERVAL_MS).unref();
 	setInterval(async () => {
@@ -72,7 +73,7 @@ export const init: ServerInit = () => {
 			if (!(await kv.setIfAbsent('lock:reminders', String(process.pid), REMINDER_CHECK_INTERVAL_MS / 1000 - 10))) return;
 			await sendDueReminders();
 		} catch (err) {
-			console.warn('[reminders] sending failed', err);
+			log.error('reminders', 'sending failed', { err });
 		}
 	}, REMINDER_CHECK_INTERVAL_MS).unref();
 };
@@ -106,12 +107,26 @@ async function rateLimit(event: RequestEvent): Promise<Response | null> {
 		}
 	} catch (err) {
 		// Fail open: a Redis outage shouldn't take the API down with it.
-		console.warn('[rate-limit] check failed', err);
+		log.warn('rate-limit', 'check failed', { err });
 	}
 	return null;
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Everything logged while handling this request carries its id (also sent back as X-Request-Id).
+	const requestId = event.request.headers.get('x-request-id')?.slice(0, 64) || crypto.randomUUID();
+	const response = await withRequestContext({ requestId, userId: null, method: event.request.method, path: event.url.pathname }, () =>
+		handleRequest({ event, resolve })
+	);
+	try {
+		response.headers.set('x-request-id', requestId);
+	} catch {
+		// Immutable headers.
+	}
+	return response;
+};
+
+const handleRequest: Handle = async ({ event, resolve }) => {
 	if (isForbiddenCrossSite(event.request, event.url, ALLOWED_ORIGINS)) {
 		return Response.json({ message: 'Cross-site request blocked', code: 'forbidden' }, { status: 403 });
 	}
@@ -125,6 +140,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		throw err;
 	}
 	event.locals.user = session?.user ?? null;
+	const ctx = requestContext();
+	if (ctx) ctx.userId = event.locals.user?.id ?? null;
 	event.locals.session = session?.session ?? null;
 
 	const limited = await rateLimit(event);

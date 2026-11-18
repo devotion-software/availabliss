@@ -12,6 +12,8 @@ import { db } from '../db';
 import { calendars } from '../db/schema';
 import { env } from '../env';
 import type { CalendarAdapter, RemoteCalendar } from './types';
+import { log } from '../log';
+import { recordFailure } from '../failures';
 
 /** Channels are replaced once they have less than this left. */
 const RENEW_BEFORE_MS = 24 * 60 * 60 * 1000;
@@ -67,7 +69,7 @@ export async function maintainPush<Creds>(
 		let channel = null;
 		if (row.busy && cal) {
 			channel = await adapter.watch(creds, cal, { id: randomUUID(), address, token: pushToken(row.id) }).catch((err) => {
-				console.warn('[calendars] watch failed', provider, row.id, err);
+				void recordFailure('calendars', `calendar-watch:${provider}`, 'watch failed', { provider, connectionId: row.id, err });
 				return null;
 			});
 		}
@@ -91,5 +93,5 @@ export async function stopPush<Creds>(adapter: CalendarAdapter<Creds>, creds: Cr
 
 async function stopChannel<Creds>(adapter: CalendarAdapter<Creds>, creds: Creds, channel: Channel) {
 	// Best effort: a channel we can't stop just lapses, and its notifications are ignored.
-	await adapter.unwatch?.(creds, channel).catch((err) => console.warn('[calendars] unwatch failed', channel.id, err));
+	await adapter.unwatch?.(creds, channel).catch((err) => log.warn('calendars', 'unwatch failed', { channelId: channel.id, err }));
 }

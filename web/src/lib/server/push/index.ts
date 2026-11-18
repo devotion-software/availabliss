@@ -4,6 +4,7 @@ import { devices } from '../db/schema';
 import { apnsConfigured, sendApns } from './apns';
 import { fcmConfigured, sendFcm } from './fcm';
 import type { PushMessage } from './types';
+import { recordFailure } from '../failures';
 
 export type { PushMessage };
 
@@ -18,7 +19,7 @@ export async function sendPush(userIds: string[], message: PushMessage): Promise
 				if (!send) return;
 				if ((await send(device.token, message)) === 'invalid') await db.delete(devices).where(eq(devices.id, device.id));
 			} catch (err) {
-				console.warn('[push] send failed', device.platform, err);
+				void recordFailure('push', `push:${device.platform}`, 'send failed', { platform: device.platform, err });
 			}
 		})
 	);

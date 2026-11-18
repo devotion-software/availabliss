@@ -13,6 +13,7 @@ import { db } from './db';
 import { groupMembers } from './db/schema';
 
 import { clearSlotCounts } from './availability/slot-count-cache';
+import { log } from './log';
 
 const SLOT_COUNT_EVENTS = new Set<LiveEvent['type']>(['availability.changed', 'group.updated', 'member.changed']);
 const mine = alias(groupMembers, 'mine');
@@ -54,7 +55,7 @@ export function createHub(bus: Bus) {
 		subscribe(userId: string, listener: Listener): () => void {
 			ready ??= bus.subscribe(CHANNEL, deliver).catch((err) => {
 				ready = null;
-				console.warn('[live] could not subscribe to the bus', err);
+				log.error('live', 'could not subscribe to the bus', { err });
 			});
 			let set = channels.get(userId);
 			if (!set) channels.set(userId, (set = new Set()));
@@ -70,7 +71,7 @@ export function createHub(bus: Bus) {
 			if (!envelope.userIds.length) return Promise.resolve();
 			return bus.publish(CHANNEL, JSON.stringify(envelope)).catch((err) => {
 				// Live updates are best effort; clients also refresh on focus.
-				console.warn('[live] publish failed', err);
+				log.warn('live', 'publish failed', { err });
 			});
 		}
 	};
