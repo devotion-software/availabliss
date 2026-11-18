@@ -35,11 +35,17 @@ async function getRow(userId: string, id: string): Promise<Row> {
 	return row;
 }
 
+/** Who's optional and the quorum belong to one group's members, so templates don't keep them. */
+function portable(requirement: Requirement): Requirement {
+	const { quorum: _quorum, optionalMemberIds: _optional, ...rest } = requirement;
+	return rest;
+}
+
 export async function createTemplate(userId: string, input: { name: string; requirement: Requirement }): Promise<RequirementTemplate> {
 	const [{ n }] = await db.select({ n: count() }).from(requirementTemplates).where(eq(requirementTemplates.userId, userId));
 	if (n >= MAX_TEMPLATES) throw badRequest(`You can save up to ${MAX_TEMPLATES} templates. Delete one you don't use first.`);
 	const id = newId();
-	await db.insert(requirementTemplates).values({ id, userId, ...input });
+	await db.insert(requirementTemplates).values({ id, userId, name: input.name, requirement: portable(input.requirement) });
 	return toTemplate(await getRow(userId, id));
 }
 
@@ -52,7 +58,7 @@ export async function updateTemplate(
 	if (patch.name !== undefined || patch.requirement !== undefined) {
 		await db
 			.update(requirementTemplates)
-			.set(patch)
+			.set({ ...patch, ...(patch.requirement && { requirement: portable(patch.requirement) }) })
 			.where(and(eq(requirementTemplates.id, id), eq(requirementTemplates.userId, userId)));
 	}
 	return toTemplate(await getRow(userId, id));
