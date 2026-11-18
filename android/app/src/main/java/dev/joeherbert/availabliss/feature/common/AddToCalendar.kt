@@ -7,6 +7,11 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,7 +51,6 @@ import dev.joeherbert.availabliss.designsystem.component.ColorSwatch
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.RowDivider
 import dev.joeherbert.availabliss.designsystem.component.SurfacePanel
-import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
@@ -336,31 +340,48 @@ fun AddToCalendarButton(status: CalendarStatus, onClick: () -> Unit, modifier: M
 /** How long "Added to your calendar" shows before the button goes. */
 private const val CONFIRMATION_MILLIS = 3_000L
 
-/** "● In Work · Change": the quiet line once a plan is in the user's calendar. */
+/**
+ * "● In Work ⌄": a small chip once a plan is in the user's calendar. Tapping it (when the calendar
+ * can be chosen) moves the plan to another calendar; it hugs its content instead of spanning the card.
+ */
 @Composable
 private fun AddedToCalendarRow(status: CalendarStatus, onChange: () -> Unit) {
     val colors = AvailablissTheme.colors
-    Row(
-        Modifier.fillMaxWidth().defaultMinSize(minHeight = 32.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        val calendar = status.calendar
-        if (calendar != null) {
-            ColorSwatch(calendar.color?.let(::parseHex) ?: colors.warn, size = 10.dp, radius = 5.dp)
-        } else {
-            Icon(AvIcons.Check, null, tint = colors.okInk, modifier = Modifier.size(14.dp))
-        }
-        Text(
-            calendar?.let { "In ${it.name}" } ?: "In your calendar",
-            style = AvailablissTheme.type.caption,
-            color = colors.muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        if (status.canChange) {
-            TextAction("Change", onChange, Modifier.semantics { contentDescription = "Change calendar" })
+    val calendar = status.calendar
+    val label = calendar?.let { "In ${it.name}" } ?: "In your calendar"
+    Row(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .defaultMinSize(minHeight = 28.dp)
+                .clip(CircleShape)
+                .background(colors.surface)
+                .border(1.dp, colors.line, CircleShape)
+                .then(
+                    if (status.canChange) {
+                        Modifier.clickable(role = Role.Button, onClickLabel = "Change calendar", onClick = onChange)
+                    } else Modifier,
+                )
+                .semantics(mergeDescendants = true) { contentDescription = label }
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (calendar != null) {
+                ColorSwatch(calendar.color?.let(::parseHex) ?: colors.warn, size = 8.dp, radius = 4.dp)
+            } else {
+                Icon(AvIcons.Check, null, tint = colors.okInk, modifier = Modifier.size(12.dp))
+            }
+            Text(
+                label,
+                style = AvailablissTheme.type.caption,
+                color = colors.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (status.canChange) {
+                Icon(AvIcons.ChevronDown, null, tint = colors.muted, modifier = Modifier.size(12.dp))
+            }
         }
     }
 }

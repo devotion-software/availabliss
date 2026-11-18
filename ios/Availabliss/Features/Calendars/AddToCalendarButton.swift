@@ -112,31 +112,46 @@ struct AddToCalendarButton: View {
     }
 }
 
-/// "In Work · Change": the quiet line once a plan is in the user's calendar.
+/// "● In Work ⌄": a small chip once a plan is in the user's calendar. Tapping it (when the calendar can be
+/// chosen) moves the plan to another calendar; the row hugs its content instead of spanning the card.
 private struct AddedToCalendarRow: View {
     let calendar: EKCalendar?
     let canChange: Bool
     let change: () -> Void
     @Environment(\.theme) private var theme
 
+    private var interactive: Bool { canChange && calendar != nil }
+
     var body: some View {
-        HStack(spacing: 8) {
-            if let calendar {
-                Circle().fill(Color(cgColor: calendar.cgColor)).frame(width: 10, height: 10)
-            } else {
-                Image(systemName: "calendar.badge.checkmark").font(.system(size: 14, weight: .semibold)).foregroundStyle(theme.okInk)
+        HStack {
+            Button(action: change) {
+                HStack(spacing: 6) {
+                    if let calendar {
+                        Circle().fill(Color(cgColor: calendar.cgColor)).frame(width: 8, height: 8)
+                    } else {
+                        Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(theme.okInk)
+                    }
+                    Text(calendar.map { "In \($0.title)" } ?? "In your calendar")
+                        .bodyFont(13, .medium, relativeTo: .subheadline)
+                        .foregroundStyle(theme.ink)
+                        .lineLimit(1)
+                    if interactive {
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(theme.muted)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .frame(minHeight: 28)
+                .background(Capsule().fill(theme.surface))
+                .overlay(Capsule().strokeBorder(theme.line, lineWidth: 1))
+                .contentShape(Capsule())
             }
-            Text(calendar.map { "In \($0.title)" } ?? "In your calendar")
-                .bodyFont(13, .medium, relativeTo: .subheadline)
-                .foregroundStyle(theme.muted)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-            if canChange && calendar != nil {
-                Button("Change", action: change)
-                    .buttonStyle(.textAction)
-                    .accessibilityLabel("Change calendar")
-            }
+            .buttonStyle(.plain)
+            .disabled(!interactive)
+            .accessibilityLabel(calendar.map { "In \($0.title)" } ?? "In your calendar")
+            .accessibilityHint(interactive ? "Change calendar" : "")
+            Spacer(minLength: 0)
         }
-        .frame(minHeight: 32)
     }
 }

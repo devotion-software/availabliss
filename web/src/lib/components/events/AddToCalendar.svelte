@@ -59,8 +59,10 @@
 
 {#if remembered && !added}
 	<p class="in-calendar">
-		<Icon name="check" size={15} strokeWidth={2.4} />
-		<span>In your calendar</span>
+		<span class="chip">
+			<Icon name="check" size={13} strokeWidth={2.6} />
+			In your calendar
+		</span>
 		<button type="button" class="again" onclick={() => (remembered = false)}>Add again</button>
 	</p>
 {:else}
@@ -88,27 +90,37 @@
 {/if}
 
 <style>
+	/* A small chip that hugs its content, with Add again beside it. */
 	.in-calendar {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 4px;
 		margin: 0;
-		min-height: 32px;
+	}
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-height: 28px;
+		padding: 0 10px;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--surface);
 		font-size: 13px;
 		font-weight: 500;
-		color: var(--muted);
+		color: var(--ink);
+		white-space: nowrap;
 	}
-	.in-calendar :global(svg) {
+	.chip :global(svg) {
 		color: var(--ok-ink);
 		flex: none;
 	}
-	.in-calendar span {
-		flex: 1;
-	}
 	.again {
+		/* Tap area taller than it looks, without making the row taller. */
+		margin: -8px 0;
 		min-height: 44px;
-		padding: 0 4px;
-		font-size: 14px;
+		padding: 0 8px;
+		font-size: 13px;
 		font-weight: 600;
 		color: var(--accent-ink);
 	}
