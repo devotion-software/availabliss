@@ -23,6 +23,8 @@ export const GET = authed<{ id: string }>(async ({ params, userId }) => {
 		username: r.username,
 		name: r.inviteeEmail ? displayName({ name: r.inviteeName, email: r.inviteeEmail }) : null,
 		url: inviteUrl(r.token),
+		maxUses: r.maxUses,
+		uses: r.uses,
 		expiresAt: r.expiresAt.toISOString(),
 		createdAt: r.createdAt.toISOString(),
 		invitedBy: displayName({ name: r.inviterName, email: r.inviterEmail, nameInGroup: r.inviterNameInGroup })
@@ -31,7 +33,7 @@ export const GET = authed<{ id: string }>(async ({ params, userId }) => {
 });
 
 /**
- * Nothing: a link anyone can use. With `emails` (or `email`): one invite per address, emailed to
+ * Nothing: a link anyone can use, by `maxUses` people (null: no limit; left out: one). With `emails` (or `email`): one invite per address, emailed to
  * it, that only that person can accept. With `usernames`: one invite per person, sent to their
  * Activity (and phone) and only they can accept. With `userIds`: the same, for people who are already
  * in a group with you (a new group with the same people), whether or not they have a username.
@@ -69,12 +71,12 @@ export const POST = authed<{ id: string }>(async ({ event, params, userId }) => 
 
 	const created = [];
 	for (const email of emails.length || people.length ? emails : [null]) {
-		const { id, token, expiresAt } = await createInvite(params.id, userId, email);
-		created.push({ id, email, username: null as string | null, name: null as string | null, invitedUserId: null as string | null, token, url: inviteUrl(token), expiresAt: expiresAt.toISOString() });
+		const { id, token, expiresAt, maxUses } = await createInvite(params.id, userId, email, null, input.maxUses === undefined ? 1 : input.maxUses);
+		created.push({ id, maxUses, email, username: null as string | null, name: null as string | null, invitedUserId: null as string | null, token, url: inviteUrl(token), expiresAt: expiresAt.toISOString() });
 	}
 	for (const person of people) {
-		const { id, token, expiresAt } = await createInvite(params.id, userId, null, person.id);
-		created.push({ id, email: null, username: person.username, name: person.name, invitedUserId: person.id, token, url: inviteUrl(token), expiresAt: expiresAt.toISOString() });
+		const { id, token, expiresAt, maxUses } = await createInvite(params.id, userId, null, person.id);
+		created.push({ id, maxUses, email: null, username: person.username, name: person.name, invitedUserId: person.id, token, url: inviteUrl(token), expiresAt: expiresAt.toISOString() });
 	}
 	if (emails.length || people.length) {
 		const [me, group] = await Promise.all([getMe(userId), getGroupRow(params.id)]);
@@ -99,6 +101,8 @@ export const POST = authed<{ id: string }>(async ({ event, params, userId }) => 
 		username: c.username,
 		name: c.name,
 		url: c.url,
+		maxUses: c.maxUses,
+		uses: 0,
 		expiresAt: c.expiresAt,
 		createdAt: new Date().toISOString(),
 		invitedBy: ''

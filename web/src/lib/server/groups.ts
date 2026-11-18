@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/mysql-core';
 import type { Group, Member, Requirement, Role, TileColor } from '#lib/types';
 import { TILE_COLORS } from '#lib/types';
@@ -339,19 +339,33 @@ export async function leaveGroup(groupId: string, userId: string, newOwnerId: st
 
 // ─── Invites ──────────────────────────────────────────────────────────────
 
-/** An invite: a link anyone can use, or (with `email` or `invitedUserId`) one only that person can join with. */
-export async function createInvite(groupId: string, userId: string, email: string | null, invitedUserId: string | null = null) {
+/**
+ * An invite: a link anyone can use, by up to `maxUses` people (null: no limit; one unless asked), or
+ * (with `email` or `invitedUserId`) one only that person can join with.
+ */
+export async function createInvite(
+	groupId: string,
+	userId: string,
+	email: string | null,
+	invitedUserId: string | null = null,
+	maxUses: number | null = 1
+) {
 	await requireMember(groupId, userId, 'admin');
 	const id = newId();
 	const token = newToken();
 	const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+	// An invite for one person is only ever for them.
+	const limit = email || invitedUserId ? 1 : maxUses;
 	await db
 		.insert(groupInvites)
-		.values({ id, groupId, token, email: email?.trim().toLowerCase() ?? null, invitedUserId, createdBy: userId, expiresAt });
-	return { id, token, expiresAt };
+		.values({ id, groupId, token, email: email?.trim().toLowerCase() ?? null, invitedUserId, createdBy: userId, maxUses: limit, expiresAt });
+	return { id, token, expiresAt, maxUses: limit };
 }
 
-/** A group's invites that can still be used (unexpired; each is single-use), newest first (admins only). */
+/** Whether an invite still has room: no limit, or fewer people have joined with it than it allows. */
+const hasRoom = () => or(isNull(groupInvites.maxUses), lt(groupInvites.uses, groupInvites.maxUses));
+
+/** A group's invites that can still be used (unexpired, not used up), newest first (admins only). */
 export async function listInvites(groupId: string, userId: string) {
 	await requireMember(groupId, userId, 'admin');
 	const invitee = alias(user, 'invitee');
@@ -363,6 +377,8 @@ export async function listInvites(groupId: string, userId: string) {
 			username: invitee.username,
 			inviteeName: invitee.name,
 			inviteeEmail: invitee.email,
+			maxUses: groupInvites.maxUses,
+			uses: groupInvites.uses,
 			expiresAt: groupInvites.expiresAt,
 			createdAt: groupInvites.createdAt,
 			inviterName: user.name,
@@ -373,7 +389,7 @@ export async function listInvites(groupId: string, userId: string) {
 		.innerJoin(user, eq(user.id, groupInvites.createdBy))
 		.leftJoin(groupMembers, and(eq(groupMembers.userId, groupInvites.createdBy), eq(groupMembers.groupId, groupInvites.groupId)))
 		.leftJoin(invitee, eq(invitee.id, groupInvites.invitedUserId))
-		.where(and(eq(groupInvites.groupId, groupId), gt(groupInvites.expiresAt, new Date())))
+		.where(and(eq(groupInvites.groupId, groupId), gt(groupInvites.expiresAt, new Date()), hasRoom()))
 		.orderBy(desc(groupInvites.createdAt));
 	return rows;
 }
@@ -390,8 +406,12 @@ async function liveInvite(token: string) {
 		where: and(eq(groupInvites.token, token), gt(groupInvites.expiresAt, new Date()))
 	});
 	if (!invite) throw notFound('This invite has expired or does not exist');
+	if (invite.maxUses !== null && invite.uses >= invite.maxUses) throw usedUp();
 	return invite;
 }
+
+// not_found (as a link that's gone always was), so older apps show the message as they did.
+const usedUp = () => notFound('This invite link has been used up');
 
 export async function previewInvite(token: string) {
 	const invite = await liveInvite(token);
@@ -437,19 +457,31 @@ export async function acceptInvite(token: string, userId: string): Promise<{ gro
 		const who = invitee?.username ? `@${invitee.username}` : 'someone else';
 		throw new ApiError('forbidden', `This invite was sent to ${who}. Sign in as ${who} to join.`);
 	}
-	const [result] = await db.insert(groupMembers).ignore().values({ groupId: invite.groupId, userId, role: 'member' });
-	const joined = result.affectedRows > 0;
+	// Joining and counting the use happen together: the count only goes up while there's room
+	// (the row is locked while it's checked), so people joining at once can't go past the limit,
+	// and whoever misses out isn't added.
+	const joined = await db.transaction(async (tx) => {
+		const [result] = await tx.insert(groupMembers).ignore().values({ groupId: invite.groupId, userId, role: 'member' });
+		if (result.affectedRows === 0) return false;
+		const [counted] = await tx
+			.update(groupInvites)
+			.set({ uses: sql`${groupInvites.uses} + 1` })
+			.where(and(eq(groupInvites.id, invite.id), hasRoom()));
+		if (counted.affectedRows === 0) throw usedUp();
+		return true;
+	});
 	if (joined) {
-		// Every invite is single-use: once someone joins with it, it's gone. Any other invite
-		// to the group sent to them (by email or username) goes too.
+		// An invite for one person is gone once they join, as is any other invite to the group sent
+		// to them (by email or username). A link stays (used up, once full) until it expires.
 		const me = await db.query.user.findFirst({ where: eq(user.id, userId), columns: { email: true } });
+		const forOnePerson = invite.email !== null || invite.invitedUserId !== null;
 		await db
 			.delete(groupInvites)
 			.where(
 				and(
 					eq(groupInvites.groupId, invite.groupId),
 					or(
-						eq(groupInvites.id, invite.id),
+						forOnePerson ? eq(groupInvites.id, invite.id) : undefined,
 						eq(groupInvites.invitedUserId, userId),
 						me ? sql`lower(${groupInvites.email}) = ${me.email.toLowerCase()}` : undefined
 					)

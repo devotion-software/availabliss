@@ -139,7 +139,9 @@ export const inviteSchema = z
 		emails: z.array(z.email()).max(20, 'Invite up to 20 people at a time').optional(),
 		usernames: z.array(username).max(20, 'Invite up to 20 people at a time').optional(),
 		// People who already share a group with you (e.g. a new group with the same people).
-		userIds: z.array(z.string().min(1).max(64)).max(20, 'Invite up to 20 people at a time').optional()
+		userIds: z.array(z.string().min(1).max(64)).max(20, 'Invite up to 20 people at a time').optional(),
+		// For a link: how many people can join with it (null: no limit). Left out: one, as before.
+		maxUses: z.number().int().min(1).max(1000).nullable().optional()
 	})
 	.refine((i) => (i.emails?.length ?? 0) + (i.usernames?.length ?? 0) + (i.userIds?.length ?? 0) <= 20, { message: 'Invite up to 20 people at a time' });
 

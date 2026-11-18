@@ -225,6 +225,10 @@ export const groupInvites = mysqlTable(
 		// Invited by username: only this account can join with it.
 		invitedUserId: varchar('invited_user_id', { length: 36 }).references(() => user.id, { onDelete: 'cascade' }),
 		createdBy: userRef('created_by'),
+		/** How many people can join with it (null: no limit). Invites made before this were single-use. */
+		maxUses: int('max_uses').default(1),
+		/** How many people have joined with it (only ever goes up, and never past `maxUses`). */
+		uses: int('uses').default(0).notNull(),
 		expiresAt: instant('expires_at').notNull(),
 		createdAt: createdAt()
 	},

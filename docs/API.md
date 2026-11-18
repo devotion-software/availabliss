@@ -435,11 +435,11 @@ interface ManualBlock {
 | GET 🔒 | `/groups/:id/preferences` | | `{ preferences: GroupPreference[] }` (every member's) |
 | POST 🔒 | `/groups/:id/preferences` | `{ kind: 'dates', from, to }` or `{ kind: 'weekly', days?: Weekday[], window?: { from, to } \| null }` | `GroupPreference` |
 | DELETE 🔒 | `/groups/:id/preferences/:prefId` | | 204 (your own only) |
-| GET 👑 | `/groups/:id/invites` | | `{ invites: GroupInvite[] }` (live ones, newest first; every invite is single-use, and joining also removes any other invites to that group sent to you) |
-| POST 👑 | `/groups/:id/invites` | `{ emails?: string[], usernames?: string[], userIds?: string[], email?: string }` (≤ 20 people) | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |
+| GET 👑 | `/groups/:id/invites` | | `{ invites: GroupInvite[] }` (live ones, newest first: unexpired and not used up; joining also removes any other invites to that group sent to you) |
+| POST 👑 | `/groups/:id/invites` | `{ emails?: string[], usernames?: string[], userIds?: string[], email?: string, maxUses?: number \| null }` (≤ 20 people; `maxUses` 1–1000 or null for a link) | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |
 | DELETE 👑 | `/groups/:id/invites/:inviteId` | | 204 (the link stops working) |
 | GET | `/invites/:token` | | `{ groupName, inviterName, memberCount, expiresAt, email: string \| null, username: string \| null, personal: boolean }` (`personal`: sent to one person's Activity, so they can decline it) |
-| POST 🔒 | `/invites/:token/accept` | | `Group & { joined: boolean }` (`joined`: false when you were already a member; the apps then skip asking what name to go by. 403 if the invite was for a different address or username) |
+| POST 🔒 | `/invites/:token/accept` | | `Group & { joined: boolean }` (`joined`: false when you were already a member; the apps then skip asking what name to go by. 403 if the invite was for a different address or username; 404 "This invite link has been used up" once a link is full) |
 | POST 🔒 | `/invites/:token/decline` | | 204 (an invite sent to you in Activity: it's removed, with its Activity item; nobody is told. 403 for anyone else's invite or a link) |
 
 **Names in a group.** Each member can choose the name they go by in one group (`PATCH /groups/:id/members/me`).
@@ -463,7 +463,12 @@ The new owner gets a `role.changed` notification (see Notifications & devices). 
 `member.changed` with the new owner's `Member` (when ownership moved), then
 `{ userId, removed: true }` for the leaver; the leaver's own apps get that too, so they close the group.
 
-With no emails, an invite is a link anyone can use until it expires (14 days). With emails, each
+With no emails, an invite is a link anyone can use until it expires (14 days), by up to `maxUses`
+people: a number from 1 to 1000, or `null` for no limit. Left out it's 1 (single-use, as before, so
+older apps keep making single-use links). Each person who joins with it counts once (someone already in
+the group doesn't); joining and counting happen together, so people joining at the same moment can't
+go past the limit, and anyone who misses out isn't added. Once full it's off the invites list, and
+`GET /invites/:token` and accept say `404` "This invite link has been used up" until it expires. With emails, each
 address gets its own emailed invite that only someone signed in with that address can accept; it's
 used up once they join. With usernames, each person gets their own invite in Activity (an
 `invite.received` notification and a push, `data: { token }`) that only they can accept; it's used
@@ -479,7 +484,8 @@ accept (`POST /invites/:token/accept`) or decline (`POST /invites/:token/decline
 // `match` days they fit with `preferredBy: string[]` (user ids).
 interface GroupPreference { id: string; userId: string; kind: 'dates' | 'weekly'; from: string | null; to: string | null; days: Weekday[]; window: { from: string; to: string } | null; label: string }
 // name: the account name of the person it was sent to in Activity (by username or id), else null.
-interface GroupInvite { id: string; email: string | null; username: string | null; name?: string | null; url: string; expiresAt: string; createdAt: string; invitedBy: string }
+// maxUses: how many people can join with it (null: no limit; always 1 for an invite for one person); uses: how many have.
+interface GroupInvite { id: string; email: string | null; username: string | null; name?: string | null; url: string; maxUses: number | null; uses: number; expiresAt: string; createdAt: string; invitedBy: string }
 ```
 
 ### Availability

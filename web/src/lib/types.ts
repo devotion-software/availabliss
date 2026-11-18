@@ -479,6 +479,10 @@ export interface GroupInvite {
 	/** The account name of the person it was sent to in Activity (by username or user id), or null. */
 	name?: string | null;
 	url: string;
+	/** How many people can join with it (null: no limit). Always 1 for an invite for one person. */
+	maxUses: number | null;
+	/** How many people have joined with it so far. */
+	uses: number;
 	expiresAt: string;
 	createdAt: string;
 	invitedBy: string;
