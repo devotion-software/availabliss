@@ -2,9 +2,10 @@ import EventKit
 import SwiftUI
 
 /// Add-to-device-calendar button. With more than one calendar to choose from it asks which one
-/// in a sheet (the last one used is ticked), then says "Added to your calendar" while you're
-/// still here. Once added it says which calendar the plan is in, with Change to move it to
-/// another; if it's been deleted from the calendar since, Add to calendar comes back.
+/// in a sheet (the last one used is ticked), then says "Added to your calendar" for a few
+/// seconds. After that the button goes: a quiet line says which calendar the plan is in, with
+/// Change to move it to another; if it's been deleted from the calendar since, Add to calendar
+/// comes back.
 /// Disabled while saving so a double tap can't create two events.
 struct AddToCalendarButton: View {
     let event: GroupEvent
@@ -40,6 +41,12 @@ struct AddToCalendarButton: View {
         }
         .errorAlert($error)
         .sensoryFeedback(.success, trigger: justAdded)
+        .task(id: justAdded) {
+            guard justAdded else { return }
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.3)) { justAdded = false }
+        }
         .task(id: "\(event.start.timeIntervalSince1970)-\(event.end.timeIntervalSince1970)") {
             app.deviceCalendar.updateIfPlanChanged(event)
         }
