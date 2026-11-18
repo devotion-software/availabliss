@@ -52,6 +52,7 @@ import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.EmptyState
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
+import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
@@ -68,7 +69,12 @@ import dev.joeherbert.availabliss.designsystem.theme.Spacing
 
 /** Activity tab: in-app notification history. */
 @Composable
-fun ActivityScreen(onOpenLink: (DeepLink) -> Unit, viewModel: ActivityViewModel = hiltViewModel()) {
+fun ActivityScreen(
+    onOpenLink: (DeepLink) -> Unit,
+    /** "My plans" (top right): every plan across your groups. */
+    onOpenMyPlans: () -> Unit = {},
+    viewModel: ActivityViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::messageShown)
@@ -86,6 +92,7 @@ fun ActivityScreen(onOpenLink: (DeepLink) -> Unit, viewModel: ActivityViewModel 
         onItem = { item -> viewModel.open(item)?.let(onOpenLink) },
         onMarkAllRead = viewModel::markAllRead,
         onRetry = viewModel::refresh,
+        onOpenMyPlans = onOpenMyPlans,
     )
 }
 
@@ -130,6 +137,7 @@ fun ActivityContent(
     onItem: (NotificationUi) -> Unit,
     onMarkAllRead: () -> Unit,
     onRetry: () -> Unit,
+    onOpenMyPlans: () -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
     AvailablissBackground(OrbLayout.Main) {
@@ -140,6 +148,7 @@ fun ActivityContent(
                 modifier = Modifier.padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = Spacing.s),
             ) {
                 if (state.items.any { it.unread }) TextAction("Mark all read", onMarkAllRead)
+                GlassIconButton(AvIcons.Calendar, "My plans", onOpenMyPlans)
             }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),

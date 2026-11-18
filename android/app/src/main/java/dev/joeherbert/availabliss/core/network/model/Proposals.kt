@@ -109,6 +109,40 @@ data class GroupEvent(
 @Serializable
 data class EventsResponse(val events: List<GroupEvent>)
 
+/**
+ * A plan in `GET /me/plans`: a [GroupEvent] with its group's name and your reply to its proposal
+ * ([myResponse] null when it was added straight to the calendar, with no proposal).
+ */
+@Serializable
+data class MyPlan(
+    val id: String,
+    val groupId: String,
+    val proposalId: String? = null,
+    val title: String,
+    val location: String? = null,
+    val note: String? = null,
+    val start: String,
+    val end: String,
+    val allDay: Boolean = false,
+    val image: String? = null,
+    val createdBy: String = "",
+    val createdAt: String = "",
+    val groupName: String = "",
+    val myResponse: ResponseKind? = null,
+) {
+    /** As a plain event (for adding it to a calendar). */
+    val event: GroupEvent
+        get() = GroupEvent(id, groupId, proposalId, title, location, note, start, end, allDay, image, createdBy, createdAt, groupName)
+}
+
+/** `GET /me/plans`: [going] soonest first, [notGoing] upcoming ones you can't make, [past] newest first. */
+@Serializable
+data class MyPlansResponse(
+    val going: List<MyPlan> = emptyList(),
+    val notGoing: List<MyPlan> = emptyList(),
+    val past: List<MyPlan> = emptyList(),
+)
+
 @Serializable
 data class CreateEventRequest(
     val title: String,

@@ -14,6 +14,9 @@ import kotlinx.serialization.Serializable
 @Serializable data object ActivityRoute
 @Serializable data object YouRoute
 
+/** Every plan across your groups, from Activity. */
+@Serializable data object MyPlansRoute
+
 /** A group's calendar: its home screen, with the header's chat and "More" menu. */
 @Serializable data class GroupRoute(val groupId: String)
 

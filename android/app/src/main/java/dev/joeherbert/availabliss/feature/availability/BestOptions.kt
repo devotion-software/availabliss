@@ -18,6 +18,8 @@ data class BestOptionUi(
     val fair: String? = null,
     /** How many members' preferred times it fits. */
     val preferredCount: Int = 0,
+    /** Picked to ask the group about in a date poll ("Shortlist"). */
+    val shortlisted: Boolean = false,
 )
 
 /**
@@ -43,7 +45,14 @@ object BestOptions {
      * The top [max] slots that haven't ended by [now], ranked, as card rows. [nameOf] gives the
      * name to show for a user id ("You" for the viewer, else a first name).
      */
-    fun options(slots: List<Slot>, now: Instant, nameOf: (String) -> String, max: Int = MAX): List<BestOptionUi> {
+    fun options(
+        slots: List<Slot>,
+        now: Instant,
+        nameOf: (String) -> String,
+        max: Int = MAX,
+        shortlist: List<Slot> = emptyList(),
+    ): List<BestOptionUi> {
+        val picked = shortlist.mapTo(HashSet(), Shortlist::key)
         val upcoming = rank(slots.filter { slot -> DateTimes.parseInstant(slot.end)?.isAfter(now) ?: true }).take(max)
         val scored = upcoming.any { it.score != null }
         return upcoming.mapIndexed { i, slot ->
@@ -54,6 +63,7 @@ object BestOptions {
                 missing = missingLine(slot.missingMemberIds, nameOf),
                 fair = fairLine(slot.fairFor, nameOf),
                 preferredCount = slot.preferredBy.size,
+                shortlisted = Shortlist.key(slot) in picked,
             )
         }
     }
@@ -71,4 +81,33 @@ object BestOptions {
         val names = ids.map(nameOf).map { if (it == "You") "you" else it }
         return "Fair for ${names.joinNamesSummary(2)}, who missed out last time"
     }
+}
+
+/**
+ * Times picked from Best options to put to the group as a date poll ("Which of these works?").
+ * The server takes 2–5 different times. Pure, so it's unit tested.
+ */
+object Shortlist {
+    const val MIN = 2
+    const val MAX = 5
+    const val DEFAULT_QUESTION = "Which of these works?"
+
+    /** Identifies a time across months (the same slot can come back in a refetch). */
+    fun key(slot: Slot): String = "${slot.start}|${slot.end}"
+
+    /** Adds [slot], or takes it off if it's there; nothing more is added once [MAX] are picked. Soonest first. */
+    fun toggle(picked: List<Slot>, slot: Slot): List<Slot> {
+        val key = key(slot)
+        return when {
+            picked.any { key(it) == key } -> picked.filterNot { key(it) == key }
+            picked.size >= MAX -> picked
+            else -> (picked + slot).sortedBy { DateTimes.parseInstant(it.start) ?: Instant.MAX }
+        }
+    }
+
+    /** Enough picked to ask the group (and not too many). */
+    fun canAsk(picked: List<Slot>): Boolean = picked.size in MIN..MAX
+
+    /** "3 picked · Ask the group". */
+    fun barLabel(count: Int): String = "$count picked · Ask the group"
 }

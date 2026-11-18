@@ -48,6 +48,7 @@ import dev.joeherbert.availabliss.feature.group.GroupViewModel
 import dev.joeherbert.availabliss.feature.home.HomeScreen
 import dev.joeherbert.availabliss.feature.members.InviteScreen
 import dev.joeherbert.availabliss.feature.members.MembersScreen
+import dev.joeherbert.availabliss.feature.myplans.MyPlansScreen
 import dev.joeherbert.availabliss.feature.mytime.MyTimeScreen
 import dev.joeherbert.availabliss.feature.newgroup.NewGroupScreen
 import dev.joeherbert.availabliss.feature.onboarding.RegionScreen
@@ -129,6 +130,14 @@ fun MainNavHost(root: RootViewModel) {
                         // A chat opens straight over Activity, so back returns here.
                         if (link is DeepLink.GroupChat) nav.navigateSingleTop(GroupChatRoute(link.groupId)) else nav.open(link)
                     },
+                    onOpenMyPlans = { nav.navigate(MyPlansRoute) { launchSingleTop = true } },
+                )
+            }
+            composable<MyPlansRoute> {
+                MyPlansScreen(
+                    onBack = { nav.popBackStack() },
+                    onOpenProposal = { nav.navigate(ProposalRoute(it)) },
+                    onOpenGroup = { nav.navigate(GroupRoute(it)) },
                 )
             }
             composable<YouRoute> {
@@ -184,6 +193,7 @@ fun MainNavHost(root: RootViewModel) {
                     onProposeTime = { if (overGroup) nav.popBackStack() else openGroup() },
                     onAddEvent = { nav.navigate(EventEditorRoute(groupId)) },
                     onOpenGroup = if (overGroup) null else openGroup,
+                    onProposeSlot = { p -> nav.navigate(CreateProposalRoute(groupId, p.start, p.end, p.allDay, p.title, p.note)) },
                 )
             }
             composable<GroupPlansRoute> { backStackEntry ->

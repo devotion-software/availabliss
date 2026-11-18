@@ -129,6 +129,10 @@ interface AvailablissApi {
 
     @GET("api/v1/me/upcoming")
     suspend fun getUpcoming(): EventsResponse
+
+    /** Every plan across your groups: going, can't make it and past. */
+    @GET("api/v1/me/plans")
+    suspend fun getMyPlans(): dev.joeherbert.availabliss.core.network.model.MyPlansResponse
     // endregion
 
     // region Regions & holidays
@@ -216,6 +220,10 @@ interface AvailablissApi {
 
     @GET("api/v1/groups/{id}")
     suspend fun getGroup(@Path("id") id: String): Group
+
+    /** The free time nearest the group's next meet-up, from its rhythm. */
+    @GET("api/v1/groups/{id}/next")
+    suspend fun getNextSuggestion(@Path("id") id: String): dev.joeherbert.availabliss.core.network.model.NextSuggestionResponse
 
     @PATCH("api/v1/groups/{id}")
     suspend fun updateGroup(@Path("id") id: String, @Body body: UpdateGroupRequest): Group
@@ -423,6 +431,10 @@ interface AvailablissApi {
 
     @POST("api/v1/groups/{id}/messages")
     suspend fun sendPoll(@Path("id") groupId: String, @Body body: SendPollRequest): Message
+
+    /** A date poll: its options are times. */
+    @POST("api/v1/groups/{id}/messages")
+    suspend fun sendDatePoll(@Path("id") groupId: String, @Body body: dev.joeherbert.availabliss.core.network.model.SendDatePollRequest): Message
 
     @POST("api/v1/groups/{id}/messages/receipts")
     suspend fun sendReceipts(@Path("id") groupId: String, @Body body: ReceiptsRequest)

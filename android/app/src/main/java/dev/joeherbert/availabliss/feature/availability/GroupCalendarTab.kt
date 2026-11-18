@@ -33,6 +33,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.foundation.selection.toggleable
+import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
+import dev.joeherbert.availabliss.designsystem.component.AvTextField
+import dev.joeherbert.availabliss.designsystem.component.SectionLabel
 import androidx.compose.ui.Alignment
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
@@ -103,11 +109,22 @@ fun GroupCalendarTab(
     onCreateProposal: (ProposalPrefill) -> Unit,
     /** The group's Plans card, shown above the calendar (renders nothing when there are no plans). */
     plans: @Composable () -> Unit = {},
+    /** Opens the group's chat (after asking the group about shortlisted times). */
+    onOpenChat: () -> Unit = {},
     viewModel: GroupCalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::messageShown)
+    val currentOnOpenChat by rememberUpdatedState(onOpenChat)
+    LaunchedEffect(state.openChat) {
+        if (!state.openChat) return@LaunchedEffect
+        viewModel.chatOpened()
+        currentOnOpenChat()
+    }
+    state.asking?.let { ask ->
+        AskGroupSheet(ask, state.shortlist, onQuestion = viewModel::onAskQuestion, onSend = viewModel::askGroup, onDismiss = viewModel::closeAsk)
+    }
     var planning by rememberSaveable { mutableStateOf(false) }
     var upgradeReason by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -148,6 +165,8 @@ fun GroupCalendarTab(
             onCreateProposal(ProposalPrefill(start, end, false))
         },
         onProposeSpan = { start, end -> onCreateProposal(ProposalPrefill(start, end, false)) },
+        onToggleShortlist = viewModel::toggleShortlist,
+        onAskGroup = viewModel::openAsk,
         // Offered only when the server has the AI planner set up; without Pro it explains Pro first.
         onPlanWithAi = if (state.aiPlanner.available && state.hasSlots) {
             { if (state.aiPlanner.included) planning = true else upgradeReason = PLANNER_UPGRADE_REASON }
@@ -182,6 +201,10 @@ fun GroupCalendarContent(
     /** "Plan with AI"; null hides it (not set up on this server, or nothing works yet). */
     onPlanWithAi: (() -> Unit)? = null,
     plans: @Composable () -> Unit = {},
+    /** "Shortlist" on a Best options row. */
+    onToggleShortlist: (Slot) -> Unit = {},
+    /** "3 picked · Ask the group": opens the date poll sheet. */
+    onAskGroup: () -> Unit = {},
 ) {
     AvailablissBackground(OrbLayout.GroupCalendar) {
         Box(Modifier.fillMaxSize()) {
@@ -198,6 +221,9 @@ fun GroupCalendarContent(
                 state.syncBanner?.let { SyncBanner(it, state.nudging, onNudge) }
                 if (state.requirementSummary.isNotBlank()) TimingChip(state.requirementSummary, state.isAdmin, onOpenTiming)
                 plans()
+                state.nextOne?.let { next ->
+                    NextOneCard(next, onPropose = { next.slot?.let(onPropose) ?: onProposeDay(next.target) })
+                }
                 // Which way the next page slides in: forward (later) comes from the right.
                 var forward by remember { mutableStateOf(true) }
                 val previous = { forward = false; onPrevious() }
@@ -225,7 +251,7 @@ fun GroupCalendarContent(
                     modifier = Modifier.swipeToStep(onPrevious = previous, onNext = next),
                 ) { page ->
                     when (page.view) {
-                        CalendarView.Month -> MonthSection(page, onSelectDate, onPlanWithAi, onPropose)
+                        CalendarView.Month -> MonthSection(page, onSelectDate, onPlanWithAi, onPropose, onToggleShortlist, onAskGroup)
                         CalendarView.Week -> if (page.weekLoading && page.weekColumns.isEmpty()) LoadingIndicator()
                         // The time grid needs width: cards in portrait, the grid in landscape.
                         else if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -415,6 +441,8 @@ private fun MonthSection(
     onSelectDate: (LocalDate) -> Unit,
     onPlanWithAi: (() -> Unit)?,
     onPropose: (Slot) -> Unit,
+    onToggleShortlist: (Slot) -> Unit,
+    onAskGroup: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
         if (state.loading && state.monthRows.all { row -> row.all { it == null } }) {
@@ -426,10 +454,19 @@ private fun MonthSection(
             }
         }
         if (state.bestOptions.isNotEmpty()) {
-            BestOptionsCard(state.bestOptions, onPlanWithAi, onPropose, onSelect = { slot -> DateTimes.localDate(slot.start)?.let(onSelectDate) })
+            BestOptionsCard(
+                state.bestOptions,
+                onPlanWithAi,
+                onPropose,
+                onSelect = { slot -> DateTimes.localDate(slot.start)?.let(onSelectDate) },
+                onToggleShortlist = onToggleShortlist,
+                shortlistFull = state.shortlist.size >= Shortlist.MAX,
+            )
         } else {
             onPlanWithAi?.let { PlanWithAiRow(it) }
         }
+        // Picked times can come from other months too, so the bar stays while paging.
+        if (state.shortlist.isNotEmpty()) ShortlistBar(state.shortlist.size, onAskGroup)
     }
 }
 
@@ -439,7 +476,15 @@ private fun MonthSection(
  * its day.
  */
 @Composable
-private fun BestOptionsCard(options: List<BestOptionUi>, onPlanWithAi: (() -> Unit)?, onPropose: (Slot) -> Unit, onSelect: (Slot) -> Unit) {
+private fun BestOptionsCard(
+    options: List<BestOptionUi>,
+    onPlanWithAi: (() -> Unit)?,
+    onPropose: (Slot) -> Unit,
+    onSelect: (Slot) -> Unit,
+    onToggleShortlist: (Slot) -> Unit,
+    /** [Shortlist.MAX] are picked: only picked rows can change. */
+    shortlistFull: Boolean,
+) {
     val colors = AvailablissTheme.colors
     Column(
         Modifier.fillMaxWidth().glass(Shapes.panel).padding(14.dp),
@@ -482,6 +527,7 @@ private fun BestOptionsCard(options: List<BestOptionUi>, onPlanWithAi: (() -> Un
                     option.missing?.let { Text(it, style = AvailablissTheme.type.caption, color = colors.warnInk) }
                     option.fair?.let { Text(it, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.accentInk) }
                 }
+                ShortlistToggle(option.shortlisted, enabled = option.shortlisted || !shortlistFull, onToggle = { onToggleShortlist(option.slot) })
                 PrimaryButton(
                     text = "Propose",
                     onClick = { onPropose(option.slot) },
@@ -492,6 +538,129 @@ private fun BestOptionsCard(options: List<BestOptionUi>, onPlanWithAi: (() -> Un
                 )
             }
         }
+    }
+}
+
+/**
+ * "Shortlist": picks a Best option to put to the group in a date poll. A star, filled once picked;
+ * greyed out once [Shortlist.MAX] others are picked.
+ */
+@Composable
+private fun ShortlistToggle(shortlisted: Boolean, enabled: Boolean, onToggle: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(Shapes.controlSmall)
+            .background(if (shortlisted) colors.accentSoft else colors.surface)
+            .border(1.dp, if (shortlisted) colors.accent else colors.glassBorder, Shapes.controlSmall)
+            .alpha(if (enabled) 1f else 0.4f)
+            .toggleable(value = shortlisted, enabled = enabled, role = Role.Checkbox, onValueChange = { onToggle() })
+            .semantics { contentDescription = "Shortlist" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(if (shortlisted) AvIcons.Check else AvIcons.Star, null, tint = if (shortlisted) colors.accentInk else colors.muted, modifier = Modifier.size(16.dp))
+    }
+}
+
+/**
+ * Under Best options while times are shortlisted: "3 picked · Ask the group" once there are 2–5
+ * (opening the date poll sheet), else a nudge to pick another.
+ */
+@Composable
+private fun ShortlistBar(count: Int, onAsk: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    if (count >= Shortlist.MIN) {
+        PrimaryButton(
+            text = Shortlist.barLabel(count),
+            onClick = onAsk,
+            icon = AvIcons.Poll,
+            style = ButtonStyle.Solid,
+            height = 48.dp,
+            shape = Shapes.controlSmall,
+            textStyle = AvailablissTheme.type.bodySmallStrong,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    } else {
+        Text(
+            "1 picked · shortlist another to ask the group which works",
+            style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
+            color = colors.muted,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
+    }
+}
+
+/** The date poll sheet: the shortlisted times and the question, then Post poll (opens the chat). */
+@Composable
+private fun AskGroupSheet(ask: AskGroupUi, shortlist: List<Slot>, onQuestion: (String) -> Unit, onSend: () -> Unit, onDismiss: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    AvBottomSheet(title = "Ask the group", onDismissRequest = onDismiss) {
+        AvTextField(value = ask.question, onValueChange = onQuestion, label = "Question", placeholder = Shortlist.DEFAULT_QUESTION)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            SectionLabel("Options")
+            shortlist.forEach { slot ->
+                Row(
+                    Modifier.fillMaxWidth().clip(Shapes.controlSmall).background(colors.surface).border(1.dp, colors.glassBorder, Shapes.controlSmall).padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(AvIcons.Calendar, null, tint = colors.accentInk, modifier = Modifier.size(15.dp))
+                    Text(
+                        DateTimes.rangeLabel(slot.start, slot.end, AvailabilityUiMapper.isAllDay(slot)),
+                        style = AvailablissTheme.type.bodySmallStrong,
+                        color = colors.ink,
+                    )
+                }
+            }
+        }
+        Text("Everyone can pick any that work for them.", style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+        PrimaryButton(
+            text = "Post poll",
+            onClick = onSend,
+            style = ButtonStyle.Accent,
+            height = 52.dp,
+            enabled = ask.canSend,
+            loading = ask.sending,
+            icon = AvIcons.Poll,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * "Next one" for a group that meets regularly: the free time nearest when the rhythm says it's
+ * due, with Propose (an evening on the day when nothing works near it).
+ */
+@Composable
+private fun NextOneCard(next: NextOneUi, onPropose: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    Row(
+        Modifier.fillMaxWidth().glass(Shapes.panel).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(colors.accentSoft), contentAlignment = Alignment.Center) {
+            Icon(AvIcons.Repeat, null, tint = colors.accentInk, modifier = Modifier.size(17.dp))
+        }
+        Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Next one", style = AvailablissTheme.type.micro.copy(fontWeight = FontWeight.Bold), color = colors.accentInk, modifier = Modifier.semantics { heading() })
+            Text(next.label ?: "Due ${next.targetLabel}", style = AvailablissTheme.type.bodySmallStrong, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                next.note?.let { "$it · ${next.rhythmLabel.lowercase()}" } ?: "Nothing works for everyone near then · ${next.rhythmLabel.lowercase()}",
+                style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
+                color = if (next.slot?.missingMemberIds?.isNotEmpty() == true) colors.warnInk else colors.muted,
+                maxLines = 2,
+            )
+        }
+        PrimaryButton(
+            text = "Propose",
+            onClick = onPropose,
+            style = ButtonStyle.Accent,
+            height = 36.dp,
+            shape = Shapes.controlSmall,
+            textStyle = AvailablissTheme.type.label,
+        )
     }
 }
 

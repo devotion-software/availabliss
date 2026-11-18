@@ -8,7 +8,10 @@ import dev.joeherbert.availabliss.core.network.model.SendAttachmentsRequest
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
 import dev.joeherbert.availabliss.core.network.model.MessageThread
 import dev.joeherbert.availabliss.core.network.model.MessagesResponse
+import dev.joeherbert.availabliss.core.network.model.NewDatePoll
 import dev.joeherbert.availabliss.core.network.model.NewPoll
+import dev.joeherbert.availabliss.core.network.model.PollSlot
+import dev.joeherbert.availabliss.core.network.model.SendDatePollRequest
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.ReceiptState
 import dev.joeherbert.availabliss.core.network.model.ReceiptsRequest
@@ -49,6 +52,10 @@ class ChatRepository @Inject constructor(
 
     suspend fun sendPoll(groupId: String, question: String, options: List<String>, multi: Boolean): ApiResult<Message> =
         call { api.sendPoll(groupId, SendPollRequest(NewPoll(question.trim(), options.map { it.trim() }, multi))) }
+
+    /** A date poll asking which of [slots] (2–5) works; anyone can pick more than one. */
+    suspend fun sendDatePoll(groupId: String, question: String, slots: List<PollSlot>): ApiResult<Message> =
+        call { api.sendDatePoll(groupId, SendDatePollRequest(NewDatePoll(question.trim(), slots, multi = true))) }
 
     suspend fun markReceipts(groupId: String, upTo: String, state: ReceiptState): ApiResult<Unit> =
         call { api.sendReceipts(groupId, ReceiptsRequest(upTo, state)) }

@@ -53,6 +53,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.network.model.Role as GroupRole
 import dev.joeherbert.availabliss.core.network.model.Member
+import dev.joeherbert.availabliss.core.network.model.RhythmEvery
 import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
@@ -121,6 +122,8 @@ fun GroupSettingsScreen(
             onUseAccountName = { viewModel.saveMyName(null) },
             onToggleArchived = viewModel::toggleArchived,
             onAutoArchive = viewModel::setAutoArchive,
+            onRhythm = viewModel::setRhythm,
+            onRhythmPrompt = viewModel::setRhythmPrompt,
             onDelete = viewModel::requestDelete,
             onLeave = viewModel::requestLeave,
             onNewGroupWithPeople = { currentOnNewGroup() },
@@ -156,6 +159,8 @@ data class GroupSettingsActions(
     val onUseAccountName: () -> Unit = {},
     val onToggleArchived: () -> Unit = {},
     val onAutoArchive: (Boolean) -> Unit = {},
+    val onRhythm: (RhythmEvery?) -> Unit = {},
+    val onRhythmPrompt: (Boolean) -> Unit = {},
     val onDelete: () -> Unit = {},
     val onLeave: () -> Unit = {},
     val onNewGroupWithPeople: () -> Unit = {},
@@ -188,6 +193,7 @@ fun GroupSettingsContent(state: GroupSettingsUiState, snackbar: SnackbarHostStat
                     DetailsCard(state, actions)
                     MyNameCard(state, actions)
                     if (state.members.size > 1) NewGroupCard(actions)
+                    if (state.canEdit) RhythmCard(state, actions)
                     if (state.canEdit) ArchiveCard(state, actions)
                     LeaveCard(state, actions)
                     if (state.canDelete) DeleteCard(actions)
@@ -338,6 +344,58 @@ private fun MyNameCard(state: GroupSettingsUiState, actions: GroupSettingsAction
             )
         } else if (state.myNameInGroup != null) {
             TextAction("Use ${state.accountName} instead", actions.onUseAccountName, enabled = !state.savingMyName)
+        }
+    }
+}
+
+/**
+ * "How often do you meet?" (admins): None, every week, every two weeks or every month, and whether
+ * the next one is suggested in the chat. The calendar then shows a "Next one" card.
+ */
+@Composable
+private fun RhythmCard(state: GroupSettingsUiState, actions: GroupSettingsActions) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    GlassPanel(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("How often do you meet?", style = type.bodySmallStrong, color = colors.ink)
+            Text(
+                "The calendar suggests the next one: the free time nearest when it's due.",
+                style = type.caption.copy(fontWeight = FontWeight.Normal),
+                color = colors.muted,
+            )
+        }
+        Column(Modifier.selectableGroup().alpha(if (state.savingRhythm) 0.5f else 1f)) {
+            (listOf<RhythmEvery?>(null) + RhythmEvery.entries).forEachIndexed { index, every ->
+                if (index > 0) RowDivider()
+                val selected = state.rhythm == every
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .selectable(selected = selected, enabled = !state.savingRhythm, role = Role.RadioButton) { actions.onRhythm(every) },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        every?.label ?: "None",
+                        style = if (selected) type.bodySmallStrong else type.body,
+                        color = colors.ink,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (selected) Icon(AvIcons.Check, null, tint = colors.accentInk, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+        if (state.rhythm != null) {
+            RowDivider()
+            ToggleRow(
+                title = "Suggest the next one in the chat",
+                subtitle = "Once a plan has passed and nothing newer is planned: “Same again?” with a time that works.",
+                checked = state.rhythmPrompt,
+                onCheckedChange = actions.onRhythmPrompt,
+                modifier = Modifier.alpha(if (state.savingRhythm) 0.5f else 1f),
+            )
         }
     }
 }

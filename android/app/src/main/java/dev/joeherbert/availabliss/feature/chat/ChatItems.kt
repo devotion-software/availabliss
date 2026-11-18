@@ -20,6 +20,8 @@ import dev.joeherbert.availabliss.core.network.model.MessageReply
 import dev.joeherbert.availabliss.core.network.model.asReply
 import dev.joeherbert.availabliss.core.network.model.canReply
 import dev.joeherbert.availabliss.core.network.model.Poll
+import dev.joeherbert.availabliss.core.network.model.PollSlot
+import dev.joeherbert.availabliss.core.network.model.isDatePoll
 import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.chat.BubbleQuote
@@ -125,6 +127,10 @@ fun buildChatItems(
     events: Map<String, GroupEvent>,
     today: LocalDate = DateTimes.today(),
     now: Instant = Instant.now(),
+    /** Who's busy for each date poll option's time, by [pollSlotKey]; missing while it loads. */
+    conflicts: Map<String, List<String>> = emptyMap(),
+    /** You're an owner or admin: you can propose any date poll's winner, not just your own. */
+    isAdmin: Boolean = false,
 ): List<ChatItem> {
     val items = mutableListOf<ChatItem>()
     // Deleted messages get no receipt (they can't be opened for info).
@@ -150,7 +156,12 @@ fun buildChatItems(
                 items += ChatItem.System(m.id, m.body.orEmpty())
 
             m.kind == MessageKind.Poll && m.poll != null ->
-                items += ChatItem.PollItem(m.id, m.poll.toUi(directory, canClose = own, title = if (own) "Your poll" else "Poll by $authorName"), own, m.authorId?.let(directory::avatar))
+                items += ChatItem.PollItem(
+                    m.id,
+                    m.poll.toUi(directory, canClose = own, title = if (own) "Your poll" else "Poll by $authorName", canPropose = own || isAdmin, conflicts = conflicts),
+                    own,
+                    m.authorId?.let(directory::avatar),
+                )
 
             m.kind == MessageKind.Proposal && m.proposalId != null -> {
                 val p = proposals[m.proposalId]
@@ -376,10 +387,17 @@ fun List<Message>.withDeleted(messageId: String): List<Message> {
     return map { m -> if (m.id == messageId) deleted else m }.withQuotesOf(deleted)
 }
 
-private fun Poll.toUi(directory: MemberDirectory, canClose: Boolean, title: String): PollUi {
+private fun Poll.toUi(
+    directory: MemberDirectory,
+    canClose: Boolean,
+    title: String,
+    canPropose: Boolean = false,
+    conflicts: Map<String, List<String>> = emptyMap(),
+): PollUi {
     val counts = options.map { it.voterIds.size }
     val max = counts.maxOrNull() ?: 0
     val voters = options.flatMap { it.voterIds }
+    val nameOf = { id: String -> if (directory.isMe(id)) "You" else directory.displayName(id, youSuffix = false) }
     return PollUi(
         id = id,
         question = question,
@@ -395,9 +413,30 @@ private fun Poll.toUi(directory: MemberDirectory, canClose: Boolean, title: Stri
                 count = o.voterIds.size,
                 mine = o.voterIds.any(directory::isMe),
                 leading = max > 0 && o.voterIds.size == max,
-            )
+                detail = o.slot?.let { slot -> conflicts[pollSlotKey(slot)]?.let { busyLine(it, nameOf) } },
+                busy = o.slot?.let { slot -> conflicts[pollSlotKey(slot)]?.isNotEmpty() } == true,
+            ).let { ui -> o.slot?.let { ui.copy(label = DateTimes.rangeLabel(it.start, it.end, it.allDay)) } ?: ui }
         },
+        isDatePoll = isDatePoll,
+        canPropose = canPropose && isDatePoll,
     )
+}
+
+/** Identifies a date poll option's time, for the conflicts it's checked against. */
+fun pollSlotKey(slot: PollSlot): String = "${slot.start}|${slot.end}"
+
+/**
+ * Who's busy for a date poll option: "Everyone's free", "You're busy", "Ana is busy",
+ * "You and Ana are busy", "3 people are busy". [nameOf] gives "You" for the viewer.
+ */
+fun busyLine(ids: List<String>, nameOf: (String) -> String): String {
+    val names = ids.map(nameOf).sortedBy { it != "You" }
+    return when (names.size) {
+        0 -> "Everyone's free"
+        1 -> if (names[0] == "You") "You're busy" else "${names[0]} is busy"
+        2 -> "${names[0]} and ${names[1]} are busy"
+        else -> "${names.size} people are busy"
+    }
 }
 
 /** "Today", "Yesterday", "Wed 11 Nov". */

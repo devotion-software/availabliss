@@ -5,6 +5,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -78,10 +81,43 @@ data class Group(
     val members: List<Member>,
     /** Archive it automatically once its event has passed and nothing else is planned (older servers omit it). */
     val autoArchive: Boolean = false,
+    /** How often it meets, or null (older servers omit it). */
+    val rhythm: Rhythm? = null,
     val createdAt: String,
     /** Only from accepting an invite: false when you were already in the group (null from older servers). */
     val joined: Boolean? = null,
 )
+
+/**
+ * How often a group meets ([every]: `week`, `two-weeks` or `month`, see [frequency]). With [prompt],
+ * once a plan has ended and nothing newer is planned, the server suggests the next one in the chat.
+ */
+@Serializable
+data class Rhythm(val every: String, val prompt: Boolean = false) {
+    /** Null for a frequency this build doesn't know. */
+    val frequency: RhythmEvery? get() = RhythmEvery.entries.firstOrNull { it.wire == every }
+
+    /** As sent in a PATCH: both fields, always (the shared Json leaves out values equal to their defaults). */
+    fun toJson(): JsonObject = buildJsonObject {
+        put("every", JsonPrimitive(every))
+        put("prompt", JsonPrimitive(prompt))
+    }
+}
+
+/** [Rhythm.every]'s values, as offered in Group settings. */
+enum class RhythmEvery(val wire: String, val label: String) {
+    Week("week", "Every week"),
+    TwoWeeks("two-weeks", "Every two weeks"),
+    Month("month", "Every month"),
+}
+
+/** `GET /groups/:id/next`: the free time nearest the group's next meet-up, or null without a rhythm. */
+@Serializable
+data class NextSuggestionResponse(val suggestion: NextSuggestion? = null)
+
+/** [target] (`YYYY-MM-DD`) is when the rhythm says the next one falls; [slot] the nearest free time, if any. */
+@Serializable
+data class NextSuggestion(val target: String, val slot: Slot? = null)
 
 /** `POST /requirements/preview` body. */
 @Serializable
@@ -110,6 +146,8 @@ data class UpdateGroupRequest(
     val archived: Boolean? = null,
     /** Archive it automatically once its event has passed. */
     val autoArchive: Boolean? = null,
+    /** A [Rhythm] as JSON, or [kotlinx.serialization.json.JsonNull] to stop it; left out (null) to keep it. */
+    val rhythm: JsonElement? = null,
 )
 
 @Serializable

@@ -19,6 +19,8 @@ import dev.joeherbert.availabliss.core.network.model.MemberRoleRequest
 import dev.joeherbert.availabliss.core.network.model.Requirement
 import dev.joeherbert.availabliss.core.network.model.RequirementPreview
 import dev.joeherbert.availabliss.core.network.model.RequirementPreviewRequest
+import dev.joeherbert.availabliss.core.network.model.NextSuggestion
+import dev.joeherbert.availabliss.core.network.model.Rhythm
 import dev.joeherbert.availabliss.core.network.model.Role
 import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.core.network.model.UpdateGroupRequest
@@ -71,6 +73,14 @@ class GroupsRepository @Inject constructor(
         archived: Boolean? = null,
         autoArchive: Boolean? = null,
     ): ApiResult<Group> = call { api.updateGroup(id, UpdateGroupRequest(name, color, requirement, archived, autoArchive)) }.onSuccess(::cache)
+
+    /** Sets how often the group meets, or with null stops it (admins). */
+    suspend fun setRhythm(id: String, rhythm: Rhythm?): ApiResult<Group> = call {
+        api.updateGroup(id, UpdateGroupRequest(rhythm = rhythm?.toJson() ?: JsonNull))
+    }.onSuccess(::cache)
+
+    /** The free time nearest the group's next meet-up (null without a rhythm). */
+    suspend fun nextSuggestion(id: String): ApiResult<NextSuggestion?> = call { api.getNextSuggestion(id) }.map { it.suggestion }
 
     suspend fun delete(id: String): ApiResult<Unit> = call { api.deleteGroup(id) }.onSuccess { forget(id) }
 

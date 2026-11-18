@@ -85,6 +85,7 @@ fun GroupScreen(
             onOpenTiming = onOpenTiming,
             onCreateProposal = onCreateProposal,
             plans = { PlansCard(onOpenProposal = onOpenProposal, onSeeAll = onOpenPlans) },
+            onOpenChat = onOpenChat,
         )
         GroupTopBar(
             state,

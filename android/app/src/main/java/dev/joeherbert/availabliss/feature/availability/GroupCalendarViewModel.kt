@@ -9,6 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.billing.PlanRepository
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.UserMessage
+import dev.joeherbert.availabliss.core.data.ChatRepository
 import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.live.LiveEvents
@@ -21,6 +22,9 @@ import dev.joeherbert.availabliss.core.network.model.DayAvailability
 import dev.joeherbert.availabliss.core.network.model.AiPlannerAccess
 import dev.joeherbert.availabliss.core.network.model.DayStatus
 import dev.joeherbert.availabliss.core.network.model.Group
+import dev.joeherbert.availabliss.core.network.model.NextSuggestion
+import dev.joeherbert.availabliss.core.network.model.PollSlot
+import dev.joeherbert.availabliss.core.network.model.Rhythm
 import dev.joeherbert.availabliss.core.network.model.Role
 import dev.joeherbert.availabliss.core.network.model.Slot
 import dev.joeherbert.availabliss.core.network.model.SlotPosition
@@ -46,6 +50,28 @@ import javax.inject.Inject
 
 /** Month or week; the selected day's detail (who's free when) shows under either. */
 enum class CalendarView(val label: String) { Month("Month"), Week("Week") }
+
+/** The "Ask the group" sheet: the date poll's question, before it's posted. */
+data class AskGroupUi(val question: String = Shortlist.DEFAULT_QUESTION, val sending: Boolean = false) {
+    val canSend: Boolean get() = question.isNotBlank() && !sending
+}
+
+/**
+ * The "Next one" card, for a group with a rhythm: when the rhythm says it falls ([targetLabel]) and
+ * the nearest free time ([slot], with [label] and who'd miss it), or null [slot] when nothing works near it.
+ */
+data class NextOneUi(
+    val target: LocalDate,
+    /** "Fri 4 Dec". */
+    val targetLabel: String,
+    /** "Every week", "Every two weeks", "Every month". */
+    val rhythmLabel: String,
+    val slot: Slot? = null,
+    /** "Fri 4 Dec · 18:00 – 22:00"; null without a [slot]. */
+    val label: String? = null,
+    /** "Everyone's free", "Ana can't make it"; null without a [slot]. */
+    val note: String? = null,
+)
 
 /** Everything the group calendar renders. Built from raw state by [AvailabilityUiMapper]. */
 data class GroupCalendarUiState(
@@ -95,6 +121,14 @@ data class GroupCalendarUiState(
     val findingFree: Boolean = true,
     /** The selected day (which way a jump to a free date slides). */
     val selectedDate: LocalDate = DateTimes.today(),
+    /** Times picked from Best options for a date poll, soonest first. */
+    val shortlist: List<Slot> = emptyList(),
+    /** Non-null while the "Ask the group" sheet is open. */
+    val asking: AskGroupUi? = null,
+    /** The date poll was posted: the screen opens the chat, then calls [GroupCalendarViewModel.chatOpened]. */
+    val openChat: Boolean = false,
+    /** The group has a rhythm: the next time to meet. */
+    val nextOne: NextOneUi? = null,
 )
 
 private data class RawState(
@@ -115,12 +149,17 @@ private data class RawState(
     val previousFree: LocalDate? = null,
     val nextFree: LocalDate? = null,
     val findingFree: Boolean = true,
+    val shortlist: List<Slot> = emptyList(),
+    val asking: AskGroupUi? = null,
+    val openChat: Boolean = false,
+    val next: NextSuggestion? = null,
 )
 
 @HiltViewModel
 class GroupCalendarViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val groups: GroupsRepository,
+    private val chat: ChatRepository,
     plans: PlanRepository,
     users: UserRepository,
     liveEvents: LiveEvents,
@@ -133,6 +172,9 @@ class GroupCalendarViewModel @Inject constructor(
     private var dayJob: Job? = null
     private var liveRefreshJob: Job? = null
     private var freeJob: Job? = null
+    private var nextJob: Job? = null
+    /** The rhythm the "Next one" card was last loaded for. */
+    private var rhythm: Rhythm? = null
     /** The group's search range: nothing outside it can work, so the free-date search stops at its ends. */
     private var searchRange: Pair<LocalDate, LocalDate>? = null
 
@@ -181,6 +223,10 @@ class GroupCalendarViewModel @Inject constructor(
                 if (range != searchRange) {
                     searchRange = range
                     findFreeNeighbours()
+                }
+                if (group != null && group.rhythm != rhythm) {
+                    rhythm = group.rhythm
+                    loadNext()
                 }
             }
         }
@@ -240,6 +286,7 @@ class GroupCalendarViewModel @Inject constructor(
         days.clear()
         loadMonth(silent = true)
         loadForView()
+        loadNext()
     }
 
     /**
@@ -267,6 +314,52 @@ class GroupCalendarViewModel @Inject constructor(
     }
 
     fun messageShown(message: UserMessage) = raw.update { if (it.message?.id == message.id) it.copy(message = null) else it }
+
+    // region Shortlist (a date poll from Best options)
+    /** "Shortlist" on a Best options row: picks it to ask the group about, or unpicks it. */
+    fun toggleShortlist(slot: Slot) = raw.update { it.copy(shortlist = Shortlist.toggle(it.shortlist, slot)) }
+
+    fun openAsk() {
+        if (Shortlist.canAsk(raw.value.shortlist)) raw.update { it.copy(asking = AskGroupUi()) }
+    }
+
+    fun onAskQuestion(value: String) = raw.update { s -> s.copy(asking = s.asking?.copy(question = value.take(200))) }
+
+    fun closeAsk() = raw.update { if (it.asking?.sending == true) it else it.copy(asking = null) }
+
+    /** Posts the shortlisted times as a date poll, then opens the chat to it. */
+    fun askGroup() {
+        val s = raw.value
+        val ask = s.asking ?: return
+        if (!ask.canSend || !Shortlist.canAsk(s.shortlist)) return
+        raw.update { it.copy(asking = ask.copy(sending = true)) }
+        viewModelScope.launch {
+            val slots = s.shortlist.map { PollSlot(it.start, it.end, AvailabilityUiMapper.isAllDay(it)) }
+            when (val result = chat.sendDatePoll(groupId, ask.question, slots)) {
+                is ApiResult.Success -> raw.update { it.copy(asking = null, shortlist = emptyList(), openChat = true) }
+                is ApiResult.Failure -> raw.update {
+                    it.copy(asking = it.asking?.copy(sending = false), message = UserMessage(result.error.message))
+                }
+            }
+        }
+    }
+
+    fun chatOpened() = raw.update { it.copy(openChat = false) }
+    // endregion
+
+    /** The "Next one" card: only for a group with a rhythm. */
+    private fun loadNext() {
+        nextJob?.cancel()
+        if (rhythm == null) {
+            raw.update { it.copy(next = null) }
+            return
+        }
+        nextJob = viewModelScope.launch {
+            // A failure keeps the last suggestion: it's a hint, not the calendar itself.
+            val result = groups.nextSuggestion(groupId)
+            if (result is ApiResult.Success) raw.update { it.copy(next = result.value) }
+        }
+    }
 
     /** The slot the detail card proposes, with the all-day guess. */
     fun proposalFor(slot: Slot): Triple<String, String, Boolean> = Triple(slot.start, slot.end, AvailabilityUiMapper.isAllDay(slot))
@@ -429,9 +522,14 @@ class GroupCalendarViewModel @Inject constructor(
             CalendarView.Week -> weekStart != DateTimes.startOfWeek(today)
         }
         val monthRows = AvailabilityUiMapper.monthRows(r.month, r.availability, group, meId, r.selected, today)
+        val nameOf = { id: String -> AvailabilityUiMapper.displayName(group, id, meId) }
         return GroupCalendarUiState(
+            shortlist = r.shortlist,
+            asking = r.asking,
+            openChat = r.openChat,
+            nextOne = group?.rhythm?.let { rhythm -> r.next?.let { NextOne.ui(it, rhythm, nameOf) } },
             showPartialLegend = AvailabilityUiMapper.hasPartial(monthRows),
-            bestOptions = BestOptions.options(r.availability?.slots.orEmpty(), java.time.Instant.now(), { AvailabilityUiMapper.displayName(group, it, meId) }),
+            bestOptions = BestOptions.options(r.availability?.slots.orEmpty(), java.time.Instant.now(), nameOf, shortlist = r.shortlist),
             awayFromToday = awayFromToday,
             previousFree = r.previousFree,
             nextFree = r.nextFree,

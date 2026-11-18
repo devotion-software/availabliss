@@ -71,6 +71,25 @@ sealed interface CalendarChoice {
 
     /** A plan already in [currentCalendarId], to move to another calendar. */
     data class Move(override val key: String, val currentCalendarId: Long) : CalendarChoice
+
+    /** Several plans ("Add all to calendar") waiting for one choice of calendar, by key. */
+    data class AddAll(val drafts: List<Pair<String, CalendarEventDraft>>) : CalendarChoice {
+        override val key: String get() = "all"
+    }
+}
+
+/**
+ * How "Add all to calendar" went: [added] plans went in. With [needsAccess] they couldn't be added
+ * directly (no calendar access), so the calendar app was opened for the first one only.
+ */
+data class AddAllResult(val added: Int, val needsAccess: Boolean = false) {
+    /** "Added 3 plans to your calendar". */
+    val message: String
+        get() = when {
+            needsAccess -> "Opened your calendar app for the first one. Allow calendar access to add them all at once."
+            added == 1 -> "Added 1 plan to your calendar"
+            else -> "Added $added plans to your calendar"
+        }
 }
 
 /** Where one plan stands in the phone's calendars, for [AddToCalendarButton]. */
@@ -178,15 +197,56 @@ class AddToCalendarDelegate @Inject constructor(
         }
     }
 
-    /** A calendar was chosen in the sheet: remember it, and add the waiting plan there or move it there. */
-    suspend fun choose(calendarId: Long) {
-        val choice = _state.value.choosing ?: return
+    /**
+     * Adds every plan in [drafts] (by key) not already in a calendar, asking which calendar once when
+     * there's a choice. Returns how it went, or null while the choice is showing ([choose] returns it then).
+     */
+    suspend fun addAll(drafts: List<Pair<String, CalendarEventDraft>>): AddAllResult? {
+        val s = _state.value
+        val todo = drafts.filter { (key, _) -> key !in s.inCalendar }.distinctBy { it.first }
+        return when {
+            todo.isEmpty() -> AddAllResult(0)
+            s.calendars.size > 1 -> {
+                _state.update { it.copy(choosing = CalendarChoice.AddAll(todo)) }
+                null
+            }
+            else -> insertAll(todo, s.selectedCalendarId)
+        }
+    }
+
+    /**
+     * A calendar was chosen in the sheet: remember it, and add the waiting plan(s) there or move it
+     * there. Returns how "Add all" went when that's what it was for.
+     */
+    suspend fun choose(calendarId: Long): AddAllResult? {
+        val choice = _state.value.choosing ?: return null
         _state.update { it.copy(choosing = null, selectedCalendarId = calendarId) }
         preferences.setAddToCalendarId(calendarId)
-        when (choice) {
-            is CalendarChoice.Add -> insert(choice.key, choice.draft, calendarId)
-            is CalendarChoice.Move -> move(choice.key, calendarId)
+        return when (choice) {
+            is CalendarChoice.Add -> insert(choice.key, choice.draft, calendarId).let { null }
+            is CalendarChoice.Move -> move(choice.key, calendarId).let { null }
+            is CalendarChoice.AddAll -> insertAll(choice.drafts, calendarId)
         }
+    }
+
+    /** Inserts each in turn; without calendar access only the first can go (through the calendar app). */
+    private suspend fun insertAll(drafts: List<Pair<String, CalendarEventDraft>>, calendarId: Long?): AddAllResult {
+        var added = 0
+        for ((key, draft) in drafts) {
+            when (val result = inserter.insert(draft, calendarId)) {
+                is InsertResult.Inserted -> {
+                    addedEvents.set(key, AddedCalendarEvent(result.eventId))
+                    _state.update { it.copy(added = it.added + key, inCalendar = it.inCalendar + (key to calendarId)) }
+                    added++
+                }
+                is InsertResult.NeedsIntent -> {
+                    if (added > 0) continue
+                    _state.update { it.copy(pendingIntent = result.intent, added = it.added + key, inCalendar = it.inCalendar + (key to null)) }
+                    return AddAllResult(1, needsAccess = drafts.size > 1)
+                }
+            }
+        }
+        return AddAllResult(added)
     }
 
     fun cancelChoice() = _state.update { it.copy(choosing = null) }
@@ -239,6 +299,14 @@ fun AddToCalendarEffect(
         is CalendarChoice.Add -> CalendarChoiceSheet(
             title = "Add to calendar",
             message = "Which calendar should ${choice.draft.title} go in?",
+            calendars = state.calendars,
+            selectedId = state.selectedCalendarId,
+            onChoose = onChoose,
+            onDismiss = onCancelChoice,
+        )
+        is CalendarChoice.AddAll -> CalendarChoiceSheet(
+            title = "Add to calendar",
+            message = "Which calendar should your ${choice.drafts.size} plans go in?",
             calendars = state.calendars,
             selectedId = state.selectedCalendarId,
             onChoose = onChoose,

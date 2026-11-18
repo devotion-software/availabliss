@@ -65,6 +65,9 @@ class EventsRepository @Inject constructor(
 
     suspend fun upcoming(): ApiResult<List<GroupEvent>> = call { api.getUpcoming() }.map { it.events }
 
+    /** Every plan across your groups ("My plans"): going, can't make it and past. */
+    suspend fun myPlans(): ApiResult<dev.joeherbert.availabliss.core.network.model.MyPlansResponse> = call { api.getMyPlans() }
+
     suspend fun create(groupId: String, request: CreateEventRequest): ApiResult<GroupEvent> =
         call { api.createEvent(groupId, request) }
 

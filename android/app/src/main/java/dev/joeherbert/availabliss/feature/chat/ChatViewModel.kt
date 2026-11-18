@@ -43,6 +43,7 @@ import dev.joeherbert.availabliss.core.calendar.CalendarEventDraft
 import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
 import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 import dev.joeherbert.availabliss.feature.common.MemberDirectory
+import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
 import android.net.Uri
 import dev.joeherbert.availabliss.core.data.AttachmentFiles
 import dev.joeherbert.availabliss.core.data.PickedFile
@@ -219,6 +220,8 @@ private data class ChatData(
     val messages: List<Message> = emptyList(),
     val proposals: Map<String, Proposal> = emptyMap(),
     val events: Map<String, GroupEvent> = emptyMap(),
+    /** Who's busy for each date poll option's time, by [pollSlotKey]. */
+    val conflicts: Map<String, List<String>> = emptyMap(),
     val hasMore: Boolean = false,
     val loading: Boolean = true,
     val loadingOlder: Boolean = false,
@@ -245,6 +248,7 @@ private data class ItemInputs(
     val messages: List<Message>,
     val proposals: Map<String, Proposal>,
     val events: Map<String, GroupEvent>,
+    val conflicts: Map<String, List<String>>,
 )
 
 @HiltViewModel
@@ -267,6 +271,9 @@ class ChatViewModel @Inject constructor(
 
     private val requestedProposals = mutableSetOf<String>()
     private val requestedEvents = mutableSetOf<String>()
+    /** Date poll times whose conflicts have been asked for, by [pollSlotKey]. */
+    private val requestedConflicts = mutableSetOf<String>()
+    private var conflictsJob: Job? = null
     private var visible = false
     private var lastSeenSent: String? = null
     private var receiptJob: Job? = null
@@ -280,7 +287,7 @@ class ChatViewModel @Inject constructor(
      * the menu, a sheet or the sending flag does.
      */
     private val items = combine(
-        data.map { ItemInputs(it.group, it.messages, it.proposals, it.events) }.distinctUntilChanged(),
+        data.map { ItemInputs(it.group, it.messages, it.proposals, it.events, it.conflicts) }.distinctUntilChanged(),
         meIds,
     ) { inputs, me -> inputs.toItems(me) }.flowOn(Dispatchers.Default)
 
@@ -370,6 +377,8 @@ class ChatViewModel @Inject constructor(
                 m.proposalId?.let(requestedProposals::remove)
                 m.eventId?.let(requestedEvents::remove)
             }
+            // Busy times may have changed while disconnected.
+            requestedConflicts.clear()
             resolveReferences()
             scheduleReceipts()
             refreshGroup()
@@ -392,6 +401,41 @@ class ChatViewModel @Inject constructor(
             viewModelScope.launch {
                 (events.get(id) as? ApiResult.Success)?.value?.let(::putEvent)
             }
+        }
+        resolveConflicts(messages)
+    }
+
+    /** Who's busy for each open date poll's times (the conflicts endpoint), fetched once each. */
+    private fun resolveConflicts(messages: List<Message>) {
+        val now = java.time.Instant.now()
+        messages.asSequence()
+            .mapNotNull { it.poll?.takeIf { poll -> !poll.closed } }
+            .flatMap { it.options.asSequence().mapNotNull { o -> o.slot } }
+            .filter { slot -> DateTimes.parseInstant(slot.end)?.isAfter(now) ?: false }
+            .filter { requestedConflicts.add(pollSlotKey(it)) }
+            .toList()
+            .forEach { slot ->
+                viewModelScope.launch {
+                    when (val result = proposals.conflicts(groupId, slot.start, slot.end)) {
+                        is ApiResult.Success -> data.update { it.copy(conflicts = it.conflicts + (pollSlotKey(slot) to result.value)) }
+                        // Asked again next time the chat catches up.
+                        is ApiResult.Failure -> requestedConflicts.remove(pollSlotKey(slot))
+                    }
+                }
+            }
+    }
+
+    /**
+     * Busy times changed (someone synced): re-checks date poll options. Syncs come in bursts, so
+     * they're coalesced, and nothing is fetched without an open date poll.
+     */
+    private fun refreshConflicts() {
+        if (data.value.messages.none { m -> m.poll?.let { !it.closed && it.options.any { o -> o.slot != null } } == true }) return
+        conflictsJob?.cancel()
+        conflictsJob = viewModelScope.launch {
+            delay(CONFLICTS_DEBOUNCE_MS)
+            requestedConflicts.clear()
+            resolveConflicts(data.value.messages)
         }
     }
 
@@ -420,7 +464,11 @@ class ChatViewModel @Inject constructor(
                     d.copy(messages = d.messages.map { m -> updates[m.id]?.let { m.copy(receipt = it.toReceipt()) } ?: m })
                 }
             }
-            is LivePayload.PollUpdated -> replacePoll(payload.poll)
+            is LivePayload.PollUpdated -> {
+                replacePoll(payload.poll)
+                resolveConflicts(data.value.messages)
+            }
+            is LivePayload.AvailabilityChanged -> refreshConflicts()
             is LivePayload.ProposalChanged -> putProposal(payload.proposal)
             is LivePayload.ProposalConfirmed -> {
                 putProposal(payload.proposal)
@@ -852,6 +900,16 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * "Propose this" on a date poll's option: its time for the propose form, or null if it's
+     * gone or has no time.
+     */
+    fun proposalFor(messageId: String, optionId: String): ProposalPrefill? {
+        val poll = data.value.messages.firstOrNull { it.id == messageId }?.poll ?: return null
+        val slot = poll.options.firstOrNull { it.id == optionId }?.slot ?: return null
+        return ProposalPrefill(slot.start, slot.end, slot.allDay)
+    }
+
     fun onClosePoll(messageId: String) {
         val poll = (data.value.messages + data.value.thread?.messages.orEmpty()).firstOrNull { it.id == messageId }?.poll ?: return
         viewModelScope.launch {
@@ -983,6 +1041,8 @@ class ChatViewModel @Inject constructor(
         memberCount = group?.memberCount ?: 0,
         proposals = proposals,
         events = events,
+        conflicts = conflicts,
+        isAdmin = group?.role?.isAdmin == true,
     ).asReversed()
 
     private fun ChatData.toUi(items: List<ChatItem>, me: String?, cal: AddToCalendarState): ChatUiState {
@@ -1026,6 +1086,8 @@ class ChatViewModel @Inject constructor(
     private fun ThreadSession.toUi(directory: MemberDirectory, memberCount: Int, me: String?): ThreadUi {
         val target = threadReplyTarget(messages, pickedId, me)
         val items = buildChatItems(messages, directory, memberCount, proposals = emptyMap(), events = emptyMap())
+            // A thread is for replying: proposing a date poll's winner happens in the chat.
+            .map { if (it is ChatItem.PollItem) it.copy(poll = it.poll.copy(canPropose = false)) else it }
             // No receipt rows, and no Edit / Delete / View thread from inside a thread.
             .filterNot { it is ChatItem.Receipt }
             .map { if (it is ChatItem.Text) it.copy(canEdit = false, inThread = false) else it }
@@ -1072,6 +1134,7 @@ class ChatViewModel @Inject constructor(
 
     private companion object {
         const val RECEIPT_DEBOUNCE_MS = 600L
+        const val CONFLICTS_DEBOUNCE_MS = 1_000L
         /** How many older pages "Show in chat" loads looking for a message. */
         const val MAX_PAGES_TO_FIND = 20
     }

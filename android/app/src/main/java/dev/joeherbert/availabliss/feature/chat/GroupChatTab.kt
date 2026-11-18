@@ -60,6 +60,7 @@ import dev.joeherbert.availabliss.designsystem.component.chat.ChatMeta
 import dev.joeherbert.availabliss.designsystem.component.chat.ConfirmedBanner
 import dev.joeherbert.availabliss.designsystem.component.chat.MessageBubble
 import dev.joeherbert.availabliss.designsystem.component.chat.PollCard
+import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCard
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardUi
 import dev.joeherbert.availabliss.designsystem.component.chat.ReadReceipt
@@ -123,6 +124,8 @@ data class ChatActions(
     val onOpenEvent: (String) -> Unit = {},
     val onVote: (messageId: String, optionId: String) -> Unit = { _, _ -> },
     val onClosePoll: (messageId: String) -> Unit = {},
+    /** "Propose this" on a date poll's option: the propose form, prefilled with its time. */
+    val onProposeOption: ((messageId: String, optionId: String) -> Unit)? = null,
     val onOpenInfo: (messageId: String) -> Unit = {},
     val onEditMessage: (messageId: String) -> Unit = {},
     val onDeleteMessage: (messageId: String) -> Unit = {},
@@ -160,6 +163,8 @@ fun GroupChatTab(
     onAddEvent: () -> Unit,
     /** Set when the chat wasn't opened over its group's calendar (e.g. from Activity): the group's name opens it. */
     onOpenGroup: (() -> Unit)? = null,
+    /** "Propose this" on a date poll: the propose form with that time. */
+    onProposeSlot: (ProposalPrefill) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -186,6 +191,7 @@ fun GroupChatTab(
     val currentOnOpenEvent by rememberUpdatedState(onOpenEvent)
     val currentOnProposeTime by rememberUpdatedState(onProposeTime)
     val currentOnAddEvent by rememberUpdatedState(onAddEvent)
+    val currentOnProposeSlot by rememberUpdatedState(onProposeSlot)
     // One instance for the screen's lifetime, so rows skip recomposition while you type.
     val actions = remember(viewModel) {
         ChatActions(
@@ -208,6 +214,7 @@ fun GroupChatTab(
             onOpenEvent = { currentOnOpenEvent(it) },
             onVote = viewModel::onVote,
             onClosePoll = viewModel::onClosePoll,
+            onProposeOption = { messageId, optionId -> viewModel.proposalFor(messageId, optionId)?.let { currentOnProposeSlot(it) } },
             onOpenInfo = viewModel::openInfo,
             onEditMessage = viewModel::startEdit,
             onDeleteMessage = viewModel::requestDelete,
@@ -611,6 +618,7 @@ internal fun ChatRow(
                     poll = item.poll,
                     onToggle = { optionId -> actions.onVote(item.id, optionId) },
                     onClose = { actions.onClosePoll(item.id) },
+                    onPropose = actions.onProposeOption?.let { propose -> { optionId -> propose(item.id, optionId) } },
                     modifier = Modifier.widthIn(max = 300.dp).fillMaxWidth(),
                 )
             }

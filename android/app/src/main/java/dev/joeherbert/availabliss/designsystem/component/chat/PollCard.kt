@@ -46,6 +46,10 @@ data class PollOptionUi(
     val mine: Boolean,
     /** Has the most votes (bar drawn in accent-soft). */
     val leading: Boolean,
+    /** A date poll's option: who's busy then ("Ana is busy", "Everyone's free"), once known. */
+    val detail: String? = null,
+    /** Someone's busy then ([detail] drawn in warn ink). */
+    val busy: Boolean = false,
 )
 
 @Immutable
@@ -59,6 +63,10 @@ data class PollUi(
     val canClose: Boolean = false,
     /** Who asked: "Your poll" or "Poll by Ana". */
     val title: String = "Poll",
+    /** Its options are times (labels are formatted dates). */
+    val isDatePoll: Boolean = false,
+    /** A date poll's creator (or an admin): "Propose this" under the leading option. */
+    val canPropose: Boolean = false,
 )
 
 /** Poll card with live result bars; tap an option to vote or unvote. */
@@ -68,6 +76,8 @@ fun PollCard(
     onToggle: (optionId: String) -> Unit,
     modifier: Modifier = Modifier,
     onClose: (() -> Unit)? = null,
+    /** "Propose this" on a date poll's leading option (shown when [PollUi.canPropose]). */
+    onPropose: ((optionId: String) -> Unit)? = null,
 ) {
     val colors = AvailablissTheme.colors
     Column(
@@ -78,7 +88,7 @@ fun PollCard(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(AvIcons.Poll, null, tint = colors.accentInk, modifier = Modifier.size(16.dp))
+            Icon(if (poll.isDatePoll) AvIcons.Calendar else AvIcons.Poll, null, tint = colors.accentInk, modifier = Modifier.size(16.dp))
             val votes = if (poll.totalVotes == 1) "1 vote" else "${poll.totalVotes} votes"
             Text(
                 "${poll.title} · $votes" + if (poll.closed) " · Closed" else if (poll.multi) " · Pick any" else "",
@@ -90,6 +100,14 @@ fun PollCard(
         Text(poll.question, style = AvailablissTheme.type.titleXSmall, color = colors.ink, modifier = Modifier.semantics { heading() })
         poll.options.forEach { option ->
             PollOptionRow(option, poll.totalVotes, poll.multi, enabled = !poll.closed, onClick = { onToggle(option.id) })
+            if (poll.canPropose && option.leading && onPropose != null) {
+                TextAction(
+                    "Propose this",
+                    { onPropose(option.id) },
+                    style = AvailablissTheme.type.label,
+                    modifier = Modifier.align(Alignment.End).semantics { contentDescription = "Propose ${option.label}" },
+                )
+            }
         }
         if (poll.canClose && !poll.closed && onClose != null) {
             TextAction("Close poll", onClose, color = colors.muted, style = AvailablissTheme.type.label, modifier = Modifier.align(Alignment.End))
@@ -108,9 +126,12 @@ private fun PollOptionRow(option: PollOptionUi, total: Int, multi: Boolean, enab
             .defaultMinSize(minHeight = 46.dp)
             .clip(shape)
             .background(colors.surface)
-            .border(1.dp, if (option.mine) colors.accent else colors.glassHi, shape)
+            .border(if (option.leading) 1.5.dp else 1.dp, if (option.mine || option.leading) colors.accent else colors.glassHi, shape)
             .toggleable(value = option.mine, enabled = enabled, role = if (multi) Role.Checkbox else Role.RadioButton, onValueChange = { onClick() })
-            .semantics { contentDescription = "${option.label}, ${option.count} votes" + if (option.mine) ", your vote" else "" },
+            .semantics {
+                contentDescription = "${option.label}, ${option.count} votes" + (if (option.leading) ", most votes" else "") +
+                    (option.detail?.let { ", $it" } ?: "") + if (option.mine) ", your vote" else ""
+            },
     ) {
         Box(
             Modifier
@@ -134,7 +155,12 @@ private fun PollOptionRow(option: PollOptionUi, total: Int, multi: Boolean, enab
             ) {
                 if (option.mine) Icon(AvIcons.Check, null, tint = colors.onAccent, modifier = Modifier.size(11.dp))
             }
-            Text(option.label, style = AvailablissTheme.type.bodySmallStrong, color = colors.ink, modifier = Modifier.weight(1f))
+            Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+                Text(option.label, style = AvailablissTheme.type.bodySmallStrong, color = colors.ink)
+                option.detail?.let {
+                    Text(it, style = AvailablissTheme.type.caption, color = if (option.busy) colors.warnInk else colors.muted)
+                }
+            }
             Text(option.count.toString(), style = AvailablissTheme.type.label, color = colors.neutralInk)
         }
     }
@@ -155,6 +181,27 @@ private fun PollCardPreview() {
                     ),
                 ),
                 onToggle = {},
+            )
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun DatePollCardPreview() {
+    AvailablissPreviewTheme {
+        Box(Modifier.background(AvailablissTheme.colors.bg).padding(16.dp)) {
+            PollCard(
+                PollUi(
+                    id = "p", question = "Which of these works?", totalVotes = 4, multi = true, closed = false, title = "Your poll",
+                    isDatePoll = true, canPropose = true,
+                    options = listOf(
+                        PollOptionUi("a", "Fri 13 – Sun 15 Nov", 3, mine = true, leading = true, detail = "Everyone's free"),
+                        PollOptionUi("b", "Fri 20 – Sun 22 Nov", 1, mine = false, leading = false, detail = "Ana is busy", busy = true),
+                    ),
+                ),
+                onToggle = {},
+                onPropose = {},
             )
         }
     }

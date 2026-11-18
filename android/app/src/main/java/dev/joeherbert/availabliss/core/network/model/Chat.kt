@@ -228,8 +228,19 @@ data class Poll(
     val options: List<PollOption>,
 )
 
+/**
+ * One answer to a poll. A date poll's options carry [slot], the time each stands for ([label] is
+ * then made by the server in the group's time zone); older servers and plain polls leave it out.
+ */
 @Serializable
-data class PollOption(val id: String, val label: String, val voterIds: List<String> = emptyList())
+data class PollOption(val id: String, val label: String, val voterIds: List<String> = emptyList(), val slot: PollSlot? = null)
+
+/** The time a date poll's option stands for (ISO instants). */
+@Serializable
+data class PollSlot(val start: String, val end: String, val allDay: Boolean = false)
+
+/** A date poll: its options are times. Shows who's busy for each, and lets its creator propose the winner. */
+val Poll.isDatePoll: Boolean get() = options.any { it.slot != null }
 
 @Serializable
 data class MessageInfo(
@@ -273,6 +284,13 @@ data class SendPollRequest(val poll: NewPoll)
 
 @Serializable
 data class NewPoll(val question: String, val options: List<String>, val multi: Boolean = false)
+
+/** A date poll ("Which of these works?"): 2–5 different times; its option labels are made by the server. */
+@Serializable
+data class SendDatePollRequest(val poll: NewDatePoll)
+
+@Serializable
+data class NewDatePoll(val question: String, val slots: List<PollSlot>, val multi: Boolean)
 
 @Serializable
 enum class ReceiptState {
