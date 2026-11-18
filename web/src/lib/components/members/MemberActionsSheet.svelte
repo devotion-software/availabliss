@@ -20,7 +20,7 @@
 	]);
 </script>
 
-<Sheet bind:open title={member.name} placement="center" width={400}>
+<Sheet bind:open title={member.name} width={400}>
 	<div class="actions">
 		{#each actions as a (a.label)}
 			<button

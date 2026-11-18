@@ -19,7 +19,7 @@
 	];
 </script>
 
-<Sheet bind:open title="Set {name}'s reply" description="Only admins can do this. They'll see it was set by you." placement="center" width={400}>
+<Sheet bind:open title="Set {name}'s reply" description="Only admins can do this. They'll see it was set by you." width={400}>
 	<div class="options" role="group" aria-label="Reply">
 		{#each OPTIONS as o (o.value)}
 			<button

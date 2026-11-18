@@ -14,7 +14,7 @@
 		placement?: 'auto' | 'center';
 		onconfirm: () => Promise<unknown> | unknown;
 	}
-	let { open = $bindable(), title, message, confirmLabel, cancelLabel = 'Cancel', destructive = false, placement = 'center', onconfirm }: Props =
+	let { open = $bindable(), title, message, confirmLabel, cancelLabel = 'Cancel', destructive = false, placement = 'auto', onconfirm }: Props =
 		$props();
 
 	let busy = $state(false);

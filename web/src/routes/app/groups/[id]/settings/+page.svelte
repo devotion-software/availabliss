@@ -210,7 +210,6 @@
 	message="{group.name} will be deleted for everyone in it, with its chat, plans and photos. This can't be undone."
 	confirmLabel="Delete group"
 	destructive
-	placement="auto"
 	onconfirm={destroy}
 />
 
