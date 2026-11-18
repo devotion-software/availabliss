@@ -87,16 +87,18 @@ data class ProposalActions(
     val onOverride: (userId: String, ResponseKind) -> Unit = { _, _ -> },
     val onCancel: () -> Unit = {},
     val onAddToCalendar: () -> Unit = {},
+    val onOpenChat: (groupId: String) -> Unit = {},
 )
 
 @Composable
-fun ProposalScreen(onBack: () -> Unit, viewModel: ProposalViewModel = hiltViewModel()) {
+fun ProposalScreen(onBack: () -> Unit, onOpenChat: (groupId: String) -> Unit, viewModel: ProposalViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
     AddToCalendarEffect(state.calendar, viewModel::onIntentHandled, viewModel::chooseCalendar, viewModel::cancelCalendarChoice)
     LaunchedEffect(state.closed) { if (state.closed) onBack() }
     val currentOnBack by rememberUpdatedState(onBack)
+    val currentOnOpenChat by rememberUpdatedState(onOpenChat)
     // One instance for the screen's lifetime so unchanged parts skip recomposition.
     val actions = remember(viewModel) {
         ProposalActions(
@@ -106,6 +108,7 @@ fun ProposalScreen(onBack: () -> Unit, viewModel: ProposalViewModel = hiltViewMo
             onOverride = viewModel::override,
             onCancel = viewModel::cancel,
             onAddToCalendar = viewModel::addToCalendar,
+            onOpenChat = { currentOnOpenChat(it) },
         )
     }
     ProposalContent(state = state, actions = actions)
@@ -353,9 +356,9 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
             }
         }
         Column(
-            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 10.dp),
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 24.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             VennLogo(
                 132.dp,
@@ -365,12 +368,12 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
             Text("Everyone's in.", style = AvailablissTheme.type.displayLarge, color = colors.ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
             // "All 4 of you can make", then the date and time large on their own lines, then the place.
             Column(
-                Modifier.semantics(mergeDescendants = true) {},
+                Modifier.padding(horizontal = 10.dp).semantics(mergeDescendants = true) {},
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    "All ${state.total} of you can make",
+                    "All ${state.coming.size.takeIf { it > 0 } ?: state.total} of you can make",
                     style = AvailablissTheme.type.bodyLarge,
                     color = colors.muted,
                     textAlign = TextAlign.Center,
@@ -390,9 +393,60 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
                     )
                 }
             }
+            if (state.coming.isNotEmpty()) {
+                PeoplePanel("Who's coming", state.coming.size.toString(), state.coming, Modifier.padding(top = 6.dp))
+            }
+            if (state.joinedLater.isNotEmpty()) {
+                PeoplePanel("Joined since", null, state.joinedLater, quiet = true)
+            }
         }
-        GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.cardLarge, contentPadding = PaddingValues(14.dp)) {
+        GlassPanel(
+            Modifier.fillMaxWidth(),
+            shape = Shapes.cardLarge,
+            contentPadding = PaddingValues(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             AddToCalendarButton(state.calendarStatus, onClick = actions.onAddToCalendar)
+            SecondaryButton(
+                text = "Go to chat",
+                onClick = { actions.onOpenChat(state.groupId) },
+                icon = AvIcons.Chat,
+                enabled = state.groupId.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** Who's coming (or, [quiet], who joined the group since): a titled glass list of people. */
+@Composable
+private fun PeoplePanel(title: String, trailing: String?, people: List<ProposalMemberUi>, modifier: Modifier = Modifier, quiet: Boolean = false) {
+    val colors = AvailablissTheme.colors
+    GlassPanel(
+        modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.Top,
+    ) {
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp).semantics { heading() }) {
+            Text(title, style = AvailablissTheme.type.captionStrong, color = colors.muted, modifier = Modifier.weight(1f))
+            trailing?.let { Text(it, style = AvailablissTheme.type.captionStrong, color = colors.muted) }
+        }
+        people.forEach { person ->
+            RowDivider()
+            Row(
+                Modifier.fillMaxWidth().defaultMinSize(minHeight = if (quiet) 48.dp else 52.dp).alpha(if (quiet) 0.65f else 1f)
+                    .semantics(mergeDescendants = true) {},
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Avatar(person.person, size = if (quiet) 28.dp else 34.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(person.name, style = AvailablissTheme.type.bodyMedium, color = colors.ink, maxLines = 1)
+                    if (person.note.isNotEmpty()) {
+                        Text(person.note, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                    }
+                }
+            }
         }
     }
 }
@@ -424,7 +478,8 @@ private fun ProposalPendingPreview() {
 private fun ProposalConfirmedPreview() {
     AvailablissPreviewTheme(dark = true) {
         ProposalContent(
-            ProposalUiState(loading = false, groupName = "Lake District crew", range = "Sat 14 Nov · 18:30 – 21:00", rangeDate = "Sat 14 Nov", rangeTime = "18:30 – 21:00", total = 6, location = "Keswick", status = ProposalStatus.Confirmed),
+            ProposalUiState(loading = false, groupName = "Lake District crew", range = "Sat 14 Nov · 18:30 – 21:00", rangeDate = "Sat 14 Nov", rangeTime = "18:30 – 21:00", total = 4, location = "Keswick", status = ProposalStatus.Confirmed,
+                coming = previewMembers.take(3), joinedLater = previewMembers.drop(3)),
             ProposalActions(),
         )
     }

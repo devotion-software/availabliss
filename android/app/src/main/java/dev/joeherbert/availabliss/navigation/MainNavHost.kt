@@ -223,7 +223,20 @@ fun MainNavHost(root: RootViewModel) {
                     onSignOut = root::signOut,
                 )
             }
-            composable<ProposalRoute> { ProposalScreen(onBack = { nav.popBackStack() }) }
+            composable<ProposalRoute> {
+                ProposalScreen(
+                    onBack = { nav.popBackStack() },
+                    // Opened from that chat, it just goes back to it.
+                    onOpenChat = { groupId ->
+                        val previous = nav.previousBackStackEntry
+                        if (previous?.destination?.hasRoute<GroupChatRoute>() == true && previous.toRoute<GroupChatRoute>().groupId == groupId) {
+                            nav.popBackStack()
+                        } else {
+                            nav.navigate(GroupChatRoute(groupId))
+                        }
+                    },
+                )
+            }
             composable<CreateProposalRoute> {
                 CreateProposalScreen(
                     onBack = { nav.popBackStack() },

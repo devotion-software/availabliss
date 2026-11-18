@@ -47,6 +47,7 @@ data class ProposalMemberUi(
 data class ProposalUiState(
     val loading: Boolean = true,
     val error: String? = null,
+    val groupId: String = "",
     val groupName: String = "",
     /** "Ana proposed · 2h ago" */
     val proposedBy: String = "",
@@ -61,6 +62,13 @@ data class ProposalUiState(
     val accepted: Int = 0,
     val total: Int = 0,
     val members: List<ProposalMemberUi> = emptyList(),
+    /** Confirmed: the members who accepted (everyone at the time), proposer first. */
+    val coming: List<ProposalMemberUi> = emptyList(),
+    /**
+     * Confirmed: members without an acceptance. Only people who joined the group after it was
+     * confirmed (it confirms once every member has accepted, and replies then close).
+     */
+    val joinedLater: List<ProposalMemberUi> = emptyList(),
     /** Open proposals that clash with someone's busy time: "Priya is busy then". */
     val clash: String? = null,
     /** "Their calendars or blocked time overlap. …" */
@@ -231,12 +239,15 @@ class ProposalViewModel @Inject constructor(
                 canOverride = isAdmin && id != meId && p.status == ProposalStatus.Open && response != ResponseKind.Accepted,
             )
         }
+        val inGroup = { id: String -> g == null || g.members.any { it.userId == id } }
+        val confirmed = p.status == ProposalStatus.Confirmed
         val proposerName = directory.displayName(p.createdBy, youSuffix = false).let { if (p.createdBy == meId) "You" else it }
         val key = p.eventId ?: p.id
         val rangeParts = DateTimes.rangeParts(p.start, p.end, p.allDay)
         return ProposalUiState(
             loading = loading,
             error = error,
+            groupId = p.groupId,
             groupName = g?.name.orEmpty(),
             proposedBy = "$proposerName proposed · ${DateTimes.relative(p.createdAt)}",
             title = p.title?.takeIf { it.isNotBlank() },
@@ -247,6 +258,12 @@ class ProposalViewModel @Inject constructor(
             accepted = ProposalFormatting.acceptedCount(p),
             total = ProposalFormatting.totalCount(p, g?.memberCount ?: 0),
             members = members,
+            coming = if (!confirmed) emptyList() else members
+                .filter { it.response == ResponseKind.Accepted && inGroup(it.userId) }
+                .map { it.copy(note = if (it.userId == p.createdBy) "Proposed this" else "") },
+            joinedLater = if (!confirmed || g == null) emptyList() else members
+                .filter { it.response != ResponseKind.Accepted && inGroup(it.userId) }
+                .map { it.copy(note = "Joined after this was confirmed") },
             clash = Clash.text(busyIds, { directory[it]?.name }, meId),
             clashDetail = Clash.detail(busyIds, meId),
             iAmBusy = meId != null && meId in busyIds,
