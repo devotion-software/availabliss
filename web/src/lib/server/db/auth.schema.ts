@@ -33,6 +33,8 @@ export const user = mysqlTable("user", {
   onboarded: boolean("onboarded").default(false).notNull(),
   // Minutes counted as busy before and after each busy time when finding free slots (0 = none).
   busyBufferMinutes: int("busy_buffer_minutes").default(0).notNull(),
+  // Pushes before a confirmed plan: 'both' (the day before and an hour before), 'day', 'hour' or 'off'.
+  eventReminders: varchar("event_reminders", { length: 8 }).default("both").notNull(),
 });
 
 export const session = mysqlTable(

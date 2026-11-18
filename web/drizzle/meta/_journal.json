@@ -232,6 +232,13 @@
       "when": 1795007675836,
       "tag": "0032_daffy_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1795007848106,
+      "tag": "0033_dry_marauders",
+      "breakpoints": true
     }
   ]
 }

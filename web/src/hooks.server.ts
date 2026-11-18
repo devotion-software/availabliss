@@ -5,6 +5,7 @@ import { COLOR_THEMES, THEME_MODES, type ColorTheme, type ThemeMode } from '#lib
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
 import type { RequestEvent } from '@sveltejs/kit';
 import { autoArchiveGroups } from '#lib/server/auto-archive';
+import { REMINDER_CHECK_INTERVAL_MS, sendDueReminders } from '#lib/server/reminders';
 import { deleteAbandonedUploads } from '#lib/server/attachments';
 import { checkCaldavConnections, syncStaleConnections } from '#lib/server/calendars';
 import { isForbiddenCrossSite, selfOrigins } from '#lib/server/csrf';
@@ -66,6 +67,14 @@ export const init: ServerInit = () => {
 			console.warn('[groups] auto-archive failed', err);
 		}
 	}, AUTO_ARCHIVE_INTERVAL_MS).unref();
+	setInterval(async () => {
+		try {
+			if (!(await kv.setIfAbsent('lock:reminders', String(process.pid), REMINDER_CHECK_INTERVAL_MS / 1000 - 10))) return;
+			await sendDueReminders();
+		} catch (err) {
+			console.warn('[reminders] sending failed', err);
+		}
+	}, REMINDER_CHECK_INTERVAL_MS).unref();
 };
 
 const OTP_SEND_PATH = '/api/auth/email-otp/send-verification-otp';

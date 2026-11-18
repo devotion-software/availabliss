@@ -92,7 +92,12 @@ export interface User {
 	onboarded: boolean;
 	/** Minutes counted as busy before and after each busy time when finding free slots (0 = none). */
 	busyBufferMinutes: BusyBufferMinutes;
+	/** Pushes before a confirmed plan you're going to: the day before, an hour before, both or none. */
+	eventReminders: EventReminders;
 }
+
+export const EVENT_REMINDERS = ['both', 'day', 'hour', 'off'] as const;
+export type EventReminders = (typeof EVENT_REMINDERS)[number];
 
 /** The buffers on offer around busy time ("None", 15 min, 30 min, 1 hour, 2 hours). */
 export const BUSY_BUFFER_MINUTES = [0, 15, 30, 60, 120] as const;
@@ -445,7 +450,12 @@ export const NOTIFICATION_KINDS = [
 	'message',
 	'event.created',
 	/** Your role in a group changed: made an admin, no longer an admin, or handed ownership. `data.role` is the new one. */
-	'role.changed'
+	'role.changed',
+	/**
+	 * A reminder: a confirmed plan is tomorrow or in an hour (`data.eventId`), or a proposal you
+	 * haven't replied to is within a day (`data.proposalId`). `data.reminder` is 'day', 'hour' or 'reply'.
+	 */
+	'reminder'
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

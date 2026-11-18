@@ -1,4 +1,4 @@
-import { COLOR_THEMES, THEME_MODES, type User } from './types';
+import { COLOR_THEMES, EVENT_REMINDERS, THEME_MODES, type User } from './types';
 import { mediaUrl } from './server/media-urls';
 import type { User as AuthUser } from './auth';
 import { toBusyBuffer } from './busy-buffer';
@@ -18,6 +18,7 @@ export function toPublicUser(u: AuthUser): User {
 		schoolAuthority: u.schoolAuthority ?? null,
 		timezone: u.timezone || 'Europe/London',
 		onboarded: !!u.onboarded,
-		busyBufferMinutes: toBusyBuffer(Number(u.busyBufferMinutes ?? 0))
+		busyBufferMinutes: toBusyBuffer(Number(u.busyBufferMinutes ?? 0)),
+		eventReminders: EVENT_REMINDERS.find((r) => r === u.eventReminders) ?? 'both'
 	};
 }

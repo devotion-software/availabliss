@@ -328,6 +328,21 @@ export const events = mysqlTable(
 	]
 );
 
+/**
+ * Reminders already sent, so each goes once: an event's day-before and hour-before pushes, and the
+ * nudge to reply to a proposal. Keyed by when it starts, so a plan that moves is reminded again.
+ */
+export const sentReminders = mysqlTable(
+	'sent_reminders',
+	{
+		kind: varchar('kind', { length: 16 }).notNull(),
+		targetId: varchar('target_id', { length: 36 }).notNull(),
+		startsAt: farInstant('starts_at').notNull(),
+		sentAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.kind, t.targetId, t.startsAt] })]
+);
+
 // ─── Chat ─────────────────────────────────────────────────────────────────
 export const polls = mysqlTable('polls', {
 	id: id(),

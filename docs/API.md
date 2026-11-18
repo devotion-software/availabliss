@@ -120,6 +120,7 @@ interface User {
   schoolAuthority: string | null;// id from GET /regions/school-authorities
   timezone: string;              // IANA, e.g. "Europe/London"
   onboarded: boolean;            // false until the user finishes calendar setup
+  eventReminders: 'both' | 'day' | 'hour' | 'off'; // pushes before confirmed plans you're going to (day before / hour before)
   busyBufferMinutes: 0 | 15 | 30 | 60 | 120; // counted as busy before and after each busy time when finding free slots and clashes (not in /me/busy)
 }
 
@@ -238,7 +239,7 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/me` | | `User` |
-| PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'username' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded' \| 'busyBufferMinutes'>>` | `User` (`409` if the username is taken; changing `busyBufferMinutes` publishes `availability.changed` to the user's groups) |
+| PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'username' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded' \| 'busyBufferMinutes' \| 'eventReminders'>>` | `User` (`409` if the username is taken; changing `busyBufferMinutes` publishes `availability.changed` to the user's groups) |
 | GET 🔒 | `/usernames/:username` | | `UsernameCheck`: whether it can be yours, and who has it (to invite them) |
 | GET 🔒 | `/me/busy?from&to` (ISO instants, `to` after `from`, at most 120 days apart) | | `{ intervals: BusyInterval[] }` (own merged busy time; `label` is only ever returned to the owner) |
 | PUT 🔒 | `/me/avatar` | the image bytes (JPEG / PNG / WebP / HEIC, ≤ 10 MB) with its `image/*` content type | `User` (`image` is the new picture, shrunk to fit 512 px) |
@@ -766,13 +767,20 @@ Native apps keep this open while foregrounded and rely on push otherwise.
 ```ts
 interface Notification {
   id: string; groupId: string | null;
-  kind: 'proposal.created' | 'proposal.confirmed' | 'proposal.changed' | 'nudge' | 'invite.accepted' | 'invite.received' | 'message' | 'event.created'
+  kind: 'proposal.created' | 'proposal.confirmed' | 'proposal.changed' | 'nudge' | 'invite.accepted' | 'invite.received' | 'message' | 'event.created' | 'reminder'
       | 'role.changed';                // clients show kinds they don't know with a generic icon and open the group (or proposal) from `data`
   title: string; body: string;
   data: Record<string, string>;        // e.g. { proposalId }
   readAt: string | null; createdAt: string;
 }
 ```
+
+**Reminders** (`kind: 'reminder'`): a job every 5 minutes sends, once each, a push and Activity item
+the day before a confirmed plan (24 hours ahead; 09:00 the day before for all-day plans, in the
+group's time zone) and an hour before it, to members going (yes or maybe; everyone for events added
+directly), as each chose in `User.eventReminders`; `data` has `eventId`, `reminder: 'day' | 'hour'` and
+`proposalId` when it came from one. A day before an open proposal, members who haven't replied get
+one too (`data.proposalId`, `reminder: 'reply'`). Android shows them in the `reminder` channel.
 
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |

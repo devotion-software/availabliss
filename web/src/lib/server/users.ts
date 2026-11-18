@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import { mediaUrl } from './media-urls';
-import type { ColorTheme, ThemeMode, User } from '#lib/types';
-import { COLOR_THEMES, THEME_MODES } from '#lib/types';
+import type { ColorTheme, EventReminders, ThemeMode, User } from '#lib/types';
+import { COLOR_THEMES, EVENT_REMINDERS, THEME_MODES } from '#lib/types';
 import { toBusyBuffer } from '#lib/busy-buffer';
 import { db, isDuplicateKey } from './db';
 import { groupMembers, groups, user } from './db/schema';
@@ -28,7 +28,8 @@ export const toUser = (row: UserRow): User => ({
 	schoolAuthority: row.schoolAuthority,
 	timezone: row.timezone,
 	onboarded: row.onboarded,
-	busyBufferMinutes: toBusyBuffer(row.busyBufferMinutes)
+	busyBufferMinutes: toBusyBuffer(row.busyBufferMinutes),
+	eventReminders: oneOf<EventReminders>(EVENT_REMINDERS, row.eventReminders, 'both')
 });
 
 export async function getMe(userId: string): Promise<User> {
@@ -41,7 +42,7 @@ export async function getMe(userId: string): Promise<User> {
 export type UserPatch = Partial<
 	Pick<
 		User,
-		'name' | 'themeMode' | 'colorTheme' | 'country' | 'subdivision' | 'schoolAuthority' | 'timezone' | 'onboarded' | 'busyBufferMinutes'
+		'name' | 'themeMode' | 'colorTheme' | 'country' | 'subdivision' | 'schoolAuthority' | 'timezone' | 'onboarded' | 'busyBufferMinutes' | 'eventReminders'
 	> & {
 		username: string;
 	}
