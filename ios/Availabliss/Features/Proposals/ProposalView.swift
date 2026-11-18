@@ -225,7 +225,7 @@ struct ResponsePill: View {
     }
 }
 
-/// "Everyone's in." — the confirmed state.
+/// "Everyone's in." — the confirmed state: when, who's coming, Add to calendar and Go to chat.
 private struct ConfirmedView: View {
     let model: ProposalViewModel
     let group: Group
@@ -233,34 +233,45 @@ private struct ConfirmedView: View {
     @Environment(\.theme) private var theme
     @State private var bloom = false
 
+    private var me: String? { app.session.user?.id }
+
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                IconButton(systemImage: "chevron.left", label: "Back") { app.router.pop() }
-                Spacer()
+        ScrollView {
+            VStack(spacing: 0) {
+                HStack {
+                    IconButton(systemImage: "chevron.left", label: "Back") { app.router.pop() }
+                    Spacer()
+                }
+                .padding(.horizontal, 6)
+                VStack(spacing: 18) {
+                    VennLogo(size: 132)
+                        .scaleEffect(bloom ? 1 : 0.6)
+                        .opacity(bloom ? 1 : 0)
+                    Text("Everyone's in.")
+                        .displayFont(40, .heavy, relativeTo: .largeTitle)
+                        .accessibilityAddTraits(.isHeader)
+                    when
+                        .padding(.horizontal, 10)
+                    people
+                        .padding(.top, 6)
+                }
+                .padding(.top, 12)
             }
-            .padding(.horizontal, 6)
-            Spacer()
-            VStack(spacing: 18) {
-                VennLogo(size: 132)
-                    .scaleEffect(bloom ? 1 : 0.6)
-                    .opacity(bloom ? 1 : 0)
-                Text("Everyone's in.")
-                    .displayFont(40, .heavy, relativeTo: .largeTitle)
-                    .accessibilityAddTraits(.isHeader)
-                when
-            }
-            .padding(.horizontal, 10)
-            Spacer()
-            actions
+            .padding(.horizontal, 14)
+            .padding(.top, 16)
+            .padding(.bottom, 20)
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 16)
-        .padding(.bottom, 24)
+        .scrollBounceBehavior(.basedOnSize)
+        .safeAreaInset(edge: .bottom) { actions }
         .onAppear {
             withAnimation(.spring(response: 0.7, dampingFraction: 0.6).delay(0.1)) { bloom = true }
         }
         .sensoryFeedback(.success, trigger: bloom)
+    }
+
+    private var comingCount: Int {
+        let count = model.coming.count
+        return count > 0 ? count : model.acceptedCount
     }
 
     /// "All 4 of you can make", then the date and time large on their own lines, then the place.
@@ -269,7 +280,7 @@ private struct ConfirmedView: View {
         if let proposal = model.proposal {
             let parts = Formatting.spanParts(start: proposal.start, end: proposal.end, allDay: proposal.allDay)
             VStack(spacing: 6) {
-                Text("All \(model.memberCount) of you can make")
+                Text("All \(comingCount) of you can make")
                     .bodyFont(16)
                     .foregroundStyle(theme.muted)
                     .padding(.bottom, 2)
@@ -294,6 +305,40 @@ private struct ConfirmedView: View {
         }
     }
 
+    /// Who's coming (everyone who accepted), then anyone who joined the group since, quieter.
+    @ViewBuilder
+    private var people: some View {
+        VStack(spacing: 12) {
+            if !model.coming.isEmpty {
+                GlassList(data: model.coming, id: \.userId, header: "Who\u{2019}s coming", trailingHeader: "\(model.coming.count)", rowMinHeight: 52) { member in
+                    personRow(member, note: member.userId == model.proposal?.createdBy ? "Proposed this" : nil)
+                }
+            }
+            if !model.joinedLater.isEmpty {
+                GlassList(data: model.joinedLater, id: \.userId, header: "Joined since", rowMinHeight: 48) { member in
+                    personRow(member, note: "Joined after this was confirmed", size: 28)
+                        .opacity(0.65)
+                }
+            }
+        }
+    }
+
+    private func personRow(_ member: Member, note: String?, size: CGFloat = 34) -> some View {
+        HStack(spacing: 12) {
+            Avatar(name: member.name, imageURL: member.image, color: theme.tile(forUser: member.userId), size: size)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(member.userId == me ? "\(member.name) (you)" : member.name)
+                    .bodyFont(15, .semibold)
+                    .lineLimit(1)
+                if let note {
+                    Text(note).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
     @ViewBuilder
     private var actions: some View {
         VStack(spacing: 10) {
@@ -302,8 +347,24 @@ private struct ConfirmedView: View {
             } else {
                 ProgressView().frame(height: 54)
             }
+            Button(action: openChat) {
+                Label("Go to chat", systemImage: "bubble.left")
+            }
+            .buttonStyle(.secondary)
         }
         .padding(14)
         .glass(cornerRadius: 28)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 24)
+    }
+
+    /// Opens the group's chat; back from it returns here. Opened from that chat, it just goes back.
+    private func openChat() {
+        let chat = AppRoute.groupSection(id: group.id, section: .chat)
+        if app.router.currentPath.dropLast().last == chat {
+            app.router.pop()
+        } else {
+            app.router.push(chat)
+        }
     }
 }

@@ -85,6 +85,19 @@ final class ProposalViewModel {
         return group.members.filter { $0.userId == proposer } + group.members.filter { $0.userId != proposer }
     }
 
+    /// Confirmed: the members who accepted (everyone at the time), proposer first.
+    var coming: [Member] {
+        guard let proposal else { return [] }
+        return rows.filter { proposal.response(for: $0.userId)?.response == .accepted }
+    }
+
+    /// Confirmed: members without an acceptance. Only people who joined the group after it was
+    /// confirmed (a proposal confirms only once every member has accepted, and replies then close).
+    var joinedLater: [Member] {
+        guard let proposal else { return [] }
+        return rows.filter { proposal.response(for: $0.userId)?.response != .accepted }
+    }
+
     func note(for member: Member, me: String?) -> String {
         guard let proposal else { return "" }
         if member.userId == proposal.createdBy { return "Proposed this" }
