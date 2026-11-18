@@ -3,12 +3,21 @@ package dev.joeherbert.availabliss.core.network.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-@Serializable
-enum class ResponseKind {
-    @SerialName("pending") Pending,
-    @SerialName("accepted") Accepted,
-    @SerialName("declined") Declined,
+/**
+ * A member's reply to a proposal. [Maybe] is a soft yes ("I can make it if I must"): counted
+ * apart from [Accepted], and it doesn't confirm a proposal on its own. Replies this build
+ * doesn't know decode as [Pending].
+ */
+@Serializable(with = ResponseKindSerializer::class)
+enum class ResponseKind(override val wire: String) : WireEnum {
+    Pending("pending"),
+    Accepted("accepted"),
+    Maybe("maybe"),
+    Declined("declined"),
 }
+
+object ResponseKindSerializer :
+    LenientEnumSerializer<ResponseKind>("ResponseKind", ResponseKind.entries.toTypedArray(), ResponseKind.Pending)
 
 @Serializable
 enum class ProposalStatus {
@@ -39,7 +48,10 @@ data class Proposal(
     /** Open proposals: members whose calendars or blocked time clash with it (ids only). */
     val busyMemberIds: List<String> = emptyList(),
 ) {
-    /** Everyone it was put to accepted; false once confirmed anyway with someone who can't make it or never replied. */
+    /**
+     * Everyone it was put to firmly accepted; false once confirmed anyway with someone who can't
+     * make it, said maybe or never replied.
+     */
     val everyoneIn: Boolean get() = responses.all { it.response == ResponseKind.Accepted }
 }
 

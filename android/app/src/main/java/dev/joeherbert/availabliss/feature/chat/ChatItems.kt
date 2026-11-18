@@ -77,7 +77,8 @@ sealed interface ChatItem {
     /**
      * "Everyone's in": the system message posted when a proposal is confirmed, once its
      * event has loaded. [recent] (sent within the last day) lets it play the confetti burst.
-     * [headline] is "It's on" when it was confirmed before everyone accepted.
+     * [headline] is "It's on" when it was confirmed before everyone accepted, and then [count]
+     * says who can make it, with maybes apart: "3 of 5 in · 1 maybe".
      */
     data class Confirmed(
         val id: String,
@@ -88,6 +89,7 @@ sealed interface ChatItem {
         val detail: String,
         val recent: Boolean,
         val headline: String = "Everyone's in",
+        val count: String? = null,
     ) : ChatItem {
         override val key get() = id
     }
@@ -142,7 +144,7 @@ fun buildChatItems(
         when {
             // A confirmation; until its event loads (or if it was deleted) it stays a plain line.
             m.kind == MessageKind.System && m.eventId != null && events[m.eventId] != null ->
-                items += confirmedItem(m, events.getValue(m.eventId), now)
+                items += confirmedItem(m, events.getValue(m.eventId), proposals, now)
 
             m.kind == MessageKind.System || m.authorId == null && m.kind == MessageKind.Text ->
                 items += ChatItem.System(m.id, m.body.orEmpty())
@@ -280,7 +282,7 @@ fun attachmentsSpoken(attachments: List<Attachment>): String =
     if (attachments.size == 1 && (attachments[0].kind == AttachmentKind.File || attachments[0].kind == AttachmentKind.Pass)) attachments[0].toUi().accessibilityLabel
     else attachmentsSummary(attachments)
 
-private fun confirmedItem(m: Message, e: GroupEvent, now: Instant): ChatItem.Confirmed {
+private fun confirmedItem(m: Message, e: GroupEvent, proposals: Map<String, Proposal>, now: Instant): ChatItem.Confirmed {
     val sent = DateTimes.parseInstant(m.createdAt)
     val detail = listOfNotNull(
         DateTimes.rangeLabel(e.start, e.end, e.allDay).takeIf { it.isNotEmpty() },
@@ -294,7 +296,29 @@ private fun confirmedItem(m: Message, e: GroupEvent, now: Instant): ChatItem.Con
         detail = detail,
         recent = sent != null && !sent.isBefore(now.minus(BURST_WINDOW)) && !sent.isAfter(now.plus(BURST_WINDOW)),
         headline = if (m.body?.startsWith("It's on") == true) "It's on" else "Everyone's in",
+        count = confirmedCount(m, e.proposalId?.let(proposals::get)),
     )
+}
+
+/** "(3 of 5 can make it, 1 maybe)" at the end of an "It's on for …" confirmation. */
+private val CONFIRMED_COUNT = Regex("""\((\d+) of (\d+) can make it(?:, (\d+) maybe)?\)""")
+
+/**
+ * Who can make a plan confirmed before everyone accepted: "3 of 5 in · 1 maybe". From the
+ * proposal when it's loaded (so later reply changes show), else from the message; null when
+ * everyone's in.
+ */
+private fun confirmedCount(m: Message, proposal: Proposal?): String? {
+    if (proposal != null) {
+        if (proposal.everyoneIn) return null
+        return ProposalFormatting.withMaybes(
+            "${ProposalFormatting.acceptedCount(proposal)} of ${proposal.responses.size} in",
+            ProposalFormatting.maybeCount(proposal),
+        )
+    }
+    val match = CONFIRMED_COUNT.find(m.body.orEmpty()) ?: return null
+    val (coming, total, maybe) = match.destructured
+    return ProposalFormatting.withMaybes("$coming of $total in", maybe.toIntOrNull() ?: 0)
 }
 
 /** How recent a confirmation must be to burst. */

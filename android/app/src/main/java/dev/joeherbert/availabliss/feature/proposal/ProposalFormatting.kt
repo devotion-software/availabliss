@@ -11,7 +11,14 @@ import dev.joeherbert.availabliss.feature.common.MemberDirectory
 /** Shared presentation rules for proposals (chat cards, list, detail). */
 object ProposalFormatting {
 
+    /** Firm yeses. */
     fun acceptedCount(proposal: Proposal): Int = proposal.responses.count { it.response == ResponseKind.Accepted }
+
+    /** Maybes (soft yeses), counted apart from [acceptedCount]. */
+    fun maybeCount(proposal: Proposal): Int = proposal.responses.count { it.response == ResponseKind.Maybe }
+
+    /** "3 of 6 in" → "3 of 6 in · 1 maybe" when anyone said maybe. */
+    fun withMaybes(text: String, maybe: Int): String = if (maybe > 0) "$text · $maybe maybe" else text
 
     fun totalCount(proposal: Proposal, memberCount: Int): Int = proposal.responses.size.takeIf { it > 0 } ?: memberCount
 
@@ -37,10 +44,10 @@ object ProposalFormatting {
     fun clashShort(proposal: Proposal, directory: MemberDirectory?): String? =
         Clash.short(busyIds(proposal)) { directory?.get(it)?.name }
 
-    /** "Everyone's in", or "It's on · 3 of 4 coming" when confirmed without everyone. */
+    /** "Everyone's in", or "It's on · 3 of 4 coming" (" · 1 maybe") when confirmed without everyone. */
     fun confirmedStatus(proposal: Proposal): String =
         if (proposal.everyoneIn) "Everyone's in"
-        else "It's on · ${acceptedCount(proposal)} of ${proposal.responses.size} coming"
+        else withMaybes("It's on · ${acceptedCount(proposal)} of ${proposal.responses.size} coming", maybeCount(proposal))
 
     fun card(proposal: Proposal, directory: MemberDirectory?, memberCount: Int, caption: String? = null): ProposalCardUi {
         val date = DateTimes.localDate(proposal.start)
@@ -50,7 +57,7 @@ object ProposalFormatting {
         val (status, tone) = when (proposal.status) {
             ProposalStatus.Confirmed -> confirmedStatus(proposal) to ProposalCardTone.Confirmed
             ProposalStatus.Cancelled -> "Cancelled" to ProposalCardTone.Muted
-            ProposalStatus.Open -> "$accepted of $total accepted" to ProposalCardTone.Open
+            ProposalStatus.Open -> withMaybes("$accepted of $total accepted", maybeCount(proposal)) to ProposalCardTone.Open
         }
         return ProposalCardUi(
             month = date?.let(DateTimes::monthAbbrev).orEmpty(),

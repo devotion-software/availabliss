@@ -61,11 +61,16 @@ data class ProposalUiState(
     val rangeTime: String? = null,
     /** "From Fri 18:00 · Keswick" */
     val detail: String = "",
+    /** Firm yeses. */
     val accepted: Int = 0,
+    /** Maybes (soft yeses), counted apart from [accepted]. */
+    val maybe: Int = 0,
     val total: Int = 0,
     val members: List<ProposalMemberUi> = emptyList(),
     /** Confirmed: the members who accepted, proposer first. */
     val coming: List<ProposalMemberUi> = emptyList(),
+    /** Confirmed: members who said maybe (a soft yes), between who's coming and who can't. */
+    val maybes: List<ProposalMemberUi> = emptyList(),
     /** Confirmed: members who said they can't make it (confirmed anyway without them). */
     val cantMakeIt: List<ProposalMemberUi> = emptyList(),
     /** Confirmed: members who never replied (confirmed anyway before they did). */
@@ -77,7 +82,7 @@ data class ProposalUiState(
     val joinedLater: List<ProposalMemberUi> = emptyList(),
     /** Everyone it was put to can make it ("Everyone's in."), rather than confirmed anyway ("It's on."). */
     val everyoneIn: Boolean = true,
-    /** How many it was put to: who's coming, who can't and who never replied. */
+    /** How many it was put to: who's coming, who said maybe, who can't and who never replied. */
     val invited: Int = 0,
     /** The proposer or an admin, on an open proposal someone else has accepted: "Confirm anyway". */
     val canConfirmAnyway: Boolean = false,
@@ -271,19 +276,24 @@ class ProposalViewModel @Inject constructor(
         if (group != null) data.update { it.copy(group = group) }
     }
 
-    /** "Priya can't make it and Tom hasn't replied. Everyone will be told it's on, with 2 of 4 coming." */
+    /** "Priya can't make it, Ana said maybe and Tom hasn't replied. Everyone will be told it's on, with 1 of 4 coming and 1 maybe." */
     private fun confirmAnywayMessage(p: Proposal, members: List<ProposalMemberUi>, meId: String?, directory: MemberDirectory): String {
         val replied = p.responses.map { it.userId }.toSet()
         fun names(kind: ResponseKind) = members.filter { it.response == kind && it.userId in replied }
             .map { if (it.userId == meId) "You" else directory[it.userId]?.name?.firstName() ?: "Someone" }
         val declined = names(ResponseKind.Declined)
+        val maybe = names(ResponseKind.Maybe)
         val pending = names(ResponseKind.Pending)
         val parts = buildList {
             if (declined.isNotEmpty()) add("${declined.joinNamesSummary(4)} can't make it")
+            if (maybe.isNotEmpty()) add("${maybe.joinNamesSummary(4)} said maybe")
             if (pending.isNotEmpty()) add("${pending.joinNamesSummary(4)} ${if (pending.size == 1) "hasn't" else "haven't"} replied")
         }
-        val who = parts.joinToString(" and ").let { if (it.isEmpty()) "" else "$it. " }
-        return "${who}Everyone will be told it's on, with ${ProposalFormatting.acceptedCount(p)} of ${p.responses.size} coming."
+        val joined = if (parts.size <= 1) parts.firstOrNull().orEmpty() else parts.dropLast(1).joinToString(", ") + " and " + parts.last()
+        val who = if (joined.isEmpty()) "" else "$joined. "
+        val maybeCount = ProposalFormatting.maybeCount(p)
+        val maybes = if (maybeCount > 0) " and $maybeCount maybe" else ""
+        return "${who}Everyone will be told it's on, with ${ProposalFormatting.acceptedCount(p)} of ${p.responses.size} coming$maybes."
     }
 
     /** "Priya can't make it any more" / "Priya and Tom can't make it any more". */
@@ -314,7 +324,9 @@ class ProposalViewModel @Inject constructor(
                 member != null && !member.synced -> "Not synced yet"
                 id in busyIds && response == ResponseKind.Pending -> "Busy then · hasn't replied"
                 id in busyIds && response == ResponseKind.Accepted -> "Busy then, but in"
+                id in busyIds && response == ResponseKind.Maybe -> "Busy then · said maybe"
                 response == ResponseKind.Pending -> "Hasn't replied"
+                response == ResponseKind.Maybe -> "Said maybe"
                 response == ResponseKind.Declined -> "Can't make it"
                 member?.role?.isAdmin == true -> "Admin"
                 else -> "Synced"
@@ -345,10 +357,14 @@ class ProposalViewModel @Inject constructor(
             rangeTime = rangeParts.second,
             detail = ProposalFormatting.detailLine(p),
             accepted = ProposalFormatting.acceptedCount(p),
+            maybe = ProposalFormatting.maybeCount(p),
             total = ProposalFormatting.totalCount(p, g?.memberCount ?: 0),
             members = members,
             coming = if (!confirmed) emptyList() else members
                 .filter { it.response == ResponseKind.Accepted && inGroup(it.userId) }
+                .map { it.copy(note = if (it.userId == p.createdBy) "Proposed this" else "") },
+            maybes = if (!confirmed) emptyList() else members
+                .filter { it.userId in responses && it.response == ResponseKind.Maybe && inGroup(it.userId) }
                 .map { it.copy(note = if (it.userId == p.createdBy) "Proposed this" else "") },
             cantMakeIt = if (!confirmed) emptyList() else members
                 .filter { it.userId in responses && it.response == ResponseKind.Declined && inGroup(it.userId) }

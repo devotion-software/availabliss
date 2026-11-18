@@ -28,7 +28,7 @@ import javax.inject.Inject
 
 /**
  * A proposal row. [headline] / [detail] are the compact one-line forms the calendar's Plans card
- * shows: "Pub quiz" / "Fri 13 Nov · 3 of 6 in · you're in".
+ * shows: "Pub quiz" / "Fri 13 Nov · 3 of 6 in · 1 maybe · you're in".
  */
 data class ProposalListItem(
     val id: String,
@@ -114,12 +114,16 @@ class GroupProposalsViewModel @Inject constructor(
             val card = ProposalFormatting.card(p, directory, memberCount)
             val title = p.title?.takeIf { it.isNotBlank() }
             val status = if (p.status == ProposalStatus.Open) {
-                "${ProposalFormatting.acceptedCount(p)} of ${ProposalFormatting.totalCount(p, memberCount)} in"
+                ProposalFormatting.withMaybes(
+                    "${ProposalFormatting.acceptedCount(p)} of ${ProposalFormatting.totalCount(p, memberCount)} in",
+                    ProposalFormatting.maybeCount(p),
+                )
             } else {
                 "Confirmed"
             }
             val yours = when (p.responses.firstOrNull { it.userId == meId }?.response.takeIf { p.status == ProposalStatus.Open }) {
                 ResponseKind.Accepted -> "you're in"
+                ResponseKind.Maybe -> "you said maybe"
                 ResponseKind.Declined -> "you can't make it"
                 ResponseKind.Pending -> "waiting on you"
                 else -> null

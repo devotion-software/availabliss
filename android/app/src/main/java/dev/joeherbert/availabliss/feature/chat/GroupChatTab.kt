@@ -597,6 +597,7 @@ internal fun ChatRow(
             modifier = Modifier.zIndex(1f),
             burstKey = item.id.takeIf { item.recent },
             headline = item.headline,
+            count = item.count,
         ) {
             AddToCalendarButton(
                 calendar.status(item.eventId),

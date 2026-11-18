@@ -4,6 +4,9 @@ import dev.joeherbert.availabliss.core.network.model.CalendarProvider
 import dev.joeherbert.availabliss.core.network.model.ConnectionsResponse
 import dev.joeherbert.availabliss.core.network.model.NotificationKind
 import dev.joeherbert.availabliss.core.network.model.NotificationsResponse
+import dev.joeherbert.availabliss.core.network.model.Proposal
+import dev.joeherbert.availabliss.core.network.model.RespondRequest
+import dev.joeherbert.availabliss.core.network.model.ResponseKind
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -28,5 +31,22 @@ class LenientEnumTest {
         val providers = json.decodeFromString(ConnectionsResponse.serializer(), body).connections.map { it.provider }
         assertEquals(listOf(CalendarProvider.CalDav, CalendarProvider.Unknown), providers)
         assertEquals("\"microsoft\"", json.encodeToString(CalendarProvider.serializer(), CalendarProvider.Microsoft))
+    }
+
+    @Test
+    fun `proposal replies decode by wire value, maybe included, and unknown replies count as pending`() {
+        val body = """{"id":"p","groupId":"g","start":"2026-11-20T18:00:00Z","end":"2026-11-20T21:00:00Z",
+            "status":"open","createdBy":"a","createdAt":"2026-11-18T10:00:00Z","responses":[
+            {"userId":"a","response":"accepted","updatedAt":"2026-11-18T10:00:00Z"},
+            {"userId":"b","response":"maybe","updatedAt":"2026-11-18T10:00:00Z"},
+            {"userId":"c","response":"declined","updatedAt":"2026-11-18T10:00:00Z"},
+            {"userId":"d","response":"pending","updatedAt":"2026-11-18T10:00:00Z"},
+            {"userId":"e","response":"tentative","updatedAt":"2026-11-18T10:00:00Z"}]}"""
+        val responses = json.decodeFromString(Proposal.serializer(), body).responses.map { it.response }
+        assertEquals(
+            listOf(ResponseKind.Accepted, ResponseKind.Maybe, ResponseKind.Declined, ResponseKind.Pending, ResponseKind.Pending),
+            responses,
+        )
+        assertEquals("""{"response":"maybe"}""", json.encodeToString(RespondRequest.serializer(), RespondRequest(ResponseKind.Maybe)))
     }
 }

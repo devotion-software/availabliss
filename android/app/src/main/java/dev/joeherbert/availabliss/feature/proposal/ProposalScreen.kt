@@ -135,7 +135,7 @@ fun ProposalScreen(
         )
     }
     ProposalContent(state = state, actions = actions)
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) { AvSnackbarHost(snackbar, Modifier.navigationBarsPadding().padding(bottom = 120.dp)) }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) { AvSnackbarHost(snackbar, Modifier.navigationBarsPadding().padding(bottom = 180.dp)) }
 }
 
 @Composable
@@ -152,7 +152,7 @@ private fun PendingContent(state: ProposalUiState, actions: ProposalActions) {
     val colors = AvailablissTheme.colors
     Box(Modifier.fillMaxSize().statusBarsPadding()) {
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 160.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 220.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             ScreenHeader(
@@ -174,17 +174,21 @@ private fun PendingContent(state: ProposalUiState, actions: ProposalActions) {
                         if (state.detail.isNotEmpty()) Text(state.detail, style = AvailablissTheme.type.labelRegular.copy(fontWeight = FontWeight.Normal), color = colors.muted)
                     }
                     val total = state.total.coerceAtLeast(1)
-                    SyncRing(
-                        progress = state.accepted / total.toFloat(),
-                        size = 76.dp,
-                        strokeWidth = 7.dp,
-                        color = colors.ok,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${state.accepted}/${state.total}", style = AvailablissTheme.type.titleMedium, color = colors.ink)
-                            Text("accepted", style = AvailablissTheme.type.nano.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SyncRing(
+                            progress = state.accepted / total.toFloat(),
+                            size = 76.dp,
+                            strokeWidth = 7.dp,
+                            color = colors.ok,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("${state.accepted}/${state.total}", style = AvailablissTheme.type.titleMedium, color = colors.ink)
+                                Text("accepted", style = AvailablissTheme.type.nano.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                            }
                         }
+                        // Maybes are counted apart from the firm yeses in the ring.
+                        if (state.maybe > 0) StatusPill("${state.maybe} maybe", PillTone.Indigo)
                     }
                 }
             }
@@ -273,6 +277,7 @@ private fun MemberRow(member: ProposalMemberUi, onOverride: (ResponseKind) -> Un
         if (member.canOverride) OverrideMenu(member.name, onOverride)
         val (label, tone) = when (member.response) {
             ResponseKind.Accepted -> "Accepted" to PillTone.Mint
+            ResponseKind.Maybe -> "Maybe" to PillTone.Indigo
             ResponseKind.Pending -> "Waiting" to PillTone.Apricot
             ResponseKind.Declined -> "Can't make it" to PillTone.Neutral
         }
@@ -295,6 +300,7 @@ private fun OverrideMenu(name: String, onOverride: (ResponseKind) -> Unit) {
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bg) {
             listOf(
                 ResponseKind.Accepted to "Mark $name as accepted",
+                ResponseKind.Maybe to "Mark $name as maybe",
                 ResponseKind.Declined to "Mark $name as can't make it",
                 ResponseKind.Pending to "Reset $name's reply",
             ).forEach { (kind, label) ->
@@ -340,10 +346,12 @@ private fun ReplyBar(state: ProposalUiState, onRespond: (ResponseKind) -> Unit, 
     ) {
         val prompt = when (state.myResponse) {
             ResponseKind.Accepted -> "You're in. Changed your mind?"
+            ResponseKind.Maybe -> "You said maybe. Can you say for sure?"
             ResponseKind.Declined -> "You said you can't make it."
             else -> if (state.iAmBusy) "You're busy then. Can you still make it?" else "Can you make it?"
         }
         Text(prompt, style = AvailablissTheme.type.label, color = colors.ink, modifier = Modifier.padding(start = 4.dp))
+        // Can't make it and Maybe side by side, then Accept full width: three in a row don't fit on a phone.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SecondaryButton(
                 text = "Can't make it",
@@ -352,18 +360,28 @@ private fun ReplyBar(state: ProposalUiState, onRespond: (ResponseKind) -> Unit, 
                 modifier = Modifier.weight(1f),
                 textStyle = AvailablissTheme.type.bodyMedium,
             )
-            PrimaryButton(
-                text = if (state.myResponse == ResponseKind.Accepted) "Accepted" else "Accept",
-                onClick = { onRespond(ResponseKind.Accepted) },
-                height = 50.dp,
-                shape = Shapes.control,
-                textStyle = AvailablissTheme.type.bodyMedium,
-                enabled = state.myResponse != ResponseKind.Accepted,
-                loading = state.responding,
-                icon = if (state.myResponse == ResponseKind.Accepted) AvIcons.Check else null,
+            val maybe = state.myResponse == ResponseKind.Maybe
+            SecondaryButton(
+                text = "Maybe",
+                onClick = { onRespond(ResponseKind.Maybe) },
+                enabled = !state.responding && !maybe,
                 modifier = Modifier.weight(1f),
+                icon = if (maybe) AvIcons.Check else null,
+                textStyle = AvailablissTheme.type.bodyMedium,
+                borderColor = if (maybe) colors.accent else colors.line2,
             )
         }
+        PrimaryButton(
+            text = if (state.myResponse == ResponseKind.Accepted) "Accepted" else "Accept",
+            onClick = { onRespond(ResponseKind.Accepted) },
+            height = 50.dp,
+            shape = Shapes.control,
+            textStyle = AvailablissTheme.type.bodyMedium,
+            enabled = state.myResponse != ResponseKind.Accepted,
+            loading = state.responding,
+            icon = if (state.myResponse == ResponseKind.Accepted) AvIcons.Check else null,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -464,6 +482,9 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
             if (state.coming.isNotEmpty()) {
                 PeoplePanel("Who's coming", state.coming.size.toString(), state.coming)
             }
+            if (state.maybes.isNotEmpty()) {
+                PeoplePanel("Maybe", state.maybes.size.toString(), state.maybes)
+            }
             if (state.cantMakeIt.isNotEmpty()) {
                 PeoplePanel("Can't make it", state.cantMakeIt.size.toString(), state.cantMakeIt, quiet = true)
             }
@@ -523,13 +544,17 @@ private fun ReviewPrompt(state: ProposalUiState, actions: ProposalActions) {
     }
 }
 
-/** "Can't make it any more?" (or "Can make it after all?") under the plan, confirmed in a sheet. */
+/**
+ * "Can't make it any more?" (or "Can you say for sure?", "Can make it after all?") under the
+ * plan, confirmed in a sheet offering the other replies: I can make it, Maybe, I can't make it.
+ */
 @Composable
 private fun ChangeReply(state: ProposalUiState, onRespond: (ResponseKind) -> Unit) {
     val colors = AvailablissTheme.colors
     var open by remember { mutableStateOf(false) }
     val label = when (state.myResponse) {
         ResponseKind.Accepted -> "Can't make it any more?"
+        ResponseKind.Maybe -> "Can you say for sure?"
         ResponseKind.Declined -> "Can make it after all?"
         else -> "Can you make it?"
     }
@@ -551,23 +576,32 @@ private fun ChangeReply(state: ProposalUiState, onRespond: (ResponseKind) -> Uni
         open = false
         onRespond(ResponseKind.Accepted)
     }, icon = AvIcons.Check)
+    val maybe = ConfirmOption("Maybe", onClick = {
+        open = false
+        onRespond(ResponseKind.Maybe)
+    }, kind = ConfirmOption.Kind.Secondary)
     ConfirmSheet(
-        title = if (state.myResponse == ResponseKind.Accepted) "Can't make it any more?" else "Can you make it?",
+        title = when (state.myResponse) {
+            ResponseKind.Accepted -> "Can't make it any more?"
+            ResponseKind.Maybe -> "Can you say for sure?"
+            else -> "Can you make it?"
+        },
         message = if (state.myResponse == ResponseKind.Accepted) {
-            "The plan stays on. Whoever proposed it and the admins will be told, so they can keep it or find another date."
+            "The plan stays on. If you can't make it, whoever proposed it and the admins will be told, so they can keep it or find another date."
         } else {
             "Let everyone know whether you're coming."
         },
         options = when (state.myResponse) {
-            ResponseKind.Accepted -> listOf(iCant)
-            ResponseKind.Declined -> listOf(iCan)
-            else -> listOf(iCan, iCant)
+            ResponseKind.Accepted -> listOf(maybe, iCant)
+            ResponseKind.Maybe -> listOf(iCan, iCant)
+            ResponseKind.Declined -> listOf(iCan, maybe)
+            else -> listOf(iCan, maybe, iCant)
         },
         onDismiss = { open = false },
     )
 }
 
-/** Who's coming (or, [quiet], who can't, never replied or joined the group since): a titled glass list of people. */
+/** Who's coming or said maybe (or, [quiet], who can't, never replied or joined the group since): a titled glass list of people. */
 @Composable
 private fun PeoplePanel(title: String, trailing: String?, people: List<ProposalMemberUi>, modifier: Modifier = Modifier, quiet: Boolean = false) {
     val colors = AvailablissTheme.colors
@@ -603,7 +637,7 @@ private fun PeoplePanel(title: String, trailing: String?, people: List<ProposalM
 private val previewMembers = listOf(
     ProposalMemberUi("a", AvatarPerson("a", "Ana"), "Ana", "Proposed this", ResponseKind.Accepted, false),
     ProposalMemberUi("p", AvatarPerson("p", "Priya"), "Priya", "Synced", ResponseKind.Accepted, false),
-    ProposalMemberUi("s", AvatarPerson("s", "Sam"), "Sam (you)", "Admin", ResponseKind.Pending, false),
+    ProposalMemberUi("s", AvatarPerson("s", "Sam"), "Sam (you)", "Said maybe", ResponseKind.Maybe, false),
     ProposalMemberUi("t", AvatarPerson("t", "Tom"), "Tom", "Hasn't replied", ResponseKind.Pending, true),
 )
 
@@ -614,8 +648,8 @@ private fun ProposalPendingPreview() {
         ProposalContent(
             ProposalUiState(
                 loading = false, groupName = "Lake District crew", proposedBy = "Ana proposed · 2h ago",
-                range = "Fri 13 – Sun 15 Nov", detail = "From Fri 18:00 · Keswick", accepted = 2, total = 4,
-                members = previewMembers, isAdmin = true,
+                range = "Fri 13 – Sun 15 Nov", detail = "From Fri 18:00 · Keswick", accepted = 2, maybe = 1, total = 4,
+                members = previewMembers, isAdmin = true, myResponse = ResponseKind.Maybe,
             ),
             ProposalActions(),
         )
@@ -628,7 +662,7 @@ private fun ProposalConfirmedPreview() {
     AvailablissPreviewTheme(dark = true) {
         ProposalContent(
             ProposalUiState(loading = false, groupName = "Lake District crew", range = "Sat 14 Nov · 18:30 – 21:00", rangeDate = "Sat 14 Nov", rangeTime = "18:30 – 21:00", total = 4, location = "Keswick", status = ProposalStatus.Confirmed,
-                coming = previewMembers.take(3), joinedLater = previewMembers.drop(3)),
+                coming = previewMembers.take(2), maybes = previewMembers.slice(2..2), joinedLater = previewMembers.drop(3), everyoneIn = false, invited = 3),
             ProposalActions(),
         )
     }
