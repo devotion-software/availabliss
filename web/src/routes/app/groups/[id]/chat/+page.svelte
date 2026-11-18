@@ -2,6 +2,8 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { ChatThread } from '#lib/client/chat-thread.svelte';
+	import { replyingTo } from '#lib/client/chat-messages';
+	import { memberMap } from '#lib/client/members';
 	import { firstName, listNames } from '#lib/client/format';
 	import GroupTile from '#lib/components/ui/GroupTile.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
@@ -82,6 +84,8 @@
 			editing={thread.editing}
 			onsaveedit={(b) => thread.saveEdit(b)}
 			oncanceledit={() => thread.cancelEdit()}
+			replying={replyingTo(thread.replyingTo, data.user.id, memberMap(group))}
+			oncancelreply={() => thread.cancelReply()}
 		/>
 	</div>
 </div>

@@ -13,18 +13,30 @@
 	import { portal } from '#lib/components/ui/portal';
 
 	/**
-	 * Info / Edit / Delete for one of your messages: opened by long-press, right-click or the bubble's ⋯ button.
+	 * Reply / Info, and Edit / Delete on your own messages: opened by long-press, right-click or the bubble's ⋯ button.
 	 * Floats at the pointer (or the button), kept inside the viewport. Same look as the group's More menu.
 	 */
 	interface Props {
 		/** Where to open it; null when closed. */
 		anchor: MessageMenuAnchor | null;
 		oninfo: () => void;
-		onedit: () => void;
-		ondelete: () => void;
+		/** Each is left out of the menu when not given. */
+		onreply?: () => void;
+		onedit?: () => void;
+		ondelete?: () => void;
 		onclose: () => void;
 	}
-	let { anchor, oninfo, onedit, ondelete, onclose }: Props = $props();
+	let { anchor, oninfo, onreply, onedit, ondelete, onclose }: Props = $props();
+
+	type Item = { label: string; icon: 'reply' | 'info' | 'pencil' | 'trash'; run: () => void; danger?: boolean };
+	const items = $derived(
+		[
+			onreply && { label: 'Reply', icon: 'reply', run: onreply },
+			{ label: 'Info', icon: 'info', run: oninfo },
+			onedit && { label: 'Edit', icon: 'pencil', run: onedit },
+			ondelete && { label: 'Delete', icon: 'trash', run: ondelete, danger: true }
+		].filter(Boolean) as Item[]
+	);
 
 	let el: HTMLElement | undefined = $state();
 	let pos = $state({ left: 0, top: 0 });
@@ -77,16 +89,18 @@
 	}
 
 	function onkeydown(e: KeyboardEvent) {
-		const i = buttons.indexOf(document.activeElement as HTMLElement);
+		// The menu's items change with the message; drop slots left from a longer one.
+		const live = buttons.slice(0, items.length);
+		const i = live.indexOf(document.activeElement as HTMLElement);
 		if (e.key === 'Escape' || e.key === 'Tab') {
 			e.preventDefault();
 			e.stopPropagation();
 			choose(() => {});
 		} else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
 			e.preventDefault();
-			const n = buttons.length;
+			const n = live.length;
 			const next = i < 0 ? (e.key === 'ArrowDown' ? 0 : n - 1) : (i + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
-			buttons[next]?.focus();
+			live[next]?.focus();
 		}
 	}
 </script>
@@ -103,15 +117,11 @@
 		use:portal
 		{onkeydown}
 	>
-		<button bind:this={buttons[0]} type="button" role="menuitem" onclick={() => choose(oninfo)}>
-			<Icon name="info" size={18} />Info
-		</button>
-		<button bind:this={buttons[1]} type="button" role="menuitem" onclick={() => choose(onedit)}>
-			<Icon name="pencil" size={18} />Edit
-		</button>
-		<button bind:this={buttons[2]} type="button" role="menuitem" class="danger" onclick={() => choose(ondelete)}>
-			<Icon name="trash" size={18} />Delete
-		</button>
+		{#each items as item, i (item.label)}
+			<button bind:this={buttons[i]} type="button" role="menuitem" class:danger={item.danger} onclick={() => choose(item.run)}>
+				<Icon name={item.icon} size={18} />{item.label}
+			</button>
+		{/each}
 	</div>
 {/if}
 

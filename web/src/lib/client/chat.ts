@@ -14,7 +14,8 @@ export interface PollInput {
 
 export const listMessages = (groupId: string, opts: { before?: string; limit?: number } = {}, fetch?: Fetch) =>
 	api.get<MessagePage>(`/groups/${groupId}/messages`, { fetch, query: { before: opts.before, limit: opts.limit ?? 50 } });
-export const sendMessage = (groupId: string, body: string) => api.post<Message>(`/groups/${groupId}/messages`, { body });
+export const sendMessage = (groupId: string, body: string, replyToId?: string | null) =>
+	api.post<Message>(`/groups/${groupId}/messages`, replyToId ? { body, replyToId } : { body });
 export const sendPoll = (groupId: string, poll: PollInput) => api.post<Message>(`/groups/${groupId}/messages`, { poll });
 export const sendReceipt = (groupId: string, upTo: string, state: 'delivered' | 'seen') =>
 	api.post(`/groups/${groupId}/messages/receipts`, { upTo, state });

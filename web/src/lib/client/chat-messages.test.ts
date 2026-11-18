@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Message } from '#lib/types';
-import { applyMessageUpdate, canModifyMessage, deletedCopy } from './chat-messages';
+import type { Member } from '#lib/types';
+import { applyMessageUpdate, canModifyMessage, canReplyTo, deletedCopy, replyAuthorName, replyPreview, replySnippet, replyingTo } from './chat-messages';
 
 const msg = (over: Partial<Message> = {}): Message => ({
 	id: 'm1',
@@ -67,4 +68,39 @@ test('deletedCopy', () => {
 	expect(d.body).toBeNull();
 	expect(d.deleted).toBe(true);
 	expect(d.receipt).toEqual(msg().receipt);
+});
+
+describe('replies', () => {
+	const quote = (over = {}) => ({ id: 'm1', authorId: 'u2', authorName: 'Priya Shah', kind: 'text' as const, text: 'hello', deleted: false, ...over });
+	const members = new Map([['u2', { userId: 'u2', name: 'Priya Shah' } as Member]]);
+
+	test('text and polls that are sent and still there can be replied to', () => {
+		expect(canReplyTo(msg())).toBe(true);
+		expect(canReplyTo(msg({ kind: 'poll' }))).toBe(true);
+		expect(canReplyTo(msg({ id: 'temp-1' }))).toBe(false);
+		expect(canReplyTo(msg({ deleted: true, body: null }))).toBe(false);
+		expect(canReplyTo(msg({ kind: 'system', authorId: null }))).toBe(false);
+	});
+
+	test('a quote is one line of the text, or the poll question', () => {
+		expect(replyPreview(msg({ body: 'Who is  in?\nMe' })).text).toBe('Who is in? Me');
+		const poll = msg({ kind: 'poll', body: null, poll: { id: 'p', question: 'Which park?', multi: false, closed: false, options: [] } });
+		expect(replySnippet(replyPreview(poll))).toBe('Poll: Which park?');
+		expect(replySnippet(quote({ deleted: true, text: null }))).toBe('Deleted message');
+	});
+
+	test('names: you, the member, or the name sent for someone who has left', () => {
+		expect(replyAuthorName(quote({ authorId: 'me' }), 'me', members)).toBe('You');
+		expect(replyAuthorName(quote(), 'me', members)).toBe('Priya Shah');
+		expect(replyAuthorName(quote({ authorId: 'gone', authorName: 'Leo' }), 'me', members)).toBe('Leo');
+		expect(replyingTo(msg({ id: 'a', authorId: 'u2' }), 'me', members)).toEqual({ id: 'a', name: 'Priya Shah', snippet: 'hello' });
+	});
+
+	test('edits and deletes of the original refresh quotes of it, even when it is not loaded', () => {
+		const list = [msg({ id: 'r', replyTo: quote() })];
+		const edited = applyMessageUpdate(list, msg({ id: 'm1', authorId: 'u2', body: 'hello again' }));
+		expect(edited[0].replyTo).toMatchObject({ text: 'hello again', deleted: false, authorName: 'Priya Shah' });
+		const deleted = applyMessageUpdate(edited, msg({ id: 'm1', authorId: 'u2', body: null, deleted: true }));
+		expect(deleted[0].replyTo).toMatchObject({ text: null, deleted: true });
+	});
 });

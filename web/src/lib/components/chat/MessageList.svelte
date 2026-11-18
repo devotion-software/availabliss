@@ -7,7 +7,9 @@
 	import Button from '#lib/components/ui/Button.svelte';
 	import Spinner from '#lib/components/ui/Spinner.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
-	import MessageBubble from './MessageBubble.svelte';
+	import MessageBubble, { type BubbleQuote } from './MessageBubble.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
+	import { replyAuthorName, replySnippet } from '#lib/client/chat-messages';
 	import PollCard from './PollCard.svelte';
 	import ProposalCard from './ProposalCard.svelte';
 	import EventCard from './EventCard.svelte';
@@ -35,9 +37,12 @@
 	let sentinel: HTMLElement | undefined = $state();
 	let infoOpen = $state(false);
 	let infoMessage = $state<Message | null>(null);
-	// Info / Edit / Delete on one of your messages.
+	// Reply / Info, and Edit / Delete on your own messages.
 	let menuAnchor = $state<MessageMenuAnchor | null>(null);
-	let menuMessage: Message | null = null;
+	let menuMessage = $state<Message | null>(null);
+	// The original of a tapped quote, flashed after scrolling to it.
+	let highlighted = $state<string | null>(null);
+	let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 	let confirmOpen = $state(false);
 	let deleting = $state<Message | null>(null);
 
@@ -69,7 +74,8 @@
 				first: !joins(prev, m),
 				last: !joins(m, next),
 				mine: m.authorId === meId,
-				receipt: i === lastMine
+				receipt: i === lastMine,
+				quote: m.replyTo && !m.deleted ? quoteFor(m.replyTo) : null
 			};
 		});
 	});
@@ -116,6 +122,25 @@
 			tick().then(() => scroller?.scrollTo({ top: scroller.scrollHeight, behavior: initial ? 'auto' : 'smooth' }));
 		}
 	});
+
+	function quoteFor(r: NonNullable<Message['replyTo']>): BubbleQuote {
+		return { id: r.id, name: replyAuthorName(r, meId, members), snippet: replySnippet(r), deleted: r.deleted };
+	}
+
+	/** Scrolls to a quoted message (when it's loaded) and flashes it. */
+	function showOriginal(id: string) {
+		const el = scroller?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(id)}"]`);
+		if (!el) return;
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+		highlighted = id;
+		clearTimeout(highlightTimer);
+		highlightTimer = setTimeout(() => (highlighted = null), 1400);
+	}
+
+	function reply(m: Message) {
+		thread.startReply(m);
+	}
 
 	async function loadOlder() {
 		const before = scroller?.scrollHeight ?? 0;
@@ -166,22 +191,29 @@
 		{#each items as item (item.m.id)}
 			{@const m = item.m}
 			{#if item.divider}<span class="divider">{item.divider}</span>{/if}
-			<div class="item" class:tight={!item.first}>
+			<div class="item" class:tight={!item.first} class:highlight={highlighted === m.id} data-message-id={m.id}>
 				{#if isConfirmationMessage(m)}
 					<ConfirmedBanner message={m} {compact} />
 				{:else if m.kind === 'system'}
 					<p class="system">{m.body}</p>
 				{:else if m.kind === 'poll' && m.poll}
-					<PollCard
-						poll={m.poll}
-						{meId}
-						mine={item.mine}
-						authorName={m.authorId ? members.get(m.authorId)?.name : undefined}
-						{compact}
-						canClose={item.mine}
-						onvote={(ids) => thread.vote(m.poll!.id, ids)}
-						onclose={() => thread.closePoll(m.poll!.id)}
-					/>
+					<div class="poll-line" class:mine={item.mine}>
+						<PollCard
+							poll={m.poll}
+							{meId}
+							mine={item.mine}
+							authorName={m.authorId ? members.get(m.authorId)?.name : undefined}
+							{compact}
+							canClose={item.mine}
+							onvote={(ids) => thread.vote(m.poll!.id, ids)}
+							onclose={() => thread.closePoll(m.poll!.id)}
+						/>
+						{#if thread.canReply(m)}
+							<button type="button" class="poll-reply" aria-label="Reply to the poll" title="Reply" onclick={() => reply(m)}>
+								<Icon name="reply" size={17} strokeWidth={2.2} />
+							</button>
+						{/if}
+					</div>
 				{:else if m.kind === 'proposal' && m.proposalId}
 					<ProposalCard proposalId={m.proposalId} {members} {meId} {compact} />
 				{:else if m.kind === 'event'}
@@ -196,8 +228,12 @@
 						{compact}
 						showEdited={!item.receipt}
 						canModify={thread.canModify(m)}
+						canReply={thread.canReply(m)}
+						quote={item.quote}
 						oninfo={openInfo}
 						onmenu={openMenu}
+						onreply={reply}
+						onquote={showOriginal}
 					/>
 				{/if}
 				{#if item.receipt}
@@ -215,8 +251,9 @@
 	anchor={menuAnchor}
 	onclose={() => (menuAnchor = null)}
 	oninfo={() => menuMessage && openInfo(menuMessage)}
-	onedit={() => menuMessage && thread.startEdit(menuMessage)}
-	ondelete={() => menuMessage && confirmDelete(menuMessage)}
+	onreply={menuMessage && thread.canReply(menuMessage) ? () => menuMessage && reply(menuMessage) : undefined}
+	onedit={menuMessage && thread.canModify(menuMessage) ? () => menuMessage && thread.startEdit(menuMessage) : undefined}
+	ondelete={menuMessage && thread.canModify(menuMessage) ? () => menuMessage && confirmDelete(menuMessage) : undefined}
 />
 
 <ConfirmSheet
@@ -232,6 +269,7 @@
 	.scroller {
 		flex: 1;
 		min-height: 0;
+		overflow-x: hidden;
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		scrollbar-width: thin;
@@ -256,6 +294,63 @@
 	}
 	.item.tight {
 		margin-top: -6px;
+	}
+	.item {
+		border-radius: 18px;
+		transition:
+			background-color 0.6s ease,
+			box-shadow 0.6s ease;
+	}
+	.item.highlight {
+		background: var(--accent-soft);
+		box-shadow: 0 0 0 6px var(--accent-soft);
+		transition-duration: 0.2s;
+	}
+	.poll-line {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+	}
+	.poll-reply {
+		position: absolute;
+		top: 50%;
+		translate: 0 -50%;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--muted);
+		opacity: 0;
+		transition:
+			opacity 0.15s ease,
+			background-color 0.15s ease;
+	}
+	/* Beside the card: to its right for others' polls, left for yours. */
+	.poll-line:not(.mine) .poll-reply {
+		left: min(calc(100% + 4px), calc(320px + 4px));
+	}
+	.poll-line.mine .poll-reply {
+		right: min(calc(100% + 4px), calc(320px + 4px));
+	}
+	.poll-reply:hover {
+		color: var(--ink);
+		background: var(--surface);
+	}
+	.poll-reply:focus-visible {
+		opacity: 1;
+	}
+	@media (hover: hover) {
+		.poll-line:hover .poll-reply {
+			opacity: 1;
+		}
+	}
+	@media (hover: none) {
+		/* No hover on touch screens: keep it faintly visible. */
+		.poll-reply {
+			opacity: 0.7;
+		}
 	}
 	.older,
 	.center {

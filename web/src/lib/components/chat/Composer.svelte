@@ -2,11 +2,13 @@
 	import { tick, untrack } from 'svelte';
 	import { fly } from 'svelte/transition';
 	import type { Message } from '#lib/types';
+	import type { ReplyingTo } from '#lib/client/chat-messages';
 	import Icon from '#lib/components/ui/Icon.svelte';
 
 	/**
 	 * Message box with a + menu for Poll / Propose a time / Add event (Chat.dc.html).
 	 * While `editing` one of your messages it holds that text, and send becomes Save; cancelling restores your draft.
+	 * While `replying`, a "Replying to …" strip with ✕ sits above the field.
 	 */
 	interface Props {
 		groupId: string;
@@ -18,8 +20,22 @@
 		/** Saves the edit; should throw on failure (stays in edit mode). */
 		onsaveedit?: (body: string) => Promise<unknown> | unknown;
 		oncanceledit?: () => void;
+		/** The message your next one replies to. */
+		replying?: ReplyingTo | null;
+		oncancelreply?: () => void;
 	}
-	let { groupId, onsend, onpoll, onpropose, compact = false, editing = null, onsaveedit, oncanceledit }: Props = $props();
+	let {
+		groupId,
+		onsend,
+		onpoll,
+		onpropose,
+		compact = false,
+		editing = null,
+		onsaveedit,
+		oncanceledit,
+		replying = null,
+		oncancelreply
+	}: Props = $props();
 
 	const uid = $props.id();
 	let body = $state('');
@@ -47,6 +63,20 @@
 			} else {
 				body = draft;
 				draft = '';
+			}
+		});
+	});
+
+	// Starting a reply puts you in the field.
+	let replyingId: string | null = null;
+	$effect(() => {
+		const id = replying?.id ?? null;
+		untrack(() => {
+			if (id === replyingId) return;
+			replyingId = id;
+			if (id) {
+				menu = false;
+				tick().then(() => input?.focus());
 			}
 		});
 	});
@@ -90,7 +120,15 @@
 		} else if (e.key === 'Escape' && editing) {
 			e.stopPropagation();
 			oncanceledit?.();
+		} else if (e.key === 'Escape' && replying) {
+			e.stopPropagation();
+			oncancelreply?.();
 		}
+	}
+
+	function cancelReply() {
+		oncancelreply?.();
+		input?.focus();
 	}
 
 	function cancelEdit() {
@@ -127,6 +165,19 @@
 		</div>
 	{/if}
 
+	{#if replying && !editing}
+		<div class="replying" transition:fly={{ y: 8, duration: 180 }}>
+			<span class="bar-line" aria-hidden="true"></span>
+			<span class="replying-text" id="composer-replying-{uid}">
+				<span class="replying-label">Replying to {replying.name === 'You' ? 'yourself' : replying.name}</span>
+				<span class="replying-snippet">{replying.snippet}</span>
+			</span>
+			<button type="button" class="cancel-edit" aria-label="Cancel reply" title="Cancel reply" onclick={cancelReply}>
+				<Icon name="x" size={16} strokeWidth={2.4} />
+			</button>
+		</div>
+	{/if}
+
 	<form class="bar" class:glass={!compact} onsubmit={submit}>
 		<button
 			type="button"
@@ -148,7 +199,7 @@
 			autocomplete="off"
 			enterkeyhint={editing ? 'done' : 'send'}
 			maxlength={4000}
-			aria-describedby={editing ? `composer-editing-${uid}` : undefined}
+			aria-describedby={editing ? `composer-editing-${uid}` : replying ? `composer-replying-${uid}` : undefined}
 		/>
 		{#if editing}
 			<button type="submit" class="send" aria-label="Save" title="Save" disabled={!body.trim() || saving}>
@@ -217,6 +268,42 @@
 	}
 	.editing-label {
 		flex: 1;
+	}
+	.replying {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 6px 4px 6px 12px;
+		border-radius: 14px;
+		background: var(--accent-soft);
+	}
+	.bar-line {
+		width: 3px;
+		align-self: stretch;
+		border-radius: 2px;
+		background: var(--accent-ink);
+	}
+	.replying-text {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+	.replying-label {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--accent-ink);
+	}
+	.replying-label,
+	.replying-snippet {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.replying-snippet {
+		font-size: 12px;
+		color: var(--muted);
 	}
 	.cancel-edit {
 		width: 32px;

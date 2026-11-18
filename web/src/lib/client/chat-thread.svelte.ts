@@ -17,7 +17,7 @@ import {
 	type MessagePage,
 	type PollInput
 } from './chat';
-import { applyMessageUpdate, canModifyMessage, deletedCopy, isTempMessage } from './chat-messages';
+import { applyMessageUpdate, canModifyMessage, canReplyTo, deletedCopy, isTempMessage, replyPreview } from './chat-messages';
 import { toasts } from './toast.svelte';
 
 const PAGE = 50;
@@ -36,6 +36,8 @@ export class ChatThread {
 	unseen = $state(0);
 	/** Your message being edited in the composer, or null. */
 	editing = $state<Message | null>(null);
+	/** The message your next one replies to, shown above the composer. */
+	replyingTo = $state<Message | null>(null);
 
 	readonly groupId: string;
 	readonly meId: string;
@@ -91,6 +93,8 @@ export class ChatThread {
 	async send(body: string) {
 		const text = body.trim();
 		if (!text) return;
+		const replying = this.replyingTo;
+		this.replyingTo = null;
 		const temp: Message = {
 			id: `temp-${++tempSeq}`,
 			groupId: this.groupId,
@@ -104,16 +108,33 @@ export class ChatThread {
 			editedAt: null,
 			deleted: false,
 			receipt: { delivered: 0, seen: 0, recipients: this.#recipients, seenBy: [] },
-			replyTo: null
+			replyTo: replying ? replyPreview(replying) : null
 		};
 		this.messages = [...this.messages, temp];
 		try {
-			this.#settle(temp.id, await sendMessage(this.groupId, text));
+			this.#settle(temp.id, await sendMessage(this.groupId, text, replying?.id));
 		} catch (err) {
 			this.messages = this.messages.filter((m) => m.id !== temp.id);
+			this.replyingTo ??= replying;
 			toasts.error(err);
 			throw err;
 		}
+	}
+
+	/** Can be replied to: sent text and polls that are still there. */
+	canReply(message: Message) {
+		return canReplyTo(message);
+	}
+
+	/** Your next message replies to this one (leaves edit mode). */
+	startReply(message: Message) {
+		if (!canReplyTo(message)) return;
+		this.editing = null;
+		this.replyingTo = message;
+	}
+
+	cancelReply() {
+		this.replyingTo = null;
 	}
 
 	/** Your own text messages can be edited and deleted. */
@@ -122,7 +143,9 @@ export class ChatThread {
 	}
 
 	startEdit(message: Message) {
-		if (this.canModify(message)) this.editing = message;
+		if (!this.canModify(message)) return;
+		this.replyingTo = null;
+		this.editing = message;
 	}
 
 	cancelEdit() {
@@ -158,6 +181,7 @@ export class ChatThread {
 		const current = this.messages.find((m) => m.id === message.id);
 		if (current) this.messages = applyMessageUpdate(this.messages, deletedCopy(current));
 		if (this.editing?.id === message.id) this.editing = null;
+		if (this.replyingTo?.id === message.id) this.replyingTo = null;
 	}
 
 	async sendPoll(poll: PollInput) {
@@ -213,6 +237,7 @@ export class ChatThread {
 				if ((groupId ?? payload.groupId) !== this.groupId) return;
 				this.messages = applyMessageUpdate(this.messages, payload);
 				if (payload.deleted && this.editing?.id === payload.id) this.editing = null;
+				if (payload.deleted && this.replyingTo?.id === payload.id) this.replyingTo = null;
 			}),
 			live.on('poll.updated', ({ groupId, payload }) => {
 				if (groupId === null || groupId === this.groupId) this.#replacePoll(payload);

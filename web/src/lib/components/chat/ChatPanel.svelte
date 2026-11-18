@@ -2,6 +2,8 @@
 	import { untrack } from 'svelte';
 	import type { Group, User } from '#lib/types';
 	import { ChatThread } from '#lib/client/chat-thread.svelte';
+	import { replyingTo } from '#lib/client/chat-messages';
+	import { memberMap } from '#lib/client/members';
 	import MessageList from './MessageList.svelte';
 	import Composer from './Composer.svelte';
 	import PollComposerSheet from './PollComposerSheet.svelte';
@@ -43,6 +45,8 @@
 		editing={thread.editing}
 		onsaveedit={(b) => thread.saveEdit(b)}
 		oncanceledit={() => thread.cancelEdit()}
+		replying={replyingTo(thread.replyingTo, me.id, memberMap(group))}
+		oncancelreply={() => thread.cancelReply()}
 	/>
 </section>
 

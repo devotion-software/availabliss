@@ -1,5 +1,5 @@
 /** Pure helpers for chat messages: who can edit/delete what, and applying edits and deletions. */
-import type { Message } from '#lib/types';
+import type { Member, Message, MessageReply } from '#lib/types';
 
 export const isTempMessage = (m: Message) => m.id.startsWith('temp-');
 
@@ -14,10 +14,56 @@ export const canModifyMessage = (m: Message, meId: string) =>
  */
 export function applyMessageUpdate(messages: Message[], updated: Message): Message[] {
 	const i = messages.findIndex((m) => m.id === updated.id);
-	if (i < 0) return messages;
-	const next = messages.slice();
-	next[i] = { ...messages[i], ...updated, receipt: updated.receipt ?? messages[i].receipt };
+	const quoted = messages.some((m) => m.replyTo?.id === updated.id);
+	if (i < 0 && !quoted) return messages;
+	const next = quoted ? withQuotesOf(messages, updated) : messages.slice();
+	if (i >= 0) next[i] = { ...messages[i], ...updated, receipt: updated.receipt ?? messages[i].receipt };
 	return next;
+}
+
+/** Can be replied to: sent text and polls that are still there. */
+export const canReplyTo = (m: Message) => (m.kind === 'text' || m.kind === 'poll') && !!m.authorId && !m.deleted && !isTempMessage(m);
+
+/** A message as a quote: for "Replying to …", an optimistic reply, and refreshing quotes after it changes. */
+export function replyPreview(m: Message, authorName: string | null = null): MessageReply {
+	const raw = m.kind === 'poll' ? m.poll?.question : m.body;
+	return {
+		id: m.id,
+		authorId: m.authorId,
+		authorName,
+		kind: m.kind,
+		text: m.deleted ? null : (raw?.replace(/\s+/g, ' ').trim() ?? null),
+		deleted: m.deleted
+	};
+}
+
+/** One line for a quote: "Deleted message", "Poll: Which park?" or the text. */
+export function replySnippet(r: MessageReply): string {
+	if (r.deleted) return 'Deleted message';
+	if (r.kind === 'poll') return `Poll: ${r.text ?? ''}`;
+	if (r.kind === 'proposal') return r.text ?? 'Proposal';
+	if (r.kind === 'event') return r.text ?? 'Event';
+	return r.text ?? '';
+}
+
+/** Who a quote is from: "You", the member's name, or the name the server sent (someone who has left). */
+export const replyAuthorName = (r: { authorId: string | null; authorName?: string | null }, meId: string, members: Map<string, Member>) =>
+	r.authorId && r.authorId === meId ? 'You' : ((r.authorId ? members.get(r.authorId)?.name : undefined) ?? r.authorName ?? 'Someone');
+
+/** "Replying to Priya" above the composer: who and one line of what they said. */
+export interface ReplyingTo {
+	id: string;
+	name: string;
+	snippet: string;
+}
+
+export const replyingTo = (m: Message | null, meId: string, members: Map<string, Member>): ReplyingTo | null =>
+	m ? { id: m.id, name: replyAuthorName(m, meId, members), snippet: replySnippet(replyPreview(m)) } : null;
+
+/** Quotes aren't republished when the original is edited or deleted: refreshes loaded replies to it. */
+function withQuotesOf(messages: Message[], original: Message): Message[] {
+	const fresh = replyPreview(original);
+	return messages.map((m) => (m.replyTo?.id === original.id ? { ...m, replyTo: { ...m.replyTo, text: fresh.text, deleted: fresh.deleted } } : m));
 }
 
 /** A message as it reads once deleted: no text, flagged deleted. */
