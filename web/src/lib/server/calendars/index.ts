@@ -698,9 +698,19 @@ export async function setCalendarBusy(userId: string, connectionId: string, cale
 	return getConnection(userId, connectionId);
 }
 
+/** "Sync now" pulls a connection at most this often; taps in between get its current state. */
+export const SYNC_NOW_GAP_SECONDS = 30;
+
+/**
+ * "Sync now" from calendar settings. Once per connection per 30 s (across instances), so
+ * repeated taps can't start syncs that overlap each other. Phone calendars upload from the
+ * device, so there's nothing to pull for them here.
+ */
 export async function syncNow(userId: string, connectionId: string): Promise<CalendarConnection> {
-	await ownedRow(userId, connectionId);
-	await syncConnection(connectionId);
+	const row = await ownedRow(userId, connectionId);
+	if (row.provider !== 'device' && (await kv.setIfAbsent(`calendar-sync:now:${connectionId}`, '1', SYNC_NOW_GAP_SECONDS))) {
+		await syncConnection(connectionId);
+	}
 	return getConnection(userId, connectionId);
 }
 

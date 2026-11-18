@@ -5,11 +5,11 @@ import { db } from '#lib/server/db';
 import { busyIntervals, calendarConnections, calendars } from '#lib/server/db/schema';
 import { encryptJson } from '#lib/server/crypto';
 import { newId } from '#lib/server/ids';
-import { adapters, checkConnection, horizonFor, planCoverage, refreshCoverage, syncConnection } from '#lib/server/calendars';
+import { adapters, checkConnection, horizonFor, planCoverage, refreshCoverage, syncConnection, syncNow } from '#lib/server/calendars';
 import type { CalendarAdapter, ChangedEvents, RemoteBusy, RemoteCalendar } from '#lib/server/calendars/types';
 import { createGroup, updateGroup } from '#lib/server/groups';
 import { loadBusy } from '#lib/server/busy';
-import { everyDay, fixture } from './fixtures';
+import { apiError, everyDay, fixture } from './fixtures';
 
 const fx = fixture('calendar-sync');
 const DAY = 24 * 60 * 60 * 1000;
@@ -313,5 +313,31 @@ describe('CalDAV change checks', () => {
 		expect(await checkConnection(id)).toBe(false);
 		expect(fake.reads).toEqual([]);
 		expect((await conn(id)).checkedAt).toBeNull();
+	});
+});
+
+describe('syncNow', () => {
+	test('syncs straight away, at most once per connection per 30 seconds; only your own connections', async () => {
+		const me = await fx.user();
+		const id = await connection(me);
+		const other = await connection(me);
+		fake.calendars = [{ externalId: 'home', name: 'Home', color: null, changes: 'version', version: 'v1' }];
+		fake.events = [busy('home', yearsAhead(0.1))];
+
+		const synced = await syncNow(me, id);
+		expect(synced.status).toBe('ok');
+		expect(synced.lastSyncedAt).not.toBeNull();
+		expect(fake.reads.length).toBeGreaterThan(0);
+		expect(await rows(me)).toHaveLength(1);
+
+		// A second tap straight after doesn't start another sync; it answers with where things are.
+		fake.reads = [];
+		expect((await syncNow(me, id)).lastSyncedAt).toBe(synced.lastSyncedAt);
+		expect(fake.reads).toEqual([]);
+		// Another connection has its own allowance.
+		await syncNow(me, other);
+		expect(fake.reads.length).toBeGreaterThan(0);
+
+		expect((await apiError(syncNow(await fx.user(), id))).code).toBe('not_found');
 	});
 });

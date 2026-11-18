@@ -365,7 +365,7 @@ interface CalendarConnection {
 | POST 🔒 | `/calendars/caldav` | `{ username, appPassword, serverUrl? }` (defaults to iCloud) | `CalendarConnection` |
 | PUT 🔒 | `/calendars/device` | `DeviceSync` | `CalendarConnection` |
 | PATCH 🔒 | `/calendars/:connectionId/calendars/:calendarId` | `{ busy: boolean }` | `CalendarConnection` |
-| POST 🔒 | `/calendars/:connectionId/sync` | | `CalendarConnection` |
+| POST 🔒 | `/calendars/:connectionId/sync` | | `CalendarConnection` ("Sync now": pulls a Google / Outlook / iCloud connection straight away and returns it with `status` and `lastSyncedAt`; a failed sync shows as `status: 'error'` or `'reauth_required'`, not an HTTP error. At most once per connection per 30 s: a call in between returns the connection as it is. Phone calendars aren't pulled; the app uploads with `PUT /calendars/device`.) |
 | DELETE 🔒 | `/calendars/:connectionId` | | `204` |
 
 Calendar change notifications (called by Google and Microsoft, not by clients;
