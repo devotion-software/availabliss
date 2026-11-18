@@ -25,6 +25,7 @@ async function membersByGroup(groupIds: string[]): Promise<Map<string, Member[]>
 			joinedAt: groupMembers.joinedAt,
 			name: user.name,
 			email: user.email,
+			nameInGroup: groupMembers.displayName,
 			image: user.image
 		})
 		.from(groupMembers)
@@ -34,7 +35,13 @@ async function membersByGroup(groupIds: string[]): Promise<Map<string, Member[]>
 	const synced = await syncedUserIds([...new Set(rows.map((r) => r.userId))]);
 	const result = new Map<string, Member[]>(groupIds.map((id) => [id, []]));
 	for (const { groupId, email, ...m } of rows) {
-		result.get(groupId)!.push({ ...m, name: displayName({ name: m.name, email }), joinedAt: m.joinedAt.toISOString(), synced: synced.has(m.userId) });
+		result.get(groupId)!.push({
+			...m,
+			name: displayName({ name: m.name, email, nameInGroup: m.nameInGroup }),
+			nameInGroup: m.nameInGroup || null,
+			joinedAt: m.joinedAt.toISOString(),
+			synced: synced.has(m.userId)
+		});
 	}
 	return result;
 }

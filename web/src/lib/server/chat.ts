@@ -2,11 +2,11 @@
 import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import type { Attachment, Message, MessageInfo, MessageKind, MessageLocation, MessageReply, MessageThread, Poll } from '#lib/types';
 import { db } from './db';
-import { groups, messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
+import { groupMembers, groups, messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
 import { badRequest, conflict, forbidden, notFound } from './http';
 import { alias } from 'drizzle-orm/mysql-core';
 import { newId } from './ids';
-import { memberIds, requireMember } from './groups';
+import { memberIds, memberName, requireMember } from './groups';
 import { publishToGroup } from './realtime';
 import { markChatRead, notify } from './notifications';
 import { displayName } from './names';
@@ -230,11 +230,13 @@ async function loadReplies(ids: string[]): Promise<Map<string, MessageReply>> {
 			location: messages.location,
 			question: polls.question,
 			name: user.name,
-			email: user.email
+			email: user.email,
+			nameInGroup: groupMembers.displayName
 		})
 		.from(messages)
 		.leftJoin(polls, eq(polls.id, messages.pollId))
 		.leftJoin(user, eq(user.id, messages.authorId))
+		.leftJoin(groupMembers, and(eq(groupMembers.userId, messages.authorId), eq(groupMembers.groupId, messages.groupId)))
 		.where(inArray(messages.id, [...new Set(ids)]));
 	// Photos and files sent without a caption are quoted as "📷 Photo", "📎 Plan.pdf" and so on.
 	const attachments = await attachmentsFor(rows.filter((r) => !r.deletedAt && r.kind === 'text' && !r.body).map((r) => r.id));
@@ -397,7 +399,7 @@ export async function postMessage(groupId: string, authorId: string | null, inpu
 
 	if (authorId && (input.kind === 'text' || input.kind === 'poll')) {
 		const [author, group] = await Promise.all([
-			db.query.user.findFirst({ where: eq(user.id, authorId), columns: { name: true, email: true } }),
+			memberName(groupId, authorId),
 			db.query.groups.findFirst({ where: eq(groups.id, groupId), columns: { name: true } })
 		]);
 		const poll = message.poll ? `Poll: ${message.poll.question}` : null;
@@ -408,7 +410,7 @@ export async function postMessage(groupId: string, authorId: string | null, inpu
 				kind: 'message',
 				groupId,
 				title: group?.name ?? 'New message',
-				body: pushPreview(`${displayName(author, 'Someone')}: ${poll ?? (input.location ? locationSummary(input.location) : input.body || attachmentSummary(uploads))}`),
+				body: pushPreview(`${author}: ${poll ?? (input.location ? locationSummary(input.location) : input.body || attachmentSummary(uploads))}`),
 				data: { messageId: id },
 				record: 'per-group'
 			}

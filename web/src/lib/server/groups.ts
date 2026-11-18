@@ -67,6 +67,7 @@ export async function listMembers(groupId: string): Promise<Member[]> {
 			joinedAt: groupMembers.joinedAt,
 			name: user.name,
 			email: user.email,
+			nameInGroup: groupMembers.displayName,
 			image: user.image
 		})
 		.from(groupMembers)
@@ -76,7 +77,8 @@ export async function listMembers(groupId: string): Promise<Member[]> {
 	const synced = await syncedUserIds(rows.map((r) => r.userId));
 	return rows.map(({ email, ...r }) => ({
 		...r,
-		name: displayName({ name: r.name, email }),
+		name: displayName({ name: r.name, email, nameInGroup: r.nameInGroup }),
+		nameInGroup: r.nameInGroup || null,
 		joinedAt: r.joinedAt.toISOString(),
 		synced: synced.has(r.userId)
 	}));
@@ -218,6 +220,32 @@ export async function deleteGroup(groupId: string, userId: string): Promise<stri
 	return members;
 }
 
+/**
+ * The name someone goes by in the group: the one they set for it, else their account name
+ * (or email). Works for people who have since left (their account name).
+ */
+export async function memberName(groupId: string, userId: string, fallback = 'Someone'): Promise<string> {
+	const [row] = await db
+		.select({ name: user.name, email: user.email, nameInGroup: groupMembers.displayName })
+		.from(user)
+		.leftJoin(groupMembers, and(eq(groupMembers.userId, user.id), eq(groupMembers.groupId, groupId)))
+		.where(eq(user.id, userId))
+		.limit(1);
+	return displayName(row, fallback);
+}
+
+/** Sets (or with null, clears) the name you go by in the group. */
+export async function setMemberDisplayName(groupId: string, userId: string, name: string | null): Promise<Member> {
+	await requireMember(groupId, userId);
+	await db
+		.update(groupMembers)
+		.set({ displayName: name?.trim() || null })
+		.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)));
+	const member = (await listMembers(groupId)).find((m) => m.userId === userId);
+	if (!member) throw notFound('Member not found');
+	return member;
+}
+
 export async function setMemberRole(groupId: string, actorId: string, targetId: string, role: 'admin' | 'member') {
 	await requireMember(groupId, actorId, 'admin');
 	const current = await roleIn(groupId, targetId);
@@ -238,11 +266,7 @@ export async function setMemberRole(groupId: string, actorId: string, targetId: 
  * made an admin, no longer an admin, or (`owner`) handed the group by its owner as they left.
  */
 async function notifyRoleChanged(groupId: string, actorId: string, targetId: string, role: Role) {
-	const [group, actor] = await Promise.all([
-		getGroupRow(groupId),
-		db.query.user.findFirst({ where: eq(user.id, actorId), columns: { name: true, email: true } })
-	]);
-	const name = displayName(actor);
+	const [group, name] = await Promise.all([getGroupRow(groupId), memberName(groupId, actorId)]);
 	const body =
 		role === 'owner'
 			? `You're now the owner. ${name} left and handed the group to you.`
@@ -340,10 +364,12 @@ export async function listInvites(groupId: string, userId: string) {
 			expiresAt: groupInvites.expiresAt,
 			createdAt: groupInvites.createdAt,
 			inviterName: user.name,
-			inviterEmail: user.email
+			inviterEmail: user.email,
+			inviterNameInGroup: groupMembers.displayName
 		})
 		.from(groupInvites)
 		.innerJoin(user, eq(user.id, groupInvites.createdBy))
+		.leftJoin(groupMembers, and(eq(groupMembers.userId, groupInvites.createdBy), eq(groupMembers.groupId, groupInvites.groupId)))
 		.leftJoin(invitee, eq(invitee.id, groupInvites.invitedUserId))
 		.where(and(eq(groupInvites.groupId, groupId), gt(groupInvites.expiresAt, new Date())))
 		.orderBy(desc(groupInvites.createdAt));

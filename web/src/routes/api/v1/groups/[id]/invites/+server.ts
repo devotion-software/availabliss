@@ -21,7 +21,7 @@ export const GET = authed<{ id: string }>(async ({ params, userId }) => {
 		url: inviteUrl(r.token),
 		expiresAt: r.expiresAt.toISOString(),
 		createdAt: r.createdAt.toISOString(),
-		invitedBy: displayName({ name: r.inviterName, email: r.inviterEmail })
+		invitedBy: displayName({ name: r.inviterName, email: r.inviterEmail, nameInGroup: r.inviterNameInGroup })
 	}));
 	return json({ invites });
 });

@@ -116,6 +116,16 @@ export const updateGroupSchema = createGroupSchema.partial().extend({ archived: 
 
 export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
 
+/** The name you go by in one group; null or blank goes back to your account name. */
+export const memberNameSchema = z.object({
+	displayName: z
+		.string()
+		.trim()
+		.max(80)
+		.nullable()
+		.transform((v) => v || null)
+});
+
 /** Leaving: the owner names the admin who becomes owner. */
 export const leaveGroupSchema = z.object({ newOwnerId: z.string().min(1).nullish() });
 

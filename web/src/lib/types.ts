@@ -89,7 +89,10 @@ export interface User {
 
 export interface Member {
 	userId: string;
+	/** The name they go by in this group: `nameInGroup` when set, else their account name. */
 	name: string;
+	/** The name they chose for this group, or null to use their account name. */
+	nameInGroup: string | null;
 	image: string | null;
 	role: Role;
 	synced: boolean;

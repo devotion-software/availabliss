@@ -118,7 +118,8 @@ interface User {
 
 interface Member {
   userId: string;
-  name: string;     // their name, or their email address if they haven't set one
+  name: string;     // the name they go by in this group (nameInGroup), else their name, or their email address if they haven't set one
+  nameInGroup: string | null;    // the name they chose for this group; null = their account name
   image: string | null;
   role: Role;
   synced: boolean;               // has a connected calendar or any manual block
@@ -427,6 +428,7 @@ interface ManualBlock {
 | DELETE 👑 | `/groups/:id/image` | | `Group` (no photo: the monogram tile) |
 | DELETE ⭐ | `/groups/:id` | | `204` |
 | PATCH 👑 | `/groups/:id/members/:userId` | `{ role: 'admin' \| 'member' }` | `Member` (they get a `role.changed` notification) |
+| PATCH 🔒 | `/groups/:id/members/me` | `{ displayName: string \| null }` (trimmed, ≤ 80; null or blank clears it) | `Member` (the name you go by in this group; publishes `member.changed`. See Names in a group) |
 | DELETE 👑/self | `/groups/:id/members/:userId` | | `204` (an admin removes someone; never the owner. Yourself = leave, as `POST /groups/:id/leave` with no new owner) |
 | POST 🔒 | `/groups/:id/leave` | `{ newOwnerId?: string }` (the owner only: the admin who becomes owner) | `204` (see Leaving a group) |
 | POST 👑 | `/groups/:id/nudge` | | `{ nudged: number }` (push/email to unsynced members, rate limited to once per 12h) |
@@ -437,7 +439,14 @@ interface ManualBlock {
 | POST 👑 | `/groups/:id/invites` | `{ emails?: string[], usernames?: string[], email?: string }` (≤ 20 people) | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |
 | DELETE 👑 | `/groups/:id/invites/:inviteId` | | 204 (the link stops working) |
 | GET | `/invites/:token` | | `{ groupName, inviterName, memberCount, expiresAt, email: string \| null, username: string \| null }` |
-| POST 🔒 | `/invites/:token/accept` | | `Group` (403 if the invite was for a different address or username) |
+| POST 🔒 | `/invites/:token/accept` | | `Group & { joined: boolean }` (`joined`: false when you were already a member; the apps then skip asking what name to go by. 403 if the invite was for a different address or username) |
+
+**Names in a group.** Each member can choose the name they go by in one group (`PATCH /groups/:id/members/me`).
+Within that group it replaces their account name everywhere the server names them: `Member.name` (so the members
+list, chat authors, proposal replies and busy lists, which the apps resolve by `userId`), reply quotes
+(`replyTo.authorName`), the invites list (`invitedBy`), system messages ("Sam can't make it any more") and the
+Activity items and pushes about that group. Outside the group (invite emails and previews, `/me`) it's always the
+account name. System messages keep the name used when they were posted.
 
 **Leaving a group.** Anyone can leave, but a group always keeps an owner, so always at least one admin:
 

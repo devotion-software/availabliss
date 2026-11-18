@@ -206,6 +206,8 @@ export const groupMembers = mysqlTable(
 			.references(() => groups.id, { onDelete: 'cascade' }),
 		userId: userRef(),
 		role: mysqlEnum('role', ROLES).default('member').notNull(),
+		/** The name the member goes by in this group (null: their account name). */
+		displayName: varchar('display_name', { length: 80 }),
 		joinedAt: instant('joined_at').defaultNow().notNull()
 	},
 	(t) => [primaryKey({ columns: [t.groupId, t.userId] }), index('group_members_user_idx').on(t.userId)]

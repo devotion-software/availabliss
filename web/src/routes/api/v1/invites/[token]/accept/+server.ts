@@ -8,7 +8,8 @@ export const POST = authed<{ token: string }>(async ({ params, userId }) => {
 	const { groupId, joined: isNew } = await acceptInvite(params.token, userId);
 	const group = await getGroup(groupId, userId);
 	// Already a member (or a second tap): nothing changed, so nobody is told.
-	if (!isNew) return json(group);
+	// `joined` tells the apps whether to ask what name to go by in the group.
+	if (!isNew) return json({ ...group, joined: false });
 	await onMemberJoined(groupId, userId);
 	const joined = group.members.find((m) => m.userId === userId);
 	await publishToGroup(groupId, 'member.changed', joined);
@@ -16,5 +17,5 @@ export const POST = authed<{ token: string }>(async ({ params, userId }) => {
 		group.members.filter((m) => m.userId !== userId && m.role !== 'member').map((m) => m.userId),
 		{ kind: 'invite.accepted', groupId, title: group.name, body: `${joined?.name || 'Someone'} joined the group` }
 	);
-	return json(group);
+	return json({ ...group, joined: true });
 });

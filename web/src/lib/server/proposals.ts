@@ -15,7 +15,7 @@ import { db } from './db';
 import { events, groupMembers, proposalResponses, proposals, user } from './db/schema';
 import { conflict, forbidden, notFound } from './http';
 import { newId } from './ids';
-import { getGroupRow, memberIds, requireMember } from './groups';
+import { getGroupRow, memberIds, memberName, requireMember } from './groups';
 import { publishToGroup } from './realtime';
 import { unarchiveOnActivity } from './auto-archive';
 import { notify } from './notifications';
@@ -25,7 +25,6 @@ import { slotLabel } from './availability/labels';
 import { sendConfirmedEmail } from './email';
 import { env } from './env';
 import { loadBusy, type LabelledBusy } from './busy';
-import { displayName } from './names';
 
 type ProposalRow = typeof proposals.$inferSelect;
 type ResponseRow = typeof proposalResponses.$inferSelect;
@@ -164,7 +163,7 @@ export async function createProposal(groupId: string, userId: string, input: Pro
 	});
 
 	const group = await getGroupRow(groupId);
-	const proposer = await db.query.user.findFirst({ where: eq(user.id, userId), columns: { name: true, email: true } });
+	const proposer = await memberName(groupId, userId);
 	const when = slotLabel({ start: Date.parse(input.start), end: Date.parse(input.end) }, group.requirement);
 
 	await postMessage(groupId, userId, { kind: 'proposal', proposalId: id });
@@ -177,7 +176,7 @@ export async function createProposal(groupId: string, userId: string, input: Pro
 			kind: 'proposal.created',
 			groupId,
 			title: group.name,
-			body: `${displayName(proposer)} proposed ${when}. Can you make it?`,
+			body: `${proposer} proposed ${when}. Can you make it?`,
 			data: { proposalId: id }
 		}
 	);
@@ -230,12 +229,7 @@ async function changeConfirmedResponse(row: ProposalRow, userId: string, respons
 	await publishToGroup(row.groupId, 'proposal.updated', proposal);
 
 	if (droppedOut) {
-		const [group, who, reviewers] = await Promise.all([
-			getGroupRow(row.groupId),
-			db.query.user.findFirst({ where: eq(user.id, userId), columns: { name: true, email: true } }),
-			reviewerIds(row)
-		]);
-		const name = displayName(who);
+		const [group, name, reviewers] = await Promise.all([getGroupRow(row.groupId), memberName(row.groupId, userId), reviewerIds(row)]);
 		const when = slotLabel({ start: row.start.getTime(), end: row.end.getTime() }, group.requirement);
 		await postMessage(row.groupId, null, { kind: 'system', body: `${name} can't make it any more` });
 		await notify(
@@ -318,11 +312,7 @@ async function cancelPlan(row: ProposalRow, userId: string): Promise<void> {
 	const event = row.eventId ? await db.query.events.findFirst({ where: eq(events.id, row.eventId) }) : null;
 	if (event) await removeEvent(event);
 
-	const [group, who] = await Promise.all([
-		getGroupRow(row.groupId),
-		db.query.user.findFirst({ where: eq(user.id, userId), columns: { name: true, email: true } })
-	]);
-	const name = displayName(who);
+	const [group, name] = await Promise.all([getGroupRow(row.groupId), memberName(row.groupId, userId)]);
 	const when = slotLabel({ start: row.start.getTime(), end: row.end.getTime() }, group.requirement);
 	await postMessage(row.groupId, null, { kind: 'system', body: `${name} cancelled the plan for ${when}` });
 	await publishToGroup(row.groupId, 'proposal.updated', await fetchProposal(row.id));
