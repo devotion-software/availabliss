@@ -77,7 +77,17 @@ final class GroupAvailabilityViewModel {
         }
     }
 
-    func day(_ date: CalendarDay) -> AvailabilityDay? { availability?.day(date) }
+    /// A day's status: from the month on screen, or a neighbouring month already fetched (a week
+    /// can run into the next month).
+    func day(_ date: CalendarDay) -> AvailabilityDay? { availability?.day(date) ?? months[date.firstOfMonth]?.day(date) }
+
+    /// True when the day works for everyone (and isn't over); unknown days count as working, so
+    /// nothing fades while it loads.
+    func works(_ date: CalendarDay) -> Bool {
+        if date < .today() { return false }
+        guard let status = day(date)?.status else { return true }
+        return status == .match
+    }
     func slot(for date: CalendarDay) -> Slot? { availability?.slot(containing: date) }
 
     // MARK: Loading
@@ -212,6 +222,10 @@ final class GroupAvailabilityViewModel {
     private func loadWeek() async {
         if availability == nil || selectedDay.firstOfMonth != availability?.from.firstOfMonth { await loadMonth() }
         let week = weekDays
+        // A week running into the next (or previous) month needs that month's days too.
+        for other in Set(week.map(\.firstOfMonth)) where other != month && months[other] == nil {
+            _ = try? await fetchMonth(other)
+        }
         await withTaskGroup(of: Void.self) { group in
             for day in week where dayDetails[day] == nil {
                 group.addTask { [weak self] in _ = try? await self?.fetchDay(day) }

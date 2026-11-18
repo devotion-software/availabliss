@@ -16,6 +16,11 @@ struct TimeAxis {
 
 // MARK: - Week
 
+/// How far a week day that doesn't work for everyone fades.
+enum WeekFade {
+    static let opacity = 0.5
+}
+
 /// Week view: a time grid per visible day with "everyone free" in accent and busy runs faded.
 struct WeekGrid: View {
     let model: GroupAvailabilityViewModel
@@ -31,6 +36,7 @@ struct WeekGrid: View {
                     Text(model.weekDays.count > 4 ? "\(Weekday.short(day.weekday()).prefix(1)) \(day.day)" : "\(Weekday.short(day.weekday())) \(day.day)")
                         .todayMark(day)
                         .frame(maxWidth: .infinity)
+                        .opacity(model.works(day) || day == .today() ? 1 : WeekFade.opacity)
                 }
             }
             .bodyFont(11, .semibold, relativeTo: .caption2)
@@ -41,6 +47,8 @@ struct WeekGrid: View {
                 ForEach(model.weekDays, id: \.self) { day in
                     let selected = day == model.selectedDay
                     WeekColumn(day: day, detail: model.dayDetails[day], axis: axis, group: group)
+                        // Days that don't work for everyone step back, like the month's plain cells.
+                        .opacity(model.works(day) ? 1 : WeekFade.opacity)
                         .overlay {
                             if selected { RoundedRectangle(cornerRadius: 14).stroke(theme.ink, lineWidth: 2).padding(-3) }
                         }
@@ -149,7 +157,7 @@ struct WeekCards: View {
     var body: some View {
         VStack(spacing: 8) {
             ForEach(model.weekDays, id: \.self) { day in
-                WeekDayCard(day: day, detail: model.dayDetails[day], status: model.day(day)?.status, group: group, isSelected: day == model.selectedDay)
+                WeekDayCard(day: day, detail: model.dayDetails[day], status: model.day(day)?.status, works: model.works(day), group: group, isSelected: day == model.selectedDay)
                     .onTapGesture { withAnimation(.spring(response: 0.3)) { model.pick(day) } }
                     .accessibilityAddTraits(day == model.selectedDay ? [.isButton, .isSelected] : .isButton)
             }
@@ -161,6 +169,8 @@ private struct WeekDayCard: View {
     let day: CalendarDay
     let detail: DayAvailability?
     let status: AvailabilityDay.Status?
+    /// Works for everyone (or not known yet): days that don't are faded.
+    let works: Bool
     let group: Group
     let isSelected: Bool
     private let axis = TimeAxis(startHour: 0, endHour: 24)
@@ -177,6 +187,8 @@ private struct WeekDayCard: View {
                     .padding(.top, day == .today() ? 3 : 0)
             }
             .frame(width: 40)
+            // Today's date stays at full strength, so it's easy to find on a faded day.
+            .opacity(works || day == .today() ? 1 : WeekFade.opacity)
             VStack(alignment: .leading, spacing: 6) {
                 Text(summary)
                     .bodyFont(14, .semibold)
@@ -187,6 +199,7 @@ private struct WeekDayCard: View {
                 }
                 strip
             }
+            .opacity(works ? 1 : WeekFade.opacity)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -194,7 +207,6 @@ private struct WeekDayCard: View {
         .overlay {
             if isSelected { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(theme.ink, lineWidth: 2) }
         }
-        .opacity(isPast || status == .hidden ? 0.5 : 1)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
