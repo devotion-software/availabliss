@@ -416,6 +416,13 @@ interface ManualBlock {
 | PATCH 🔒 | `/blocks/:id` | `Partial<Omit<ManualBlock, 'id'>>` | `ManualBlock` |
 | DELETE 🔒 | `/blocks/:id` | | `204` |
 
+My time is for blocking time ahead: busy time only matters for finding dates to come. A new block
+that has already passed (a one-off that ended before yesterday in your profile's time zone, or a
+repeat whose `until` is before yesterday) is `400` "That time has already passed". Earlier today is
+fine, and the day's grace covers a phone in another time zone. Edits aren't checked, so a series that
+started long ago can still be changed or ended. The apps only open today onwards: past days are shown
+muted and can't be tapped, and the date pickers start at today (or an edited block's own start).
+
 ### Groups
 
 | Method | Path | Body | Response |

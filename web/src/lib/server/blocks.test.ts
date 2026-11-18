@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { Repeat } from '#lib/types';
-import { expandBlock, occurrenceDates, toManualBlock } from './blocks';
+import { expandBlock, isPastBlock, occurrenceDates, toManualBlock } from './blocks';
 
 const block = (start: string, end: string, repeat: Repeat = 'none', until: string | null = null) => ({
 	start: new Date(start),
@@ -178,5 +178,34 @@ describe('expandBlock (new repeats)', () => {
 	test('weekdays within a week', () => {
 		const b = block('2026-11-16T09:00:00Z', '2026-11-16T17:30:00Z', 'weekdays');
 		expect(expandBlock(b, at('2026-11-21T00:00:00Z'), at('2026-11-24T00:00:00Z'), TZ)).toHaveLength(1);
+	});
+});
+
+describe('isPastBlock', () => {
+	// 18 Nov 2026, 15:00 in London.
+	const now = at('2026-11-18T15:00:00Z');
+	const once = (start: string, end: string) => ({ start, end, repeat: 'none' as const, until: null });
+
+	test('earlier today and yesterday are allowed (a day of grace for time zones); before that is past', () => {
+		expect(isPastBlock(once('2026-11-18T09:00:00Z', '2026-11-18T10:00:00Z'), 'Europe/London', now)).toBe(false);
+		expect(isPastBlock(once('2026-11-17T09:00:00Z', '2026-11-17T10:00:00Z'), 'Europe/London', now)).toBe(false);
+		expect(isPastBlock(once('2026-11-16T09:00:00Z', '2026-11-16T10:00:00Z'), 'Europe/London', now)).toBe(true);
+		// An all-day block for the 16th ends at midnight starting the 17th.
+		expect(isPastBlock(once('2026-11-16T00:00:00Z', '2026-11-17T00:00:00Z'), 'Europe/London', now)).toBe(true);
+		expect(isPastBlock(once('2026-11-10T09:00:00Z', '2026-11-19T10:00:00Z'), 'Europe/London', now)).toBe(false);
+	});
+
+	test('a repeat is past only when its last date has gone', () => {
+		const weekly = (until: string | null) => ({ end: '2026-01-05T10:00:00Z', repeat: 'weekly' as const, until });
+		expect(isPastBlock(weekly(null), 'Europe/London', now)).toBe(false);
+		expect(isPastBlock(weekly('2026-12-01'), 'Europe/London', now)).toBe(false);
+		expect(isPastBlock(weekly('2026-11-01'), 'Europe/London', now)).toBe(true);
+	});
+
+	test("days are the user's", () => {
+		// 12:00 UTC on the 18th is already the 19th in Auckland, where a block on the 17th is past.
+		const morning = at('2026-11-18T12:00:00Z');
+		expect(isPastBlock(once('2026-11-17T09:00:00Z', '2026-11-17T10:00:00Z'), 'Pacific/Auckland', morning)).toBe(true);
+		expect(isPastBlock(once('2026-11-17T09:00:00Z', '2026-11-17T10:00:00Z'), 'America/New_York', morning)).toBe(false);
 	});
 });

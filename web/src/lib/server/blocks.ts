@@ -2,7 +2,7 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { ManualBlock, Repeat } from '#lib/types';
 import { db } from './db';
-import { manualBlocks } from './db/schema';
+import { manualBlocks, user } from './db/schema';
 import { badRequest, notFound } from './http';
 import { newId } from './ids';
 import { addDays, DAY, dateOf, daysBetween, wallClock, weekdayOf, zonedInstant } from './availability/time';
@@ -147,7 +147,20 @@ function toColumns({ start, end, ...rest }: Partial<BlockInput>): Partial<typeof
 	return { ...rest, ...(start && { start: new Date(start) }), ...(end && { end: new Date(end) }) };
 }
 
+/**
+ * Whether a new block lies wholly in the past: it (or, repeating, its last date) ended before
+ * yesterday in the user's time zone. Earlier today is fine; the day's grace allows for a phone
+ * set to a different time zone than the profile. Busy time only matters for finding dates ahead.
+ */
+export function isPastBlock(input: Pick<BlockInput, 'end' | 'repeat' | 'until'>, timeZone: string, now = Date.now()): boolean {
+	const yesterday = addDays(dateOf(now, timeZone), -1);
+	if (input.repeat !== 'none') return input.until !== null && input.until < yesterday;
+	return Date.parse(input.end) <= zonedInstant(yesterday, 0, timeZone);
+}
+
 export async function createBlock(userId: string, input: BlockInput): Promise<ManualBlock> {
+	const owner = await db.query.user.findFirst({ where: eq(user.id, userId), columns: { timezone: true } });
+	if (isPastBlock(input, owner?.timezone ?? 'UTC')) throw badRequest('That time has already passed. Block time from today onwards.');
 	const id = newId();
 	await db.insert(manualBlocks).values({ id, userId, ...toColumns(input), start: new Date(input.start), end: new Date(input.end) });
 	return getBlock(userId, id);

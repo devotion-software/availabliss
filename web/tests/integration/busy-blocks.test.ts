@@ -56,6 +56,21 @@ describe('blocks CRUD', () => {
 		expect((await listBlocks(me)).map((x) => x.id)).toEqual([b.id]);
 	});
 
+	test('a new block that has already passed is refused; a repeat that started back then, or changes to an old block, are fine', async () => {
+		const me = await fx.user();
+		const past = await apiError(createBlock(me, block('2020-01-05T09:00:00Z', '2020-01-05T10:00:00Z')));
+		expect(past.code).toBe('validation_error');
+		expect(past.message).toMatch(/already passed/);
+		expect((await apiError(createBlock(me, block('2020-01-05T09:00:00Z', '2020-01-05T10:00:00Z', { repeat: 'weekly', until: '2020-06-01' })))).code).toBe(
+			'validation_error'
+		);
+		const weekly = await createBlock(me, block('2020-01-05T09:00:00Z', '2020-01-05T10:00:00Z', { repeat: 'weekly' }));
+		const later = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+		await createBlock(me, block(new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), later));
+		// Ending a series (its last date may be in the past) is an edit, not a new block.
+		expect(await updateBlock(me, weekly.id, { until: '2020-03-01' })).toMatchObject({ until: '2020-03-01' });
+	});
+
 	test("users cannot see or change each other's blocks", async () => {
 		const [me, other] = await fx.users(2);
 		const mine = await createBlock(me, block('2031-01-05T09:00:00Z', '2031-01-05T10:00:00Z'));
