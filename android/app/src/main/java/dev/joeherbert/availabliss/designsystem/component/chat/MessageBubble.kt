@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.joeherbert.availabliss.core.network.model.MessageLocation
 import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.dashedBorder
@@ -90,6 +91,9 @@ fun MessageBubble(
     onOpenAttachment: (String) -> Unit = {},
     /** Files downloading to open: progress 0–1 by attachment id (below 0 when unknown). */
     downloads: Map<String, Float> = emptyMap(),
+    /** A shared place, drawn as a map card instead of [text]; tapping it calls [onOpenLocation]. */
+    location: MessageLocation? = null,
+    onOpenLocation: () -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
     var menuOpen by remember { mutableStateOf(false) }
@@ -106,13 +110,14 @@ fun MessageBubble(
                 if (deleted) Modifier.semantics { contentDescription = accessibilityLabel ?: "Message deleted" }
                 else interactions(onClick, accessibilityLabel, actions, onLongClick = { menuOpen = true }),
             )
-            if (attachments.isNotEmpty() && !deleted) {
+            if ((attachments.isNotEmpty() || location != null) && !deleted) {
                 val longPress: (() -> Unit)? = if (actions.isNotEmpty()) ({ menuOpen = true }) else null
                 Column(
                     interaction.width(IntrinsicSize.Max).padding(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     if (quote != null) QuoteBlock(quote, own, onQuoteClick, Modifier.fillMaxWidth().widthIn(max = 240.dp).padding(4.dp))
+                    if (location != null) LocationCard(location, own, onOpenLocation, onLongClick = longPress)
                     val (images, files) = attachments.partition { it.visual }
                     AttachmentGallery(images, onOpenAttachment, onLongClick = longPress)
                     files.forEach { f ->

@@ -103,6 +103,8 @@ fun ChatComposer(
     /** Set to offer Photos and File in the + menu. */
     onPhotos: (() -> Unit)? = null,
     onFiles: (() -> Unit)? = null,
+    /** Set to offer Location in the + menu (share where you are or a place). */
+    onLocation: (() -> Unit)? = null,
     /** Editing a message with attachments: an empty caption can be saved. */
     allowEmptyText: Boolean = false,
 ) {
@@ -185,10 +187,11 @@ fun ChatComposer(
                     .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (onPhotos != null || onFiles != null) {
+                if (onPhotos != null || onFiles != null || onLocation != null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         onPhotos?.let { MenuTile("Photos", AvIcons.Photo, it, Modifier.weight(1f), compact = true) }
                         onFiles?.let { MenuTile("File", AvIcons.Attach, it, Modifier.weight(1f), compact = true) }
+                        onLocation?.let { MenuTile("Location", AvIcons.Location, it, Modifier.weight(1f), compact = true) }
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -300,7 +303,7 @@ private fun ChatComposerPreview() {
     AvailablissPreviewTheme {
         Box(Modifier.background(AvailablissTheme.colors.bg)) {
             ChatComposer(
-                "", {}, {}, menuOpen = true, onToggleMenu = {}, onPoll = {}, onProposeTime = {}, onAddEvent = {}, onPhotos = {}, onFiles = {},
+                "", {}, {}, menuOpen = true, onToggleMenu = {}, onPoll = {}, onProposeTime = {}, onAddEvent = {}, onPhotos = {}, onFiles = {}, onLocation = {},
                 attachments = listOf(
                     ComposerAttachment("1", AttachmentUiKind.Image, "IMG_0001.jpg", progress = 0.4f),
                     ComposerAttachment("2", AttachmentUiKind.File, "Itinerary.pdf", uploaded = true),

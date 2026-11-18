@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.joeherbert.availabliss.core.network.model.MessageLocation
 import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
@@ -142,6 +143,10 @@ data class ChatActions(
     val onFiles: () -> Unit = {},
     val onRemoveAttachment: (String) -> Unit = {},
     val onRetryAttachment: (String) -> Unit = {},
+    /** Location in the + menu: the sheet to share where you are or a place you find. */
+    val onLocation: () -> Unit = {},
+    /** Tapped a shared place: ask which maps app to open it in. */
+    val onOpenLocation: (MessageLocation) -> Unit = {},
 )
 
 /** The group's chat (full screen; back returns to the calendar tab). */
@@ -173,6 +178,8 @@ fun GroupChatTab(
     BackHandler(enabled = state.editing && !state.menuOpen) { viewModel.cancelEdit() }
     BackHandler(enabled = state.replying != null && !state.editing && !state.menuOpen) { viewModel.cancelReply() }
 
+    // A shared place that was tapped: which maps app to open it in.
+    var openingLocation by remember { mutableStateOf<MessageLocation?>(null) }
     val currentOnBack by rememberUpdatedState(onBack)
     val currentOnOpenProposal by rememberUpdatedState(onOpenProposal)
     val currentOnOpenEvent by rememberUpdatedState(onOpenEvent)
@@ -221,6 +228,8 @@ fun GroupChatTab(
             },
             onRemoveAttachment = viewModel::removeAttachment,
             onRetryAttachment = viewModel::retryAttachment,
+            onLocation = viewModel::openLocationSheet,
+            onOpenLocation = { openingLocation = it },
         )
     }
     // The same rows inside the thread sheet, where tapping one offers Reply / Show in chat.
@@ -259,6 +268,18 @@ fun GroupChatTab(
         )
     }
     state.info?.let { MessageInfoSheet(it, onDismiss = viewModel::closeInfo) }
+    state.locationSheet?.let { sheet ->
+        LocationSheet(
+            sheet = sheet,
+            onQuery = viewModel::onPlaceQuery,
+            onSearch = viewModel::searchPlaces,
+            onClear = viewModel::clearPlaceSearch,
+            onPick = viewModel::pickPlace,
+            onSend = viewModel::sendLocation,
+            onDismiss = viewModel::closeLocationSheet,
+        )
+    }
+    openingLocation?.let { location -> OpenLocationSheet(location, onDismiss = { openingLocation = null }) }
     state.viewer?.let { viewer ->
         AttachmentViewer(
             viewer = viewer,
@@ -328,6 +349,7 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
                 onRetryAttachment = actions.onRetryAttachment,
                 onPhotos = actions.onPhotos,
                 onFiles = actions.onFiles,
+                onLocation = actions.onLocation,
                 allowEmptyText = state.editingCaption,
             )
         }
@@ -553,6 +575,8 @@ internal fun ChatRow(
             attachments = item.attachments,
             onOpenAttachment = { attachmentId -> actions.onOpenAttachment(item.id, attachmentId) },
             downloads = if (item.attachments.isEmpty()) emptyMap() else downloads,
+            location = item.location,
+            onOpenLocation = { item.location?.let(actions.onOpenLocation) },
         ) }
         is ChatItem.ProposalCard -> ProposalCard(
             ui = item.card ?: ProposalCardUi("", "", "Proposed a time", "Loading…", ""),

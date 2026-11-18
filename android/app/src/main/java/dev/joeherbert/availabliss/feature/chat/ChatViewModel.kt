@@ -17,6 +17,8 @@ import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.common.firstName
 import dev.joeherbert.availabliss.core.common.joinNamesSummary
 import dev.joeherbert.availabliss.core.data.ChatRepository
+import dev.joeherbert.availabliss.core.data.FoundPlace
+import dev.joeherbert.availabliss.core.data.PlaceSearch
 import dev.joeherbert.availabliss.core.data.EventsRepository
 import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.ProposalsRepository
@@ -29,6 +31,7 @@ import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
 import dev.joeherbert.availabliss.core.network.model.MessageKind
+import dev.joeherbert.availabliss.core.network.model.MessageLocation
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ReceiptState
@@ -50,6 +53,7 @@ import dev.joeherbert.availabliss.designsystem.component.chat.AttachmentUiKind
 import dev.joeherbert.availabliss.designsystem.component.chat.ComposerAttachment
 import dev.joeherbert.availabliss.designsystem.component.chat.MAX_ATTACHMENTS
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -180,6 +184,19 @@ data class ChatUiState(
     val downloads: Map<String, Float> = emptyMap(),
     /** Non-null while the photo viewer is open. */
     val viewer: ViewerUi? = null,
+    /** Non-null while the Share a location sheet is open. */
+    val locationSheet: LocationSheetUi? = null,
+)
+
+/** The Share a location sheet: a place search and what it found, or the place picked from it. */
+data class LocationSheetUi(
+    val query: String = "",
+    val results: List<FoundPlace> = emptyList(),
+    val searching: Boolean = false,
+    /** A search finished with nothing found. */
+    val noResults: Boolean = false,
+    val picked: FoundPlace? = null,
+    val sending: Boolean = false,
 )
 
 /** Editing [messageId]; [original] is its text, [stashedDraft] the composer draft to restore afterwards. */
@@ -219,6 +236,7 @@ private data class ChatData(
     val pending: List<PendingUpload> = emptyList(),
     val downloads: Map<String, Float> = emptyMap(),
     val viewer: ViewerUi? = null,
+    val locationSheet: LocationSheetUi? = null,
 )
 
 /** What the message list is built from; everything else in [ChatData] changes without rebuilding it. */
@@ -239,6 +257,7 @@ class ChatViewModel @Inject constructor(
     private val users: UserRepository,
     private val addToCalendar: AddToCalendarDelegate,
     private val files: AttachmentFiles,
+    private val places: PlaceSearch,
     liveEvents: LiveEvents,
 ) : ViewModel() {
 
@@ -659,9 +678,12 @@ class ChatViewModel @Inject constructor(
         it.id == messageId && it.kind == MessageKind.Text && !it.deleted && it.authorId != null && it.authorId == meId
     }
 
+    /** Your own text message that can be edited: not a shared place (those can only be deleted). */
+    private fun canEdit(messageId: String): Message? = editable(messageId)?.takeIf { it.location == null }
+
     /** Puts the composer into edit mode with the message's text; the current draft comes back afterwards. */
     fun startEdit(messageId: String) {
-        val m = editable(messageId) ?: return
+        val m = canEdit(messageId) ?: return
         val stash = data.value.editing?.stashedDraft ?: draft
         val text = m.displayText.orEmpty()
         data.update { it.copy(editing = EditSession(m.id, text, stash, hasAttachments = m.attachments.isNotEmpty()), menuOpen = false, replyingToId = null) }
@@ -714,6 +736,58 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
+    // endregion
+
+    // region Location
+    fun openLocationSheet() = data.update { it.copy(locationSheet = LocationSheetUi(), menuOpen = false) }
+    fun closeLocationSheet() = data.update { it.copy(locationSheet = null) }
+
+    fun onPlaceQuery(value: String) = updateLocation { it.copy(query = value.take(200), noResults = false) }
+
+    fun clearPlaceSearch() = updateLocation { LocationSheetUi() }
+
+    /** Searches for [LocationSheetUi.query], nearer [near] (lat, lng) first. */
+    fun searchPlaces(near: Pair<Double, Double>?) {
+        val query = data.value.locationSheet?.query?.trim().orEmpty()
+        if (query.isEmpty() || data.value.locationSheet?.searching == true) return
+        updateLocation { it.copy(searching = true, picked = null, noResults = false) }
+        viewModelScope.launch {
+            val found = try {
+                places.search(query, near)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                updateLocation { it.copy(searching = false) }
+                data.update { it.copy(message = UserMessage("Couldn't search for places. Check your connection and try again.")) }
+                return@launch
+            }
+            updateLocation { it.copy(searching = false, results = found, noResults = found.isEmpty(), picked = found.singleOrNull()) }
+        }
+    }
+
+    fun pickPlace(place: FoundPlace) = updateLocation { it.copy(picked = place) }
+
+    /** Shares [location] (as a reply, if one is being written), then closes the sheet. */
+    fun sendLocation(location: MessageLocation) {
+        if (data.value.locationSheet?.sending == true) return
+        val replyTo = data.value.replyingToId
+        updateLocation { it.copy(sending = true) }
+        viewModelScope.launch {
+            when (val result = chat.sendLocation(groupId, location, replyTo)) {
+                is ApiResult.Success -> {
+                    appendMessage(result.value)
+                    data.update { it.copy(locationSheet = null, replyingToId = if (it.replyingToId == replyTo) null else it.replyingToId) }
+                }
+                is ApiResult.Failure -> {
+                    updateLocation { it.copy(sending = false) }
+                    data.update { it.copy(message = UserMessage(result.error.message)) }
+                }
+            }
+        }
+    }
+
+    private fun updateLocation(transform: (LocationSheetUi) -> LocationSheetUi) =
+        data.update { d -> d.copy(locationSheet = d.locationSheet?.let(transform)) }
     // endregion
 
     // region Polls
@@ -939,6 +1013,7 @@ class ChatViewModel @Inject constructor(
             editingCaption = editing?.hasAttachments == true,
             downloads = downloads,
             viewer = viewer,
+            locationSheet = locationSheet,
         )
     }
 

@@ -61,6 +61,7 @@ import dev.joeherbert.availabliss.core.network.model.ReceiptsRequest
 import dev.joeherbert.availabliss.core.network.model.RegisterDeviceRequest
 import dev.joeherbert.availabliss.core.network.model.RespondRequest
 import dev.joeherbert.availabliss.core.network.model.SchoolAuthoritiesResponse
+import dev.joeherbert.availabliss.core.network.model.SendLocationRequest
 import dev.joeherbert.availabliss.core.network.model.SendPollRequest
 import dev.joeherbert.availabliss.core.network.model.SendTextRequest
 import dev.joeherbert.availabliss.core.network.model.SubdivisionsResponse
@@ -381,6 +382,9 @@ interface AvailablissApi {
     @Multipart
     @POST("api/v1/groups/{id}/attachments")
     suspend fun uploadAttachment(@Path("id") groupId: String, @Part file: okhttp3.MultipartBody.Part): Attachment
+
+    @POST("api/v1/groups/{id}/messages")
+    suspend fun sendLocation(@Path("id") groupId: String, @Body body: SendLocationRequest): Message
 
     @POST("api/v1/groups/{id}/messages")
     suspend fun sendPoll(@Path("id") groupId: String, @Body body: SendPollRequest): Message

@@ -39,7 +39,24 @@ data class Message(
      * apps ("📷 Photo"), so show this instead.
      */
     val caption: String? = null,
+    /** A shared place (a one-off pin); [body] is then a fallback for older apps. Null once deleted. */
+    val location: MessageLocation? = null,
 )
+
+/** A place shared in a chat message: where it is and, for a named place, what it's called. */
+@Serializable
+data class MessageLocation(
+    val lat: Double,
+    val lng: Double,
+    /** A place's name, or null for "my location". */
+    val name: String? = null,
+    val address: String? = null,
+    /** How precise a device's position was, in metres. */
+    val accuracy: Double? = null,
+) {
+    /** "📍 Dishoom Shoreditch" or "📍 Location", as the server quotes it. */
+    val summary: String get() = "\uD83D\uDCCD ${name ?: "Location"}"
+}
 
 /** Unknown kinds decode as [File]. */
 @Serializable(with = AttachmentKindSerializer::class)
@@ -145,7 +162,11 @@ fun attachmentsSummary(attachments: List<Attachment>): String {
 
 /** The text to show with the message: its caption when it has attachments, else its body. */
 val Message.displayText: String?
-    get() = if (attachments.isNotEmpty()) caption?.takeIf { it.isNotBlank() } else body
+    get() = when {
+        location != null -> null
+        attachments.isNotEmpty() -> caption?.takeIf { it.isNotBlank() }
+        else -> body
+    }
 
 /** A quoted message above a reply: who sent it and one line of it. */
 @Serializable
@@ -181,6 +202,7 @@ fun Message.asReply(authorName: String? = null): MessageReply = MessageReply(
     text = if (deleted) null else (
         when {
             kind == MessageKind.Poll -> poll?.question
+            location != null -> location.summary
             attachments.isNotEmpty() -> displayText ?: attachmentsSummary(attachments)
             else -> body
         }
@@ -241,6 +263,10 @@ data class SendTextRequest(val body: String, val replyToId: String? = null)
 /** Sends uploaded attachments (1–10) with an optional caption. */
 @Serializable
 data class SendAttachmentsRequest(val attachmentIds: List<String>, val body: String? = null, val replyToId: String? = null)
+
+/** Shares a place. */
+@Serializable
+data class SendLocationRequest(val location: MessageLocation, val replyToId: String? = null)
 
 @Serializable
 data class SendPollRequest(val poll: NewPoll)

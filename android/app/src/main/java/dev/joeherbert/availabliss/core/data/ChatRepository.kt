@@ -12,6 +12,8 @@ import dev.joeherbert.availabliss.core.network.model.NewPoll
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.ReceiptState
 import dev.joeherbert.availabliss.core.network.model.ReceiptsRequest
+import dev.joeherbert.availabliss.core.network.model.MessageLocation
+import dev.joeherbert.availabliss.core.network.model.SendLocationRequest
 import dev.joeherbert.availabliss.core.network.model.SendPollRequest
 import dev.joeherbert.availabliss.core.network.model.SendTextRequest
 import dev.joeherbert.availabliss.core.network.model.VoteRequest
@@ -40,6 +42,10 @@ class ChatRepository @Inject constructor(
     /** Uploads one file as [name] (not yet sent). */
     suspend fun upload(groupId: String, name: String, body: RequestBody): ApiResult<Attachment> =
         call { api.uploadAttachment(groupId, MultipartBody.Part.createFormData("file", name, body)) }
+
+    /** Shares a place (your position, or one you found). */
+    suspend fun sendLocation(groupId: String, location: MessageLocation, replyToId: String? = null): ApiResult<Message> =
+        call { api.sendLocation(groupId, SendLocationRequest(location, replyToId)) }
 
     suspend fun sendPoll(groupId: String, question: String, options: List<String>, multi: Boolean): ApiResult<Message> =
         call { api.sendPoll(groupId, SendPollRequest(NewPoll(question.trim(), options.map { it.trim() }, multi))) }

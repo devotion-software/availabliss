@@ -48,6 +48,15 @@ object AvIcons {
     /** A photo: a frame with a sun and hills (group photos, event covers). */
     val Photo = line("Photo", rect(3f, 4f, 18f, 16f, 3f), circle(8.5f, 9.5f, 1.5f), "M21 16l-5-5-9 9")
     val Location = line("Location", "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z", circle(12f, 9.5f, 2.5f))
+    /** Your current position: a navigation arrow. */
+    val Navigate = line("Navigate", "M3 11l18-8-8 18-2-8z")
+    val Search = line("Search", circle(11f, 11f, 7f), "M20 20l-4-4")
+    /** A folded map (Apple Maps / Google Maps). */
+    val Map = line("Map", "M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z", "M9 4v14M15 6v14")
+    /** A 3×3 grid (what3words squares). */
+    val Grid = line("Grid", rect(3f, 3f, 18f, 18f, 3f), "M9 3v18M15 3v18M3 9h18M3 15h18")
+    /** Opens somewhere else: a box with an arrow out of its corner. */
+    val External = line("External", "M14 4h6v6M20 4l-9 9", "M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5")
     val Poll = line("Poll", "M5 20V10M12 20V4M19 20v-7", stroke = 2.2f)
     val ArrowRight = line("ArrowRight", "M5 12h14M13 6l6 6-6 6", stroke = 2.2f)
     val ArrowDown = line("ArrowDown", "M12 5v14M6 13l6 6 6-6", stroke = 2.2f)

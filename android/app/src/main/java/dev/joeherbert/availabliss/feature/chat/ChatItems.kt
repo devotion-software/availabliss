@@ -15,6 +15,7 @@ import dev.joeherbert.availabliss.designsystem.component.chat.fileIconFor
 import dev.joeherbert.availabliss.designsystem.component.chat.formatFileSize
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageKind
+import dev.joeherbert.availabliss.core.network.model.MessageLocation
 import dev.joeherbert.availabliss.core.network.model.MessageReply
 import dev.joeherbert.availabliss.core.network.model.asReply
 import dev.joeherbert.availabliss.core.network.model.canReply
@@ -63,6 +64,8 @@ sealed interface ChatItem {
         val inThread: Boolean = false,
         /** Photos, GIFs and files; [text] is then the caption (possibly empty). */
         val attachments: List<AttachmentUi> = emptyList(),
+        /** A shared place, drawn as a map card ([text] is then empty). */
+        val location: MessageLocation? = null,
     ) : ChatItem {
         override val key get() = id
     }
@@ -184,8 +187,10 @@ fun buildChatItems(
                     else -> "This message was deleted"
                 }
                 val attachments = if (m.deleted) emptyList() else m.attachments.map { it.toUi() }
-                if (text.isNotBlank() || attachments.isNotEmpty()) {
-                    val spoken = listOf(attachmentsSpoken(m.attachments), text).filter { it.isNotBlank() }.joinToString(", ")
+                val location = if (m.deleted) null else m.location
+                if (text.isNotBlank() || attachments.isNotEmpty() || location != null) {
+                    val place = location?.let { listOfNotNull("Location: ${it.name ?: "shared location"}", it.address).joinToString(", ") }.orEmpty()
+                    val spoken = listOf(attachmentsSpoken(m.attachments), place, text).filter { it.isNotBlank() }.joinToString(", ")
                     val next = messages.getOrNull(index + 1)
                     val continues = next != null && next.authorId == m.authorId && next.kind == MessageKind.Text &&
                         DateTimes.localDate(next.createdAt) == date
@@ -207,11 +212,12 @@ fun buildChatItems(
                         // Your latest message says "Edited" on its receipt line instead.
                         edited = m.isEdited && receipt == null,
                         deleted = m.deleted,
-                        canEdit = own && m.kind == MessageKind.Text && !m.deleted,
+                        canEdit = own && m.kind == MessageKind.Text && !m.deleted && location == null,
                         canReply = m.canReply,
                         quote = if (m.deleted) null else m.replyTo?.let { quoteFor(it, directory) },
                         inThread = m.replyTo != null || m.id in repliedTo,
                         attachments = attachments,
+                        location = location,
                     )
                 }
             }
@@ -339,7 +345,7 @@ fun List<Message>.withUpdated(updated: Message): List<Message> = map { m ->
 
 /** Marks a message deleted locally after your own DELETE succeeds. */
 fun List<Message>.withDeleted(messageId: String): List<Message> {
-    val deleted = firstOrNull { it.id == messageId }?.copy(body = null, deleted = true, attachments = emptyList(), caption = null) ?: return this
+    val deleted = firstOrNull { it.id == messageId }?.copy(body = null, deleted = true, attachments = emptyList(), caption = null, location = null) ?: return this
     return map { m -> if (m.id == messageId) deleted else m }.withQuotesOf(deleted)
 }
 

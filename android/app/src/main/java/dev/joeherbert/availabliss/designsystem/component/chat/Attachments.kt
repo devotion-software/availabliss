@@ -199,7 +199,7 @@ const val MAX_ATTACHMENTS = 10
 
 // endregion
 
-private val GalleryWidth = 240.dp
+internal val GalleryWidth = 240.dp
 private val GalleryGap = 4.dp
 private val TileShape = RoundedCornerShape(14.dp)
 
