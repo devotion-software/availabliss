@@ -98,6 +98,83 @@ final class GroupAvailabilityViewModel {
         case .week: await loadWeek()
         }
         if dayDetails[selectedDay] == nil { await loadDay(selectedDay) }
+        await findFreeNeighbours()
+    }
+
+    // MARK: Previous / next free date
+
+    /// The group's search range: nothing outside it can work, so the search stops at its ends.
+    var searchRange: DateRange?
+    /// The nearest dates that work for everyone before and after the month or week on screen
+    /// (the first day of a run that works, from today on). Nil when there's none that way.
+    private(set) var previousFree: CalendarDay?
+    private(set) var nextFree: CalendarDay?
+    /// Still looking: the buttons wait rather than say there's none.
+    private(set) var isFindingFree = true
+
+    /// The first and last day of the month or week on screen.
+    private var pageBounds: (start: CalendarDay, end: CalendarDay) {
+        switch mode {
+        case .month: (month, month.lastOfMonth())
+        case .week: (selectedDay.startOfWeek(), selectedDay.startOfWeek().adding(days: 6))
+        }
+    }
+
+    /// Looks either side of the page for the nearest free dates, fetching further months (within
+    /// the search range) when the ones already loaded have none.
+    private func findFreeNeighbours() async {
+        guard let range = searchRange else { return }
+        let key = pageKey, mode = self.mode, generation = self.generation
+        let (start, end) = pageBounds
+        let earliest = max(range.from, .today())
+        let next = await freeDay(after: end, until: range.to)
+        let previous = end < earliest ? nil : await freeDay(before: start, from: earliest)
+        guard key == pageKey, mode == self.mode, generation == self.generation else { return }
+        nextFree = next
+        previousFree = previous
+        isFindingFree = false
+    }
+
+    /// Where a run of days that works for everyone starts (not the middle of a weekend).
+    private func startsFreeRun(_ day: AvailabilityDay) -> Bool {
+        day.status == .match && day.slotPosition != .middle && day.slotPosition != .end
+    }
+
+    private func freeDay(after day: CalendarDay, until last: CalendarDay) async -> CalendarDay? {
+        let from = max(day.adding(days: 1), .today())
+        var month = from.firstOfMonth
+        // A search range is a few months; the cap just keeps a very long one from fetching for ever.
+        for _ in 0..<24 where month <= last {
+            guard let loaded = try? await fetchMonth(month) else { return nil }
+            if let found = loaded.days.first(where: { $0.date >= from && $0.date <= last && startsFreeRun($0) }) {
+                return found.date
+            }
+            month = month.addingMonths(1)
+        }
+        return nil
+    }
+
+    private func freeDay(before day: CalendarDay, from first: CalendarDay) async -> CalendarDay? {
+        let until = day.adding(days: -1)
+        guard until >= first else { return nil }
+        var month = until.firstOfMonth
+        for _ in 0..<24 where month >= first.firstOfMonth {
+            guard let loaded = try? await fetchMonth(month) else { return nil }
+            if let found = loaded.days.last(where: { $0.date <= until && $0.date >= first && startsFreeRun($0) }) {
+                return found.date
+            }
+            month = month.addingMonths(-1)
+        }
+        return nil
+    }
+
+    /// To the month or week holding `day`, with it selected. Follow with `load()`.
+    func jump(to day: CalendarDay) {
+        lastDelta = day > selectedDay ? 1 : -1
+        month = day.firstOfMonth
+        selectedDay = day
+        userPickedDay = true
+        if let cached = months[month] { show(cached) }
     }
 
     func step(by delta: Int) async {

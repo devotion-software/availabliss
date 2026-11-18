@@ -23,7 +23,9 @@ struct GroupAvailabilityView: View {
         self.detail = detail
         self.group = group
         self.onOpenTiming = onOpenTiming
-        _model = State(initialValue: GroupAvailabilityViewModel(groupId: group.id, api: detail.api))
+        let model = GroupAvailabilityViewModel(groupId: group.id, api: detail.api)
+        model.searchRange = group.requirement.range
+        _model = State(initialValue: model)
     }
 
     var body: some View {
@@ -37,6 +39,7 @@ struct GroupAvailabilityView: View {
                 TimingChip(summary: group.requirementSummary, action: onOpenTiming)
                 GroupPlansCard(detail: detail, group: group)
                 headingRow
+                freeJumps
                 if let gaps = model.availability?.checkedUntil, !gaps.isEmpty {
                     CoverageNote(gaps: gaps, group: group, me: app.session.user?.id)
                 }
@@ -52,7 +55,10 @@ struct GroupAvailabilityView: View {
         .refreshable { await model.invalidate() }
         .onChange(of: model.mode) { _, _ in Task { await model.load() } }
         .onChange(of: model.selectedDay) { _, _ in Task { await model.loadSelectedDay() } }
-        .onChange(of: group.requirement) { _, _ in Task { await model.invalidate() } }
+        .onChange(of: group.requirement) { _, requirement in
+            model.searchRange = requirement.range
+            Task { await model.invalidate() }
+        }
         .task(id: group.id) {
             for await event in app.live.events(forGroup: group.id) {
                 switch event.kind {
@@ -154,6 +160,30 @@ struct GroupAvailabilityView: View {
         Task { await model.load() }
     }
 
+    /// To the month or week holding the nearest free date before / after this one, with it selected.
+    private func jump(to day: CalendarDay) {
+        pageEdge = day > model.selectedDay ? .trailing : .leading
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { model.jump(to: day) }
+        Task { await model.load() }
+    }
+
+    /// "‹ Fri 25 Dec · Free dates · Fri 5 Feb ›": skips the months or weeks where nothing works.
+    /// A side is greyed out when there's none that way in the group's search range.
+    private var freeJumps: some View {
+        HStack(spacing: 8) {
+            FreeJumpButton(direction: -1, day: model.previousFree, isFinding: model.isFindingFree) { jump(to: $0) }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Free dates")
+                .bodyFont(11, .semibold, relativeTo: .caption2)
+                .foregroundStyle(theme.muted)
+                .fixedSize()
+                .accessibilityHidden(true)
+            FreeJumpButton(direction: 1, day: model.nextFree, isFinding: model.isFindingFree) { jump(to: $0) }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .padding(.top, -6)
+    }
+
     private var headingRow: some View {
         HStack(spacing: 6) {
             Button { page(by: -1) } label: { chevron("chevron.left") }
@@ -252,6 +282,56 @@ private struct TodayMark: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// "‹ Fri 25 Dec" or "Fri 5 Feb ›"; "‹ None earlier" / "None later ›" (greyed out) when there's
+/// none, or "‹ Earlier" / "Later ›" while it's still looking.
+private struct FreeJumpButton: View {
+    /// -1 = earlier, 1 = later.
+    let direction: Int
+    let day: CalendarDay?
+    let isFinding: Bool
+    let action: (CalendarDay) -> Void
+    @Environment(\.theme) private var theme
+
+    private var name: String { direction < 0 ? "Previous free" : "Next free" }
+
+    var body: some View {
+        Button {
+            if let day { action(day) }
+        } label: {
+            HStack(spacing: 4) {
+                if direction < 0 { Image(systemName: "chevron.left").font(.system(size: 10, weight: .bold)) }
+                Text(label)
+                if direction > 0 { Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)) }
+            }
+            .bodyFont(12, .semibold, relativeTo: .caption)
+            .lineLimit(1)
+            .foregroundStyle(day == nil ? theme.muted : theme.accentInk)
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(Capsule().fill(day == nil ? theme.line : theme.accentSoft))
+            .opacity(day == nil ? 0.7 : 1)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(day == nil)
+        .animation(.easeInOut(duration: 0.2), value: day)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var label: String {
+        if let day { return Formatting.shortDay(day) }
+        if isFinding { return direction < 0 ? "Earlier" : "Later" }
+        return direction < 0 ? "None earlier" : "None later"
+    }
+
+    private var accessibilityText: String {
+        if let day { return "\(name) date, \(Formatting.longDay(day.startDate()))" }
+        if isFinding { return "\(name) date, looking" }
+        return direction < 0 ? "No earlier free dates" : "No later free dates"
     }
 }
 
