@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { buildPrompt, resolvePlan, type Plan } from './planner';
 
 const slots = [
@@ -48,4 +48,14 @@ test('buildPrompt numbers the slots and never needs member names', () => {
 	expect(prompt).toContain('3. Fri 4 – Sun 6 Dec');
 	expect(prompt).toContain('Christmas Day');
 	expect(prompt).toContain('Notes from the person asking: Keep it cheap');
+});
+
+describe('buildDraftPrompt', () => {
+	test('names the group, the time and the notes, never members', async () => {
+		const { buildDraftPrompt } = await import('./planner');
+		const prompt = buildDraftPrompt({ groupName: 'Uni lot', timing: 'An evening from 18:00', when: 'Fri 13 Nov · 19:00–22:00', members: 5, notes: 'curry?' });
+		expect(prompt).toContain('Uni lot (5 people)');
+		expect(prompt).toContain('Proposed time: Fri 13 Nov · 19:00–22:00');
+		expect(prompt).toContain('curry?');
+	});
 });

@@ -86,6 +86,7 @@ out. Some endpoints have tighter limits of their own:
 | `GET /groups/:id/availability[/day]` | 120 / minute |
 | `POST /requirements/preview` | 120 / minute |
 | `POST /groups/:id/planner` | 20 / hour |
+| `POST /groups/:id/planner/draft` | 30 / hour |
 | `GET /regions/detect` | 30 / minute per IP |
 | `POST /api/auth/email-otp/send-verification-otp` | 5 / minute per IP and 5 / 15 minutes per email address |
 | `POST /api/auth/sign-in/email-otp` | 10 / minute per IP |
@@ -349,6 +350,7 @@ calendars or busy time.
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | POST 🔒 | `/groups/:id/planner` | `{ notes?: string (≤500) }` | `PlannerResult` (`402 upgrade_required` without Pro, `409` when no time works yet; 20 an hour) |
+| POST 🔒 | `/groups/:id/planner/draft` | `{ start, end, notes? }` | `{ title, note }`: Pro, an AI-drafted proposal title and message for the time you picked (`404` when AI isn't set up here, `402 upgrade_required` without Pro; 30 an hour) |
 
 ```ts
 interface PlannerResult {
@@ -535,7 +537,9 @@ accept (`POST /invites/:token/accept`) or decline (`POST /invites/:token/decline
 
 ```ts
 // Preferred times are guidelines: they never block a date. Availability marks the slots and
-// `match` days they fit with `preferredBy: string[]` (user ids).
+// `match` days they fit with `preferredBy: string[]` (user ids). For Pro viewers each slot also has
+// `score` ("best date": preferences weighted by who's compromised in recent plans, plus notice) and
+// `fairFor: string[]` (who it suits that missed out or said maybe last time); sort by score.
 interface GroupPreference { id: string; userId: string; kind: 'dates' | 'weekly'; from: string | null; to: string | null; days: Weekday[]; window: { from: string; to: string } | null; label: string }
 // name: the account name of the person it was sent to in Activity (by username or id), else null.
 // maxUses: how many people can join with it (null: no limit; always 1 for an invite for one person); uses: how many have.

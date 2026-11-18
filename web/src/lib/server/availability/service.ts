@@ -1,8 +1,10 @@
 /** Loads a group's members, busy time and holidays, then runs the engine. */
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gt, inArray } from 'drizzle-orm';
 import type { Availability, DayAvailability, Requirement } from '#lib/types';
 import { db } from '../db';
-import { groupMembers, user } from '../db/schema';
+import { groupMembers, proposalResponses, proposals, user } from '../db/schema';
+import { isPro } from '../billing';
+import { scoreSlots } from './best-date';
 import { badRequest } from '../http';
 import { getGroupRow, memberIds, requireMember } from '../groups';
 import { calendarCoverage, loadBusy, syncedUserIds } from '../busy';
@@ -68,9 +70,35 @@ export async function groupAvailability(groupId: string, userId: string, from: s
 	if (daysBetween(from, to) > MAX_RANGE_DAYS) throw badRequest(`Ask for at most ${MAX_RANGE_DAYS} days at a time`);
 	await requireMember(groupId, userId);
 	const group = await getGroupRow(groupId);
-	const [input, prefs] = await Promise.all([engineInput(group, from, to), groupPreferenceList(groupId, group.requirement.timezone)]);
+	const [input, prefs, pro] = await Promise.all([
+		engineInput(group, from, to),
+		groupPreferenceList(groupId, group.requirement.timezone),
+		isPro(userId)
+	]);
 	// Preferences only mark and rank what works; they never block a date.
-	return applyPreferences(computeAvailability(input), prefs, group.requirement.timezone);
+	const availability = applyPreferences(computeAvailability(input), prefs, group.requirement.timezone);
+	if (!pro) return availability;
+	return { ...availability, slots: scoreSlots(availability.slots, await compromiseCounts(groupId), Date.now()) };
+}
+
+/** Recent compromises: how often each member's reply to a plan that went ahead wasn't a firm yes. */
+const COMPROMISE_LOOKBACK_DAYS = 365;
+async function compromiseCounts(groupId: string): Promise<Map<string, number>> {
+	const rows = await db
+		.select({ userId: proposalResponses.userId })
+		.from(proposalResponses)
+		.innerJoin(proposals, eq(proposals.id, proposalResponses.proposalId))
+		.where(
+			and(
+				eq(proposals.groupId, groupId),
+				eq(proposals.status, 'confirmed'),
+				gt(proposals.start, new Date(Date.now() - COMPROMISE_LOOKBACK_DAYS * 86_400_000)),
+				inArray(proposalResponses.response, ['declined', 'maybe'])
+			)
+		);
+	const counts = new Map<string, number>();
+	for (const r of rows) counts.set(r.userId, (counts.get(r.userId) ?? 0) + 1);
+	return counts;
 }
 
 export async function groupDay(groupId: string, userId: string, date: string): Promise<DayAvailability> {

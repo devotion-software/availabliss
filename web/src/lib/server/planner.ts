@@ -13,10 +13,10 @@ import { z } from 'zod';
 import type { PlannerResult, Slot } from '#lib/types';
 import { env } from './env';
 import { ApiError, badRequest, conflict } from './http';
-import { getGroupRow, requireMember } from './groups';
+import { getGroupRow, memberIds, requireMember } from './groups';
 import { isPro } from './billing';
 import { planningContext } from './availability/service';
-import { requirementSummary } from './availability/labels';
+import { requirementSummary, slotLabel } from './availability/labels';
 import { log } from './log';
 
 export const aiPlannerConfigured = () => !!env.ai.apiKey;
@@ -139,4 +139,64 @@ export async function planWithAi(groupId: string, userId: string, notes: string 
 		throw new ApiError('server_error', 'The planner didn’t finish. Please try again.');
 	}
 	return resolvePlan(response.parsed_output, context.slots);
+}
+
+// ─── Drafting a proposal for a time you picked ───────────────────────────
+
+export const DraftSchema = z.object({ title: z.string(), note: z.string() });
+
+const DRAFT_SYSTEM = `You write the title and message for a proposal a friend is about to send to their group, suggesting a particular time to meet. Write a title of at most 60 characters and a friendly, concise message of at most 300 characters that says when it is and invites people to reply. Fit the tone to the group's name and any notes. Use British English. Don't invent venues, prices or facts not in the notes.`;
+
+export function buildDraftPrompt(input: { groupName: string; timing: string; when: string; members: number; notes: string | null }): string {
+	return [
+		`Group: ${input.groupName} (${input.members} people)`,
+		`What they're planning: ${input.timing}`,
+		`Proposed time: ${input.when}`,
+		input.notes ? `Notes from the person proposing: ${input.notes}` : 'No notes.'
+	].join('\n');
+}
+
+/** Pro: a title and message for a proposal at a time the user chose. */
+export async function draftProposal(
+	groupId: string,
+	userId: string,
+	input: { start: string; end: string; notes: string | null }
+): Promise<{ title: string; note: string }> {
+	await requireMember(groupId, userId);
+	if (!aiPlannerConfigured()) throw new ApiError('not_found', 'AI drafting isn’t available');
+	if (!(await isPro(userId))) throw new ApiError('upgrade_required', 'AI drafting is part of Availabliss Pro.');
+	const group = await getGroupRow(groupId);
+	const members = (await memberIds(groupId)).length;
+	const prompt = buildDraftPrompt({
+		groupName: group.name,
+		timing: requirementSummary(group.requirement),
+		when: slotLabel({ start: Date.parse(input.start), end: Date.parse(input.end) }, group.requirement),
+		members,
+		notes: input.notes
+	});
+	let response;
+	try {
+		response = await anthropic().beta.messages.parse({
+			model: env.ai.model,
+			max_tokens: 2000,
+			output_config: { effort: 'low', format: betaZodOutputFormat(DraftSchema) },
+			betas: ['server-side-fallback-2026-07-01'],
+			fallbacks: 'default',
+			system: DRAFT_SYSTEM,
+			messages: [{ role: 'user', content: prompt }]
+		});
+	} catch (err) {
+		if (err instanceof Anthropic.RateLimitError) throw new ApiError('rate_limited', 'The planner is busy. Try again in a minute.');
+		if (err instanceof Anthropic.APIError) {
+			log.error('planner', 'draft failed', { err });
+			throw new ApiError('server_error', 'Couldn’t draft that right now. Please try again shortly.');
+		}
+		throw err;
+	}
+	if (response.stop_reason === 'refusal') throw badRequest('The planner can’t help with that. Try different notes.');
+	if (!response.parsed_output) {
+		log.error('planner', 'no draft', { stopReason: response.stop_reason });
+		throw new ApiError('server_error', 'Couldn’t draft that. Please try again.');
+	}
+	return { title: response.parsed_output.title.slice(0, 120), note: response.parsed_output.note.slice(0, 1000) };
 }

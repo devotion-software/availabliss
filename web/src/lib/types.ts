@@ -227,6 +227,10 @@ export interface Slot {
 	label: string;
 	/** Members whose preferences this slot fits. */
 	preferredBy?: string[];
+	/** Pro: the "best date" score (higher is better), weighing preferences and who's compromised before. */
+	score?: number;
+	/** Pro: people this time suits who've compromised in the group's recent plans. */
+	fairFor?: string[];
 }
 
 /** A member's preferred time for a group. A guideline: it never blocks a date. */
