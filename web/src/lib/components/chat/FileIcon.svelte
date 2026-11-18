@@ -19,6 +19,7 @@
 		audio: 'music',
 		video: 'video',
 		image: 'image',
+		pass: 'ticket',
 		file: 'file'
 	};
 </script>

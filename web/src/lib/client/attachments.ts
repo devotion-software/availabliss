@@ -1,5 +1,5 @@
-/** Pure helpers for chat attachments (photos, GIFs and files): sizes, labels, layout and limits. */
-import type { Attachment, Message } from '#lib/types';
+/** Pure helpers for chat attachments (photos, GIFs, files and Wallet passes): sizes, labels, layout and limits. */
+import type { Attachment, Message, WalletPass } from '#lib/types';
 
 /** At most this many attachments in one message. */
 export const MAX_ATTACHMENTS = 10;
@@ -10,7 +10,7 @@ export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 /** File extensions the server accepts as files (anything else is a 400). */
 export const FILE_EXTENSIONS = [
 	'pdf', 'txt', 'md', 'csv', 'rtf', 'ics', 'vcf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
-	'pages', 'numbers', 'key', 'epub', 'zip', 'mp3', 'm4a', 'wav', 'mp4', 'mov'
+	'pages', 'numbers', 'key', 'epub', 'zip', 'mp3', 'm4a', 'wav', 'mp4', 'mov', 'pkpass', 'pkpasses'
 ] as const;
 
 /** "1.2 MB", "340 KB", "12 bytes". */
@@ -45,7 +45,7 @@ export function middleTruncate(name: string, max = 32): string {
 	return `${name.slice(0, head)}…${name.slice(name.length - tail)}`;
 }
 
-export type FileIconKind = 'pdf' | 'doc' | 'sheet' | 'slides' | 'zip' | 'audio' | 'video' | 'image' | 'file';
+export type FileIconKind = 'pdf' | 'doc' | 'sheet' | 'slides' | 'zip' | 'audio' | 'video' | 'image' | 'pass' | 'file';
 
 /** Which icon a file card shows, by extension then MIME type. */
 export function fileIconKind(name: string, mime = ''): FileIconKind {
@@ -54,6 +54,7 @@ export function fileIconKind(name: string, mime = ''): FileIconKind {
 	if (['doc', 'docx', 'odt', 'rtf', 'pages', 'txt', 'md', 'epub'].includes(ext)) return 'doc';
 	if (['xls', 'xlsx', 'ods', 'numbers', 'csv'].includes(ext)) return 'sheet';
 	if (['ppt', 'pptx', 'odp', 'key'].includes(ext)) return 'slides';
+	if (['pkpass', 'pkpasses'].includes(ext) || mime.startsWith('application/vnd.apple.pkpass')) return 'pass';
 	if (ext === 'zip' || mime === 'application/zip') return 'zip';
 	if (['mp3', 'm4a', 'wav'].includes(ext) || mime.startsWith('audio/')) return 'audio';
 	if (['mp4', 'mov'].includes(ext) || mime.startsWith('video/')) return 'video';
@@ -70,26 +71,73 @@ export const bubbleSrc = (a: Attachment) => (a.kind === 'gif' ? a.url : (a.thumb
 /** A photo or file as a download (photos are served inline otherwise). */
 export const downloadUrl = (url: string) => `${url}${url.includes('?') ? '&' : '?'}download=1`;
 
-/** For screen readers: "Photo", "GIF", "File: Plan.pdf, 1.2 MB". */
-export function attachmentLabel(a: Pick<Attachment, 'kind' | 'name' | 'size'>): string {
+/** For screen readers: "Photo", "GIF", "Wallet pass: Concert ticket", "File: Plan.pdf, 1.2 MB". */
+export function attachmentLabel(a: Pick<Attachment, 'kind' | 'name' | 'size'> & { pass?: WalletPass | null }): string {
 	if (a.kind === 'image') return 'Photo';
 	if (a.kind === 'gif') return 'GIF';
+	if (a.kind === 'pass') return `Wallet pass: ${passTitle(a.pass ?? null)}`;
 	return `File: ${a.name}, ${formatBytes(a.size)}`;
 }
 
-/** One line for a message with attachments and no caption: "Photo", "GIF", "3 photos", "Plan.pdf", "2 files", "2 attachments". */
-export function attachmentSummary(attachments: Pick<Attachment, 'kind' | 'name'>[]): string {
+/** One line for a message with attachments and no caption: "Photo", "GIF", "3 photos", "Plan.pdf", "Concert ticket", "2 files", "2 passes", "2 attachments". */
+export function attachmentSummary(attachments: (Pick<Attachment, 'kind' | 'name'> & { pass?: WalletPass | null })[]): string {
 	const n = attachments.length;
 	if (!n) return '';
 	if (n === 1) {
 		const [a] = attachments;
-		return a.kind === 'image' ? 'Photo' : a.kind === 'gif' ? 'GIF' : a.name;
+		return a.kind === 'image' ? 'Photo' : a.kind === 'gif' ? 'GIF' : a.kind === 'pass' ? passTitle(a.pass ?? null) : a.name;
 	}
 	if (attachments.every((a) => a.kind === 'image')) return `${n} photos`;
 	if (attachments.every((a) => a.kind === 'gif')) return `${n} GIFs`;
 	if (attachments.every(isVisual)) return `${n} photos`;
-	if (attachments.every((a) => a.kind === 'file')) return `${n} files`;
+	if (attachments.every((a) => a.kind === 'pass')) return `${n} passes`;
+	if (attachments.every((a) => a.kind === 'file' || a.kind === 'pass')) return `${n} files`;
 	return `${n} attachments`;
+}
+
+// ─── Wallet passes ────────────────────────────────────────────────────────
+
+const PASS_STYLE_NAMES: Record<string, string> = { boardingPass: 'Boarding pass', eventTicket: 'Ticket', coupon: 'Coupon', storeCard: 'Card', generic: 'Pass' };
+
+/** What a pass is: its description, else "Ticket", "Boarding pass"…; "2 tickets" for a bundle. */
+export function passTitle(pass: Pick<WalletPass, 'description' | 'style' | 'count'> | null): string {
+	if (!pass) return 'Ticket';
+	if (pass.count > 1) return `${pass.count} ${pass.style === 'boardingPass' ? 'boarding passes' : pass.style === 'eventTicket' ? 'tickets' : 'passes'}`;
+	return pass.description || PASS_STYLE_NAMES[pass.style] || 'Ticket';
+}
+
+/** "Wed 2 Dec · 19:30" in the reader's time zone. */
+export function passDate(iso: string, locale = 'en-GB', timeZone?: string): string | null {
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return null;
+	const day = date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', timeZone });
+	const time = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone });
+	return `${day.replace(',', '')} · ${time}`;
+}
+
+export interface PassCard {
+	organization: string;
+	headline: string;
+	date: string | null;
+	venue: string | null;
+	fields: { label: string | null; value: string }[];
+}
+
+/** What a pass's card shows: the event (or what it is), when, where and up to three other details. */
+export function passCard(pass: WalletPass, locale?: string, timeZone?: string): PassCard {
+	const headline = pass.count > 1 ? passTitle(pass) : (pass.eventName ?? passTitle(pass));
+	const date = pass.relevantDate ? passDate(pass.relevantDate, locale, timeZone) : null;
+	const fields = pass.fields
+		.filter((f) => f.value !== headline && f.value !== pass.organizationName && !(f.date && date))
+		.slice(0, 3)
+		.map((f) => ({ label: f.label, value: f.date ? (passDate(f.value, locale, timeZone) ?? f.value) : f.value }));
+	return { organization: pass.logoText ?? pass.organizationName, headline, date, venue: pass.venue, fields };
+}
+
+/** Whether this browser hands a .pkpass to Apple Wallet (Safari, and any browser on iPhone / iPad). */
+export function opensWallet(userAgent: string): boolean {
+	if (/iPhone|iPad|iPod/.test(userAgent)) return true;
+	return /Macintosh/.test(userAgent) && /Safari\//.test(userAgent) && !/Chrome|Chromium|Edg\/|Firefox|OPR\//.test(userAgent);
 }
 
 /** The text a message shows: with attachments its caption (or nothing), otherwise its body. */
@@ -145,7 +193,7 @@ export const isHeic = (file: { name: string; type: string }) =>
 export function pickProblem(file: { name: string; type: string; size: number }): string | null {
 	const kind = pickedKind(file);
 	if (kind !== 'file') return file.size > MAX_IMAGE_BYTES ? `${file.name} is too big. Photos can be up to 15 MB.` : null;
-	if (!(FILE_EXTENSIONS as readonly string[]).includes(extensionOf(file.name)))
-		return `${file.name} can’t be sent. Try a PDF, document, spreadsheet, presentation, ZIP, audio or video file.`;
+	if (!(FILE_EXTENSIONS as readonly string[]).includes(extensionOf(file.name)) && !file.type.startsWith('application/vnd.apple.pkpass'))
+		return `${file.name} can’t be sent. Try a PDF, document, spreadsheet, presentation, ZIP, audio, video or Wallet pass.`;
 	return file.size > MAX_FILE_BYTES ? `${file.name} is too big. Files can be up to 25 MB.` : null;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Attachment } from '#lib/types';
+import type { Attachment, WalletPass } from '#lib/types';
 import {
 	attachmentLabel,
 	attachmentSummary,
@@ -12,6 +12,9 @@ import {
 	gridTiles,
 	messageText,
 	middleTruncate,
+	opensWallet,
+	passCard,
+	passTitle,
 	pickProblem,
 	pickedKind
 } from './attachments';
@@ -150,5 +153,61 @@ describe('picking', () => {
 		expect(pickProblem(file('a.pdf', 'application/pdf'))).toBeNull();
 		expect(pickProblem(file('a.pdf', 'application/pdf', 26 * 1024 * 1024))).toContain('25 MB');
 		expect(pickProblem(file('setup.exe', 'application/octet-stream'))).toContain('can’t be sent');
+	});
+});
+
+describe('Wallet passes', () => {
+	const pass: WalletPass = {
+		style: 'eventTicket',
+		organizationName: 'Roundhouse',
+		description: 'Concert ticket',
+		logoText: null,
+		passTypeIdentifier: 'p',
+		serialNumber: 's',
+		relevantDate: '2026-12-02T00:30:00.000Z',
+		expirationDate: null,
+		voided: false,
+		eventName: 'Winter Gig',
+		venue: 'Roundhouse, London',
+		fields: [
+			{ label: 'Event', value: 'Winter Gig', date: false },
+			{ label: 'Doors', value: '2026-12-02T00:30:00.000Z', date: true },
+			{ label: 'Seat', value: '12A', date: false }
+		],
+		backgroundColor: '#201840',
+		foregroundColor: '#ffffff',
+		labelColor: null,
+		count: 1
+	};
+
+	test('the card: event, date in the reader\'s zone, the details that add something', () => {
+		expect(passCard(pass, 'en-GB', 'Europe/London')).toEqual({
+			organization: 'Roundhouse',
+			headline: 'Winter Gig',
+			date: 'Wed 2 Dec · 00:30',
+			venue: 'Roundhouse, London',
+			fields: [{ label: 'Seat', value: '12A' }]
+		});
+		expect(passCard({ ...pass, count: 3 }).headline).toBe('3 tickets');
+	});
+
+	test('titles and summaries', () => {
+		expect(passTitle(pass)).toBe('Concert ticket');
+		expect(passTitle({ ...pass, description: '', style: 'boardingPass' })).toBe('Boarding pass');
+		expect(passTitle(null)).toBe('Ticket');
+		const a = att({ kind: 'pass', name: 'gig.pkpass', mime: 'application/vnd.apple.pkpass', pass });
+		expect(attachmentSummary([a])).toBe('Concert ticket');
+		expect(attachmentSummary([a, a])).toBe('2 passes');
+		expect(attachmentSummary([a, att({ kind: 'file', name: 'Plan.pdf' })])).toBe('2 files');
+		expect(attachmentLabel(a)).toBe('Wallet pass: Concert ticket');
+		expect(fileIconKind('gig.pkpass')).toBe('pass');
+		expect(pickProblem({ name: 'gig.pkpass', type: 'application/vnd.apple.pkpass', size: 2000 })).toBeNull();
+	});
+
+	test('which browsers hand passes to Wallet', () => {
+		expect(opensWallet('Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140 Mobile/15E148 Safari/604.1')).toBe(true);
+		expect(opensWallet('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15')).toBe(true);
+		expect(opensWallet('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36')).toBe(false);
+		expect(opensWallet('Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36')).toBe(false);
 	});
 });
