@@ -150,6 +150,21 @@ jobs:
         run: bun test src/lib/server/redis
       - name: Smoke test
         run: bun scripts/smoke.ts
+      - name: Install Playwright's Chromium
+        run: bunx playwright install --with-deps chromium
+      - name: Browser end-to-end tests
+        # The server rate-limits sign-in codes per IP (5 a minute), and the smoke test just used some.
+        run: |
+          sleep 60
+          bunx playwright test --project=phone
+      - name: Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
       - name: Server log
         if: failure()
         run: cat server.log

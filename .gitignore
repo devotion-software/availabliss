@@ -37,3 +37,7 @@ web/.uploads/
 
 # Scratch scripts (screenshots etc.)
 web/.tmp-*
+
+# Playwright output
+web/test-results/
+web/playwright-report/

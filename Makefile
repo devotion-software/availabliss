@@ -4,7 +4,7 @@ WEB := web
 IMAGE ?= availabliss-web
 
 .DEFAULT_GOAL := help
-.PHONY: help setup hooks env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test test-integration smoke \
+.PHONY: help setup hooks env db-up db-down db-reset db-generate db-migrate db-studio dev build preview check test test-integration smoke e2e \
 	seed-demo clean-demo set-plan apple-secret school-holidays \
 	docker-build docker-run ios-project ios-open ios-build ios-uitest android-build android-test android-tour clean
 
@@ -65,6 +65,9 @@ test-integration: ## Run DB integration tests against DATABASE_URL (needs `make 
 
 smoke: ## End-to-end API smoke test against the running dev server (needs `make dev`)
 	cd $(WEB) && bun scripts/smoke.ts
+
+e2e: ## Browser end-to-end tests (Playwright) against the running dev server (needs `make dev`)
+	cd $(WEB) && bunx playwright test
 
 seed-demo: ## Create demo users, groups, busy time and chat (prints the email to sign in with)
 	cd $(WEB) && bun scripts/seed-demo.ts

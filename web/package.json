@@ -17,13 +17,15 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:push": "drizzle-kit push",
-		"db:studio": "drizzle-kit studio"
+		"db:studio": "drizzle-kit studio",
+		"test:e2e": "playwright test"
 	},
 	"imports": {
 		"#lib": "./src/lib/index.ts",
 		"#lib/*": "./src/lib/*"
 	},
 	"devDependencies": {
+		"@playwright/test": "1.64.1",
 		"@revenuecat/purchases-js": "^1.75.0",
 		"@sveltejs/adapter-node": "^6.0.4",
 		"@sveltejs/kit": "^3.3.1",
