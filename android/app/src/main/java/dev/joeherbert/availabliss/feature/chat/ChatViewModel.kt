@@ -68,6 +68,28 @@ data class MessageInfoUi(
 /** "Replying to Priya" above the composer, with one line of what they said. */
 data class ReplyingUi(val messageId: String, val name: String, val snippet: String)
 
+/** The thread sheet: a message's chain of replies, with a composer that replies within it. */
+data class ThreadUi(
+    /** The message it was opened from, shown and flashed once loaded. */
+    val focusId: String,
+    /** Oldest first. */
+    val items: List<ChatItem> = emptyList(),
+    val count: Int = 0,
+    val loading: Boolean = true,
+    val truncated: Boolean = false,
+    /** Who your reply goes to; [picked] when you chose it rather than it being the latest. */
+    val replying: ReplyingUi? = null,
+    val picked: Boolean = false,
+    val sending: Boolean = false,
+    /** Non-null while a tapped message's Reply / Show in chat options are showing. */
+    val actions: ThreadActionsUi? = null,
+)
+
+data class ThreadActionsUi(val messageId: String, val title: String, val snippet: String, val canReply: Boolean)
+
+/** Scroll the chat to [messageId] and flash it ("Show in chat" from a thread). */
+data class ShowInChatRequest(val messageId: String, val nonce: Long = System.nanoTime())
+
 /** Poll creation form. */
 data class PollDraft(
     val question: String = "",
@@ -110,11 +132,24 @@ data class ChatUiState(
     val confirmDeleteId: String? = null,
     /** Add to calendar on "Everyone's in" banners (`added` holds event ids added this session). */
     val calendar: AddToCalendarState = AddToCalendarState(),
+    /** Non-null while the thread sheet is open. */
+    val thread: ThreadUi? = null,
+    val showInChat: ShowInChatRequest? = null,
     val message: UserMessage? = null,
 )
 
 /** Editing [messageId]; [original] is its text, [stashedDraft] the composer draft to restore afterwards. */
 private data class EditSession(val messageId: String, val original: String, val stashedDraft: String)
+
+private data class ThreadSession(
+    val focusId: String,
+    val messages: List<Message> = emptyList(),
+    val truncated: Boolean = false,
+    val loading: Boolean = true,
+    val pickedId: String? = null,
+    val sending: Boolean = false,
+    val actionsForId: String? = null,
+)
 
 private data class InfoSheet(val messageId: String, val info: MessageInfo? = null, val error: String? = null)
 
@@ -134,6 +169,8 @@ private data class ChatData(
     val editing: EditSession? = null,
     val replyingToId: String? = null,
     val confirmDeleteId: String? = null,
+    val thread: ThreadSession? = null,
+    val showInChat: ShowInChatRequest? = null,
     val message: UserMessage? = null,
 )
 
@@ -188,6 +225,10 @@ class ChatViewModel @Inject constructor(
      * moves the caret) nor rebuilds the message list.
      */
     var draft by mutableStateOf("")
+        private set
+
+    /** The thread sheet's composer text, kept apart from the chat's. */
+    var threadDraft by mutableStateOf("")
         private set
 
     init {
@@ -300,7 +341,7 @@ class ChatViewModel @Inject constructor(
             }
             is LivePayload.MessageUpdated -> {
                 val m = payload.message
-                data.update { it.copy(messages = it.messages.withUpdated(m)) }
+                data.update { it.copy(messages = it.messages.withUpdated(m), thread = it.thread?.let { t -> t.copy(messages = t.messages.withUpdated(m)) }) }
                 // Deleted elsewhere (e.g. on another device) while you were editing it.
                 if (m.deleted && data.value.editing?.messageId == m.id) cancelEdit()
                 if (m.deleted && data.value.replyingToId == m.id) cancelReply()
@@ -330,17 +371,20 @@ class ChatViewModel @Inject constructor(
 
     private fun appendMessage(message: Message) {
         data.update { d ->
-            if (d.messages.any { it.id == message.id }) {
-                d.copy(messages = d.messages.map { if (it.id == message.id) message else it })
+            val messages = if (d.messages.any { it.id == message.id }) {
+                d.messages.map { if (it.id == message.id) message else it }
             } else {
-                d.copy(messages = d.messages + message)
+                d.messages + message
             }
+            // A reply to something in the open thread joins it.
+            d.copy(messages = messages, thread = d.thread?.let { t -> t.copy(messages = t.messages.withThreadMessage(message)) })
         }
         resolveReferences()
     }
 
     private fun replacePoll(poll: Poll) = data.update { d ->
-        d.copy(messages = d.messages.map { m -> if (m.poll?.id == poll.id) m.copy(poll = poll) else m })
+        fun List<Message>.withPoll() = map { m -> if (m.poll?.id == poll.id) m.copy(poll = poll) else m }
+        d.copy(messages = d.messages.withPoll(), thread = d.thread?.let { it.copy(messages = it.messages.withPoll()) })
     }
     // endregion
 
@@ -460,7 +504,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = chat.delete(id)) {
                 is ApiResult.Success -> {
-                    data.update { it.copy(messages = it.messages.withDeleted(id)) }
+                    data.update { it.copy(messages = it.messages.withDeleted(id), thread = it.thread?.let { t -> t.copy(messages = t.messages.withDeleted(id)) }) }
                     if (data.value.editing?.messageId == id) cancelEdit()
                     if (data.value.replyingToId == id) cancelReply()
                 }
@@ -507,7 +551,7 @@ class ChatViewModel @Inject constructor(
     /** Tap an option: toggles your vote (single-choice polls move it). Optimistic, then reconciled. */
     fun onVote(messageId: String, optionId: String) {
         val me = meId ?: return
-        val poll = data.value.messages.firstOrNull { it.id == messageId }?.poll ?: return
+        val poll = (data.value.messages + data.value.thread?.messages.orEmpty()).firstOrNull { it.id == messageId }?.poll ?: return
         if (poll.closed) return
         val mine = poll.options.filter { me in it.voterIds }.map { it.id }.toSet()
         val selection = when {
@@ -533,7 +577,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onClosePoll(messageId: String) {
-        val poll = data.value.messages.firstOrNull { it.id == messageId }?.poll ?: return
+        val poll = (data.value.messages + data.value.thread?.messages.orEmpty()).firstOrNull { it.id == messageId }?.poll ?: return
         viewModelScope.launch {
             when (val result = chat.closePoll(poll.id)) {
                 is ApiResult.Success -> replacePoll(result.value)
@@ -559,6 +603,84 @@ class ChatViewModel @Inject constructor(
     }
 
     fun closeInfo() = data.update { it.copy(infoSheet = null) }
+    // endregion
+
+    // region Thread
+    /** Opens the thread [messageId] is part of (fetched, since it may reach past what's loaded). */
+    fun openThread(messageId: String) {
+        threadDraft = ""
+        data.update { it.copy(thread = ThreadSession(messageId), menuOpen = false) }
+        viewModelScope.launch {
+            val result = chat.thread(messageId)
+            data.update { d ->
+                val t = d.thread?.takeIf { it.focusId == messageId } ?: return@update d
+                when (result) {
+                    is ApiResult.Success -> d.copy(thread = t.copy(messages = result.value.messages, truncated = result.value.truncated, loading = false))
+                    is ApiResult.Failure -> d.copy(thread = null, message = UserMessage(result.error.message))
+                }
+            }
+        }
+    }
+
+    fun closeThread() {
+        threadDraft = ""
+        data.update { it.copy(thread = null) }
+    }
+
+    fun onThreadDraftChange(value: String) {
+        threadDraft = value.take(4000)
+    }
+
+    /** Your next reply in the thread goes to [messageId]; null goes back to the latest. */
+    fun replyInThread(messageId: String?) = data.update { d ->
+        d.copy(thread = d.thread?.copy(pickedId = messageId, actionsForId = null))
+    }
+
+    fun openThreadActions(messageId: String) = data.update { d -> d.copy(thread = d.thread?.copy(actionsForId = messageId)) }
+
+    fun closeThreadActions() = data.update { d -> d.copy(thread = d.thread?.copy(actionsForId = null)) }
+
+    fun sendInThread() {
+        val t = data.value.thread ?: return
+        val text = threadDraft.trim()
+        if (text.isEmpty() || t.sending) return
+        val target = threadReplyTarget(t.messages, t.pickedId, meId) ?: return
+        threadDraft = ""
+        data.update { d -> d.copy(thread = d.thread?.copy(sending = true)) }
+        viewModelScope.launch {
+            when (val result = chat.sendText(groupId, text, target.id)) {
+                is ApiResult.Success -> {
+                    appendMessage(result.value)
+                    data.update { d -> d.copy(thread = d.thread?.copy(sending = false, pickedId = null)) }
+                }
+                is ApiResult.Failure -> {
+                    if (threadDraft.isEmpty()) threadDraft = text
+                    data.update { d -> d.copy(thread = d.thread?.copy(sending = false), message = UserMessage(result.error.message)) }
+                }
+            }
+        }
+    }
+
+    /** Closes the thread and goes to [messageId] in the chat, paging back to it if needed. */
+    fun showInChat(messageId: String) {
+        closeThread()
+        viewModelScope.launch {
+            var pages = 0
+            while (data.value.messages.none { it.id == messageId } && data.value.hasMore && pages < MAX_PAGES_TO_FIND) {
+                val oldest = data.value.messages.firstOrNull()?.id ?: break
+                val page = (chat.page(groupId, before = oldest) as? ApiResult.Success)?.value ?: break
+                data.update { cur ->
+                    val known = cur.messages.mapTo(HashSet()) { it.id }
+                    cur.copy(messages = page.messages.filterNot { it.id in known } + cur.messages, hasMore = page.hasMore)
+                }
+                pages++
+            }
+            resolveReferences()
+            if (data.value.messages.any { it.id == messageId }) data.update { it.copy(showInChat = ShowInChatRequest(messageId)) }
+        }
+    }
+
+    fun onShowInChatHandled() = data.update { it.copy(showInChat = null) }
     // endregion
 
     // region Add to calendar
@@ -605,10 +727,39 @@ class ChatViewModel @Inject constructor(
             },
             confirmDeleteId = confirmDeleteId,
             calendar = cal,
+            thread = thread?.toUi(MemberDirectory(g?.members.orEmpty(), me), g?.memberCount ?: 0, me),
+            showInChat = showInChat,
             info = infoSheet?.let { sheet ->
                 sheet.toUi(messages.firstOrNull { it.id == sheet.messageId }, MemberDirectory(g?.members.orEmpty(), me))
             },
             message = message,
+        )
+    }
+
+    private fun ThreadSession.toUi(directory: MemberDirectory, memberCount: Int, me: String?): ThreadUi {
+        val target = threadReplyTarget(messages, pickedId, me)
+        val items = buildChatItems(messages, directory, memberCount, proposals = emptyMap(), events = emptyMap())
+            // No receipt rows, and no Edit / Delete / View thread from inside a thread.
+            .filterNot { it is ChatItem.Receipt }
+            .map { if (it is ChatItem.Text) it.copy(canEdit = false, inThread = false) else it }
+        return ThreadUi(
+            focusId = focusId,
+            items = items,
+            count = messages.size,
+            loading = loading,
+            truncated = truncated,
+            replying = target?.let { ReplyingUi(it.id, replyAuthorName(it.authorId, null, directory), it.asReply().snippet) },
+            picked = pickedId != null && target?.id == pickedId,
+            sending = sending,
+            actions = actionsForId?.let { id -> messages.firstOrNull { it.id == id } }?.let { m ->
+                val name = replyAuthorName(m.authorId, null, directory)
+                ThreadActionsUi(
+                    messageId = m.id,
+                    title = if (name == "You") "Your message" else "$name\u2019s message",
+                    snippet = m.asReply().snippet,
+                    canReply = m.canReply,
+                )
+            },
         )
     }
 
@@ -633,5 +784,7 @@ class ChatViewModel @Inject constructor(
 
     private companion object {
         const val RECEIPT_DEBOUNCE_MS = 600L
+        /** How many older pages "Show in chat" loads looking for a message. */
+        const val MAX_PAGES_TO_FIND = 20
     }
 }

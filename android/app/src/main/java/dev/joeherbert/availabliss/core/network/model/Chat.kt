@@ -107,6 +107,15 @@ data class UserAt(val userId: String, val at: String)
 @Serializable
 data class MessagesResponse(val messages: List<Message>, val hasMore: Boolean)
 
+/** A message's thread: the first message of its chain of replies, then every reply under it, oldest first. */
+@Serializable
+data class MessageThread(
+    val rootId: String,
+    val messages: List<Message>,
+    /** More replies than the server returns (the earliest are kept). */
+    val truncated: Boolean = false,
+)
+
 @Serializable
 data class SendTextRequest(val body: String, val replyToId: String? = null)
 

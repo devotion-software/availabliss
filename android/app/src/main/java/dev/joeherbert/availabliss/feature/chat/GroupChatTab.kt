@@ -97,6 +97,8 @@ import androidx.compose.ui.text.style.TextAlign
 import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Everything the chat UI can ask for. */
 data class ChatActions(
@@ -122,6 +124,11 @@ data class ChatActions(
     val onAddToCalendar: (eventId: String) -> Unit = {},
     /** Set when the chat wasn't opened over its group's calendar: the header's group name opens it. */
     val onOpenGroup: (() -> Unit)? = null,
+    /** Opens the thread a message is part of (tapping a quote, or View thread). */
+    val onOpenThread: (messageId: String) -> Unit = {},
+    /** In a thread: Show in chat in a message's long-press menu. */
+    val onShowInChat: ((messageId: String) -> Unit)? = null,
+    val onShowInChatHandled: () -> Unit = {},
 )
 
 /** The group's chat (full screen; back returns to the calendar tab). */
@@ -183,6 +190,19 @@ fun GroupChatTab(
             onCancelReply = viewModel::cancelReply,
             onAddToCalendar = viewModel::onAddToCalendar,
             onOpenGroup = onOpenGroup,
+            onOpenThread = viewModel::openThread,
+            onShowInChatHandled = viewModel::onShowInChatHandled,
+        )
+    }
+    // The same rows inside the thread sheet, where tapping one offers Reply / Show in chat.
+    val threadActions = remember(viewModel) {
+        actions.copy(
+            onOpenInfo = viewModel::openThreadActions,
+            onReply = viewModel::replyInThread,
+            onEditMessage = {},
+            onDeleteMessage = {},
+            onOpenThread = {},
+            onShowInChat = viewModel::showInChat,
         )
     }
 
@@ -191,6 +211,23 @@ fun GroupChatTab(
         AvSnackbarHost(snackbar, Modifier.statusBarsPadding().padding(top = 72.dp))
     }
 
+    state.thread?.let { thread ->
+        ThreadSheet(
+            thread = thread,
+            draft = viewModel.threadDraft,
+            rowActions = threadActions,
+            addedToCalendar = state.calendar.added,
+            sheetActions = ThreadSheetActions(
+                onDraftChange = viewModel::onThreadDraftChange,
+                onSend = viewModel::sendInThread,
+                onReplyToLatest = { viewModel.replyInThread(null) },
+                onReply = viewModel::replyInThread,
+                onShowInChat = viewModel::showInChat,
+                onCloseActions = viewModel::closeThreadActions,
+                onDismiss = viewModel::closeThread,
+            ),
+        )
+    }
     state.info?.let { MessageInfoSheet(it, onDismiss = viewModel::closeInfo) }
     if (state.confirmDeleteId != null) {
         DeleteMessageDialog(onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
@@ -333,7 +370,7 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
             else -> unseen += added.size
         }
     }
-    // Tapping a quote scrolls to the original (when it's loaded) and flashes it.
+    // "Show in chat" from a thread scrolls to the message (when it's loaded) and flashes it.
     var highlighted by remember { mutableStateOf<String?>(null) }
     val showOriginal: (String) -> Unit = remember(listState) {
         { id ->
@@ -352,6 +389,15 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
         }
     }
 
+    val showRequest = state.showInChat
+    LaunchedEffect(showRequest) {
+        val request = showRequest ?: return@LaunchedEffect
+        // The rows are rebuilt off the main thread, so give them a moment to include it.
+        withTimeoutOrNull(2_000) { snapshotFlow { items.any { it.key == request.messageId } }.first { it } }
+        showOriginal(request.messageId)
+        actions.onShowInChatHandled()
+    }
+
     Box(Modifier.fillMaxSize()) {
     LazyColumn(
         state = listState,
@@ -367,7 +413,7 @@ private fun MessageList(state: ChatUiState, actions: ChatActions, listState: Laz
                 label = "quote-highlight",
             )
             Box(Modifier.drawBehind { drawRoundRect(flash, topLeft = Offset(-6.dp.toPx(), -6.dp.toPx()), size = Size(size.width + 12.dp.toPx(), size.height + 12.dp.toPx()), cornerRadius = CornerRadius(18.dp.toPx())) }) {
-                ChatRow(item, actions, state.calendar.added, showOriginal)
+                ChatRow(item, actions, state.calendar.added, actions.onOpenThread)
             }
         }
         if (state.loadingOlder) item(key = "loading-older") { LoadingIndicator() }
@@ -424,8 +470,9 @@ private val ChatItem.isOwn: Boolean
 
 private val JUMP_THRESHOLD = 200.dp
 
+/** One chat row. [onQuoteClick] gets the message's own id in the chat (to open its thread), or the quoted id in a thread. */
 @Composable
-private fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<String>, showOriginal: (String) -> Unit) {
+internal fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<String>, onQuoteClick: (String) -> Unit, quoteOpensThread: Boolean = true) {
     when (item) {
         is ChatItem.Day -> ChatMeta(item.label)
         is ChatItem.System -> ChatMeta(item.text)
@@ -439,15 +486,17 @@ private fun ChatRow(item: ChatItem, actions: ChatActions, addedToCalendar: Set<S
             accessibilityLabel = item.accessibilityLabel,
             edited = item.edited,
             deleted = item.deleted,
-            menuActions = remember(item.id, item.canEdit, item.canReply, actions) {
+            menuActions = remember(item.id, item.canEdit, item.canReply, item.inThread, actions) {
                 listOfNotNull(
                     BubbleAction("Reply") { actions.onReply(item.id) }.takeIf { item.canReply },
+                    BubbleAction("View thread") { actions.onOpenThread(item.id) }.takeIf { item.inThread },
+                    actions.onShowInChat?.let { show -> BubbleAction("Show in chat") { show(item.id) } },
                     BubbleAction("Edit") { actions.onEditMessage(item.id) }.takeIf { item.canEdit },
                     BubbleAction("Delete", destructive = true) { actions.onDeleteMessage(item.id) }.takeIf { item.canEdit },
                 )
             },
             quote = item.quote,
-            onQuoteClick = showOriginal,
+            onQuoteClick = { quotedId -> onQuoteClick(if (quoteOpensThread) item.id else quotedId) },
         ) }
         is ChatItem.ProposalCard -> ProposalCard(
             ui = item.card ?: ProposalCardUi("", "", "Proposed a time", "Loading…", ""),

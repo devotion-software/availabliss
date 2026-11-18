@@ -48,6 +48,8 @@ sealed interface ChatItem {
         val canReply: Boolean = false,
         /** The message this one replies to, quoted above the text. */
         val quote: BubbleQuote? = null,
+        /** A reply, or replied to: long-press offers View thread. */
+        val inThread: Boolean = false,
     ) : ChatItem {
         override val key get() = id
     }
@@ -107,6 +109,7 @@ fun buildChatItems(
     val items = mutableListOf<ChatItem>()
     // Deleted messages get no receipt (they can't be opened for info).
     val latestOwn = messages.lastOrNull { directory.isMe(it.authorId) && it.kind != MessageKind.System && !it.deleted }
+    val repliedTo = messages.mapNotNullTo(HashSet()) { it.replyTo?.id }
     var lastDate: LocalDate? = null
 
     messages.forEachIndexed { index, m ->
@@ -192,6 +195,7 @@ fun buildChatItems(
                         canEdit = own && m.kind == MessageKind.Text && !m.deleted,
                         canReply = m.canReply,
                         quote = if (m.deleted) null else m.replyTo?.let { quoteFor(it, directory) },
+                        inThread = m.replyTo != null || m.id in repliedTo,
                     )
                 }
             }

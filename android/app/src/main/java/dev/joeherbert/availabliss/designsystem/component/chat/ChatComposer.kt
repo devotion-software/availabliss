@@ -70,6 +70,9 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
  *
  * [replyingTo] (a name): your next message replies to theirs. A "Replying to …" strip with
  * [replyingSnippet] and a cancel button sits above the field, and the field is focused.
+ *
+ * In a thread: no + menu ([showMenu] false), a different [placeholder], the reply strip is always
+ * there (✕ only when [canCancelReply]) and the field is focused only when [focusOnReply].
  */
 @Composable
 fun ChatComposer(
@@ -88,6 +91,11 @@ fun ChatComposer(
     replyingTo: String? = null,
     replyingSnippet: String = "",
     onCancelReply: () -> Unit = {},
+    showMenu: Boolean = true,
+    placeholder: String = "Message the group",
+    canCancelReply: Boolean = true,
+    cancelReplyLabel: String = "Cancel reply",
+    focusOnReply: Boolean = true,
 ) {
     val colors = AvailablissTheme.colors
     val canSend = text.isNotBlank() && !sending
@@ -104,8 +112,8 @@ fun ChatComposer(
         }
     }
     val replying = replyingTo != null && !editing
-    LaunchedEffect(replying, replyingSnippet) {
-        if (replying) {
+    LaunchedEffect(replying, replyingSnippet, focusOnReply) {
+        if (replying && focusOnReply) {
             runCatching { focus.requestFocus() }
             keyboard?.show()
         }
@@ -151,7 +159,11 @@ fun ChatComposer(
                     )
                     Text(snippet, style = AvailablissTheme.type.caption, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                PlainIconButton(AvIcons.Close, "Cancel reply", onCancelReply, size = 40.dp, iconSize = 16.dp, tint = colors.muted)
+                if (canCancelReply) {
+                    PlainIconButton(AvIcons.Close, cancelReplyLabel, onCancelReply, size = 40.dp, iconSize = 16.dp, tint = colors.muted)
+                } else {
+                    Box(Modifier.size(width = 10.dp, height = 40.dp))
+                }
             }
         }
         AnimatedVisibility(visible = menuOpen, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
@@ -178,7 +190,7 @@ fun ChatComposer(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             val rotation by animateFloatAsState(if (menuOpen) 45f else 0f, label = "plus-rotation")
-            if (!editing) Box(
+            if (!editing && showMenu) Box(
                 Modifier
                     .size(44.dp)
                     .clip(CircleShape)
@@ -204,13 +216,13 @@ fun ChatComposer(
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = if (editing) 10.dp else 0.dp)
+                    .padding(start = if (editing || !showMenu) 10.dp else 0.dp)
                     .heightIn(min = 44.dp)
                     .focusRequester(focus)
                     .semantics { contentDescription = "Message" },
                 decorationBox = { inner ->
                     Box(Modifier.defaultMinSize(minHeight = 44.dp).padding(vertical = 11.dp), contentAlignment = Alignment.CenterStart) {
-                        if (text.isEmpty()) Text("Message the group", style = AvailablissTheme.type.bodyMediumRegular, color = colors.muted)
+                        if (text.isEmpty()) Text(placeholder, style = AvailablissTheme.type.bodyMediumRegular, color = colors.muted)
                         inner()
                     }
                 },

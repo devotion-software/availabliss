@@ -4,6 +4,7 @@ import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.AvailablissApi
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
+import dev.joeherbert.availabliss.core.network.model.MessageThread
 import dev.joeherbert.availabliss.core.network.model.MessagesResponse
 import dev.joeherbert.availabliss.core.network.model.NewPoll
 import dev.joeherbert.availabliss.core.network.model.Poll
@@ -42,6 +43,9 @@ class ChatRepository @Inject constructor(
     suspend fun delete(messageId: String): ApiResult<Unit> = call { api.deleteMessage(messageId) }
 
     suspend fun info(messageId: String): ApiResult<MessageInfo> = call { api.getMessageInfo(messageId) }
+
+    /** The thread [messageId] is part of, which may reach back past the loaded pages. */
+    suspend fun thread(messageId: String): ApiResult<MessageThread> = call { api.getMessageThread(messageId) }
 
     /** Empty [optionIds] removes the vote. */
     suspend fun vote(pollId: String, optionIds: List<String>): ApiResult<Poll> =

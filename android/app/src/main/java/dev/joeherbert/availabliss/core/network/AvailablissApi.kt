@@ -41,6 +41,7 @@ import dev.joeherbert.availabliss.core.network.model.LeaveGroupRequest
 import dev.joeherbert.availabliss.core.network.model.MemberRoleRequest
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
+import dev.joeherbert.availabliss.core.network.model.MessageThread
 import dev.joeherbert.availabliss.core.network.model.MessagesResponse
 import dev.joeherbert.availabliss.core.network.model.NotificationsResponse
 import dev.joeherbert.availabliss.core.network.model.NudgeResponse
@@ -385,6 +386,10 @@ interface AvailablissApi {
 
     @GET("api/v1/messages/{id}/info")
     suspend fun getMessageInfo(@Path("id") messageId: String): MessageInfo
+
+    /** The thread the message is part of: its first message and every reply under it. */
+    @GET("api/v1/messages/{id}/thread")
+    suspend fun getMessageThread(@Path("id") messageId: String): MessageThread
 
     @POST("api/v1/polls/{id}/vote")
     suspend fun vote(@Path("id") pollId: String, @Body body: VoteRequest): Poll
