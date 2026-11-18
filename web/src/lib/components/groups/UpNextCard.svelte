@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { UpcomingEvent } from '#lib/client/events';
+	import type { GroupSummary } from '#lib/types';
+	import GroupTile from '#lib/components/ui/GroupTile.svelte';
 	import { useFormat } from '#lib/client/format';
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
 	import AddToCalendar from '#lib/components/events/AddToCalendar.svelte';
@@ -7,8 +9,10 @@
 	/** The next confirmed plan across all groups (Main.dc "Up next"). */
 	interface Props {
 		event: UpcomingEvent;
+		/** Its group, for the small photo or coloured tile beside the name. */
+		group?: GroupSummary;
 	}
-	let { event }: Props = $props();
+	let { event, group }: Props = $props();
 	const fmt = useFormat();
 	// Remembers which URL failed, so a new cover gets a fresh try.
 	let failed = $state<string | null>(null);
@@ -23,7 +27,10 @@
 	{#if cover}<img class="cover" src={cover} alt="" onerror={() => (failed = cover)} />{/if}
 	<div class="top">
 		<StatusPill tone="mint" icon="check" size="md">It's on</StatusPill>
-		<a class="group" href="/app/groups/{event.groupId}">{event.groupName}</a>
+		<a class="group" href="/app/groups/{event.groupId}">
+			{#if group}<GroupTile monogram={group.monogram} color={group.color} image={group.image} size={20} />{/if}
+			<span>{event.groupName}</span>
+		</a>
 	</div>
 	<div class="what">
 		<h2>{event.allDay ? fmt.current.when(event.start, event.end, true) : fmt.current.dateTime(event.start)}</h2>
@@ -94,10 +101,19 @@
 	.group {
 		position: relative;
 		z-index: 2;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
 		font-size: 12px;
 		font-weight: 500;
 		color: var(--muted);
 		text-decoration: none;
+	}
+	.group span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.group:hover {
 		color: var(--ink);

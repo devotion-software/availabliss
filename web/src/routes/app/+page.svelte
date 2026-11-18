@@ -32,7 +32,7 @@
 
 	<div class="layout">
 		{#if next.length}
-			<div class="side"><UpNextPager events={next} /></div>
+			<div class="side"><UpNextPager events={next} groups={data.groups} /></div>
 		{/if}
 
 		<section class="groups" aria-labelledby="groups-heading">

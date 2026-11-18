@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { UpcomingEvent } from '#lib/client/events';
+	import type { GroupSummary } from '#lib/types';
 	import UpNextCard from './UpNextCard.svelte';
 
 	/**
@@ -8,8 +9,11 @@
 	 */
 	interface Props {
 		events: UpcomingEvent[];
+		/** Your groups, for each card's group tile. */
+		groups?: GroupSummary[];
 	}
-	let { events }: Props = $props();
+	let { events, groups = [] }: Props = $props();
+	const groupOf = (id: string) => groups.find((g) => g.id === id);
 
 	let track = $state<HTMLDivElement>();
 	let current = $state(0);
@@ -33,13 +37,13 @@
 </script>
 
 {#if events.length === 1}
-	<UpNextCard event={events[0]} />
+	<UpNextCard event={events[0]} group={groupOf(events[0].groupId)} />
 {:else}
 	<div class="pager" role="region" aria-roledescription="carousel" aria-label="Up next">
 		<div class="track" bind:this={track} onscroll={onScroll}>
 			{#each events as event, i (event.id)}
 				<div class="slide" role="group" aria-roledescription="slide" aria-label="{i + 1} of {events.length}">
-					<UpNextCard {event} />
+					<UpNextCard {event} group={groupOf(event.groupId)} />
 				</div>
 			{/each}
 		</div>
