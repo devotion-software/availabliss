@@ -12,11 +12,13 @@
 	import Composer from '#lib/components/chat/Composer.svelte';
 	import PollComposerSheet from '#lib/components/chat/PollComposerSheet.svelte';
 	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
+	import { dropFiles } from '#lib/components/chat/drop-files';
 
 	let { data } = $props();
 
 	let pollOpen = $state(false);
 	let proposeOpen = $state(false);
+	let composer: ReturnType<typeof Composer> | undefined = $state();
 
 	const group = $derived(data.group);
 	// Keyed on ids only, so refetching group details doesn't throw away the conversation.
@@ -44,7 +46,7 @@
 
 <svelte:head><title>{group.name} · Chat · Availabliss</title></svelte:head>
 
-<div class="chat">
+<div class="chat" use:dropFiles={(files) => composer?.addFiles(files)}>
 	<header class="head glass">
 		<span class="back" class:keep={fromActivity}>
 			<IconButton
@@ -77,8 +79,9 @@
 
 	<div class="composer">
 		<Composer
+			bind:this={composer}
 			groupId={group.id}
-			onsend={(b) => thread.send(b)}
+			onsend={(b, ids) => thread.send(b, ids)}
 			onpoll={() => (pollOpen = true)}
 			onpropose={() => (proposeOpen = true)}
 			editing={thread.editing}
@@ -100,6 +103,11 @@
 		min-height: 320px;
 		display: flex;
 		flex-direction: column;
+	}
+	/* Files dragged over the chat. */
+	.chat:global([data-dropping]) {
+		outline: 2px dashed var(--accent);
+		outline-offset: -2px;
 	}
 	/* Back already goes to the calendar on phones. */
 	.cal-link {

@@ -4,15 +4,20 @@
 	import type { Message } from '#lib/types';
 	import type { ReplyingTo } from '#lib/client/chat-messages';
 	import Icon from '#lib/components/ui/Icon.svelte';
+	import { AttachmentDraft } from '#lib/client/attachment-draft.svelte';
+	import AttachmentTray from './AttachmentTray.svelte';
 
 	/**
-	 * Message box with a + menu for Poll / Propose a time / Add event (Chat.dc.html).
+	 * Message box with a + menu for Photos / Files / Poll / Propose a time / Add event (Chat.dc.html).
+	 * Photos and files (also pasted, or dropped via `addFiles`) upload straight away into a tray above the field;
+	 * once they're up, send sends them with the text as their caption.
 	 * While `editing` one of your messages it holds that text, and send becomes Save; cancelling restores your draft.
 	 * While `replying`, a "Replying to …" strip with ✕ sits above the field.
 	 */
 	interface Props {
 		groupId: string;
-		onsend: (body: string) => Promise<unknown> | unknown;
+		/** Sends the text, or uploaded attachments (by id) with the text as caption; should throw on failure. */
+		onsend: (body: string, attachmentIds: string[]) => Promise<unknown> | unknown;
 		/** The + menu's actions (no + menu when `plain`). */
 		onpoll?: () => void;
 		onpropose?: () => void;
@@ -24,7 +29,7 @@
 		/** The message your next one replies to. */
 		replying?: ReplyingTo | null;
 		oncancelreply?: () => void;
-		/** In a thread: no + menu, a different placeholder, ✕ on the reply strip only when `canCancelReply`. */
+		/** In a thread: a + menu with just Photos and Files, a different placeholder, ✕ on the reply strip only when `canCancelReply`. */
 		plain?: boolean;
 		placeholder?: string;
 		canCancelReply?: boolean;
@@ -55,6 +60,42 @@
 	let menu = $state(false);
 	let input: HTMLInputElement | undefined = $state();
 	let saving = $state(false);
+	let sending = $state(false);
+	let photoInput: HTMLInputElement | undefined = $state();
+	let fileInput: HTMLInputElement | undefined = $state();
+
+	// Picked attachments belong to this group's chat; switching groups drops them.
+	const picked = $derived(new AttachmentDraft(groupId));
+	$effect(() => {
+		const d = picked;
+		return () => d.clear();
+	});
+	const hasDraft = $derived(picked.items.length > 0);
+	/** Editing a message with attachments edits its caption, which may be emptied. */
+	const editingCaption = $derived(!!editing?.attachments?.length);
+	const canSend = $derived(hasDraft ? picked.ready && !sending : !!body.trim());
+
+	/** Adds files (picked, pasted or dropped onto the chat) to the next message. */
+	export function addFiles(files: Iterable<File>) {
+		if (editing) return;
+		menu = false;
+		picked.add(files);
+		input?.focus();
+	}
+
+	function onpick(e: Event) {
+		const el = e.currentTarget as HTMLInputElement;
+		const files = [...(el.files ?? [])];
+		el.value = '';
+		addFiles(files);
+	}
+
+	function onpaste(e: ClipboardEvent) {
+		const files = [...(e.clipboardData?.files ?? [])];
+		if (!files.length || editing) return;
+		e.preventDefault();
+		addFiles(files);
+	}
 
 	// Entering edit mode keeps your draft aside and fills in the message; leaving it (save, cancel, deleted) gives the draft back.
 	let draft = '';
@@ -68,7 +109,7 @@
 			editingId = id;
 			if (message) {
 				menu = false;
-				body = message.body ?? '';
+				body = (message.attachments?.length ? message.caption : message.body) ?? '';
 				tick().then(() => {
 					input?.focus();
 					input?.setSelectionRange(body.length, body.length);
@@ -97,8 +138,8 @@
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
 		const text = body.trim();
-		if (!text) return;
 		if (editing) {
+			if (!text && !editingCaption) return;
 			if (saving) return;
 			saving = true;
 			try {
@@ -111,9 +152,26 @@
 			input?.focus();
 			return;
 		}
+		if (hasDraft) {
+			// Attachments go once they're all up; the tray and text stay until the server has the message.
+			if (!picked.ready || sending) return;
+			sending = true;
+			try {
+				await onsend(text, picked.ids);
+				picked.clear();
+				body = '';
+			} catch {
+				// The thread already toasted; keep everything to try again.
+			} finally {
+				sending = false;
+			}
+			input?.focus();
+			return;
+		}
+		if (!text) return;
 		body = '';
 		try {
-			await onsend(text);
+			await onsend(text, []);
 		} catch {
 			// The thread already toasted; give the text back.
 			body = text;
@@ -152,19 +210,37 @@
 
 <div class="composer" class:compact role="presentation" {onkeydown}>
 	{#if menu}
-		<div class="menu" class:glass={!compact} id="composer-menu-{uid}" transition:fly={{ y: 10, duration: 220 }}>
-			<button type="button" onclick={() => choose(onpoll)}>
-				<Icon name="poll" size={22} />
-				Poll
+		<div class="menu" class:glass={!compact} class:few={plain} id="composer-menu-{uid}" transition:fly={{ y: 10, duration: 220 }}>
+			<button type="button" onclick={() => choose(() => photoInput?.click())}>
+				<Icon name="image" size={22} />
+				Photos
 			</button>
-			<button type="button" onclick={() => choose(onpropose)}>
-				<Icon name="check-circle" size={22} />
-				Propose a time
+			<button type="button" onclick={() => choose(() => fileInput?.click())}>
+				<Icon name="paperclip" size={22} />
+				Files
 			</button>
-			<a href="/app/groups/{groupId}/events/new" onclick={() => (menu = false)}>
-				<Icon name="calendar-plus" size={22} />
-				Add event
-			</a>
+			{#if !plain}
+				<button type="button" onclick={() => choose(onpoll)}>
+					<Icon name="poll" size={22} />
+					Poll
+				</button>
+				<button type="button" onclick={() => choose(onpropose)}>
+					<Icon name="check-circle" size={22} />
+					Propose a time
+				</button>
+				<a href="/app/groups/{groupId}/events/new" onclick={() => (menu = false)}>
+					<Icon name="calendar-plus" size={22} />
+					Add event
+				</a>
+			{/if}
+		</div>
+	{/if}
+	<input bind:this={photoInput} type="file" accept="image/*" multiple hidden onchange={onpick} />
+	<input bind:this={fileInput} type="file" multiple hidden onchange={onpick} />
+
+	{#if hasDraft && !editing}
+		<div transition:fly={{ y: 8, duration: 180 }}>
+			<AttachmentTray draft={picked} {compact} />
 		</div>
 	{/if}
 
@@ -193,35 +269,38 @@
 		</div>
 	{/if}
 
-	<form class="bar" class:glass={!compact} class:plain onsubmit={submit}>
-		{#if !plain}<button
+	<form class="bar" class:glass={!compact} onsubmit={submit}>
+		<button
 			type="button"
 			class="plus"
 			class:open={menu}
 			aria-expanded={menu}
 			aria-controls="composer-menu-{uid}"
-			aria-label="Add poll, proposal or event"
+			aria-label={plain ? 'Attach' : 'Attach, or add a poll, proposal or event'}
+			title={plain ? 'Attach' : undefined}
+			disabled={!!editing}
 			onclick={() => (menu = !menu)}
 		>
 			<Icon name="plus" size={20} strokeWidth={2.4} />
-		</button>{/if}
+		</button>
 		<label for="composer-{uid}" class="sr-only">Message</label>
 		<input
 			bind:this={input}
 			id="composer-{uid}"
 			bind:value={body}
-			placeholder={editing ? 'Edit your message' : placeholder}
+			placeholder={editing ? (editingCaption ? 'Edit the caption' : 'Edit your message') : hasDraft ? 'Add a caption' : placeholder}
+			{onpaste}
 			autocomplete="off"
 			enterkeyhint={editing ? 'done' : 'send'}
 			maxlength={4000}
 			aria-describedby={editing ? `composer-editing-${uid}` : replying ? `composer-replying-${uid}` : undefined}
 		/>
 		{#if editing}
-			<button type="submit" class="send" aria-label="Save" title="Save" disabled={!body.trim() || saving}>
+			<button type="submit" class="send" aria-label="Save" title="Save" disabled={(!body.trim() && !editingCaption) || saving}>
 				<Icon name="check" size={20} strokeWidth={2.4} />
 			</button>
 		{:else}
-			<button type="submit" class="send" aria-label="Send" disabled={!body.trim()}>
+			<button type="submit" class="send" aria-label="Send" disabled={!canSend}>
 				<Icon name="send" size={18} strokeWidth={2.2} />
 			</button>
 		{/if}
@@ -243,6 +322,17 @@
 	}
 	.compact .menu {
 		padding: 0;
+	}
+	@media (min-width: 420px) {
+		.menu:not(.few) {
+			grid-template-columns: repeat(5, minmax(0, 1fr));
+		}
+	}
+	.compact .menu:not(.few) {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+	.menu.few {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 	.menu button,
 	.menu a {
@@ -339,9 +429,6 @@
 		align-items: center;
 		gap: 6px;
 	}
-	.bar.plain {
-		padding-left: 16px;
-	}
 	.replying:has(.replying-text:last-child) {
 		padding-right: 12px;
 		min-height: 48px;
@@ -377,6 +464,9 @@
 	}
 	.plus :global(svg) {
 		transition: transform 0.2s ease;
+	}
+	.plus:disabled {
+		opacity: 0.45;
 	}
 	.plus.open {
 		background: var(--solid);

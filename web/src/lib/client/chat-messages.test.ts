@@ -133,3 +133,14 @@ describe('threads', () => {
 		expect(threadReplyTarget([], null, 'me')).toBeNull();
 	});
 });
+
+describe('replyPreview with attachments', () => {
+	const photo = { id: 'a1', kind: 'image' as const, name: 'p.jpg', mime: 'image/jpeg', size: 1, width: 1, height: 1, url: 'u', thumbnailUrl: null };
+	test('the caption when there is one', () => {
+		expect(replyPreview(msg({ body: 'Look', caption: 'Look', attachments: [photo] })).text).toBe('Look');
+	});
+	test('what is attached when there is no caption', () => {
+		expect(replyPreview(msg({ body: '📷 Photo', caption: null, attachments: [photo] })).text).toBe('Photo');
+		expect(replyPreview(msg({ body: '📎 Plan.pdf', attachments: [{ ...photo, kind: 'file', name: 'Plan.pdf' }] })).text).toBe('Plan.pdf');
+	});
+});

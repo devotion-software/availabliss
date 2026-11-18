@@ -1,5 +1,6 @@
 /** Pure helpers for chat messages: who can edit/delete what, and applying edits and deletions. */
 import type { Member, Message, MessageReply } from '#lib/types';
+import { attachmentSummary } from './attachments';
 
 export const isTempMessage = (m: Message) => m.id.startsWith('temp-');
 
@@ -26,7 +27,8 @@ export const canReplyTo = (m: Message) => (m.kind === 'text' || m.kind === 'poll
 
 /** A message as a quote: for "Replying to …", an optimistic reply, and refreshing quotes after it changes. */
 export function replyPreview(m: Message, authorName: string | null = null): MessageReply {
-	const raw = m.kind === 'poll' ? m.poll?.question : m.body;
+	// With attachments: the caption, else what they are ("Photo", "GIF", "Plan.pdf").
+	const raw = m.kind === 'poll' ? m.poll?.question : m.attachments?.length ? m.caption || attachmentSummary(m.attachments) : m.body;
 	return {
 		id: m.id,
 		authorId: m.authorId,

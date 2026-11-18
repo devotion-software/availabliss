@@ -13,9 +13,13 @@
 	import Avatar from '#lib/components/ui/Avatar.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import type { MessageMenuAnchor } from './MessageMenu.svelte';
+	import { attachmentLabel, isVisual, messageText } from '#lib/client/attachments';
+	import MessageAttachments from './MessageAttachments.svelte';
+	import AttachmentViewer from './AttachmentViewer.svelte';
 
 	/**
-	 * A text message. Others' are glass with an avatar; yours are the theme accent. A tap opens message info.
+	 * A text message, with any photos, GIFs and files above its text (the caption); a picture opens full screen.
+	 * Others' are glass with an avatar; yours are the theme accent. A tap opens message info.
 	 * A menu (Reply / Info, plus Edit / Delete on yours) opens on long-press, right-click or the ⋯ button;
 	 * hovering also shows a Reply button. A reply shows the message it quotes above its text: tapping that opens the thread.
 	 * Deleted messages are a dashed outline with no actions.
@@ -67,6 +71,14 @@
 	const edited = $derived(!!message.editedAt && !message.deleted && showEdited);
 	const hasMenu = $derived(canModify || canReply);
 	const quoteLabel = $derived(quote ? `, replying to ${quote.name}: ${quote.snippet}` : '');
+	const attachments = $derived(message.deleted ? [] : (message.attachments ?? []));
+	const pictures = $derived(attachments.filter(isVisual));
+	const text = $derived(messageText(message));
+	// For screen readers, what's attached comes before the caption.
+	const spoken = $derived(
+		[attachments.length ? attachments.map(attachmentLabel).join(', ') : '', text ?? ''].filter(Boolean).join('. ')
+	);
+	let viewing = $state<number | null>(null);
 
 	// Touch long-press opens the menu (iOS Safari has no contextmenu event for it); the click that follows is swallowed.
 	const LONG_PRESS_MS = 450;
@@ -115,6 +127,13 @@
 		}
 		oninfo?.(message);
 	}
+	function openPicture(index: number) {
+		if (suppressClick) {
+			suppressClick = false;
+			return;
+		}
+		viewing = index;
+	}
 	function openFromButton(e: MouseEvent) {
 		const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
 		// detail 0: Enter or Space rather than a pointer click.
@@ -160,8 +179,34 @@
 		onpointerup={cancelPress}
 		onpointercancel={cancelPress}
 		onpointerleave={cancelPress}
-		{oncontextmenu}>{message.body}</button
+		{oncontextmenu}>{text}</button
 	>
+{/snippet}
+
+{#snippet media()}
+	{#if attachments.length}
+		<!-- Long-press and right-click open the menu here too; a tap opens the picture or the file. -->
+		<div
+			class="media"
+			class:solo={!text}
+			role="group"
+			aria-label={mine ? 'Your attachments' : `${name}’s attachments`}
+			{onpointerdown}
+			{onpointermove}
+			onpointerup={cancelPress}
+			onpointercancel={cancelPress}
+			onpointerleave={cancelPress}
+			{oncontextmenu}
+		>
+			<MessageAttachments {attachments} {mine} {compact} onopen={openPicture} />
+		</div>
+	{/if}
+{/snippet}
+
+{#snippet content(label: string)}
+	{@render quoteBlock()}
+	{@render media()}
+	{#if text}{@render body(label)}{/if}
 {/snippet}
 
 {#if mine}
@@ -171,9 +216,8 @@
 				<div class="bubble deleted mine" role="note" aria-label="Message deleted">You deleted this message</div>
 			{:else}
 				{@render actions('left')}
-				<div class="bubble mine" class:pending class:pressable={hasMenu} class:quoted={!!quote}>
-					{@render quoteBlock()}
-					{@render body(`Your message${quoteLabel}: ${message.body}${edited ? ' (edited)' : ''}. Show message info`)}
+				<div class="bubble mine" class:pending class:pressable={hasMenu} class:quoted={!!quote} class:has-media={attachments.length > 0}>
+					{@render content(`Your message${quoteLabel}: ${spoken}${edited ? ' (edited)' : ''}. Show message info`)}
 				</div>
 			{/if}
 		</div>
@@ -190,9 +234,8 @@
 				<div class="bubble deleted theirs" role="note" aria-label="{name}: message deleted">This message was deleted</div>
 			{:else}
 				<div class="line">
-					<div class="bubble glass theirs" class:pressable={hasMenu} class:quoted={!!quote}>
-						{@render quoteBlock()}
-						{@render body(`${name}${quoteLabel}: ${message.body}${edited ? ' (edited)' : ''}. Show message info`)}
+					<div class="bubble glass theirs" class:pressable={hasMenu} class:quoted={!!quote} class:has-media={attachments.length > 0}>
+						{@render content(`${name}${quoteLabel}: ${spoken}${edited ? ' (edited)' : ''}. Show message info`)}
 					</div>
 					{@render actions('right')}
 				</div>
@@ -200,6 +243,10 @@
 			{/if}
 		</div>
 	</div>
+{/if}
+
+{#if pictures.length}
+	<AttachmentViewer {pictures} bind:index={viewing} title={mine ? 'Your photo' : `${name}’s photo`} onclose={() => (viewing = null)} />
 {/if}
 
 <style>
@@ -244,6 +291,27 @@
 	}
 	.quoted .body {
 		padding-top: 6px;
+	}
+	/* Pictures and file cards sit inside the bubble with a thin edge; the caption below them. */
+	.media {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 4px 4px 0;
+	}
+	.media.solo {
+		padding-bottom: 4px;
+	}
+	.has-media .body {
+		padding-top: 6px;
+	}
+	.has-media.quoted .media {
+		padding-top: 6px;
+	}
+	.pressable .media {
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
 	}
 	.compact .bubble {
 		font-size: 13px;

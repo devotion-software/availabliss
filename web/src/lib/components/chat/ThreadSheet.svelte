@@ -172,7 +172,7 @@
 				groupId={group.id}
 				plain
 				placeholder="Reply in thread"
-				onsend={(b) => rt?.send(b)}
+				onsend={(b, ids) => rt?.send(b, ids)}
 				replying={replyingTo(rt.replyTarget, meId, members)}
 				canCancelReply={rt.picked}
 				cancelReplyLabel="Reply to the latest message instead"

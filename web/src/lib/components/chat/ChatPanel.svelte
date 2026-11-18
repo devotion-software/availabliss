@@ -7,6 +7,7 @@
 	import MessageList from './MessageList.svelte';
 	import Composer from './Composer.svelte';
 	import PollComposerSheet from './PollComposerSheet.svelte';
+	import { dropFiles } from './drop-files';
 
 	/** Compact chat beside the desktop group calendar (Web.dc.html). */
 	interface Props {
@@ -17,6 +18,7 @@
 	let { group, me, onpropose }: Props = $props();
 
 	let pollOpen = $state(false);
+	let composer: ReturnType<typeof Composer> | undefined = $state();
 
 	// One thread per group; recreated if you switch groups.
 	// Keyed on ids only, so refetching group details doesn't throw away the conversation.
@@ -31,7 +33,7 @@
 	});
 </script>
 
-<section class="panel glass" aria-labelledby="chat-panel-{group.id}">
+<section class="panel glass" use:dropFiles={(files) => composer?.addFiles(files)} aria-labelledby="chat-panel-{group.id}">
 	<header>
 		<h2 id="chat-panel-{group.id}">Chat</h2>
 		{#if thread.unseen}<span class="new">{thread.unseen} new</span>{/if}
@@ -40,7 +42,7 @@
 	<div class="messages">
 		<MessageList {thread} {group} meId={me.id} compact />
 	</div>
-	<Composer groupId={group.id} compact onsend={(b) => thread.send(b)} onpoll={() => (pollOpen = true)}
+	<Composer bind:this={composer} groupId={group.id} compact onsend={(b, ids) => thread.send(b, ids)} onpoll={() => (pollOpen = true)}
 		{onpropose}
 		editing={thread.editing}
 		onsaveedit={(b) => thread.saveEdit(b)}
@@ -59,6 +61,10 @@
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
+	}
+	.panel:global([data-dropping]) {
+		outline: 2px dashed var(--accent);
+		outline-offset: -2px;
 	}
 	header {
 		display: flex;

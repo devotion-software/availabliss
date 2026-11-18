@@ -90,8 +90,13 @@ export class ChatThread {
 		}
 	}
 
-	async send(body: string) {
+	/**
+	 * Sends a text message (shown straight away, optimistically), or uploaded attachments with the text
+	 * as their caption (shown once the server has it). Failures toast and throw.
+	 */
+	async send(body: string, attachmentIds: string[] = []) {
 		const text = body.trim();
+		if (attachmentIds.length) return this.#sendAttachments(text, attachmentIds);
 		if (!text) return;
 		const replying = this.replyingTo;
 		this.replyingTo = null;
@@ -117,6 +122,18 @@ export class ChatThread {
 			this.#settle(temp.id, await sendMessage(this.groupId, text, replying?.id));
 		} catch (err) {
 			this.messages = this.messages.filter((m) => m.id !== temp.id);
+			this.replyingTo ??= replying;
+			toasts.error(err);
+			throw err;
+		}
+	}
+
+	async #sendAttachments(caption: string, attachmentIds: string[]) {
+		const replying = this.replyingTo;
+		this.replyingTo = null;
+		try {
+			this.#insert(await sendMessage(this.groupId, caption, replying?.id, attachmentIds));
+		} catch (err) {
 			this.replyingTo ??= replying;
 			toasts.error(err);
 			throw err;
@@ -154,12 +171,16 @@ export class ChatThread {
 		this.editing = null;
 	}
 
-	/** Saves the message being edited. Unchanged text just leaves edit mode; failures toast and throw (staying in edit mode). */
+	/**
+	 * Saves the message being edited (with attachments, its caption, which may be emptied).
+	 * Unchanged text just leaves edit mode; failures toast and throw (staying in edit mode).
+	 */
 	async saveEdit(body: string) {
 		const target = this.editing;
 		const text = body.trim();
-		if (!target || !text) return;
-		if (text === target.body) {
+		const captioned = !!target?.attachments?.length;
+		if (!target || (!text && !captioned)) return;
+		if (text === ((captioned ? target.caption : target.body) ?? '')) {
 			this.editing = null;
 			return;
 		}
@@ -286,7 +307,7 @@ export class ChatThread {
 	#insert(message: Message) {
 		if (this.messages.some((m) => m.id === message.id)) return;
 		const temp =
-			message.authorId === this.meId && message.kind === 'text'
+			message.authorId === this.meId && message.kind === 'text' && !message.attachments?.length
 				? this.messages.find((m) => isTemp(m) && m.body === message.body)
 				: undefined;
 		if (temp) {

@@ -52,13 +52,13 @@ export class ReplyThread {
 		this.pickedId = message?.id ?? null;
 	}
 
-	/** Sends a reply to the current target. Failures toast and throw (the composer keeps the text). */
-	async send(body: string) {
+	/** Sends a reply (text, or attachments with an optional caption) to the current target. Failures toast and throw (the composer keeps the text). */
+	async send(body: string, attachmentIds: string[] = []) {
 		const text = body.trim();
 		const target = this.replyTarget;
-		if (!text || !target) return;
+		if ((!text && !attachmentIds.length) || !target) return;
 		try {
-			this.messages = withThreadMessage(this.messages, await sendMessage(this.groupId, text, target.id));
+			this.messages = withThreadMessage(this.messages, await sendMessage(this.groupId, text, target.id, attachmentIds));
 			this.pickedId = null;
 		} catch (err) {
 			toasts.error(err);
