@@ -9,28 +9,53 @@ final class ChatViewModel {
     private(set) var hasMore = false
     private(set) var isLoading = false
     private(set) var isLoadingOlder = false
-    private(set) var isSending = false
     private(set) var proposals: [String: Proposal] = [:]
     private(set) var events: [String: GroupEvent] = [:]
-    var draft = ""
     var error: String?
-    /// Your message being edited in the composer, if any.
-    private(set) var editing: Message?
-    /// The composer's draft from before editing started, put back when it ends.
-    private var draftBeforeEdit = ""
-    /// The message your next one replies to, shown above the composer.
+    /// The message your next one in the chat replies to, shown above the composer.
     private(set) var replyingTo: Message?
-    /// Photos and files picked for the next message, uploading as soon as they're picked.
-    private(set) var uploads: [PendingUpload] = []
     private var uploadTasks: [UUID: Task<Void, Never>] = [:]
+
+    /// Where a message is being written: the chat's composer, or the open thread's. Both work the
+    /// same way (text, photos and files, places, editing); a thread's messages reply within it.
+    enum ComposerTarget: Hashable, Sendable { case chat, thread }
+
+    struct ComposerState {
+        var draft = ""
+        /// Photos and files picked for the next message, uploading as soon as they're picked.
+        var uploads: [PendingUpload] = []
+        /// Your message being edited, if any.
+        var editing: Message?
+        /// The draft from before editing started, put back when it ends.
+        var draftBeforeEdit = ""
+        var isSending = false
+    }
+
+    private(set) var composers: [ComposerTarget: ComposerState] = [.chat: ComposerState(), .thread: ComposerState()]
+
+    func composer(_ target: ComposerTarget) -> ComposerState { composers[target] ?? ComposerState() }
+
+    func setDraft(_ text: String, for target: ComposerTarget) { composers[target, default: ComposerState()].draft = text }
+
+    /// The chat composer's state, as the chat screen reads it.
+    var draft: String {
+        get { composer(.chat).draft }
+        set { setDraft(newValue, for: .chat) }
+    }
+    var editing: Message? { composer(.chat).editing }
+    var uploads: [PendingUpload] { composer(.chat).uploads }
+    var isSending: Bool { composer(.chat).isSending }
 
     /// The thread open in its sheet: the first message of a chain of replies and every reply under it, oldest first.
     private(set) var thread: [Message] = []
     private(set) var threadTruncated = false
     private(set) var isLoadingThread = false
-    private(set) var isSendingInThread = false
-    var threadDraft = ""
     var threadError: String?
+    var threadDraft: String {
+        get { composer(.thread).draft }
+        set { setDraft(newValue, for: .thread) }
+    }
+    var isSendingInThread: Bool { composer(.thread).isSending }
     /// The message picked to reply to in the thread; otherwise replies go to the latest one.
     private var threadReplyTargetId: String?
 
@@ -96,66 +121,90 @@ final class ChatViewModel {
     // MARK: Sending
 
     /// Whether Send can go: some text or an uploaded attachment, with nothing still uploading or failed.
-    var canSend: Bool {
-        if editing != nil { return true }
-        let hasText = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        if uploads.isEmpty { return hasText }
-        return uploads.allSatisfy { $0.uploaded != nil }
+    func canSend(_ target: ComposerTarget = .chat) -> Bool {
+        let state = composer(target)
+        if state.editing != nil { return true }
+        if target == .thread && threadReplyingTo == nil { return false }
+        let hasText = !state.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if state.uploads.isEmpty { return hasText }
+        return state.uploads.allSatisfy { $0.uploaded != nil }
     }
 
-    func send() async {
-        if editing != nil { return await saveEdit() }
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        let attachments = uploads.compactMap(\.uploaded)
-        guard canSend, !isSending, !text.isEmpty || !attachments.isEmpty else { return }
-        isSending = true
-        defer { isSending = false }
-        draft = ""
-        let replying = replyingTo
-        replyingTo = nil
-        let sent = uploads
-        uploads = []
+    var canSend: Bool { canSend(.chat) }
+
+    /// Who a new message from `target` replies to: the one picked in the chat, or in a thread the
+    /// picked message or else the latest.
+    private func replyTarget(_ target: ComposerTarget) -> Message? {
+        target == .chat ? replyingTo : threadReplyingTo
+    }
+
+    /// Shows an error where it was caused: over the chat or over the thread.
+    func report(_ message: String, _ target: ComposerTarget) {
+        if target == .thread { threadError = message } else { error = message }
+    }
+
+    func send(_ target: ComposerTarget = .chat) async {
+        if composer(target).editing != nil { return await saveEdit(target) }
+        let state = composer(target)
+        let text = state.draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let attachments = state.uploads.compactMap(\.uploaded)
+        guard canSend(target), !state.isSending, !text.isEmpty || !attachments.isEmpty else { return }
+        let replying = replyTarget(target)
+        if target == .thread && replying == nil { return }
+        composers[target]?.isSending = true
+        defer { composers[target]?.isSending = false }
+        composers[target]?.draft = ""
+        let sent = state.uploads
+        composers[target]?.uploads = []
+        if target == .chat { replyingTo = nil }
         do {
             let body = SendMessageBody(body: text.isEmpty ? nil : text, replyToId: replying?.id, attachmentIds: attachments.isEmpty ? nil : attachments.map(\.id))
             let message = try await api.send(API.Chat.send(groupId: groupId, body))
             insert(message)
+            if target == .thread { threadReplyTargetId = nil }
         } catch {
-            draft = text
-            if uploads.isEmpty { uploads = sent }
-            if replyingTo == nil { replyingTo = replying }
-            self.error = error.userMessage
+            composers[target]?.draft = text
+            if composer(target).uploads.isEmpty { composers[target]?.uploads = sent }
+            if target == .chat, replyingTo == nil { replyingTo = replying }
+            report(error.userMessage, target)
         }
     }
 
     // MARK: Attachments
 
     /// Adds picked photos or files to the next message and starts uploading them (up to 10 in all).
-    func attach(_ picked: [(data: Data, name: String, mime: String, preview: UIImage?)]) {
-        let room = AttachmentFormat.maxPerMessage - uploads.count
-        if picked.count > room { error = "A message can have up to \(AttachmentFormat.maxPerMessage) photos and files." }
+    func attach(_ picked: [(data: Data, name: String, mime: String, preview: UIImage?)], to target: ComposerTarget = .chat) {
+        let room = AttachmentFormat.maxPerMessage - composer(target).uploads.count
+        if picked.count > room { report("A message can have up to \(AttachmentFormat.maxPerMessage) photos and files.", target) }
         for item in picked.prefix(max(room, 0)) {
             let limit = item.preview != nil ? AttachmentFormat.maxPhotoBytes : AttachmentFormat.maxFileBytes
             guard item.data.count <= limit else {
-                error = item.preview != nil ? "Photos can be up to 15 MB." : "\(item.name) is too big: files can be up to 25 MB."
+                report(item.preview != nil ? "Photos can be up to 15 MB." : "\(item.name) is too big: files can be up to 25 MB.", target)
                 continue
             }
             let upload = PendingUpload(name: item.name, mime: item.mime, data: item.data, preview: item.preview)
-            uploads.append(upload)
+            composers[target, default: ComposerState()].uploads.append(upload)
             start(upload)
         }
+    }
+
+    /// The composer an upload belongs to.
+    private func targetOf(_ id: UUID) -> ComposerTarget? {
+        composers.first { $0.value.uploads.contains { $0.id == id } }?.key
     }
 
     func removeUpload(_ upload: PendingUpload) {
         uploadTasks[upload.id]?.cancel()
         uploadTasks[upload.id] = nil
-        uploads.removeAll { $0.id == upload.id }
+        guard let target = targetOf(upload.id) else { return }
+        composers[target]?.uploads.removeAll { $0.id == upload.id }
     }
 
     func retryUpload(_ upload: PendingUpload) {
-        guard let index = uploads.firstIndex(where: { $0.id == upload.id }) else { return }
-        uploads[index].error = nil
-        uploads[index].progress = 0
-        start(uploads[index])
+        guard let target = targetOf(upload.id), let index = composer(target).uploads.firstIndex(where: { $0.id == upload.id }) else { return }
+        composers[target]?.uploads[index].error = nil
+        composers[target]?.uploads[index].progress = 0
+        start(composer(target).uploads[index])
     }
 
     private func start(_ upload: PendingUpload) {
@@ -174,25 +223,35 @@ final class ChatViewModel {
     }
 
     private func setProgress(_ id: UUID, _ fraction: Double) {
-        guard let index = uploads.firstIndex(where: { $0.id == id }), uploads[index].isUploading else { return }
+        guard let target = targetOf(id), let index = composer(target).uploads.firstIndex(where: { $0.id == id }),
+              composer(target).uploads[index].isUploading else { return }
         // Held just short of done until the server has answered.
-        uploads[index].progress = min(fraction, 0.95)
+        composers[target]?.uploads[index].progress = min(fraction, 0.95)
     }
 
     private func finishUpload(_ id: UUID, attachment: Attachment?, error: String?) {
         uploadTasks[id] = nil
-        guard let index = uploads.firstIndex(where: { $0.id == id }) else { return }
-        uploads[index].progress = 1
-        uploads[index].uploaded = attachment
-        uploads[index].error = error
-        if let error { self.error = error }
+        guard let target = targetOf(id), let index = composer(target).uploads.firstIndex(where: { $0.id == id }) else { return }
+        composers[target]?.uploads[index].progress = 1
+        composers[target]?.uploads[index].uploaded = attachment
+        composers[target]?.uploads[index].error = error
+        if let error { report(error, target) }
+    }
+
+    /// Drops a composer's draft, picked files (cancelling their uploads) and any edit.
+    private func resetComposer(_ target: ComposerTarget) {
+        for upload in composer(target).uploads {
+            uploadTasks[upload.id]?.cancel()
+            uploadTasks[upload.id] = nil
+        }
+        composers[target] = ComposerState()
     }
 
     // MARK: Replying
 
     func startReplying(to message: Message) {
         guard message.canReply else { return }
-        cancelEditing()
+        cancelEditing(.chat)
         replyingTo = message
     }
 
@@ -207,7 +266,7 @@ final class ChatViewModel {
         thread = []
         threadTruncated = false
         threadReplyTargetId = nil
-        threadDraft = ""
+        resetComposer(.thread)
         isLoadingThread = true
         defer { isLoadingThread = false }
         do {
@@ -222,7 +281,7 @@ final class ChatViewModel {
     func closeThread() {
         thread = []
         threadReplyTargetId = nil
-        threadDraft = ""
+        resetComposer(.thread)
     }
 
     /// Who your reply in the thread goes to: the one you picked, else the latest from someone else
@@ -236,24 +295,11 @@ final class ChatViewModel {
     var hasPickedThreadReply: Bool { threadReplyTargetId != nil && threadReplyingTo?.id == threadReplyTargetId }
 
     func replyInThread(to message: Message?) {
+        if message != nil { cancelEditing(.thread) }
         threadReplyTargetId = message?.id
     }
 
-    func sendInThread() async {
-        let text = threadDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isSendingInThread, let target = threadReplyingTo else { return }
-        isSendingInThread = true
-        defer { isSendingInThread = false }
-        threadDraft = ""
-        do {
-            let message = try await api.send(API.Chat.send(groupId: groupId, SendMessageBody(body: text, replyToId: target.id)))
-            insert(message)
-            threadReplyTargetId = nil
-        } catch {
-            threadDraft = text
-            threadError = error.userMessage
-        }
-    }
+    func sendInThread() async { await send(.thread) }
 
     /// Loads older pages until `id` is in the chat (or there's nothing older), so it can be shown there.
     func loadUntil(_ id: String) async -> Bool {
@@ -267,27 +313,29 @@ final class ChatViewModel {
         return messages.contains { $0.id == id }
     }
 
-    /// Shares a place (as a reply, if one is being written). False if it couldn't be sent.
-    func sendLocation(_ location: MessageLocation) async -> Bool {
-        let replying = replyingTo
+    /// Shares a place (as a reply, if one is being written, or in a thread). False if it couldn't be sent.
+    func sendLocation(_ location: MessageLocation, in target: ComposerTarget = .chat) async -> Bool {
+        let replying = replyTarget(target)
         do {
             let message = try await api.send(API.Chat.send(groupId: groupId, SendMessageBody(replyToId: replying?.id, location: location)))
-            if replyingTo?.id == replying?.id { replyingTo = nil }
+            if target == .chat, replyingTo?.id == replying?.id { replyingTo = nil }
+            if target == .thread { threadReplyTargetId = nil }
             insert(message)
             return true
         } catch {
-            self.error = error.userMessage
+            report(error.userMessage, target)
             return false
         }
     }
 
-    func createPoll(question: String, options: [String], multi: Bool) async -> Bool {
+    /// Polls go in the chat itself (they can't be replies), from a thread too.
+    func createPoll(question: String, options: [String], multi: Bool, from target: ComposerTarget = .chat) async -> Bool {
         do {
             let message = try await api.send(API.Chat.send(groupId: groupId, SendMessageBody(poll: .init(question: question, options: options, multi: multi))))
             insert(message)
             return true
         } catch {
-            self.error = error.userMessage
+            report(error.userMessage, target)
             return false
         }
     }
@@ -322,38 +370,39 @@ final class ChatViewModel {
 
     // MARK: Editing and deleting
 
-    func startEditing(_ message: Message) {
+    func startEditing(_ message: Message, in target: ComposerTarget = .chat) {
         guard message.kind == .text, !message.isDeleted, message.place == nil, message.authorId == me else { return }
-        replyingTo = nil
-        if editing == nil { draftBeforeEdit = draft }
-        editing = message
-        draft = message.text ?? ""
+        if target == .chat { replyingTo = nil }
+        if composer(target).editing == nil { composers[target]?.draftBeforeEdit = composer(target).draft }
+        composers[target]?.editing = message
+        composers[target]?.draft = message.text ?? ""
     }
 
-    func cancelEditing() {
-        guard editing != nil else { return }
-        editing = nil
-        draft = draftBeforeEdit
-        draftBeforeEdit = ""
+    func cancelEditing(_ target: ComposerTarget = .chat) {
+        guard composer(target).editing != nil else { return }
+        composers[target]?.editing = nil
+        composers[target]?.draft = composer(target).draftBeforeEdit
+        composers[target]?.draftBeforeEdit = ""
     }
 
-    private func saveEdit() async {
-        guard let message = editing, !isSending else { return }
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func saveEdit(_ target: ComposerTarget) async {
+        let state = composer(target)
+        guard let message = state.editing, !state.isSending else { return }
+        let text = state.draft.trimmingCharacters(in: .whitespacesAndNewlines)
         // With attachments the caption can be cleared.
         guard !text.isEmpty || !message.files.isEmpty else { return }
-        guard text != (message.text ?? "") else { return cancelEditing() }
-        isSending = true
-        defer { isSending = false }
+        guard text != (message.text ?? "") else { return cancelEditing(target) }
+        composers[target]?.isSending = true
+        defer { composers[target]?.isSending = false }
         do {
             replaceKeepingReceipt(try await api.send(API.Chat.edit(messageId: message.id, body: text)))
-            cancelEditing()
+            cancelEditing(target)
         } catch {
-            self.error = error.userMessage
+            report(error.userMessage, target)
         }
     }
 
-    func delete(_ message: Message) async {
+    func delete(_ message: Message, from target: ComposerTarget = .chat) async {
         do {
             _ = try await api.send(API.Chat.delete(messageId: message.id))
             var deleted = message
@@ -362,11 +411,17 @@ final class ChatViewModel {
             deleted.attachments = []
             deleted.caption = nil
             replaceKeepingReceipt(deleted)
-            if editing?.id == message.id { cancelEditing() }
-            if replyingTo?.id == message.id { cancelReplying() }
+            stopEditingOrReplying(to: message.id)
         } catch {
-            self.error = error.userMessage
+            report(error.userMessage, target)
         }
+    }
+
+    /// A deleted message can't be edited or replied to any more.
+    private func stopEditingOrReplying(to messageId: String) {
+        for target in [ComposerTarget.chat, .thread] where composer(target).editing?.id == messageId { cancelEditing(target) }
+        if replyingTo?.id == messageId { cancelReplying() }
+        if threadReplyTargetId == messageId { threadReplyTargetId = nil }
     }
 
     /// An edited or deleted message: everything but the receipt, which is per viewer.
@@ -411,8 +466,7 @@ final class ChatViewModel {
         case .messageUpdated:
             guard let message = event.payload(as: Message.self), message.groupId == groupId else { return }
             replaceKeepingReceipt(message)
-            if message.isDeleted, editing?.id == message.id { cancelEditing() }
-            if message.isDeleted, replyingTo?.id == message.id { cancelReplying() }
+            if message.isDeleted { stopEditingOrReplying(to: message.id) }
         case .pollUpdated:
             if let poll = event.payload(as: Poll.self) { update(poll: poll) }
         case .messageReceipts:

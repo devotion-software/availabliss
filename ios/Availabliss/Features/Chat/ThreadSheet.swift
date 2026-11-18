@@ -2,14 +2,16 @@ import QuickLook
 import SwiftUI
 
 /// A thread: the first message of a chain of replies and every reply under it, oldest first, with
-/// a composer that replies within it (to the latest message unless you pick another). Tapping a
-/// message offers Reply and Show in chat; tapping a quote goes to the original in the thread.
+/// the same composer as the chat (photos, files, places, polls and the rest), replying within the
+/// thread (to the latest message unless you pick another). Tapping a message offers Reply, Show in
+/// chat and, on your own, Edit and Delete; tapping a quote goes to the original in the thread.
 struct ThreadSheet: View {
     /// The message the thread was opened from: shown and briefly highlighted once loaded.
     let focusId: String
     let group: Group
     let me: String?
     @Bindable var model: ChatViewModel
+    let api: APIClient
     /// Close the thread and go to this message in the chat.
     let showInChat: (String) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -20,29 +22,16 @@ struct ThreadSheet: View {
     @State private var viewing: ChatView.ViewerTarget?
     @State private var previewFile: URL?
     @State private var openingFileId: String?
+    @State private var showsMenu = false
+    /// Your message waiting for "Delete this message?".
+    @State private var pendingDelete: Message?
 
     var body: some View {
         VStack(spacing: 0) {
             header
             messages
-            if let target = model.threadReplyingTo {
-                ReplyingStrip(
-                    name: ReplyNames.name(of: target.authorId, fallback: nil, group: group, me: me),
-                    snippet: target.asReplyPreview(authorName: nil).snippet,
-                    cancelLabel: "Reply to the latest message instead",
-                    cancel: model.hasPickedThreadReply ? { model.replyInThread(to: nil) } : nil
-                )
-                Composer(
-                    text: $model.threadDraft,
-                    isMenuOpen: .constant(false),
-                    isSending: model.isSendingInThread,
-                    editingId: nil,
-                    replyingId: model.hasPickedThreadReply ? target.id : nil,
-                    showsMenu: false,
-                    placeholder: "Reply in thread"
-                ) {
-                    Task { await model.sendInThread() }
-                }
+            if model.threadReplyingTo != nil || model.composer(.thread).editing != nil {
+                ChatComposerArea(model: model, target: .thread, group: group, me: me, api: api, showsMenu: $showsMenu)
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.threadReplyingTo?.id)
@@ -64,10 +53,23 @@ struct ThreadSheet: View {
         } options: { message in
             var options: [ConfirmOption] = []
             if message.canReply {
-                options.append(ConfirmOption("Reply", systemImage: "arrowshape.turn.up.left") { model.replyInThread(to: message) })
+                options.append(ConfirmOption("Reply", systemImage: "arrowshape.turn.up.left") { reply(to: message) })
+            }
+            if canEdit(message) {
+                options.append(ConfirmOption("Edit", systemImage: "pencil", kind: .secondary) { edit(message) })
             }
             options.append(ConfirmOption("Show in chat", systemImage: "text.bubble", kind: .secondary) { showInChat(message.id) })
+            if canDelete(message) {
+                options.append(ConfirmOption("Delete", systemImage: "trash", kind: .destructive) { pendingDelete = message })
+            }
             return options
+        }
+        .confirmSheet(item: $pendingDelete) { _ in
+            "Delete this message?"
+        } message: { _ in
+            "It'll show as deleted for everyone."
+        } options: { message in
+            [ConfirmOption("Delete message", systemImage: "trash", kind: .destructive) { Task { await model.delete(message, from: .thread) } }]
         }
         .errorAlert($model.threadError)
     }
@@ -115,17 +117,19 @@ struct ThreadSheet: View {
                             startsRun: startsRun(at: index),
                             openInfo: { actionsFor = message },
                             openProposal: { _ in },
-                            onReply: { model.replyInThread(to: message) },
+                            onEdit: canEdit(message) ? { edit(message) } : nil,
+                            onDelete: canDelete(message) ? { pendingDelete = message } : nil,
+                            onReply: { reply(to: message) },
                             openQuote: { id in highlight(id, proxy: proxy) },
                             openImage: { attachment in viewing = ChatView.ViewerTarget(attachments: message.files.filter(\.isVisual), selected: attachment.id) },
                             openFile: { attachment in Task { await openFile(attachment) } },
                             openingFileId: openingFileId,
                             onShowInChat: { showInChat(message.id) },
                             showsInfo: false,
-                            tapHint: "Shows reply and show in chat",
+                            tapHint: "Shows reply, show in chat and, on your own messages, edit and delete",
                             quoteHint: "Shows the original message"
                         )
-                        .modifier(SwipeToReply(isEnabled: message.canReply) { model.replyInThread(to: message) })
+                        .modifier(SwipeToReply(isEnabled: message.canReply) { reply(to: message) })
                         .background {
                             RoundedRectangle(cornerRadius: 18, style: .continuous)
                                 .fill(theme.accentSoft)
@@ -160,6 +164,24 @@ struct ThreadSheet: View {
                 withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(newId, anchor: .bottom) }
             }
         }
+    }
+
+    private func canEdit(_ message: Message) -> Bool {
+        message.kind == .text && !message.isDeleted && message.place == nil && message.authorId != nil && message.authorId == me
+    }
+
+    private func canDelete(_ message: Message) -> Bool {
+        message.kind == .text && !message.isDeleted && message.authorId != nil && message.authorId == me
+    }
+
+    private func reply(to message: Message) {
+        showsMenu = false
+        model.replyInThread(to: message)
+    }
+
+    private func edit(_ message: Message) {
+        showsMenu = false
+        model.startEditing(message, in: .thread)
     }
 
     /// Scrolls to a message in the thread and flashes it.

@@ -24,9 +24,6 @@ struct ChatView: View {
     @State private var unseenCount = 0
     /// A message to scroll to and flash ("Show in chat" from a thread).
     @State private var showRequest: String?
-    @State private var pickingPhotos = false
-    @State private var photoSelection: [PhotosPickerItem] = []
-    @State private var pickingFiles = false
     /// A message's photos open full screen, at the one tapped.
     @State private var viewing: ViewerTarget?
     /// A downloaded file open in QuickLook.
@@ -45,21 +42,13 @@ struct ChatView: View {
     private var isScrolledBack: Bool { viewportHeight > 0 && contentBottom - viewportHeight > Self.jumpThreshold }
 
     enum ChatSheet: Identifiable {
-        case poll, propose, event, location, info(Message)
-        /// Not sheets: the photo library and the file picker.
-        case photos, files
+        case info(Message)
         /// The thread a message is part of (by the message's id).
         case thread(String)
         var id: String {
             switch self {
             case .thread(let id): "thread-\(id)"
-            case .poll: "poll"
-            case .propose: "propose"
-            case .event: "event"
-            case .location: "location"
             case .info(let message): "info-\(message.id)"
-            case .photos: "photos"
-            case .files: "files"
             }
         }
     }
@@ -75,59 +64,12 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             messageList
-            if showsMenu {
-                ComposerMenu { choice in
-                    showsMenu = false
-                    switch choice {
-                    case .photos: pickingPhotos = true
-                    case .files: pickingFiles = true
-                    default: sheet = choice
-                    }
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            if model.editing != nil {
-                EditingStrip { model.cancelEditing() }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            } else if let replying = model.replyingTo {
-                ReplyingStrip(
-                    name: ReplyNames.name(of: replying.authorId, fallback: nil, group: group, me: me),
-                    snippet: replying.asReplyPreview(authorName: nil).snippet
-                ) { model.cancelReplying() }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            if !model.uploads.isEmpty, model.editing == nil {
-                AttachmentTray(uploads: model.uploads, remove: model.removeUpload, retry: model.retryUpload)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            Composer(
-                text: $model.draft,
-                isMenuOpen: $showsMenu,
-                isSending: model.isSending,
-                editingId: model.editing?.id,
-                replyingId: model.replyingTo?.id,
-                placeholder: model.uploads.isEmpty || model.editing != nil ? "Message the group" : "Add a caption",
-                canSend: model.canSend,
-                allowsEmpty: !(model.editing?.files.isEmpty ?? true)
-            ) {
-                Task { await model.send() }
-            }
-        }
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.uploads.map(\.id))
-        .photosPicker(isPresented: $pickingPhotos, selection: $photoSelection, maxSelectionCount: AttachmentFormat.maxPerMessage, matching: .images, preferredItemEncoding: .current)
-        .onChange(of: photoSelection) { _, items in
-            guard !items.isEmpty else { return }
-            photoSelection = []
-            Task { await attachPhotos(items) }
-        }
-        .fileImporter(isPresented: $pickingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            if case .success(let urls) = result { attachFiles(urls) }
+            ChatComposerArea(model: model, target: .chat, group: group, me: me, api: detail.api, showsMenu: $showsMenu)
         }
         .fullScreenCover(item: $viewing) { target in
             AttachmentViewer(attachments: target.attachments, selection: target.selected)
         }
         .quickLookPreview($previewFile)
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.editing?.id)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: model.replyingTo?.id)
         .confirmSheet(item: $pendingDelete) { _ in
             "Delete this message?"
@@ -136,7 +78,6 @@ struct ChatView: View {
         } options: { message in
             [ConfirmOption("Delete message", systemImage: "trash", kind: .destructive) { Task { await model.delete(message) } }]
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showsMenu)
         .screenBackground(OrbLayout.chat)
         .task { await model.load(me: me) }
         .task(id: group.id) {
@@ -269,37 +210,6 @@ struct ChatView: View {
         }
     }
 
-    /// Loads picked photos (GIFs as they are, others as JPEG where needed) and starts uploading them.
-    private func attachPhotos(_ items: [PhotosPickerItem]) async {
-        var picked: [(data: Data, name: String, mime: String, preview: UIImage?)] = []
-        var failed = 0
-        for item in items {
-            let type = item.supportedContentTypes.first { $0.conforms(to: .gif) } ?? item.supportedContentTypes.first
-            guard let data = try? await item.loadTransferable(type: Data.self),
-                  let photo = await Task.detached(priority: .userInitiated, operation: { AttachmentFormat.photo(data: data, type: type) }).value
-            else { failed += 1; continue }
-            picked.append(photo)
-        }
-        model.attach(picked)
-        if failed > 0 { model.error = failed == 1 ? "One photo couldn't be loaded." : "\(failed) photos couldn't be loaded." }
-    }
-
-    /// Reads picked files and starts uploading them (the server says which types it takes).
-    private func attachFiles(_ urls: [URL]) {
-        var picked: [(data: Data, name: String, mime: String, preview: UIImage?)] = []
-        for url in urls {
-            let scoped = url.startAccessingSecurityScopedResource()
-            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-            guard let data = try? Data(contentsOf: url) else {
-                model.error = "\(url.lastPathComponent) couldn't be read. Folders and packages can't be sent: zip them first."
-                continue
-            }
-            let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
-            picked.append((data, url.lastPathComponent, mime, nil))
-        }
-        model.attach(picked)
-    }
-
     private func openThread(_ messageId: String) {
         showsMenu = false
         sheet = .thread(messageId)
@@ -333,20 +243,10 @@ struct ChatView: View {
     @ViewBuilder
     private func sheetContent(_ sheet: ChatSheet) -> some View {
         switch sheet {
-        case .poll:
-            NewPollSheet { question, options, multi in await model.createPoll(question: question, options: options, multi: multi) }
-        case .propose:
-            NewProposalSheet(group: group, me: me, draft: .blank(), api: detail.api) { _ in }
-        case .event:
-            EventEditorSheet(groupId: group.id, target: .new, api: detail.api) { _ in }
-        case .location:
-            LocationPickerSheet { location in await model.sendLocation(location) }
         case .info(let message):
             MessageInfoSheet(message: message, group: group, me: app.session.user?.id, model: model)
-        case .photos, .files:
-            EmptyView()
         case .thread(let id):
-            ThreadSheet(focusId: id, group: group, me: me, model: model) { target in
+            ThreadSheet(focusId: id, group: group, me: me, model: model, api: detail.api) { target in
                 self.sheet = nil
                 showRequest = target
             }
@@ -380,7 +280,7 @@ private struct JumpToLatestButton: View {
 }
 
 /// Above the composer while you edit a message: "Editing message" and ✕ to stop.
-private struct EditingStrip: View {
+struct EditingStrip: View {
     let cancel: () -> Void
     @Environment(\.theme) private var theme
 
@@ -463,8 +363,9 @@ struct ReplyingStrip: View {
 }
 
 /// The big buttons above the composer: Photos, Files and Location, then Poll, Propose a time and Add event.
-private struct ComposerMenu: View {
-    let choose: (ChatView.ChatSheet) -> Void
+struct ComposerMenu: View {
+    enum Choice { case photos, files, location, poll, propose, event }
+    let choose: (Choice) -> Void
     @Environment(\.theme) private var theme
 
     var body: some View {
