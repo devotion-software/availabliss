@@ -19,6 +19,28 @@ struct PlannerResult: Decodable, Sendable, Equatable {
     /// Prefill for "Propose this".
     let proposalTitle: String
     let proposalNote: String
+
+    init(best: Option, alternatives: [Option] = [], ideas: [Idea] = [], checklist: [String] = [], proposalTitle: String = "", proposalNote: String = "") {
+        self.best = best
+        self.alternatives = alternatives
+        self.ideas = ideas
+        self.checklist = checklist
+        self.proposalTitle = proposalTitle
+        self.proposalNote = proposalNote
+    }
+
+    /// Lists the model left out decode as empty (as on Android), rather than failing the whole plan.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        best = try c.decode(Option.self, forKey: .best)
+        alternatives = try c.decodeIfPresent([Option].self, forKey: .alternatives) ?? []
+        ideas = try c.decodeIfPresent([Idea].self, forKey: .ideas) ?? []
+        checklist = try c.decodeIfPresent([String].self, forKey: .checklist) ?? []
+        proposalTitle = try c.decodeIfPresent(String.self, forKey: .proposalTitle) ?? ""
+        proposalNote = try c.decodeIfPresent(String.self, forKey: .proposalNote) ?? ""
+    }
+
+    private enum CodingKeys: String, CodingKey { case best, alternatives, ideas, checklist, proposalTitle, proposalNote }
 }
 
 struct PlannerBody: Encodable, Sendable {

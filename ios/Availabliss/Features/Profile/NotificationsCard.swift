@@ -106,7 +106,7 @@ struct NotificationsCard: View {
                 if !on { off.append(category) }
                 // In the declared order, so the list doesn't depend on the order they were switched.
                 off = NotificationCategory.allCases.filter(off.contains)
-                save(NotificationSettingsPatch(off: off)) { $0.off = off }
+                save(NotificationSettingsPatch(off: off, keeping: settings.unknownOff)) { $0.off = off }
             }
         )
     }

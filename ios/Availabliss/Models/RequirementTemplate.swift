@@ -21,6 +21,9 @@ extension Requirement {
     /// already over are dropped, and times are read in your time zone.
     func forNewGroup(today: CalendarDay = .today(), timezone: String, calendar: Calendar = .current) -> Requirement {
         var r = self
+        // Who needs to be free is about one group's members, so it never carries over.
+        r.quorum = nil
+        r.optionalMemberIds = nil
         let from = r.range.from.startDate(calendar: calendar)
         let to = r.range.to.startDate(calendar: calendar)
         let length = max(0, calendar.dateComponents([.day], from: from, to: to).day ?? 0)
@@ -32,7 +35,8 @@ extension Requirement {
     }
 
     /// True when this is the same timing as `other`, ignoring when the search range starts (its
-    /// length still counts) and the time zone: a template's range moves to "today" when it's used.
+    /// length still counts), the time zone, and who needs to be free (templates don't keep it): a
+    /// template's range moves to "today" when it's used.
     /// Mirrors `sameTiming` in web/src/lib/client/templates.ts.
     func isSameTiming(as other: Requirement, calendar: Calendar = .current) -> Bool {
         func normalized(_ r: Requirement) -> Requirement {
@@ -42,6 +46,9 @@ extension Requirement {
             r.range = DateRange(from: anchor, to: anchor.adding(days: length, calendar: calendar))
             r.days = Array(Set(r.days)).sorted()
             r.timezone = ""
+            // Who needs to be free belongs to one group's members, and templates never keep it.
+            r.quorum = nil
+            r.optionalMemberIds = nil
             return r
         }
         return normalized(self) == normalized(other)

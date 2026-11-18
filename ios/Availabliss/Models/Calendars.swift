@@ -1,7 +1,11 @@
 import Foundation
 
-enum CalendarProvider: String, Codable, Sendable {
-    case google, microsoft, caldav, device
+/// Where a connection's calendars come from. A provider a newer server adds decodes as `.unknown`
+/// (shown as "Calendar"), so one new kind of connection can't stop the whole list loading.
+enum CalendarProvider: String, Codable, Sendable, TolerantDecodable {
+    case google, microsoft, caldav, device, unknown
+
+    static let fallback = CalendarProvider.unknown
 
     var displayName: String {
         switch self {
@@ -9,6 +13,7 @@ enum CalendarProvider: String, Codable, Sendable {
         case .microsoft: "Outlook"
         case .caldav: "iCloud"
         case .device: "This iPhone"
+        case .unknown: "Calendar"
         }
     }
 }

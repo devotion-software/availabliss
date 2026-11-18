@@ -50,17 +50,23 @@ struct NotificationSettings: Decodable, Sendable, Equatable {
     var quietHours: QuietHours?
     /// Active mutes only.
     var mutes: [GroupMute]
+    /// Categories turned off that this version doesn't know (from a newer server), sent back
+    /// untouched when the list is saved so they aren't switched on by accident.
+    var unknownOff: [String] = []
 
-    init(off: [NotificationCategory] = [], quietHours: QuietHours? = nil, mutes: [GroupMute] = []) {
+    init(off: [NotificationCategory] = [], quietHours: QuietHours? = nil, mutes: [GroupMute] = [], unknownOff: [String] = []) {
         self.off = off
         self.quietHours = quietHours
         self.mutes = mutes
+        self.unknownOff = unknownOff
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        // Skips categories this version doesn't know, rather than failing the whole screen.
-        off = (try container.decodeIfPresent([String].self, forKey: .off) ?? []).compactMap(NotificationCategory.init(rawValue:))
+        // Categories this version doesn't know are kept aside (not shown), rather than failing the screen.
+        let raw = try container.decodeIfPresent([String].self, forKey: .off) ?? []
+        off = raw.compactMap(NotificationCategory.init(rawValue:))
+        unknownOff = raw.filter { NotificationCategory(rawValue: $0) == nil }
         quietHours = try container.decodeIfPresent(QuietHours.self, forKey: .quietHours)
         mutes = try container.decodeIfPresent([GroupMute].self, forKey: .mutes) ?? []
     }
@@ -75,13 +81,14 @@ struct NotificationSettings: Decodable, Sendable, Equatable {
 
 /// `PATCH /me/notification-settings`: only the fields being changed are sent.
 struct NotificationSettingsPatch: Encodable, Sendable {
-    /// The whole list of categories that are off.
-    var off: [NotificationCategory]?
+    /// The whole list of categories that are off (as sent: known ones plus any kept from a newer server).
+    var off: [String]?
     /// Left out: unchanged. `.some(nil)`: sent as `null`, turning quiet hours off.
     var quietHours: QuietHours??
 
-    init(off: [NotificationCategory]? = nil, quietHours: QuietHours?? = nil) {
-        self.off = off
+    /// `keeping`: categories this version doesn't know that were off, sent back as they were.
+    init(off: [NotificationCategory]? = nil, keeping: [String] = [], quietHours: QuietHours?? = nil) {
+        self.off = off.map { $0.map(\.rawValue) + keeping }
         self.quietHours = quietHours
     }
 

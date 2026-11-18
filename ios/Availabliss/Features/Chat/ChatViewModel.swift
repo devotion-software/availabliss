@@ -384,7 +384,10 @@ final class ChatViewModel {
     func startEditing(_ message: Message, in target: ComposerTarget = .chat) {
         guard message.kind == .text, !message.isDeleted, message.place == nil, message.authorId == me else { return }
         if target == .chat { replyingTo = nil }
-        if composer(target).editing == nil { composers[target]?.draftBeforeEdit = composer(target).draft }
+        // Read before writing: `composers[target]?.x = composer(target).y` would access `composers`
+        // twice at once, which Swift's exclusivity checks stop at run time.
+        let current = composer(target)
+        if current.editing == nil { composers[target]?.draftBeforeEdit = current.draft }
         composers[target]?.editing = message
         composers[target]?.draft = message.text ?? ""
     }
@@ -392,7 +395,8 @@ final class ChatViewModel {
     func cancelEditing(_ target: ComposerTarget = .chat) {
         guard composer(target).editing != nil else { return }
         composers[target]?.editing = nil
-        composers[target]?.draft = composer(target).draftBeforeEdit
+        let restored = composer(target).draftBeforeEdit
+        composers[target]?.draft = restored
         composers[target]?.draftBeforeEdit = ""
     }
 

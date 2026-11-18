@@ -19,6 +19,9 @@ export function requirementFromTemplate(template: Pick<RequirementTemplate, 'req
 	// A JSON copy: the template may be a Svelte state proxy, which structuredClone rejects.
 	const r = JSON.parse(JSON.stringify(template.requirement)) as Requirement;
 	const length = Math.max(0, daysBetween(r.range.from, r.range.to));
+	// Who needs to be free is about one group's members, so it never carries over.
+	delete r.quorum;
+	delete r.optionalMemberIds;
 	return {
 		...r,
 		range: { from: today, to: addDays(today, length) },
@@ -46,7 +49,8 @@ function stable(value: unknown): string {
  * to "today" when it's used. Mirrors `Requirement.isSameTiming` on iOS and Android.
  */
 export function sameTiming(a: Requirement, b: Requirement): boolean {
-	const normalize = (r: Requirement) => ({
+	// Who needs to be free belongs to one group's members, and templates never keep it.
+	const normalize = ({ quorum: _q, optionalMemberIds: _o, ...r }: Requirement) => ({
 		...r,
 		range: daysBetween(r.range.from, r.range.to),
 		days: [...new Set(r.days)].sort((x, y) => x - y),
