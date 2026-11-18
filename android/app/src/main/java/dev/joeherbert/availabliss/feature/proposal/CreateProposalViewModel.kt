@@ -5,8 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.joeherbert.availabliss.core.billing.PlanRepository
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.GroupsRepository
+import dev.joeherbert.availabliss.core.data.PlannerRepository
+import dev.joeherbert.availabliss.core.network.ApiError
+import dev.joeherbert.availabliss.core.network.model.AiPlannerAccess
 import dev.joeherbert.availabliss.core.data.ProposalsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiResult
@@ -45,6 +49,12 @@ data class CreateProposalUiState(
     val message: UserMessage? = null,
     /** "Priya is busy then" when the chosen time clashes with someone's busy time. */
     val clash: String? = null,
+    /** The optional AI planner: "Draft with AI" shows when it's set up here; Pro to use. */
+    val aiPlanner: AiPlannerAccess = AiPlannerAccess(),
+    /** Waiting for the AI's title and note. */
+    val drafting: Boolean = false,
+    /** The server said drafting needs Pro (402): the screen shows the upgrade sheet. */
+    val needsPro: Boolean = false,
 ) {
     val canSubmit: Boolean get() = range.isValid && !saving
 }
@@ -55,6 +65,8 @@ class CreateProposalViewModel @Inject constructor(
     private val proposals: ProposalsRepository,
     private val groups: GroupsRepository,
     private val users: UserRepository,
+    private val planner: PlannerRepository,
+    private val plans: PlanRepository,
 ) : ViewModel() {
 
     private val route = savedStateHandle.toRoute<CreateProposalRoute>()
@@ -77,6 +89,8 @@ class CreateProposalViewModel @Inject constructor(
             _state.update { it.copy(groupName = group?.name.orEmpty(), title = it.title.ifEmpty { group?.name.orEmpty().take(120) }) }
         }
         watchConflicts()
+        viewModelScope.launch { plans.plan.collect { plan -> _state.update { it.copy(aiPlanner = plan?.aiPlanner ?: AiPlannerAccess()) } } }
+        viewModelScope.launch { plans.refresh() }
     }
 
     /** Asks who's busy whenever the times change (debounced; a newer change cancels an older check). */
@@ -98,6 +112,46 @@ class CreateProposalViewModel @Inject constructor(
     fun onTitleChange(value: String) = _state.update { it.copy(title = value.take(120)) }
     fun onLocationChange(value: String) = _state.update { it.copy(location = value.take(160)) }
     fun onNoteChange(value: String) = _state.update { it.copy(note = value.take(1000)) }
+
+    /**
+     * "Draft with AI": fills the title and note for the time picked, replacing what's there
+     * (anything blank in the answer is kept). Without Pro it asks for the upgrade instead.
+     */
+    fun draftWithAi() {
+        val s = _state.value
+        if (s.drafting || !s.range.isValid) return
+        if (!s.aiPlanner.included) {
+            _state.update { it.copy(needsPro = true) }
+            return
+        }
+        _state.update { it.copy(drafting = true) }
+        viewModelScope.launch {
+            when (val result = planner.draftProposal(route.groupId, s.range.startIso(), s.range.endIso())) {
+                is ApiResult.Success -> _state.update {
+                    it.copy(
+                        drafting = false,
+                        title = result.value.title.trim().ifEmpty { it.title }.take(120),
+                        note = result.value.note.trim().ifEmpty { it.note }.take(1000),
+                    )
+                }
+                is ApiResult.Failure -> _state.update {
+                    when (result.error) {
+                        is ApiError.UpgradeRequired -> it.copy(drafting = false, needsPro = true)
+                        // AI isn't set up on this server after all: stop offering it.
+                        is ApiError.NotFound -> it.copy(drafting = false, aiPlanner = AiPlannerAccess())
+                        else -> it.copy(drafting = false, message = UserMessage(result.error.message))
+                    }
+                }
+            }
+        }
+    }
+
+    fun needsProHandled() = _state.update { it.copy(needsPro = false) }
+
+    /** After the upgrade sheet closes: Pro may have just been bought. */
+    fun refreshPlan() {
+        viewModelScope.launch { plans.refresh() }
+    }
 
     fun submit() {
         val s = _state.value

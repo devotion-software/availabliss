@@ -64,6 +64,11 @@ data class MonthCellUi(
      * is outlined in the accent with its number in accent (a pill would fade with the cell).
      */
     val today: Boolean = false,
+    /**
+     * A day that works only with someone missing (a quorum or optional members): drawn lighter,
+     * a soft accent fill with an accent outline, and [note] says who ("2 missing").
+     */
+    val partial: Boolean = false,
 )
 
 /** How far cells that don't work fade; today's content doesn't, only its background. */
@@ -156,9 +161,13 @@ fun MonthGrid(
 private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = AvailablissTheme.colors
     val shape = bandShape(if (cell.state == CellState.Match) cell.band else null)
-    val (bg, fg, border) = when (cell.state) {
-        CellState.Match -> Triple(colors.accent, colors.onAccent, Color.Transparent)
-        CellState.Busy -> Triple(colors.busyBg, colors.ink, colors.glassBorder)
+    // Works for most of the group: lighter than a day that works for everyone.
+    val partial = cell.state == CellState.Match && cell.partial
+    val solid = cell.state == CellState.Match && !partial
+    val (bg, fg, border) = when {
+        partial -> Triple(colors.accentSoft, colors.accentInk, colors.accent)
+        cell.state == CellState.Match -> Triple(colors.accent, colors.onAccent, Color.Transparent)
+        cell.state == CellState.Busy -> Triple(colors.busyBg, colors.ink, colors.glassBorder)
         else -> Triple(colors.surface, colors.ink, colors.glassBorder)
     }
     // Today on a day that doesn't work keeps its content at full strength; only the cell fades.
@@ -169,7 +178,7 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
         Modifier
             .fillMaxWidth()
             .height(54.dp)
-            .then(if (cell.state == CellState.Match) Modifier.softShadow(shape, colors.accent, offsetY = 12.dp, blur = 24.dp, spread = (-14).dp) else Modifier)
+            .then(if (solid) Modifier.softShadow(shape, colors.accent, offsetY = 12.dp, blur = 24.dp, spread = (-14).dp) else Modifier)
             .alpha(if (plainToday) 1f else fade)
             .clip(shape)
             .background(if (plainToday) bg.copy(alpha = bg.alpha * fade) else bg)
@@ -177,9 +186,10 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
             // from today's outline (only ever one ring); on a day that works, a light inner ring reads on the fill.
             .then(
                 when {
-                    cell.selected && cell.state == CellState.Match -> Modifier.insetRing(shape, colors.onAccent, inset = 2.dp)
+                    cell.selected && solid -> Modifier.insetRing(shape, colors.onAccent, inset = 2.dp)
                     cell.selected -> Modifier.border(2.dp, colors.ink, shape)
                     plainToday -> Modifier.todayOutline(true, shape, border)
+                    partial -> Modifier.border(1.5.dp, border, shape)
                     else -> Modifier.border(1.dp, border, shape)
                 },
             )
@@ -192,11 +202,17 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
         // Today's pill is inverted on a cell already filled with the accent.
-        val onAccent = cell.state == CellState.Match
+        val onAccent = solid
         Text(
             cell.date.dayOfMonth.toString(), fontSize = 17.sp, fontWeight = AvWeights.Display650, lineHeight = 17.sp,
-            color = if (plainToday) colors.accentInk else if (!cell.today) fg else colors.accent,
-            modifier = Modifier.todayPill(cell.today && onAccent, colors.onAccent),
+            // Today on a partial day sits on an accent pill (the cell's own fill is soft).
+            color = when {
+                plainToday -> colors.accentInk
+                !cell.today -> fg
+                onAccent -> colors.accent
+                else -> colors.onAccent
+            },
+            modifier = Modifier.todayPill(cell.today && cell.state == CellState.Match, if (onAccent) colors.onAccent else colors.accent),
         )
         Text(cell.note, style = AvailablissTheme.type.micro, color = if (plainToday) colors.muted else fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -236,18 +252,29 @@ private fun HiddenCell(cell: MonthCellUi, modifier: Modifier = Modifier) {
     }
 }
 
-/** Legend under the month: "Works for everyone", "Someone's busy", "Fri–Sun only". */
+/**
+ * Legend under the month: "Works for everyone", "Most of us free" (when [showPartial]: a day
+ * on screen works only with someone missing), "Someone's busy", "Fri–Sun only".
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun MonthLegend(daysNote: String?, modifier: Modifier = Modifier) {
+fun MonthLegend(daysNote: String?, modifier: Modifier = Modifier, showPartial: Boolean = false) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
-    Row(
+    // Wraps: with "Most of us free" as well, it can be wider than a phone.
+    androidx.compose.foundation.layout.FlowRow(
         modifier.fillMaxWidth().padding(start = 2.dp, top = 4.dp, end = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         LegendItem("Works for everyone") {
             Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(colors.accent))
+        }
+        if (showPartial) {
+            LegendItem("Most of us free") {
+                Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(colors.accentSoft).border(1.dp, colors.accent, RoundedCornerShape(3.dp)))
+            }
         }
         LegendItem("Someone's busy") {
             Box(Modifier.size(10.dp).alpha(0.5f).clip(RoundedCornerShape(3.dp)).background(colors.busyBg).border(1.dp, colors.busyLine, RoundedCornerShape(3.dp)))
@@ -278,10 +305,11 @@ private fun MonthGridPreview() {
                 MonthCellUi(nov(14), CellState.Match, BandPosition.Middle, "all free"),
                 MonthCellUi(nov(15), CellState.Match, BandPosition.End, "all free"),
             ),
+            listOf(MonthCellUi(nov(20), CellState.Match, BandPosition.Single, "Tom missing", partial = true), null, null),
         )
         Column(Modifier.background(AvailablissTheme.colors.bg).padding(20.dp)) {
             MonthGrid(listOf("Fri", "Sat", "Sun"), rows, onSelect = {})
-            MonthLegend("Fri–Sun only")
+            MonthLegend("Fri–Sun only", showPartial = true)
         }
     }
 }

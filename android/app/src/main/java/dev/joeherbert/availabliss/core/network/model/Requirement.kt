@@ -6,9 +6,11 @@ import kotlinx.serialization.Serializable
 /**
  * What a group is looking for (API.md "Requirements").
  *
- * No property has a default value on purpose: the server validates every field as
- * required (nullable fields must be sent as explicit `null`), and the shared [Json]
- * instance omits properties that equal their default.
+ * Only the "most of us are free" fields ([quorum], [optionalMemberIds]) have defaults:
+ * the server validates every other field as required (nullable fields must be sent as
+ * explicit `null`), and the shared [Json] instance omits properties that equal their
+ * default. Leaving those two out means "everyone needs to be free", which is also how
+ * older servers read them.
  */
 @Serializable
 data class Requirement(
@@ -24,6 +26,13 @@ data class Requirement(
     val range: DateRange,
     val dates: List<DateRange>,
     val timezone: String,
+    /**
+     * "Most of us are free": a time works when at least this many of the required
+     * (synced, non-optional) members are free. Null = everyone.
+     */
+    val quorum: Int? = null,
+    /** Members who never stop a time from working. */
+    val optionalMemberIds: List<String> = emptyList(),
 )
 
 /** The shape of a candidate slot, discriminated by `type`. */

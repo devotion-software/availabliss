@@ -23,6 +23,9 @@ object Templates {
         val stillAhead = { r: DateRange -> r.to >= today.toString() }
         return requirement.copy(
             range = DateRange(today.toString(), today.plusDays(length).toString()),
+            // A template's quorum and optional members were someone else's group.
+            quorum = null,
+            optionalMemberIds = emptyList(),
             dates = requirement.dates.filter(stillAhead),
             customSchoolHolidays = requirement.customSchoolHolidays.filter(stillAhead),
             timezone = timezone,
@@ -37,7 +40,14 @@ object Templates {
     fun sameTiming(a: Requirement, b: Requirement): Boolean {
         fun normalized(r: Requirement): Requirement {
             val length = ChronoUnit.DAYS.between(LocalDate.parse(r.range.from), LocalDate.parse(r.range.to))
-            return r.copy(range = DateRange("", length.toString()), days = r.days.toSortedSet().toList(), timezone = "")
+            return r.copy(
+                range = DateRange("", length.toString()),
+                days = r.days.toSortedSet().toList(),
+                timezone = "",
+                // Who needs to be free belongs to a group, so templates don't keep it.
+                quorum = null,
+                optionalMemberIds = emptyList(),
+            )
         }
         return runCatching { normalized(a) == normalized(b) }.getOrDefault(false)
     }

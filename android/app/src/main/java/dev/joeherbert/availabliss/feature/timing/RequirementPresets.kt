@@ -37,6 +37,10 @@ data class TimingDraft(
     val range: DateRange,
     val dates: List<DateRange>,
     val timezone: String,
+    /** "Most of us are free": at least this many required members; null = everyone. */
+    val quorum: Int? = null,
+    /** Members who never stop a time from working. */
+    val optionalMemberIds: Set<String> = emptySet(),
 ) {
     val isSpan: Boolean get() = length is RequirementLength.Span
 
@@ -53,6 +57,8 @@ data class TimingDraft(
         range = range,
         dates = dates,
         timezone = timezone,
+        quorum = quorum,
+        optionalMemberIds = optionalMemberIds.sorted(),
     )
 }
 
@@ -106,6 +112,8 @@ object RequirementPresets {
         range = requirement.range,
         dates = requirement.dates,
         timezone = requirement.timezone,
+        quorum = requirement.quorum,
+        optionalMemberIds = requirement.optionalMemberIds.toSet(),
     )
 
     val ALL_DAYS: Set<Int> = (0..6).toSet()

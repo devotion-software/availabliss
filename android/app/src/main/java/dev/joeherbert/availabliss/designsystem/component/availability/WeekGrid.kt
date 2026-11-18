@@ -43,6 +43,8 @@ data class WeekBlockUi(
     val label: String,
     /** true = everyone free (accent), false = someone busy (faded). */
     val free: Boolean,
+    /** A free block when most of the group is free (a quorum or optional members): drawn lighter. */
+    val most: Boolean = false,
 )
 
 data class WeekColumnUi(
@@ -128,8 +130,14 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
                                 .height(height)
                                 .then(if (block.free) Modifier else Modifier.alpha(0.5f))
                                 .clip(shape)
-                                .background(if (block.free) colors.accent else colors.busyBg)
-                                .then(if (block.free) Modifier else Modifier.border(1.dp, colors.busyLine, shape))
+                                .background(if (block.most) colors.accentSoft else if (block.free) colors.accent else colors.busyBg)
+                                .then(
+                                    when {
+                                        block.most -> Modifier.border(1.dp, colors.accent, shape)
+                                        block.free -> Modifier
+                                        else -> Modifier.border(1.dp, colors.busyLine, shape)
+                                    },
+                                )
                                 .padding(6.dp),
                         ) {
                             Text(
@@ -137,7 +145,7 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
                                 fontSize = 10.sp,
                                 lineHeight = 12.5.sp,
                                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                                color = if (block.free) colors.onAccent else colors.ink,
+                                color = if (block.most) colors.accentInk else if (block.free) colors.onAccent else colors.ink,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
@@ -158,7 +166,8 @@ fun WeekCards(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSele
     val type = AvailablissTheme.type
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         columns.forEachIndexed { index, column ->
-            val free = column.blocks.filter { it.free }
+            // Everyone free first in the headline; most of us free only when nothing works for everyone.
+            val free = column.blocks.filter { it.free }.sortedBy { it.most }
             val busy = column.blocks.filterNot { it.free }
             val shape = RoundedCornerShape(18.dp)
             Row(
@@ -190,14 +199,14 @@ fun WeekCards(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSele
                     busy.firstOrNull()?.let { Text("${it.label} busy", style = type.caption, color = colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     BoxWithConstraints(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(colors.line)) {
                         val w = maxWidth
-                        (busy + free).forEach { block ->
+                        (busy + free.sortedBy { !it.most }).forEach { block ->
                             Box(
                                 Modifier
                                     .offset(x = w * block.start)
                                     .width((w * (block.end - block.start)).coerceAtLeast(3.dp))
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(if (block.free) colors.accent else colors.ink.copy(alpha = 0.32f)),
+                                    .background(if (block.most) colors.accent.copy(alpha = 0.4f) else if (block.free) colors.accent else colors.ink.copy(alpha = 0.32f)),
                             )
                         }
                     }

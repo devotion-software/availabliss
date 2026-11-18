@@ -158,6 +158,12 @@ data class TimingActions(
     val onRange: (LocalDate, LocalDate) -> Unit = { _, _ -> },
     val onAddRange: (RangeList, LocalDate, LocalDate) -> Unit = { _, _, _ -> },
     val onRemoveRange: (RangeList, DateRange) -> Unit = { _, _ -> },
+    /** "Who needs to be free": Everyone (true) or At least N of M (false). */
+    val onEveryone: (Boolean) -> Unit = {},
+    /** Steps the N in "At least N of M". */
+    val onQuorum: (Int) -> Unit = {},
+    /** Marks a member optional (or not). */
+    val onOptional: (String, Boolean) -> Unit = { _, _ -> },
     val onSave: () -> Unit = {},
     /** "Save this timing as a template" with the chosen name. */
     val onSaveTemplate: (String) -> Unit = {},
@@ -229,6 +235,7 @@ fun TimingEditorSections(state: TimingEditorUiState, canEdit: Boolean, actions: 
     LengthSection(draft, canEdit, actions)
     StartsEndsSection(state, canEdit, draft, actions, openPicker = { picker = it })
     ExtrasSection(state, canEdit, draft, actions, openPicker = { picker = it })
+    if (state.members.isNotEmpty()) WhoNeedsToBeFreeSection(state, canEdit, actions)
     RangeSection(state, canEdit, draft, actions, openPicker = { picker = it })
     TimingPickers(state, picker, actions, close = { picker = TimingPicker.None })
 }
@@ -394,6 +401,57 @@ private fun ExtrasSection(state: TimingEditorUiState, canEdit: Boolean, draft: T
                     addLabel = "+ Add school holiday",
                     onAdd = { openPicker(TimingPicker.SchoolHolidays) },
                     onRemove = { actions.onRemoveRange(RangeList.SchoolHolidays, it) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * "Who needs to be free": everyone, or "At least N of M" with a stepper, and each
+ * member with an Optional switch (optional members never stop a time from working).
+ */
+@Composable
+private fun WhoNeedsToBeFreeSection(state: TimingEditorUiState, canEdit: Boolean, actions: TimingActions) {
+    val colors = AvailablissTheme.colors
+    val draft = state.draft
+    Section {
+        SectionLabel("Who needs to be free")
+        SegmentedControl(
+            segments = listOf(Segment(true, "Everyone"), Segment(false, "At least\u2026")),
+            selected = draft.quorum == null,
+            onSelect = { if (canEdit) actions.onEveryone(it) },
+            style = SegmentedStyle.Inset,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        draft.quorum?.let { quorum ->
+            Stepper(
+                WhoNeedsToBeFree.quorumLabel(quorum, state.requiredCount),
+                "how many need to be free",
+                canEdit,
+                onMinus = { actions.onQuorum(-1) },
+                onPlus = { actions.onQuorum(1) },
+            )
+        }
+        Text(
+            if (draft.quorum == null) {
+                "A time works when everyone who isn't optional is free."
+            } else {
+                "A time works when enough of the group is free. We'll show who'd miss out."
+            },
+            style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
+            color = colors.muted,
+        )
+        Column {
+            state.members.forEachIndexed { i, member ->
+                if (i > 0) RowDivider()
+                val optional = member.userId in draft.optionalMemberIds
+                ToggleRow(
+                    title = member.name,
+                    subtitle = if (optional) "Optional · never stops a time working" else "Optional",
+                    checked = optional,
+                    onCheckedChange = { if (canEdit) actions.onOptional(member.userId, it) },
+                    accessibilityLabel = "${member.name} is optional",
                 )
             }
         }

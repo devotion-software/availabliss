@@ -90,6 +90,7 @@ class GroupTimingViewModel @Inject constructor(
             val draft = RequirementPresets.fromRequirement(group.requirement)
             original = draft
             editor.canEdit = group.role.isAdmin
+            editor.members = group.members
             _uiState.update { it.copy(loading = false, groupName = group.name, canEdit = group.role.isAdmin, error = null) }
             editor.reset(draft, group.requirement.schoolAuthority)
         }
@@ -121,7 +122,8 @@ class GroupTimingViewModel @Inject constructor(
     /** Saves the timing as shown (including unsaved edits) as a template for new groups. */
     fun saveTemplate(name: String) {
         val draft = editor.draft ?: return
-        templateSaver.save(name, draft.toRequirement())
+        // Who needs to be free is about this group's members, so it isn't kept in the template.
+        templateSaver.save(name, draft.toRequirement().copy(quorum = null, optionalMemberIds = emptyList()))
     }
 
     fun savedHandled() = _uiState.update { it.copy(saved = false) }

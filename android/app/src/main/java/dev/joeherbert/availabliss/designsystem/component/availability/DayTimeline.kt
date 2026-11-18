@@ -52,8 +52,11 @@ val DayTimelineHours = listOf(0, 4, 8, 12, 16, 20, 24)
 /** Fraction of the 00:00–24:00 day timeline for [minutesOfDay]. */
 fun dayFraction(minutesOfDay: Int): Float = (minutesOfDay / (24f * 60)).coerceIn(0f, 1f)
 
-/** An "Everyone" free band. */
-data class EveryoneBandUi(val start: Float, val end: Float, val label: String)
+/**
+ * A band on the "Everyone" row: when everyone's free ([everyone] true, solid accent), or, with
+ * a quorum or optional members, when most of the group is (drawn lighter).
+ */
+data class EveryoneBandUi(val start: Float, val end: Float, val label: String, val everyone: Boolean = true)
 
 /** Day view: "Everyone" row plus one timeline per member, 08–24. */
 @Composable
@@ -92,7 +95,11 @@ fun DayTimelineRows(everyone: List<EveryoneBandUi>, rows: List<TimelineRowUi>, m
                         .height(30.dp)
                         .clip(RoundedCornerShape(9.dp))
                         .background(colors.line)
-                        .semantics { contentDescription = "Everyone free: " + everyone.joinToString { it.label }.ifEmpty { "no shared time" } },
+                        .semantics {
+                            val all = everyone.filter { it.everyone }.joinToString { it.label }.ifEmpty { "no shared time" }
+                            val most = everyone.filterNot { it.everyone }.joinToString { it.label }
+                            contentDescription = "Everyone free: $all" + if (most.isNotEmpty()) ". Most of us free: $most" else ""
+                        },
                 ) {
                     val w = maxWidth
                     everyone.forEach { band ->
@@ -102,11 +109,12 @@ fun DayTimelineRows(everyone: List<EveryoneBandUi>, rows: List<TimelineRowUi>, m
                                 .width(w * (band.end - band.start))
                                 .fillMaxHeight()
                                 .clip(RoundedCornerShape(9.dp))
-                                .background(colors.accent)
+                                .background(if (band.everyone) colors.accent else colors.accentSoft)
+                                .then(if (band.everyone) Modifier else Modifier.border(1.dp, colors.accent, RoundedCornerShape(9.dp)))
                                 .padding(start = 8.dp),
                             contentAlignment = Alignment.CenterStart,
                         ) {
-                            Text(band.label, style = type.micro, color = colors.onAccent, maxLines = 1, overflow = TextOverflow.Clip)
+                            Text(band.label, style = type.micro, color = if (band.everyone) colors.onAccent else colors.accentInk, maxLines = 1, overflow = TextOverflow.Clip)
                         }
                     }
                 }
@@ -123,6 +131,7 @@ fun DayTimelineRows(everyone: List<EveryoneBandUi>, rows: List<TimelineRowUi>, m
             LegendSwatch(colors.okBg, "Free")
             LegendSwatch(colors.busyFill, "Busy")
             LegendSwatch(colors.accent, "Everyone free")
+            if (everyone.any { !it.everyone }) LegendSwatch(colors.accentSoft, "Most of us free")
         }
     }
 }

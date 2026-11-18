@@ -27,6 +27,7 @@ annotation class StreamingClient
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
     private const val PLANNER_PATH_SUFFIX = "/planner"
+    private const val PLANNER_DRAFT_PATH_SUFFIX = "/planner/draft"
     private const val PLANNER_TIMEOUT_SECONDS = 90
 
 
@@ -60,9 +61,10 @@ object NetworkModule {
         .readTimeout(30, TimeUnit.SECONDS)
         .cookieJar(cookieJar)
         .addInterceptor(authInterceptor)
-        // The AI planner can take 20-60s to think; everything else keeps the 30s timeout.
+        // The AI planner (and its proposal drafts) can take 20-60s to think; everything else keeps the 30s timeout.
         .addInterceptor { chain ->
-            val slow = chain.request().url.encodedPath.endsWith(PLANNER_PATH_SUFFIX)
+            val path = chain.request().url.encodedPath
+            val slow = path.endsWith(PLANNER_PATH_SUFFIX) || path.endsWith(PLANNER_DRAFT_PATH_SUFFIX)
             if (slow) chain.withReadTimeout(PLANNER_TIMEOUT_SECONDS, TimeUnit.SECONDS).proceed(chain.request()) else chain.proceed(chain.request())
         }
         .apply {

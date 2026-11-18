@@ -23,3 +23,11 @@ data class PlannerPick(val slot: Slot, val why: String)
 
 @Serializable
 data class PlannerIdea(val title: String, val description: String)
+
+/** `POST /groups/:id/planner/draft` body: the time picked (ISO instants). A null note is left out. */
+@Serializable
+data class ProposalDraftRequest(val start: String, val end: String, val notes: String? = null)
+
+/** An AI-drafted proposal title and message (Pro). */
+@Serializable
+data class ProposalDraft(val title: String = "", val note: String = "")

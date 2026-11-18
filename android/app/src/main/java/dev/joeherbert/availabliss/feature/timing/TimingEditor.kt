@@ -6,6 +6,7 @@ import dev.joeherbert.availabliss.core.data.RegionsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.getOrNull
 import dev.joeherbert.availabliss.core.network.model.DateRange
+import dev.joeherbert.availabliss.core.network.model.Member
 import dev.joeherbert.availabliss.core.network.model.RequirementLength
 import dev.joeherbert.availabliss.core.network.model.TimeWindow
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +46,10 @@ data class TimingEditorUiState(
     val rangeTo: LocalDate = DateTimes.today().plusMonths(3),
     val bankSubtitle: String = "Group owner's region · treat like a weekend day",
     val schoolSubtitle: String = "Your school authority's term dates",
+    /** The group's members, for "Who needs to be free"; empty hides it (New group). */
+    val members: List<Member> = emptyList(),
+    /** Members not marked optional: the M in "At least N of M". */
+    val requiredCount: Int = 0,
 )
 
 /**
@@ -63,6 +68,11 @@ class TimingEditor(
 
     /** False makes every intent a no-op (non-admins on the Timing tab). */
     var canEdit: Boolean = true
+
+    /** The group's members, for "Who needs to be free". Set before [reset]. */
+    var members: List<Member> = emptyList()
+
+    private val memberIds: List<String> get() = members.map { it.userId }
 
     val draft: TimingDraft? get() = _state.value?.draft
 
@@ -126,6 +136,13 @@ class TimingEditor(
         RequirementPresets.withLength(d, l.copy(endDay = end.day, endTime = DateTimes.toWireTime(end.time)), null)
     }
 
+    /** "Everyone" (true) or "At least N of M" (false). */
+    fun setEveryone(everyone: Boolean) = edit { WhoNeedsToBeFree.setEveryone(it, everyone, memberIds) }
+
+    fun changeQuorum(delta: Int) = edit { WhoNeedsToBeFree.changeQuorum(it, delta, memberIds) }
+
+    fun setOptional(userId: String, optional: Boolean) = edit { WhoNeedsToBeFree.setOptional(it, userId, optional, memberIds) }
+
     fun setRange(from: LocalDate, to: LocalDate) = edit { d ->
         d.copy(range = DateRange(minOf(from, to).toString(), maxOf(from, to).toString()))
     }
@@ -158,6 +175,9 @@ class TimingEditor(
         onRange = ::setRange,
         onAddRange = ::addRange,
         onRemoveRange = ::removeRange,
+        onEveryone = ::setEveryone,
+        onQuorum = ::changeQuorum,
+        onOptional = ::setOptional,
         onSave = onSave,
     )
     // endregion
@@ -188,6 +208,8 @@ class TimingEditor(
                 rangeFrom = DateTimes.parseDate(draft.range.from) ?: DateTimes.today(),
                 rangeTo = DateTimes.parseDate(draft.range.to) ?: DateTimes.today().plusMonths(3),
                 schoolSubtitle = authorityName?.let { name -> "$name term dates" } ?: "Your school authority's term dates",
+                members = members,
+                requiredCount = WhoNeedsToBeFree.requiredCount(draft, memberIds),
             )
         }
         schedulePreview(draft)

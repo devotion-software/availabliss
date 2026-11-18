@@ -8,6 +8,7 @@ import dev.joeherbert.availabliss.core.network.model.AvailabilityDay
 import dev.joeherbert.availabliss.core.network.model.DayAvailability
 import dev.joeherbert.availabliss.core.network.model.DayStatus
 import dev.joeherbert.availabliss.core.network.model.Group
+import dev.joeherbert.availabliss.core.network.model.Interval
 import dev.joeherbert.availabliss.core.network.model.Slot
 import dev.joeherbert.availabliss.core.network.model.SlotPosition
 import dev.joeherbert.availabliss.designsystem.component.availability.BandPosition
@@ -50,6 +51,8 @@ data class DayDetailUi(
     val past: Boolean = false,
     /** "Sam and Priya prefer this", when the time that works fits their preferred times. */
     val preferredBy: String? = null,
+    /** A time that works for most of the group: "Ana can't make it". */
+    val missing: String? = null,
 )
 
 /**
@@ -140,7 +143,11 @@ object AvailabilityUiMapper {
         }
         val slot = slots.firstOrNull { it.covers(date) }
         val busyNames = day?.busyMemberIds.orEmpty().map { name(group, it, meId) }
+        // Works only with someone missing (a quorum or optional members): drawn lighter, saying who.
+        val partial = state == CellState.Match && day?.partial == true
+        val missing = if (partial) missingIds(day, slot?.slot) else emptyList()
         val note = when {
+            partial -> missingNote(missing, group, meId)
             state == CellState.Match && slot != null && date == slot.start.toLocalDate() && slot.start.toLocalTime() != LocalTime.MIDNIGHT ->
                 DateTimes.time(slot.start)
             state == CellState.Match -> "all free"
@@ -153,7 +160,11 @@ object AvailabilityUiMapper {
         }
         val dateLabel = "${DateTimes.longWeekday(DateTimes.apiWeekday(date))} ${DateTimes.dayMonth(date)}"
         val stateLabel = when (state) {
-            CellState.Match -> "works for everyone"
+            CellState.Match -> if (partial) {
+                "works for most of the group" + (BestOptions.missingLine(missing) { displayName(group, it, meId) }?.let { ", $it" } ?: "")
+            } else {
+                "works for everyone"
+            }
             CellState.Busy -> if (busyNames.isEmpty()) "someone's busy" else "${busyNames.joinNames()} busy"
             CellState.Hidden -> if (date.isBefore(today)) "in the past" else "outside the timing"
             CellState.Free -> "free"
@@ -165,10 +176,25 @@ object AvailabilityUiMapper {
             note = note,
             selected = date == selected,
             preferredCount = if (state == CellState.Match) day?.preferredBy.orEmpty().size else 0,
+            partial = partial,
             accessibilityLabel = listOfNotNull(dateLabel, stateLabel, day?.holiday, if (date == today) "today" else null).joinToString(", "),
             today = date == today,
         )
     }
+
+    /** Who's missing on a partial day: the slot's [Slot.missingMemberIds], else the day's busy members. */
+    private fun missingIds(day: AvailabilityDay?, slot: Slot?): List<String> =
+        slot?.missingMemberIds?.takeIf { it.isNotEmpty() } ?: day?.busyMemberIds.orEmpty()
+
+    /** The month cell's note on a partial day: "Sam missing", "2 missing". */
+    fun missingNote(missing: List<String>, group: Group?, meId: String?): String = when (missing.size) {
+        0 -> "most free"
+        1 -> "${name(group, missing.first(), meId)} missing"
+        else -> "${missing.size} missing"
+    }
+
+    /** True when any day in [rows] works only with someone missing (the legend then explains it). */
+    fun hasPartial(rows: List<List<MonthCellUi?>>): Boolean = rows.any { row -> row.any { it?.partial == true } }
 
     fun detail(date: LocalDate, availability: Availability?, group: Group?, meId: String?, today: LocalDate): DayDetailUi {
         val day = availability?.days?.firstOrNull { it.date == date.toString() }
@@ -179,10 +205,16 @@ object AvailabilityUiMapper {
             val from = if (local.start.toLocalTime() == LocalTime.MIDNIGHT) DateTimes.shortDay(local.start.toLocalDate())
             else "${DateTimes.shortWeekday(DateTimes.apiWeekday(local.start.toLocalDate()))} ${DateTimes.time(local.start)}"
             val noun = group?.requirement?.slotNoun() ?: "time"
+            val missing = local.slot.missingMemberIds
             return DayDetailUi(
                 date = date,
                 title = local.slot.label.ifBlank { dayTitle },
-                subtitle = "Everyone synced is free from $from$holiday",
+                subtitle = if (missing.isEmpty()) {
+                    "Everyone synced is free from $from$holiday"
+                } else {
+                    "Most of the group is free from $from$holiday"
+                },
+                missing = BestOptions.missingLine(missing) { displayName(group, it, meId) },
                 works = true,
                 proposeLabel = "Propose this $noun",
                 slot = local.slot,
@@ -257,13 +289,20 @@ object AvailabilityUiMapper {
         return if (em > sm) sm to em else null
     }
 
-    fun everyoneBands(day: DayAvailability): List<EveryoneBandUi> = day.everyoneFree.mapNotNull { interval ->
-        val date = DateTimes.parseDate(day.date) ?: return@mapNotNull null
-        val (s, e) = clampToDate(interval.start, interval.end, date) ?: return@mapNotNull null
-        val from = "%02d:%02d".format(s / 60, s % 60)
-        val to = if (e >= 23 * 60 + 59) "late" else "%02d:%02d".format(e / 60, e % 60)
-        EveryoneBandUi(dayFraction(s), dayFraction(e), "$from – $to")
-    }.filter { it.end > it.start }
+    /**
+     * The "Everyone" row's bands: with a quorum or optional members, [DayAvailability.mostFree]
+     * stretches first (drawn lighter), then [DayAvailability.everyoneFree] on top.
+     */
+    fun everyoneBands(day: DayAvailability): List<EveryoneBandUi> {
+        val date = DateTimes.parseDate(day.date) ?: return emptyList()
+        fun bands(intervals: List<Interval>, everyone: Boolean) = intervals.mapNotNull { interval ->
+            val (s, e) = clampToDate(interval.start, interval.end, date) ?: return@mapNotNull null
+            val from = "%02d:%02d".format(s / 60, s % 60)
+            val to = if (e >= 23 * 60 + 59) "late" else "%02d:%02d".format(e / 60, e % 60)
+            EveryoneBandUi(dayFraction(s), dayFraction(e), "$from – $to", everyone = everyone)
+        }
+        return (bands(day.mostFree, everyone = false) + bands(day.everyoneFree, everyone = true)).filter { it.end > it.start }
+    }
 
     fun timelineRows(day: DayAvailability, group: Group?, meId: String?): List<TimelineRowUi> {
         val date = DateTimes.parseDate(day.date) ?: return emptyList()
@@ -320,14 +359,19 @@ object AvailabilityUiMapper {
         val busyBlocks = mergeBusy(day, date, group, meId).map { (range, names) ->
             WeekBlockUi(timelineFraction(range.first), timelineFraction(range.second), names, free = false)
         }
-        val blocks = (busyBlocks + freeBlocks).filter { it.end > it.start }
+        // With a quorum or optional members: when most of the group is free, drawn lighter under everyone free.
+        val mostBlocks = day.mostFree.mapNotNull { clampToDate(it.start, it.end, date) }.map { (s, e) ->
+            WeekBlockUi(timelineFraction(s), timelineFraction(e), "Most of us free", free = true, most = true)
+        }
+        val blocks = (busyBlocks + mostBlocks + freeBlocks).filter { it.end > it.start }
         WeekColumnUi(
             label = DateTimes.weekdayAndDay(date),
             blocks = blocks,
             selected = date == selected,
             today = date == DateTimes.today(),
             works = !date.isBefore(DateTimes.today()) && status(date).let { it == null || it == DayStatus.Match },
-            accessibilityLabel = (if (date == DateTimes.today()) "Today, " else "") + DateTimes.shortDay(date) + ": " + (freeBlocks.joinToString { it.label }.ifEmpty { "no time when everyone's free" }),
+            accessibilityLabel = (if (date == DateTimes.today()) "Today, " else "") + DateTimes.shortDay(date) + ": " +
+                (freeBlocks.joinToString { it.label }.ifEmpty { if (mostBlocks.isNotEmpty()) "most of the group free" else "no time when everyone's free" }),
         )
     }
 
@@ -352,6 +396,10 @@ object AvailabilityUiMapper {
         }
     }
     // endregion
+
+    /** "You" for the viewer, else their first name: for sentences like "You can't make it". */
+    fun displayName(group: Group?, userId: String, meId: String?): String =
+        if (userId == meId) "You" else name(group, userId, meId)
 
     fun name(group: Group?, userId: String, meId: String?, youSuffix: Boolean = false): String {
         val first = group?.members?.firstOrNull { it.userId == userId }?.name?.firstName() ?: "Someone"

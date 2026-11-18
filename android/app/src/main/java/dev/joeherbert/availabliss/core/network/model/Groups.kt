@@ -255,11 +255,24 @@ data class AvailabilityDay(
     val holiday: String? = null,
     /** Members whose preferred times this day's time that works fits. */
     val preferredBy: List<String> = emptyList(),
+    /** A `match` day whose time only works with someone missing (a quorum or optional members). */
+    val partial: Boolean = false,
 )
 
 /** `label` e.g. "Fri 13 – Sun 15 Nov". `preferredBy`: members whose preferred times it fits. */
 @Serializable
-data class Slot(val start: String, val end: String, val label: String, val preferredBy: List<String> = emptyList())
+data class Slot(
+    val start: String,
+    val end: String,
+    val label: String,
+    val preferredBy: List<String> = emptyList(),
+    /** Synced members busy then (with a quorum or optional members); empty when everyone's free. */
+    val missingMemberIds: List<String> = emptyList(),
+    /** Pro: the "best date" score (higher is better); null without Pro or on older servers. */
+    val score: Double? = null,
+    /** Pro: people this time suits who've compromised in the group's recent plans. */
+    val fairFor: List<String> = emptyList(),
+)
 
 /** A member's preferred time for a group. A guideline: it never blocks a date. */
 @Serializable
@@ -297,6 +310,8 @@ data class DayAvailability(
     val window: Interval? = null,
     val members: List<DayMember>,
     val everyoneFree: List<Interval> = emptyList(),
+    /** With a quorum or optional members: when enough of the group is free (includes [everyoneFree]). */
+    val mostFree: List<Interval> = emptyList(),
 )
 
 @Serializable

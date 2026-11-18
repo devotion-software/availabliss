@@ -8,6 +8,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
@@ -224,7 +225,7 @@ fun GroupCalendarContent(
                     modifier = Modifier.swipeToStep(onPrevious = previous, onNext = next),
                 ) { page ->
                     when (page.view) {
-                        CalendarView.Month -> MonthSection(page, onSelectDate, onPlanWithAi)
+                        CalendarView.Month -> MonthSection(page, onSelectDate, onPlanWithAi, onPropose)
                         CalendarView.Week -> if (page.weekLoading && page.weekColumns.isEmpty()) LoadingIndicator()
                         // The time grid needs width: cards in portrait, the grid in landscape.
                         else if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -413,6 +414,7 @@ private fun MonthSection(
     state: GroupCalendarUiState,
     onSelectDate: (LocalDate) -> Unit,
     onPlanWithAi: (() -> Unit)?,
+    onPropose: (Slot) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
         if (state.loading && state.monthRows.all { row -> row.all { it == null } }) {
@@ -420,20 +422,86 @@ private fun MonthSection(
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 MonthGrid(state.columnLabels, state.monthRows, onSelectDate)
-                MonthLegend(state.daysNote)
+                MonthLegend(state.daysNote, showPartial = state.showPartialLegend)
             }
         }
-        onPlanWithAi?.let { PlanWithAiRow(it) }
+        if (state.bestOptions.isNotEmpty()) {
+            BestOptionsCard(state.bestOptions, onPlanWithAi, onPropose, onSelect = { slot -> DateTimes.localDate(slot.start)?.let(onSelectDate) })
+        } else {
+            onPlanWithAi?.let { PlanWithAiRow(it) }
+        }
     }
 }
 
-/** "Best options · Plan with AI" above the selected day (mirrors web's Best options header). */
+/**
+ * "Best options": the month's top upcoming times, fewest people missing first, then the Pro
+ * "best date" score, each with Propose (mirrors web `BestOptions.svelte`). Tapping one selects
+ * its day.
+ */
 @Composable
-private fun PlanWithAiRow(onClick: () -> Unit) {
+private fun BestOptionsCard(options: List<BestOptionUi>, onPlanWithAi: (() -> Unit)?, onPropose: (Slot) -> Unit, onSelect: (Slot) -> Unit) {
+    val colors = AvailablissTheme.colors
+    Column(
+        Modifier.fillMaxWidth().glass(Shapes.panel).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        PlanWithAiRow(onPlanWithAi)
+        options.forEach { option ->
+            val shape = RoundedCornerShape(14.dp)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .background(colors.surface)
+                    .then(if (option.best) Modifier.border(1.5.dp, colors.accent, shape) else Modifier.border(1.dp, colors.glassBorder, shape))
+                    .padding(start = 12.dp, top = 10.dp, end = 10.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clickable(role = Role.Button, onClickLabel = "Show this day") { onSelect(option.slot) }
+                        .semantics(mergeDescendants = true) {},
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    if (option.best) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(AvIcons.Sparkle, null, tint = colors.accentInk, modifier = Modifier.size(12.dp))
+                            Text("Best for the group", style = AvailablissTheme.type.micro.copy(fontWeight = FontWeight.Bold), color = colors.accentInk)
+                        }
+                    }
+                    Text(option.label, style = AvailablissTheme.type.bodySmallStrong, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (option.preferredCount > 0) {
+                        Text(
+                            "${option.preferredCount} ${if (option.preferredCount == 1) "prefers" else "prefer"} this",
+                            style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
+                            color = colors.muted,
+                        )
+                    }
+                    option.missing?.let { Text(it, style = AvailablissTheme.type.caption, color = colors.warnInk) }
+                    option.fair?.let { Text(it, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.accentInk) }
+                }
+                PrimaryButton(
+                    text = "Propose",
+                    onClick = { onPropose(option.slot) },
+                    style = ButtonStyle.Accent,
+                    height = 36.dp,
+                    shape = Shapes.controlSmall,
+                    textStyle = AvailablissTheme.type.label,
+                )
+            }
+        }
+    }
+}
+
+/** "Best options · Plan with AI" above the selected day (mirrors web's Best options header); no link when [onClick] is null. */
+@Composable
+private fun PlanWithAiRow(onClick: (() -> Unit)?) {
     val colors = AvailablissTheme.colors
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("Best options", style = AvailablissTheme.type.cardTitle, color = colors.ink, modifier = Modifier.weight(1f).semantics { heading() })
-        Row(
+        if (onClick != null) Row(
             Modifier
                 .clip(Shapes.pill)
                 .clickable(role = Role.Button, onClick = onClick)
@@ -464,6 +532,7 @@ private fun DetailCard(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(detail.title, style = AvailablissTheme.type.cardTitle, color = colors.ink)
                 Text(detail.subtitle, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                detail.missing?.let { Text(it, style = AvailablissTheme.type.caption, color = colors.warnInk) }
             }
             StatusPill(if (detail.works) "Works" else if (detail.past) "Past" else "Doesn’t fit", if (detail.works) PillTone.Mint else PillTone.Neutral)
         }

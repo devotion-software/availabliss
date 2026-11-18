@@ -7,6 +7,8 @@ import dev.joeherbert.availabliss.core.network.model.LinkedAccounts
 import dev.joeherbert.availabliss.core.network.model.Plan
 import dev.joeherbert.availabliss.core.network.model.PlannerRequest
 import dev.joeherbert.availabliss.core.network.model.PlannerResult
+import dev.joeherbert.availabliss.core.network.model.ProposalDraft
+import dev.joeherbert.availabliss.core.network.model.ProposalDraftRequest
 import dev.joeherbert.availabliss.core.network.model.CreateTemplateRequest
 import dev.joeherbert.availabliss.core.network.model.RenameTemplateRequest
 import dev.joeherbert.availabliss.core.network.model.RequirementTemplate
@@ -301,6 +303,10 @@ interface AvailablissApi {
     /** The optional AI planner (Pro). Slow: NetworkModule gives this call a longer read timeout. */
     @POST("api/v1/groups/{id}/planner")
     suspend fun planWithAi(@Path("id") groupId: String, @Body body: PlannerRequest): PlannerResult
+
+    /** Pro: an AI-drafted title and note for a proposal at the time picked. Also given the longer timeout. */
+    @POST("api/v1/groups/{id}/planner/draft")
+    suspend fun draftProposal(@Path("id") groupId: String, @Body body: ProposalDraftRequest): ProposalDraft
 
     // region Plan (Pro)
     @GET("api/v1/me/plan")
