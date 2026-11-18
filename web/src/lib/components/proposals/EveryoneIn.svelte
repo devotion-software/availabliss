@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Group, Proposal } from '#lib/types';
+	import type { Reply } from '#lib/client/proposals';
 	import { useFormat } from '#lib/client/format';
 	import { getEventCached } from '#lib/client/events';
 	import Logo from '#lib/components/ui/Logo.svelte';
@@ -10,11 +11,11 @@
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import { memberMap, memberLabel } from '#lib/client/members';
-	import { everyoneIn, listNames } from './responses';
+	import { everyoneIn, knownResponse, listNames } from './responses';
 
 	/**
 	 * The confirmed state: "Everyone's in." (or "It's on." when confirmed before everyone accepted)
-	 * with Add to calendar, who's coming, who can't or never replied; Go to chat in the top corner.
+	 * with Add to calendar, who's coming, who's a maybe, who can't or never replied; Go to chat in the top corner.
 	 */
 	interface Props {
 		proposal: Proposal;
@@ -22,7 +23,7 @@
 		/** The signed-in user's id, to mark "(you)". */
 		me: string;
 		/** Change your own reply once confirmed. */
-		onrespond: (response: 'accepted' | 'declined') => Promise<unknown>;
+		onrespond: (response: Reply) => Promise<unknown>;
 		/** "Keep the plan" after someone dropped out (proposer or admin). */
 		onkeep: () => Promise<unknown>;
 		/** "Cancel and find another date" (proposer or admin). */
@@ -39,9 +40,10 @@
 		...group.members.filter((m) => m.userId === proposal.createdBy),
 		...group.members.filter((m) => m.userId !== proposal.createdBy)
 	]);
-	const replies = $derived(new Map(proposal.responses.map((r) => [r.userId, r.response])));
+	const replies = $derived(new Map(proposal.responses.map((r) => [r.userId, knownResponse(r.response)])));
 	const coming = $derived(ordered.filter((m) => replies.get(m.userId) === 'accepted'));
-	// Confirmed anyway without them: said they can't make it, or never replied.
+	// Confirmed anyway without a firm yes from them: a maybe, said they can't make it, or never replied.
+	const maybe = $derived(ordered.filter((m) => replies.get(m.userId) === 'maybe'));
 	const cantMakeIt = $derived(ordered.filter((m) => replies.get(m.userId) === 'declined'));
 	const notReplied = $derived(ordered.filter((m) => replies.get(m.userId) === 'pending'));
 	// Replies are only asked of the members at the time, so anyone without one joined the group afterwards.
@@ -70,7 +72,7 @@
 	// Your own reply, changeable once confirmed (only if you were asked: not if you joined since).
 	const mine = $derived(replies.get(me));
 	let replyOpen = $state(false);
-	let busy = $state<'keep' | 'cancel' | 'accepted' | 'declined' | null>(null);
+	let busy = $state<'keep' | 'cancel' | Reply | null>(null);
 	async function run(kind: NonNullable<typeof busy>, action: () => Promise<unknown>) {
 		busy = kind;
 		try {
@@ -156,7 +158,13 @@
 		{/if}
 		{#if mine}
 			<button type="button" class="change" disabled={busy !== null} onclick={() => (replyOpen = true)}>
-				{mine === 'accepted' ? 'Can’t make it any more?' : mine === 'declined' ? 'Can make it after all?' : 'Can you make it?'}
+				{mine === 'accepted'
+					? 'Can’t make it any more?'
+					: mine === 'maybe'
+						? 'Know whether you can make it?'
+						: mine === 'declined'
+							? 'Can make it after all?'
+							: 'Can you make it?'}
 			</button>
 		{/if}
 	</div>
@@ -175,16 +183,18 @@
 			{/each}
 		</section>
 	{/if}
-	{#each [{ id: 'cant', title: 'Can’t make it', people: cantMakeIt }, { id: 'pending', title: 'Not replied', people: notReplied }] as list (list.id)}
+	{#each [{ id: 'maybe', title: 'Maybe', people: maybe }, { id: 'cant', title: 'Can’t make it', people: cantMakeIt }, { id: 'pending', title: 'Not replied', people: notReplied }] as list (list.id)}
 		{#if list.people.length}
-			<section class="people glass quiet" aria-labelledby="{list.id}-heading">
+			<!-- Maybes are a soft yes, so they aren't dimmed like those who can't come or never replied. -->
+			<section class="people glass" class:quiet={list.id !== 'maybe'} aria-labelledby="{list.id}-heading">
 				<h2 class="people-head" id="{list.id}-heading"><span>{list.title}</span><span>{list.people.length}</span></h2>
 				{#each list.people as m (m.userId)}
 					<div class="person">
 						<Avatar name={m.name} id={m.userId} image={m.image} size={28} />
 						<div class="who">
 							<span class="name">{memberLabel(members, m.userId, me)}</span>
-							{#if proposal.responses.some((r) => r.userId === m.userId && r.droppedOut)}<span class="why">Can’t make it any more</span>{/if}
+							{#if list.id === 'maybe'}<span class="why">Can make it if they must</span>
+							{:else if proposal.responses.some((r) => r.userId === m.userId && r.droppedOut)}<span class="why">Can’t make it any more</span>{/if}
 						</div>
 					</div>
 				{/each}
@@ -229,7 +239,7 @@
 	bind:open={replyOpen}
 	title={mine === 'accepted' ? 'Can’t make it any more?' : 'Can you make it?'}
 	description={mine === 'accepted'
-		? 'The plan stays on. Whoever proposed it and the admins will be told, so they can keep it or find another date.'
+		? 'The plan stays on. If you can’t make it, whoever proposed it and the admins will be told, so they can keep it or find another date.'
 		: 'Let everyone know whether you’re coming.'}
 	width={420}
 >
@@ -237,6 +247,11 @@
 		{#if mine !== 'accepted'}
 			<Button variant="solid" icon="check" block loading={busy === 'accepted'} disabled={busy !== null} onclick={() => run('accepted', () => onrespond('accepted'))}
 				>I can make it</Button
+			>
+		{/if}
+		{#if mine !== 'maybe'}
+			<Button variant="secondary" block loading={busy === 'maybe'} disabled={busy !== null} onclick={() => run('maybe', () => onrespond('maybe'))}
+				>Maybe, if I must</Button
 			>
 		{/if}
 		{#if mine !== 'declined'}

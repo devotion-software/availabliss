@@ -14,7 +14,9 @@ export const listProposals = (groupId: string, status?: Proposal['status'], fetc
 	api.get<{ proposals: Proposal[] }>(`/groups/${groupId}/proposals`, { fetch, query: { status } }).then((r) => r.proposals);
 export const getProposal = (id: string, fetch?: Fetch) => api.get<Proposal>(`/proposals/${id}`, { fetch });
 export const createProposal = (groupId: string, body: ProposalInput) => api.post<Proposal>(`/groups/${groupId}/proposals`, body);
-export const respondToProposal = (id: string, response: 'accepted' | 'declined') =>
+/** Your own reply: a firm yes, a maybe (a soft yes) or can't make it. */
+export type Reply = Exclude<ResponseKind, 'pending'>;
+export const respondToProposal = (id: string, response: Reply) =>
 	api.post<Proposal>(`/proposals/${id}/respond`, { response });
 export const overrideResponse = (id: string, userId: string, response: ResponseKind) =>
 	api.post<Proposal>(`/proposals/${id}/override`, { userId, response });

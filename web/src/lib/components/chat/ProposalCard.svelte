@@ -5,7 +5,7 @@
 	import { useFormat, monthShort } from '#lib/client/format';
 	import { memberLabel } from '#lib/client/members';
 	import { clashShort } from '#lib/components/proposals/clash';
-	import { confirmedStatus } from '#lib/components/proposals/responses';
+	import { acceptedText, confirmedStatus } from '#lib/components/proposals/responses';
 
 	/** A proposal posted in the chat: date block, who proposed, how many accepted, link to reply. */
 	interface Props {
@@ -41,7 +41,6 @@
 	});
 
 	const startKey = $derived(proposal ? fmt.current.dayKey(proposal.start) : null);
-	const accepted = $derived(proposal?.responses.filter((r) => r.response === 'accepted').length ?? 0);
 	const total = $derived(proposal?.responses.length || members.size);
 	const myResponse = $derived(proposal?.responses.find((r) => r.userId === meId)?.response ?? 'pending');
 	const clash = $derived(proposal?.status === 'open' ? clashShort(proposal.busyMemberIds ?? [], members) : null);
@@ -49,7 +48,7 @@
 		if (!proposal) return { text: '', tone: 'muted' };
 		if (proposal.status === 'confirmed') return { text: confirmedStatus(proposal), tone: 'ok' };
 		if (proposal.status === 'cancelled') return { text: 'Withdrawn', tone: 'muted' };
-		return { text: `${accepted} of ${total} accepted`, tone: 'ok' };
+		return { text: acceptedText(proposal, total), tone: 'ok' };
 	});
 </script>
 

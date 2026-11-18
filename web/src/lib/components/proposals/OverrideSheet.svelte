@@ -14,6 +14,7 @@
 
 	const OPTIONS: { value: ResponseKind; label: string; sub: string }[] = [
 		{ value: 'accepted', label: 'Accepted', sub: 'They can make it' },
+		{ value: 'maybe', label: 'Maybe', sub: 'They can make it if they must' },
 		{ value: 'declined', label: "Can't make it", sub: 'They told you they can’t' },
 		{ value: 'pending', label: 'Waiting', sub: 'Clear their reply' }
 	];

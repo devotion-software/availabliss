@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
 	import type { Member, Proposal, ResponseKind } from '#lib/types';
-	import { cancelProposal, confirmProposal, getProposal, keepPlan, overrideResponse, respondToProposal } from '#lib/client/proposals';
+	import { cancelProposal, confirmProposal, getProposal, keepPlan, overrideResponse, respondToProposal, type Reply } from '#lib/client/proposals';
 	import { live, proposalOf } from '#lib/client/live.svelte';
 	import { useFormat } from '#lib/client/format';
 	import { isAdminRole, memberMap, memberLabel } from '#lib/client/members';
@@ -16,7 +16,7 @@
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import OverrideSheet from '#lib/components/proposals/OverrideSheet.svelte';
 	import EveryoneIn from '#lib/components/proposals/EveryoneIn.svelte';
-	import { RESPONSE_PILL, acceptedCount, askedCount, listNames, myResponse } from '#lib/components/proposals/responses';
+	import { RESPONSE_PILL, acceptedCount, askedCount, knownResponse, listNames, maybeCount, myResponse } from '#lib/components/proposals/responses';
 	import { clashText } from '#lib/components/proposals/clash';
 
 	let { data } = $props();
@@ -32,6 +32,8 @@
 	const members = $derived(memberMap(group));
 	const admin = $derived(isAdminRole(group.role));
 	const yes = $derived(acceptedCount(proposal));
+	// Maybes are shown beside the yeses but don't fill the ring: only firm yeses confirm it.
+	const maybes = $derived(maybeCount(proposal));
 	const total = $derived(askedCount(proposal, group));
 	const mine = $derived(myResponse(proposal, me));
 	const canWithdraw = $derived(proposal.status === 'open' && (proposal.createdBy === me || admin));
@@ -46,7 +48,7 @@
 	const rows = $derived(
 		group.members.map((m) => {
 			const r = proposal.responses.find((x) => x.userId === m.userId);
-			return { member: m, response: (r?.response ?? 'pending') as ResponseKind, setBy: r?.setBy ?? null };
+			return { member: m, response: knownResponse(r?.response), setBy: r?.setBy ?? null };
 		})
 	);
 
@@ -56,7 +58,9 @@
 		if (!m.synced) return 'Not synced yet';
 		if (response === 'pending' && busyIds.includes(m.userId)) return 'Busy then · hasn’t replied';
 		if (response === 'accepted' && busyIds.includes(m.userId)) return 'Busy then, but in';
+		if (response === 'maybe' && busyIds.includes(m.userId)) return 'Busy then · maybe';
 		if (response === 'pending') return 'Hasn’t replied';
+		if (response === 'maybe') return 'Can make it if they must';
 		if (response === 'declined') return 'Can’t make it';
 		if (m.role === 'owner') return 'Owner';
 		if (m.role === 'admin') return 'Admin';
@@ -86,12 +90,14 @@
 		};
 	});
 
-	let busy = $state<'accepted' | 'declined' | null>(null);
-	async function respond(response: 'accepted' | 'declined') {
+	const REPLIED: Record<Reply, string> = { accepted: "You're in", maybe: 'Marked as maybe', declined: 'Thanks for letting everyone know' };
+
+	let busy = $state<Reply | null>(null);
+	async function respond(response: Reply) {
 		busy = response;
 		try {
 			const next = await apply(() => respondToProposal(proposal.id, response));
-			if (next.status !== 'confirmed') toasts.success(response === 'accepted' ? "You're in" : 'Thanks for letting everyone know');
+			if (next.status !== 'confirmed') toasts.success(REPLIED[response]);
 			invalidate('app:groups');
 		} catch (err) {
 			toasts.error(err);
@@ -117,18 +123,21 @@
 	}
 
 	let confirmOpen = $state(false);
-	// "Priya can't make it and Tom hasn't replied. Everyone will be told it's on, with 2 of 4 coming."
+	// "Priya can't make it, Jo's a maybe and Tom hasn't replied. Everyone will be told it's on, with 2 of 5 coming and 1 maybe."
 	const confirmMessage = $derived.by(() => {
 		const name = (id: string) => (id === me ? 'You' : memberLabel(members, id, me, { first: true }));
 		const of = (kind: ResponseKind) => rows.filter((r) => r.response === kind && proposal.responses.some((x) => x.userId === r.member.userId));
 		const declined = of('declined').map((r) => name(r.member.userId));
+		const maybe = of('maybe').map((r) => name(r.member.userId));
 		const pending = of('pending').map((r) => name(r.member.userId));
 		const parts = [
 			declined.length ? `${listNames(declined)} can’t make it` : '',
+			maybe.length === 1 ? `${maybe[0] === 'You' ? 'you’re' : `${maybe[0]}’s`} a maybe` : maybe.length ? `${listNames(maybe)} are maybes` : '',
 			pending.length ? `${listNames(pending)} ${pending.length === 1 ? 'hasn’t' : 'haven’t'} replied` : ''
 		].filter(Boolean);
-		const who = parts.length ? `${parts.join(' and ')}. ` : '';
-		return `${who}Everyone will be told it’s on, with ${yes} of ${total} coming.`;
+		const sentence = listNames(parts);
+		const who = sentence ? `${sentence[0].toUpperCase()}${sentence.slice(1)}. ` : '';
+		return `${who}Everyone will be told it’s on, with ${yes} of ${total} coming${maybes ? ` and ${maybes} maybe` : ''}.`;
 	});
 	async function confirmAnyway() {
 		try {
@@ -141,10 +150,10 @@
 	}
 
 	// Once confirmed: change your reply, or (proposer or admin) keep or cancel the plan after someone dropped out.
-	async function changeReply(response: 'accepted' | 'declined') {
+	async function changeReply(response: Reply) {
 		try {
 			await apply(() => respondToProposal(proposal.id, response));
-			toasts.success(response === 'accepted' ? "You're in" : 'Thanks for letting everyone know');
+			toasts.success(REPLIED[response]);
 			invalidate('app:groups');
 		} catch (err) {
 			toasts.error(err);
@@ -229,9 +238,17 @@
 							{#if proposal.title}<span class="sub">{fmt.current.when(proposal.start, proposal.end, proposal.allDay)}</span>{/if}
 							{#if sub}<span class="sub">{sub}</span>{/if}
 						</div>
-						<SyncRing value={yes} total={total} size={76} stroke={7} tone="ok" label="{yes} of {total} accepted">
+						<SyncRing
+							value={yes}
+							total={total}
+							size={76}
+							stroke={7}
+							tone="ok"
+							label="{yes} of {total} accepted{maybes ? `, ${maybes} maybe` : ''}"
+						>
 							<span class="ring-num">{yes}/{total}</span>
 							<span class="ring-label">accepted</span>
+							{#if maybes}<span class="ring-label">+{maybes} maybe</span>{/if}
 						</SyncRing>
 					</section>
 
@@ -294,7 +311,9 @@
 				<span id="reply-q" class="q">
 					{mine === 'accepted'
 						? "You're in. Changed your mind?"
-						: mine === 'declined'
+						: mine === 'maybe'
+							? "You're a maybe. Know for sure?"
+							: mine === 'declined'
 							? "You said you can't make it"
 							: iAmBusy
 								? "You're busy then. Can you still make it?"
@@ -307,6 +326,14 @@
 						disabled={busy !== null || mine === 'declined'}
 						aria-pressed={mine === 'declined'}
 						onclick={() => respond('declined')}>Can't make it</Button
+					>
+					<Button
+						variant="secondary"
+						icon={mine === 'maybe' ? 'check' : undefined}
+						loading={busy === 'maybe'}
+						disabled={busy !== null || mine === 'maybe'}
+						aria-pressed={mine === 'maybe'}
+						onclick={() => respond('maybe')}>Maybe</Button
 					>
 					<Button
 						variant="solid"
@@ -479,6 +506,12 @@
 		gap: 10px;
 		z-index: 5;
 	}
+	/* Above the main tab bar on phones (as the timing page's save bar), once the page scrolls. */
+	@media (max-width: 899px) {
+		.reply {
+			bottom: calc(var(--tabbar-space) - 8px + env(safe-area-inset-bottom));
+		}
+	}
 	.q {
 		font-size: 13px;
 		font-weight: 600;
@@ -486,8 +519,18 @@
 	}
 	.buttons {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 8px;
+	}
+	/* Phones: three across truncates, so Accept takes its own row above Can't make it and Maybe. */
+	@media (max-width: 520px) {
+		.buttons {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.buttons > :global(:last-child) {
+			grid-column: 1 / -1;
+			order: -1;
+		}
 	}
 	.clash {
 		display: flex;
