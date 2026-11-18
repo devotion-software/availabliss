@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -383,6 +384,8 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             GlassIconButton(AvIcons.Back, "Back", actions.onBack)
+            Spacer(Modifier.weight(1f))
+            if (state.groupId.isNotEmpty()) GlassIconButton(AvIcons.Chat, "Go to chat", { actions.onOpenChat(state.groupId) })
         }
         ReviewPrompt(state, actions)
         GlassPanel(
@@ -448,8 +451,18 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
                     )
                 }
             }
+            // The first card, above Who's coming: Add to calendar (or which calendar it's in), and changing your reply.
+            GlassPanel(
+                Modifier.fillMaxWidth().padding(top = 6.dp),
+                shape = Shapes.panel,
+                contentPadding = PaddingValues(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AddToCalendarButton(state.calendarStatus, onClick = actions.onAddToCalendar)
+                if (state.canChangeReply) ChangeReply(state, actions.onRespond)
+            }
             if (state.coming.isNotEmpty()) {
-                PeoplePanel("Who's coming", state.coming.size.toString(), state.coming, Modifier.padding(top = 6.dp))
+                PeoplePanel("Who's coming", state.coming.size.toString(), state.coming)
             }
             if (state.cantMakeIt.isNotEmpty()) {
                 PeoplePanel("Can't make it", state.cantMakeIt.size.toString(), state.cantMakeIt, quiet = true)
@@ -460,22 +473,6 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
             if (state.joinedLater.isNotEmpty()) {
                 PeoplePanel("Joined since", null, state.joinedLater, quiet = true)
             }
-        }
-        GlassPanel(
-            Modifier.fillMaxWidth(),
-            shape = Shapes.cardLarge,
-            contentPadding = PaddingValues(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            AddToCalendarButton(state.calendarStatus, onClick = actions.onAddToCalendar)
-            SecondaryButton(
-                text = "Go to chat",
-                onClick = { actions.onOpenChat(state.groupId) },
-                icon = AvIcons.Chat,
-                enabled = state.groupId.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (state.canChangeReply) ChangeReply(state, actions.onRespond)
         }
     }
 }

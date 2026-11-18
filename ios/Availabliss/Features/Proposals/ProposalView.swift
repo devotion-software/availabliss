@@ -243,7 +243,7 @@ struct ResponsePill: View {
 }
 
 /// "Everyone's in." (or "It's on." when confirmed before everyone accepted) — the confirmed state:
-/// when, who's coming, who can't or never replied, Add to calendar and Go to chat.
+/// when, Add to calendar, who's coming, who can't or never replied; Go to chat in the top corner.
 private struct ConfirmedView: View {
     let model: ProposalViewModel
     let group: Group
@@ -263,6 +263,7 @@ private struct ConfirmedView: View {
                 HStack {
                     IconButton(systemImage: "chevron.left", label: "Back") { app.router.pop() }
                     Spacer()
+                    IconButton(systemImage: "bubble.left", label: "Go to chat", action: openChat)
                 }
                 .padding(.horizontal, 6)
                 if model.needsReview(me: me) {
@@ -279,8 +280,9 @@ private struct ConfirmedView: View {
                         .accessibilityAddTraits(.isHeader)
                     when
                         .padding(.horizontal, 10)
-                    people
+                    calendarCard
                         .padding(.top, 6)
+                    people
                 }
                 .padding(.top, 12)
             }
@@ -289,7 +291,6 @@ private struct ConfirmedView: View {
             .padding(.bottom, 20)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .safeAreaInset(edge: .bottom) { actions }
         .onAppear {
             withAnimation(.spring(response: 0.7, dampingFraction: 0.6).delay(0.1)) { bloom = true }
         }
@@ -470,18 +471,15 @@ private struct ConfirmedView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// The first card, above Who's coming: Add to calendar (or which calendar it's in), and changing your reply.
     @ViewBuilder
-    private var actions: some View {
+    private var calendarCard: some View {
         VStack(spacing: 10) {
             if let event = model.event {
                 AddToCalendarButton(event: event)
             } else {
                 ProgressView().frame(height: 54)
             }
-            Button(action: openChat) {
-                Label("Go to chat", systemImage: "bubble.left")
-            }
-            .buttonStyle(.secondary)
             if let changeReplyLabel {
                 Button(changeReplyLabel) { changingReply = true }
                     .bodyFont(14, .semibold, relativeTo: .subheadline)
@@ -491,9 +489,8 @@ private struct ConfirmedView: View {
             }
         }
         .padding(14)
-        .glass(cornerRadius: 28)
-        .padding(.horizontal, 14)
-        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity)
+        .glass(cornerRadius: 22)
     }
 
     /// Opens the group's chat; back from it returns here. Opened from that chat, it just goes back.

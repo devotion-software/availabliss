@@ -8,12 +8,13 @@
 	import Button from '#lib/components/ui/Button.svelte';
 	import Sheet from '#lib/components/ui/Sheet.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
+	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import { memberMap, memberLabel } from '#lib/client/members';
 	import { everyoneIn, listNames } from './responses';
 
 	/**
 	 * The confirmed state: "Everyone's in." (or "It's on." when confirmed before everyone accepted)
-	 * with who's coming, who can't or never replied, Add to calendar and Go to chat.
+	 * with Add to calendar, who's coming, who can't or never replied; Go to chat in the top corner.
 	 */
 	interface Props {
 		proposal: Proposal;
@@ -101,6 +102,10 @@
 </script>
 
 <div class="confirmed">
+	<div class="top">
+		<IconButton href="/app/groups/{group.id}" icon="chevron-left" label="Back to {group.name}" />
+		<IconButton href="/app/groups/{group.id}/chat" icon="chat" label="Go to chat" />
+	</div>
 	{#if needsReview}
 		<div class="review">
 			<div class="dropped" role="status">
@@ -130,6 +135,30 @@
 			{#if proposal.location}<span class="place">in {proposal.location}</span>{/if}
 		</p>
 		{#if proposal.title}<p class="title">{proposal.title}</p>{/if}
+	</div>
+
+	<!-- The first card, above Who's coming: Add to calendar, and changing your reply. -->
+	<div class="card glass">
+		{#if cover}<img class="cover" src={cover} alt="" onerror={() => (cover = null)} />{/if}
+		{#if proposal.eventId}
+			<AddToCalendar
+				eventId={proposal.eventId}
+				size="lg"
+				item={{
+					title: proposal.title ?? group.name,
+					start: proposal.start,
+					end: proposal.end,
+					allDay: proposal.allDay,
+					location: proposal.location,
+					note: proposal.note
+				}}
+			/>
+		{/if}
+		{#if mine}
+			<button type="button" class="change" disabled={busy !== null} onclick={() => (replyOpen = true)}>
+				{mine === 'accepted' ? 'Can’t make it any more?' : mine === 'declined' ? 'Can make it after all?' : 'Can you make it?'}
+			</button>
+		{/if}
 	</div>
 
 	{#if coming.length}
@@ -177,30 +206,6 @@
 		</section>
 	{/if}
 
-	<div class="card glass">
-		{#if cover}<img class="cover" src={cover} alt="" onerror={() => (cover = null)} />{/if}
-		{#if proposal.eventId}
-			<AddToCalendar
-				eventId={proposal.eventId}
-				size="lg"
-				item={{
-					title: proposal.title ?? group.name,
-					start: proposal.start,
-					end: proposal.end,
-					allDay: proposal.allDay,
-					location: proposal.location,
-					note: proposal.note
-				}}
-			/>
-		{/if}
-		<Button variant="secondary" size="lg" icon="chat" block href="/app/groups/{group.id}/chat">Go to chat</Button>
-		{#if mine}
-			<button type="button" class="change" disabled={busy !== null} onclick={() => (replyOpen = true)}>
-				{mine === 'accepted' ? 'Can’t make it any more?' : mine === 'declined' ? 'Can make it after all?' : 'Can you make it?'}
-			</button>
-		{/if}
-		<a class="back" href="/app/groups/{group.id}">Back to {group.name}</a>
-	</div>
 </div>
 
 <Sheet
@@ -394,7 +399,7 @@
 		min-height: 48px;
 		opacity: 0.65;
 	}
-	.who {
+	.person .who {
 		flex: 1;
 		min-width: 0;
 		display: flex;
@@ -426,13 +431,10 @@
 		border-radius: 18px;
 		margin-bottom: 8px;
 	}
-	.back {
-		align-self: center;
-		min-height: 40px;
+	.top {
 		display: flex;
+		justify-content: space-between;
 		align-items: center;
-		font-size: 13px;
-		font-weight: 600;
 	}
 	@keyframes drop {
 		from {
