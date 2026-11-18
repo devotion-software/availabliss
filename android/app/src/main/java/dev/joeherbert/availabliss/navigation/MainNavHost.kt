@@ -115,6 +115,8 @@ fun MainNavHost(root: RootViewModel) {
                 HomeScreen(
                     onOpenGroup = { nav.navigate(GroupRoute(it)) },
                     onOpenGroupChat = { nav.openGroupSection(it, GroupChatRoute(it)) },
+                    onOpenProposal = { nav.navigate(ProposalRoute(it)) },
+                    onOpenGroupPlans = { nav.openGroupSection(it, GroupPlansRoute(it)) },
                     onNewGroup = { nav.navigate(NewGroupRoute) },
                     onOpenProfile = { nav.switchTab(YouRoute) },
                 )

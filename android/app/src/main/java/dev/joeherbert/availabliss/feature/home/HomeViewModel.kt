@@ -57,6 +57,9 @@ data class GroupTileUi(
 /** The "Up next" card. */
 data class UpNextUi(
     val key: String,
+    val groupId: String,
+    /** The confirmed proposal it came from; null for an event added directly. */
+    val proposalId: String?,
     val groupName: String,
     val title: String,
     val whenLabel: String,
@@ -173,6 +176,8 @@ class HomeViewModel @Inject constructor(
         val going = summary?.memberCount?.let { "$it going" }
         return UpNextUi(
             key = event.id,
+            groupId = event.groupId,
+            proposalId = event.proposalId,
             groupName = event.groupName ?: summary?.name.orEmpty(),
             title = event.title,
             whenLabel = DateTimes.dayAndTime(event.start, event.allDay),

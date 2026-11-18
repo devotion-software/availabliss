@@ -74,6 +74,8 @@ import dev.joeherbert.availabliss.feature.common.CalendarStatus
 fun HomeScreen(
     onOpenGroup: (String) -> Unit,
     onOpenGroupChat: (String) -> Unit,
+    onOpenProposal: (String) -> Unit,
+    onOpenGroupPlans: (String) -> Unit,
     onNewGroup: () -> Unit,
     onOpenProfile: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -86,6 +88,8 @@ fun HomeScreen(
         state = state,
         onOpenGroup = onOpenGroup,
         onOpenGroupChat = onOpenGroupChat,
+        // A confirmed plan opens its proposal; an event added directly opens the group's plans.
+        onOpenUpNext = { upNext -> upNext.proposalId?.let(onOpenProposal) ?: onOpenGroupPlans(upNext.groupId) },
         onNewGroup = onNewGroup,
         onOpenProfile = onOpenProfile,
         onAddToCalendar = viewModel::addUpNextToCalendar,
@@ -99,6 +103,7 @@ fun HomeContent(
     state: HomeUiState,
     onOpenGroup: (String) -> Unit,
     onOpenGroupChat: (String) -> Unit,
+    onOpenUpNext: (UpNextUi) -> Unit,
     onNewGroup: () -> Unit,
     onOpenProfile: () -> Unit,
     onAddToCalendar: () -> Unit,
@@ -117,7 +122,7 @@ fun HomeContent(
         ) {
             item(key = "header") { Header(state, onOpenProfile) }
             state.upNext?.let { upNext ->
-                item(key = "upnext") { UpNextCard(upNext, onAddToCalendar) }
+                item(key = "upnext") { UpNextCard(upNext, onOpen = { onOpenUpNext(upNext) }, onAddToCalendar = onAddToCalendar) }
             }
             state.error?.let { error -> item(key = "error") { ErrorBanner(error, onRetry = onRetry) } }
             item(key = "groups-title") {
@@ -186,10 +191,16 @@ private fun Header(state: HomeUiState, onOpenProfile: () -> Unit) {
 }
 
 @Composable
-private fun UpNextCard(upNext: UpNextUi, onAddToCalendar: () -> Unit) {
+private fun UpNextCard(upNext: UpNextUi, onOpen: () -> Unit, onAddToCalendar: () -> Unit) {
     val colors = AvailablissTheme.colors
+    // The whole card opens the plan; Add to calendar and Change inside it keep their own taps.
     Column(
-        Modifier.fillMaxWidth().glass(Shapes.cardLarge).padding(18.dp).semantics(mergeDescendants = false) { contentDescription = "Up next" },
+        Modifier
+            .fillMaxWidth()
+            .glass(Shapes.cardLarge)
+            .clickable(role = Role.Button, onClickLabel = "Open plan", onClick = onOpen)
+            .padding(18.dp)
+            .semantics(mergeDescendants = false) { contentDescription = "Up next" },
         verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
         upNext.image?.let { CoverPhoto(it) }
@@ -299,13 +310,13 @@ private fun HomePreview() {
                 dateLabel = "Sunday 1 November",
                 greeting = "Hi, Sam",
                 profileInitial = "S",
-                upNext = UpNextUi("e1", "Book club", "Book club", "Wed 11 Nov · 18:30", "At Hana's · 8 going", calendar = CalendarStatus()),
+                upNext = UpNextUi("e1", "g1", "p1", "Book club", "Book club", "Wed 11 Nov · 18:30", "At Hana's · 8 going", calendar = CalendarStatus()),
                 groups = listOf(
                     GroupTileUi("1", "Lake District crew", "LD", TileColor.T1, "2 weekends work", PillTone.Indigo, "A weekend · Fri 6pm → Sun · Nov–Jan", people, 4 / 6f, "2 of 6 to sync", 3),
                     GroupTileUi("2", "Mum's 60th", "60", TileColor.T4, "Needs your reply", PillTone.Apricot, "One day · school holidays only", people, 1f, "All synced", 0),
                 ),
             ),
-            onOpenGroup = {}, onOpenGroupChat = {}, onNewGroup = {}, onOpenProfile = {}, onAddToCalendar = {}, onRetry = {},
+            onOpenGroup = {}, onOpenGroupChat = {}, onOpenUpNext = {}, onNewGroup = {}, onOpenProfile = {}, onAddToCalendar = {}, onRetry = {},
         )
     }
 }
