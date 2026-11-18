@@ -200,6 +200,20 @@ describe('responding', () => {
 		expect((await respond(p.id, g.admin, 'accepted')).status).toBe('confirmed');
 	});
 
+	test('plans past 2038 save (DATETIME, not TIMESTAMP): proposal, event and busy block', async () => {
+		const g = await setup();
+		const far = { start: '2040-06-01T18:00:00.000Z', end: '2040-06-01T21:00:00.000Z', allDay: false, title: 'Far off', location: null, note: null };
+		const p = await createProposal(g.groupId, g.owner, far);
+		expect((await getProposal(p.id, g.owner)).start).toBe(far.start);
+		await respond(p.id, g.admin, 'accepted');
+		const confirmed = await respond(p.id, g.member, 'accepted');
+		expect(confirmed.status).toBe('confirmed');
+		const [event] = await db.select().from(events).where(eq(events.proposalId, p.id));
+		expect(event.start.toISOString()).toBe(far.start);
+		const block = await createBlock(g.member, { start: far.start, end: far.end, allDay: false, repeat: 'none', until: null, note: null });
+		expect(block.start).toBe(far.start);
+	});
+
 	test('outsiders cannot respond', async () => {
 		const g = await setup();
 		const p = await createProposal(g.groupId, g.owner, slot(9));
