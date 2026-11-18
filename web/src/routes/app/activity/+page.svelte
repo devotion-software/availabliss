@@ -6,6 +6,7 @@
 	import { notificationHref } from '#lib/client/notifications';
 	import { useFormat } from '#lib/client/format';
 	import Icon, { type IconName } from '#lib/components/ui/Icon.svelte';
+	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
 
@@ -42,7 +43,11 @@
 <svelte:head><title>Activity · Availabliss</title></svelte:head>
 
 <div class="activity">
-	<PageHeader title="Activity" subtitle="Chats, proposals and nudges from your groups" backHref="/app" backLabel="Back to groups" backOnPhoneOnly />
+	<PageHeader title="Activity" subtitle="Chats, proposals and nudges from your groups" backHref="/app" backLabel="Back to groups" backOnPhoneOnly>
+		{#snippet actions()}
+			<IconButton href="/app/plans" icon="calendar" label="My plans" />
+		{/snippet}
+	</PageHeader>
 
 	{#if items.length}
 		<ul class="list glass" aria-live="polite">
