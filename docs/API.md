@@ -151,6 +151,8 @@ interface Requirement {
   range: DateRange;                            // search window
   dates: DateRange[];                          // if non-empty, ONLY these date ranges are considered (repeats of an identical range are dropped on save)
   timezone: string;                            // IANA zone the times above are in
+  quorum?: number | null;                      // "most of us are free": a time works when at least this many required members are free (null/absent = everyone)
+  optionalMemberIds?: string[];                // members who never stop a time from working
 }
 
 interface DateRange { from: string; to: string } // inclusive YYYY-MM-DD
@@ -203,7 +205,11 @@ A new proposal or event in an archived group with `autoArchive` on unarchives it
 | Tue → following Thu | as above with `"weeksLater": 1` |
 | A week | `{ "type": "days", "count": 7 }` |
 
-A slot "works" when every **synced** member is free for the whole slot. Members who
+A slot "works" when every **synced** member is free for the whole slot. With a `quorum` (or optional members),
+it works when at least `quorum` of the synced, non-optional members are free; such slots carry
+`missingMemberIds` (everyone synced who's busy then, optional members included; `[]` when nobody is),
+`match` days matched only by those get `partial: true`, and the day view adds `mostFree` stretches.
+Rank slots with fewer missing members first. Without either field, nothing changes. Members who
 haven't synced are ignored and reported in `pendingMemberIds`. A member counts as
 synced once they have connected any calendar or marked any busy time by hand.
 

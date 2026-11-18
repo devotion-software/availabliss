@@ -225,3 +225,48 @@ describe('time and labels', () => {
 		);
 	});
 });
+
+describe('most of us are free (quorum and optional members)', () => {
+	test('a quorum adds the weekends one person misses, marked partial with who’s missing', () => {
+		const result = computeAvailability(input({ requirement: { ...weekend, quorum: 2 } }));
+		expect(result.slots.map((s) => s.label)).toEqual([
+			'Fri 6 – Sun 8 Nov',
+			'Fri 13 – Sun 15 Nov',
+			'Fri 20 – Sun 22 Nov',
+			'Fri 27 – Sun 29 Nov'
+		]);
+		const byLabel = Object.fromEntries(result.slots.map((s) => [s.label, s.missingMemberIds]));
+		expect(byLabel['Fri 6 – Sun 8 Nov']).toEqual(['priya']);
+		expect(byLabel['Fri 20 – Sun 22 Nov']).toEqual(['tom']);
+		expect(byLabel['Fri 13 – Sun 15 Nov']).toEqual([]);
+		expect(dayOf(result, '2026-11-07')).toMatchObject({ status: 'match', partial: true });
+		expect(dayOf(result, '2026-11-14').partial).toBeUndefined();
+	});
+
+	test('an optional member never stops a time, but shows as missing', () => {
+		const result = computeAvailability(input({ requirement: { ...weekend, optionalMemberIds: ['tom'] } }));
+		const twentieth = result.slots.find((s) => s.label === 'Fri 20 – Sun 22 Nov');
+		expect(twentieth?.missingMemberIds).toEqual(['tom']);
+		expect(result.slots.some((s) => s.label === 'Fri 6 – Sun 8 Nov')).toBe(false);
+	});
+
+	test('no quorum and no optional members behaves exactly as before', () => {
+		const plain = computeAvailability(input());
+		const explicit = computeAvailability(input({ requirement: { ...weekend, quorum: null, optionalMemberIds: [] } }));
+		expect(explicit).toEqual(plain);
+	});
+
+	test('durations: stretches long enough where enough people are free', () => {
+		const evening: Requirement = { ...weekend, length: { type: 'duration', minutes: 120 }, window: { from: '18:00', to: '23:59' }, days: [], quorum: 2 };
+		const twoBusy: MemberBusy[] = [
+			{ userId: 'a', synced: true, busy: [busy('2026-11-10T18:00:00Z', '2026-11-10T20:00:00Z')] },
+			{ userId: 'b', synced: true, busy: [busy('2026-11-10T19:00:00Z', '2026-11-10T21:00:00Z')] },
+			{ userId: 'c', synced: true, busy: [] }
+		];
+		const day = computeAvailability(input({ requirement: evening, members: twoBusy, from: '2026-11-10', to: '2026-11-10' }));
+		// 19:00–20:00 has a and b busy (only c free), so the 2-of-3 stretches are 18:00–19:00 (too short) and 20:00–midnight.
+		expect(day.slots.map((s) => [s.start, s.end])).toEqual([['2026-11-10T20:00:00.000Z', '2026-11-11T00:00:00.000Z']]);
+		const detail = computeDay(input({ requirement: evening, members: twoBusy }), '2026-11-10');
+		expect(detail.mostFree?.map((i) => i.start)).toEqual(['2026-11-10T18:00:00.000Z', '2026-11-10T20:00:00.000Z']);
+	});
+});

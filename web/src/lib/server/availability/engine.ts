@@ -14,7 +14,7 @@ import type {
 	SlotPosition,
 	Weekday
 } from '#lib/types';
-import { clip, isFree, merge, overlaps, subtract, type Span } from './intervals';
+import { clip, freeForQuorum, isFree, merge, overlaps, subtract, type Span } from './intervals';
 import { addDays, eachDate, inRange, minutesOf, startOfDate, weekdayOf, zonedInstant } from './time';
 import { slotLabel } from './labels';
 
@@ -138,6 +138,30 @@ function workingSpans(c: Candidate, busy: Span[], now: number): Span[] {
 	return subtract(within, busy).filter((s) => s.end - s.start >= c.minLength!);
 }
 
+/**
+ * Like `workingSpans`, but a time works when at most `maxBusy` of the required members are busy
+ * ("most of us are free"). Fixed-length slots need that on every piece; durations need a long
+ * enough stretch where it holds.
+ */
+function quorumSpans(c: Candidate, busyLists: Span[][], maxBusy: number, now: number): Span[] {
+	if (c.minLength === null) {
+		if (c.start < now) return [];
+		const busyCount = busyLists.filter((list) => [...c.pieces.values()].some((p) => !isFree(p, list))).length;
+		return busyCount <= maxBusy ? [{ start: c.start, end: c.end }] : [];
+	}
+	const within = { start: Math.max(c.start, now), end: c.end };
+	if (within.end - within.start < c.minLength) return [];
+	return freeForQuorum(within, busyLists, maxBusy).filter((s) => s.end - s.start >= c.minLength!);
+}
+
+/** Who's needed (synced, not optional) and how many of them may be busy, from the requirement. */
+export function quorumOf(req: Requirement, synced: readonly MemberBusy[]): { required: MemberBusy[]; maxBusy: number; active: boolean } {
+	const optional = new Set(req.optionalMemberIds ?? []);
+	const required = synced.filter((m) => !optional.has(m.userId));
+	const need = req.quorum == null ? required.length : Math.min(Math.max(req.quorum, 1), required.length);
+	return { required, maxBusy: required.length - need, active: optional.size > 0 || need < required.length };
+}
+
 function positionFor(dates: string[], date: string): SlotPosition {
 	if (dates.length === 1) return 'single';
 	if (date === dates[0]) return 'start';
@@ -149,17 +173,30 @@ export function computeAvailability(input: EngineInput): Availability {
 	const synced = input.members.filter((m) => m.synced);
 	const everyoneBusy = merge(synced.flatMap((m) => m.busy));
 	const busyByMember = synced.map((m) => ({ userId: m.userId, busy: merge(m.busy) }));
+	const quorum = quorumOf(ctx.req, synced);
+	const requiredIds = new Set(quorum.required.map((m) => m.userId));
+	const requiredBusy = busyByMember.filter((m) => requiredIds.has(m.userId)).map((m) => m.busy);
 
 	const slots: Slot[] = [];
 	const covered = new Map<string, Span[]>(); // date → candidate pieces (any outcome)
 	const matched = new Map<string, SlotPosition>();
+	/** Dates matched only by times where someone's missing. */
+	const partialDates = new Set<string>();
+	const fullDates = new Set<string>();
 
 	for (const c of candidates(ctx, input.from, input.to)) {
 		const dates = [...c.pieces.keys()];
 		for (const [date, piece] of c.pieces) covered.set(date, [...(covered.get(date) ?? []), piece]);
 
-		for (const span of workingSpans(c, everyoneBusy, input.now)) {
-			slots.push({ start: new Date(span.start).toISOString(), end: new Date(span.end).toISOString(), label: slotLabel(span, ctx.req) });
+		const spans = quorum.active ? quorumSpans(c, requiredBusy, quorum.maxBusy, input.now) : workingSpans(c, everyoneBusy, input.now);
+		for (const span of spans) {
+			const slot: Slot = { start: new Date(span.start).toISOString(), end: new Date(span.end).toISOString(), label: slotLabel(span, ctx.req) };
+			if (quorum.active) {
+				// Everyone synced who's busy then, optional members included, so people see who'd miss it.
+				slot.missingMemberIds = busyByMember.filter((m) => !isFree(span, m.busy)).map((m) => m.userId);
+				for (const date of dates) (slot.missingMemberIds.length ? partialDates : fullDates).add(date);
+			}
+			slots.push(slot);
 			for (const date of dates) if (!matched.has(date)) matched.set(date, positionFor(dates, date));
 		}
 	}
@@ -175,7 +212,8 @@ export function computeAvailability(input: EngineInput): Availability {
 			.map((m) => m.userId);
 		const slotPosition = matched.get(date) ?? null;
 		const status = slotPosition ? 'match' : busyMemberIds.length ? 'busy' : 'free';
-		return { date, status, busyMemberIds, slotPosition, holiday };
+		const partial = status === 'match' && partialDates.has(date) && !fullDates.has(date);
+		return { date, status, busyMemberIds, slotPosition, holiday, ...(partial && { partial }) };
 	});
 
 	slots.sort((a, b) => a.start.localeCompare(b.start));
@@ -246,10 +284,14 @@ export function computeDay(input: EngineInput, date: string): DayAvailability {
 		busy: merge(m.busy.map((b) => clip(b, day)).filter((s): s is Span => s !== null)).map((s) => ({ ...toIso(s), manual: false }))
 	}));
 
-	const everyoneBusy = merge(input.members.filter((m) => m.synced).flatMap((m) => m.busy));
+	const synced = input.members.filter((m) => m.synced);
+	const everyoneBusy = merge(synced.flatMap((m) => m.busy));
 	const everyoneFree = window ? relevant.flatMap((p) => subtract(p, everyoneBusy)).map(toIso) : [];
-
-	return { date, window: window && toIso(window), members, everyoneFree };
+	const quorum = quorumOf(ctx.req, synced);
+	if (!quorum.active) return { date, window: window && toIso(window), members, everyoneFree };
+	const requiredBusy = quorum.required.map((m) => merge(m.busy));
+	const mostFree = window ? relevant.flatMap((p) => freeForQuorum(p, requiredBusy, quorum.maxBusy)).map(toIso) : [];
+	return { date, window: window && toIso(window), members, everyoneFree, mostFree };
 }
 
 const toIso = (s: Span) => ({ start: new Date(s.start).toISOString(), end: new Date(s.end).toISOString() });

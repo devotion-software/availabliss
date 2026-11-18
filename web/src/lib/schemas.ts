@@ -75,7 +75,9 @@ export const requirementSchema = z.object({
 	customSchoolHolidays: dateRangeList,
 	range: dateRangeSchema,
 	dates: dateRangeList,
-	timezone
+	timezone,
+	quorum: z.int().min(1).max(500).nullish(),
+	optionalMemberIds: z.array(z.string().min(1).max(36)).max(500).optional()
 });
 
 /** Typed with or without "@", in any case; stored lowercase. */

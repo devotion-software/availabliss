@@ -74,6 +74,13 @@ export interface Requirement {
 	range: DateRange;
 	dates: DateRange[];
 	timezone: string;
+	/**
+	 * "Most of us are free": a time works when at least this many of the required members (synced,
+	 * not optional) are free. Null or absent: everyone.
+	 */
+	quorum?: number | null;
+	/** Members who never stop a time from working (they're shown as missing when busy). */
+	optionalMemberIds?: string[];
 }
 
 export interface User {
@@ -219,6 +226,8 @@ export interface AvailabilityDay {
 	holiday: string | null;
 	/** Members whose preferences this day's time that works fits (only on `match` days). */
 	preferredBy?: string[];
+	/** A `match` day whose best time only meets the group's quorum (someone's missing). */
+	partial?: boolean;
 }
 
 export interface Slot {
@@ -231,6 +240,8 @@ export interface Slot {
 	score?: number;
 	/** Pro: people this time suits who've compromised in the group's recent plans. */
 	fairFor?: string[];
+	/** Synced members busy at this time (with a quorum or optional members); empty when everyone's free. */
+	missingMemberIds?: string[];
 }
 
 /** A member's preferred time for a group. A guideline: it never blocks a date. */
@@ -270,6 +281,8 @@ export interface DayAvailability {
 	window: Interval | null;
 	members: { userId: string; pending: boolean; busy: (Interval & { manual: boolean })[] }[];
 	everyoneFree: Interval[];
+	/** With a quorum or optional members: when enough of the group is free (includes everyoneFree). */
+	mostFree?: Interval[];
 }
 
 export interface ProposalResponse {

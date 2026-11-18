@@ -80,7 +80,13 @@ export function requirementSummary(req: Requirement): string {
 		const hours = l.minutes / 60;
 		what = `${Number.isInteger(hours) ? hours : hours.toFixed(1)} hour${hours === 1 ? '' : 's'} · ${daysLabel(req.days)}`;
 	}
-	const extras = [req.schoolHolidaysOnly && 'school holidays', req.dates.length > 0 && 'chosen dates'].filter(Boolean);
+	const optional = req.optionalMemberIds?.length ?? 0;
+	const extras = [
+		req.schoolHolidaysOnly && 'school holidays',
+		req.dates.length > 0 && 'chosen dates',
+		req.quorum != null && `${req.quorum}+ free`,
+		optional > 0 && `${optional} optional`
+	].filter(Boolean);
 	return [what, ...extras, monthSpan(req.range.from, req.range.to)].join(' · ');
 }
 

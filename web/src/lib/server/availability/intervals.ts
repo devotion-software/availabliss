@@ -37,6 +37,31 @@ export function isFree(span: Span, busy: readonly Span[]): boolean {
 	return !busy.some((b) => overlaps(b, span));
 }
 
+/**
+ * Parts of `within` where at most `maxBusy` of the people in `busyLists` (each merged) are busy:
+ * "enough of us are free". With maxBusy 0 it's the same as subtracting everyone's busy time.
+ */
+export function freeForQuorum(within: Span, busyLists: readonly (readonly Span[])[], maxBusy: number): Span[] {
+	const edges: { at: number; delta: number }[] = [];
+	for (const list of busyLists) {
+		for (const b of list) {
+			const c = clip(b, within);
+			if (c) edges.push({ at: c.start, delta: 1 }, { at: c.end, delta: -1 });
+		}
+	}
+	edges.sort((a, b) => a.at - b.at || a.delta - b.delta);
+	const out: Span[] = [];
+	let busy = 0;
+	let cursor = within.start;
+	for (const e of edges) {
+		if (e.at > cursor && busy <= maxBusy) out.push({ start: cursor, end: e.at });
+		busy += e.delta;
+		cursor = Math.max(cursor, e.at);
+	}
+	if (cursor < within.end && busy <= maxBusy) out.push({ start: cursor, end: within.end });
+	return merge(out);
+}
+
 export function clip(span: Span, to: Span): Span | null {
 	const start = Math.max(span.start, to.start);
 	const end = Math.min(span.end, to.end);
