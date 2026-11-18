@@ -138,6 +138,7 @@ fun CalendarSourcesContent(
             ConnectionSection(
                 connection = connection,
                 busy = connection.id in state.busyConnections,
+                syncing = connection.id in state.syncingConnections,
                 manage = manage,
                 actions = actions,
             )
@@ -189,6 +190,7 @@ private fun ConnectionSection(
     connection: CalendarConnection,
     busy: Boolean,
     manage: Boolean,
+    syncing: Boolean = false,
     actions: CalendarSourcesActions,
 ) {
     val colors = AvailablissTheme.colors
@@ -215,8 +217,12 @@ private fun ConnectionSection(
         if (manage) {
             RowDivider()
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                val synced = if (connection.status == ConnectionStatus.Ok) "Synced" else "Last synced"
                 Text(
-                    connection.lastSyncedAt?.let { "Synced ${DateTimes.relative(it)}" } ?: "Not synced yet",
+                    when {
+                        syncing -> "Syncing…"
+                        else -> connection.lastSyncedAt?.let { "$synced ${DateTimes.relative(it)}" } ?: "Not synced yet"
+                    },
                     style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
                     color = colors.muted,
                     modifier = Modifier.weight(1f),

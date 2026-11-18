@@ -17,6 +17,7 @@ import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.CalendarConnection
 import dev.joeherbert.availabliss.core.network.model.CalendarProvider
+import dev.joeherbert.availabliss.core.network.model.ConnectionStatus
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,6 +59,8 @@ data class CalendarSourcesUiState(
     val syncingDevice: Boolean = false,
     /** Connection ids with a request in flight. */
     val busyConnections: Set<String> = emptySet(),
+    /** Connection ids a "Sync now" is running for (also in [busyConnections]). */
+    val syncingConnections: Set<String> = emptySet(),
     val sheet: ConnectSheet? = null,
     val calDav: CalDavForm = CalDavForm(),
     /** OAuth start URL for the UI to open in a Custom Tab. */
@@ -174,8 +177,32 @@ class CalendarSourcesViewModel @Inject constructor(
         withConnectionBusy(connectionId) { calendars.setBusy(connectionId, calendarId, busy) }
     }
 
+    /** "Sync now": the server pulls the account straight away; a failed pull comes back as its status. */
     fun syncConnection(connectionId: String) {
-        withConnectionBusy(connectionId) { calendars.sync(connectionId) }
+        if (connectionId in _state.value.busyConnections) return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(busyConnections = it.busyConnections + connectionId, syncingConnections = it.syncingConnections + connectionId)
+            }
+            val text = when (val result = calendars.sync(connectionId)) {
+                is ApiResult.Success -> {
+                    val name = result.value.provider.title
+                    when (result.value.status) {
+                        ConnectionStatus.Ok -> null
+                        ConnectionStatus.ReauthRequired -> "Couldn't sync $name. It needs reconnecting."
+                        ConnectionStatus.Error -> "Couldn't sync $name. Try again in a moment."
+                    }
+                }
+                is ApiResult.Failure -> result.error.message
+            }
+            _state.update {
+                it.copy(
+                    busyConnections = it.busyConnections - connectionId,
+                    syncingConnections = it.syncingConnections - connectionId,
+                    message = text?.let(::UserMessage) ?: it.message,
+                )
+            }
+        }
     }
 
     fun disconnect(connectionId: String) {
