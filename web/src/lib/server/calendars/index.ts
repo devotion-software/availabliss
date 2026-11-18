@@ -607,7 +607,13 @@ export async function syncStaleConnections(deadline = Infinity): Promise<number>
 }
 
 /** Runs `task` over `ids`, `concurrency` at a time, starting none after `deadline`. Counts the true results. */
-async function pool(ids: string[], concurrency: number, deadline: number, task: (id: string) => Promise<boolean>): Promise<number> {
+async function pool(
+	ids: string[],
+	concurrency: number,
+	deadline: number,
+	task: (id: string) => Promise<boolean>,
+	stats?: { started: number }
+): Promise<number> {
 	let next = 0;
 	let count = 0;
 	const worker = async () => {
@@ -616,6 +622,7 @@ async function pool(ids: string[], concurrency: number, deadline: number, task: 
 		}
 	};
 	await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
+	if (stats) stats.started = next;
 	return count;
 }
 
@@ -660,14 +667,29 @@ export async function checkConnection(connectionId: string): Promise<boolean> {
 
 /** Checks every working CalDAV connection, longest-unchecked first, until `deadline`. Returns how many synced. */
 export async function checkCaldavConnections(deadline = Infinity): Promise<number> {
+	const startedAt = Date.now();
 	const rows = await db
-		.select({ id: calendarConnections.id })
+		.select({ id: calendarConnections.id, checkedAt: calendarConnections.checkedAt })
 		.from(calendarConnections)
 		.where(and(eq(calendarConnections.provider, 'caldav'), eq(calendarConnections.status, 'ok')))
 		// NULL (never checked) sorts first.
 		.orderBy(asc(calendarConnections.checkedAt))
 		.limit(1000);
-	return pool(rows.map((r) => r.id), CHECK_CONCURRENCY, deadline, checkConnection);
+	const stats = { started: 0 };
+	const synced = await pool(rows.map((r) => r.id), CHECK_CONCURRENCY, deadline, checkConnection, stats);
+	// The numbers to decide on when to check less often (see the "iCloud change-check load" task):
+	// how long a run takes against its budget, and whether connections start being left unchecked.
+	const oldest = rows[0]?.checkedAt;
+	log.info('calendars', 'CalDAV change check', {
+		connections: rows.length,
+		checked: stats.started,
+		leftForNextRun: rows.length - stats.started,
+		synced,
+		durationMs: Date.now() - startedAt,
+		budgetMs: Number.isFinite(deadline) ? deadline - startedAt : null,
+		oldestCheckAgeSeconds: oldest ? Math.round((startedAt - oldest.getTime()) / 1000) : null
+	});
+	return synced;
 }
 
 // ─── Device calendars ─────────────────────────────────────────────────────
