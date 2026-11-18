@@ -41,11 +41,30 @@
 		}
 	}
 
+	// "Synced just now" moves on to "Last synced 2m ago" without a reload.
+	let now = $state(Date.now());
+	$effect(() => {
+		if (!manage) return;
+		const timer = setInterval(() => (now = Date.now()), 30_000);
+		return () => clearInterval(timer);
+	});
+	const syncedText = $derived.by(() => {
+		const at = connection.lastSyncedAt;
+		if (!at) return 'Not synced yet';
+		if (now - Date.parse(at) < 60_000) return 'Synced just now';
+		return `Last synced ${fmt.current.relative(at)}`;
+	});
+
+	/** Sync now: the server pulls the account straight away; a failed pull comes back as its status. */
 	async function sync() {
 		syncing = true;
 		try {
-			onchange(await syncConnection(connection.id));
-			toasts.success('Synced');
+			const updated = await syncConnection(connection.id);
+			now = Date.now();
+			onchange(updated);
+			const name = PROVIDER_NAME[updated.provider];
+			if (updated.status === 'reauth_required') toasts.error(`Couldn't sync ${name}. It needs reconnecting.`);
+			else if (updated.status === 'error') toasts.error(`Couldn't sync ${name}. Try again in a moment.`);
 		} catch (err) {
 			toasts.error(err);
 		} finally {
@@ -85,15 +104,12 @@
 
 	{#if manage}
 		<div class="foot">
-			{#if connection.status === 'ok'}
-				<span class="synced">
-					{connection.lastSyncedAt ? `Last synced ${fmt.current.relative(connection.lastSyncedAt)}` : 'Not synced yet'}
-				</span>
-			{:else if connection.status === 'reauth_required'}
+			{#if connection.status === 'reauth_required'}
 				<StatusPill tone="apricot" icon="alert">Needs reconnecting</StatusPill>
-			{:else}
+			{:else if connection.status === 'error'}
 				<StatusPill tone="apricot" icon="alert">Sync failed</StatusPill>
 			{/if}
+			<span class="synced" aria-live="polite">{syncing ? 'Syncing…' : syncedText}</span>
 			<span class="spacer"></span>
 			{#if connection.status === 'reauth_required' && (connection.provider === 'google' || connection.provider === 'microsoft')}
 				<Button size="sm" variant="warn" href={oauthStartUrl(connection.provider, returnTo)} data-sveltekit-reload>Reconnect</Button>
