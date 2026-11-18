@@ -30,6 +30,8 @@ data class GroupShellUiState(
     val isAdmin: Boolean = false,
     /** "5 members · you're the owner" */
     val membersLine: String = "",
+    /** Someone else is in it: offers "New group with these people". */
+    val hasOthers: Boolean = false,
 )
 
 /**
@@ -55,6 +57,7 @@ class GroupViewModel @Inject constructor(
             groupName = group?.name.orEmpty(),
             unreadCount = count,
             isAdmin = group?.role?.isAdmin == true,
+            hasOthers = (group?.members?.size ?: 0) > 1,
             membersLine = group?.let {
                 val count = "${it.memberCount} ${if (it.memberCount == 1) "member" else "members"}"
                 val members = if (it.archived) "$count · archived" else count

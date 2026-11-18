@@ -113,10 +113,21 @@ class GroupsRepository @Inject constructor(
 
     /**
      * Neither: a link anyone can use. Emails: one invite each, emailed, only for that person.
-     * Usernames: one invite each, to the person's Activity, only for them.
+     * Usernames / user ids: one invite each, to the person's Activity, only for them (by id: only
+     * people already in a group with you).
      */
-    suspend fun createInvite(groupId: String, emails: List<String> = emptyList(), usernames: List<String> = emptyList()): ApiResult<InviteLink> =
-        call { api.createInvite(groupId, CreateInviteRequest(emails.takeIf { it.isNotEmpty() }, usernames.takeIf { it.isNotEmpty() })) }
+    suspend fun createInvite(
+        groupId: String,
+        emails: List<String> = emptyList(),
+        usernames: List<String> = emptyList(),
+        userIds: List<String> = emptyList(),
+    ): ApiResult<InviteLink> =
+        call {
+            api.createInvite(
+                groupId,
+                CreateInviteRequest(emails.takeIf { it.isNotEmpty() }, usernames.takeIf { it.isNotEmpty() }, userIds.takeIf { it.isNotEmpty() }),
+            )
+        }
 
     suspend fun preferences(groupId: String): ApiResult<List<dev.joeherbert.availabliss.core.network.model.GroupPreference>> =
         call { api.preferences(groupId).preferences }
@@ -133,6 +144,9 @@ class GroupsRepository @Inject constructor(
     suspend fun invite(token: String): ApiResult<InvitePreview> = call { api.getInvite(token) }
 
     suspend fun acceptInvite(token: String): ApiResult<Group> = call { api.acceptInvite(token) }.onSuccess(::cache)
+
+    /** Turns down an invite sent to you in Activity. */
+    suspend fun declineInvite(token: String): ApiResult<Unit> = call { api.declineInvite(token) }
 
     /** [from] / [to] are `YYYY-MM-DD`. */
     suspend fun availability(groupId: String, from: String, to: String): ApiResult<Availability> =

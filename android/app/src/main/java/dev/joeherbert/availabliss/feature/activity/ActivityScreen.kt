@@ -58,6 +58,7 @@ import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
 import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
@@ -72,6 +73,10 @@ fun ActivityScreen(onOpenLink: (DeepLink) -> Unit, viewModel: ActivityViewModel 
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::messageShown)
     val permission = rememberNotificationPermission()
+    LifecycleResumeEffect(viewModel) {
+        viewModel.resumed()
+        onPauseOrDispose { }
+    }
 
     ActivityContent(
         state = state,

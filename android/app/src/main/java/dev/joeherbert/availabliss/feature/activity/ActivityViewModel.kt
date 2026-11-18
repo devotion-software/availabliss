@@ -66,6 +66,16 @@ class ActivityViewModel @Inject constructor(
         }
     }
 
+    private var resumedBefore = false
+
+    /**
+     * Back on Activity (after the first time): catch up, e.g. an invite opened from here was joined or
+     * declined (a declined one's item goes).
+     */
+    fun resumed() {
+        if (resumedBefore) refresh() else resumedBefore = true
+    }
+
     fun refresh() {
         viewModelScope.launch {
             when (val result = notifications.refresh()) {

@@ -204,11 +204,11 @@ class MembersViewModel @Inject constructor(
         val expires = DateTimes.localDateTime(invite.expiresAt)?.let { DateTimes.longDay(it.toLocalDate()) }.orEmpty()
         return InviteUi(
             id = invite.id,
-            title = invite.email ?: invite.username?.let { "@$it" } ?: invite.url,
+            title = invite.email ?: invite.username?.let { "@$it" } ?: invite.name ?: invite.url,
             status = if (invite.isLink) "Link for one person · expires $expires" else "Invited · invite expires $expires",
             isLink = invite.isLink,
             url = invite.url,
-            byUsername = invite.email == null && invite.username != null,
+            byUsername = invite.email == null && (invite.username != null || invite.name != null),
         )
     }
     // endregion

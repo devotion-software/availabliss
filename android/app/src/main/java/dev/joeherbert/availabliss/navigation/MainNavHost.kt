@@ -117,7 +117,7 @@ fun MainNavHost(root: RootViewModel) {
                     onOpenGroupChat = { nav.openGroupSection(it, GroupChatRoute(it)) },
                     onOpenProposal = { nav.navigate(ProposalRoute(it)) },
                     onOpenGroupPlans = { nav.openGroupSection(it, GroupPlansRoute(it)) },
-                    onNewGroup = { nav.navigate(NewGroupRoute) },
+                    onNewGroup = { nav.navigate(NewGroupRoute()) },
                     onOpenProfile = { nav.switchTab(YouRoute) },
                 )
             }
@@ -147,6 +147,7 @@ fun MainNavHost(root: RootViewModel) {
                     onOpenTiming = { nav.navigate(GroupTimingRoute(groupId)) },
                     onOpenMembers = { nav.navigate(MembersRoute(groupId)) },
                     onOpenSettings = { nav.navigate(GroupSettingsRoute(groupId)) },
+                    onNewGroupWithPeople = { nav.navigate(NewGroupRoute(groupId)) },
                     onOpenProposal = { nav.navigate(ProposalRoute(it)) },
                     onCreateProposal = { p -> nav.navigate(CreateProposalRoute(groupId, p.start, p.end, p.allDay, p.title, p.note)) },
                 )
@@ -196,9 +197,11 @@ fun MainNavHost(root: RootViewModel) {
                 )
             }
             composable<GroupTimingRoute> { GroupTimingTab(onBack = { nav.popBackStack() }, onSaved = { nav.popBackStack() }) }
-            composable<GroupSettingsRoute> {
+            composable<GroupSettingsRoute> { backStackEntry ->
+                val groupId = backStackEntry.toRoute<GroupSettingsRoute>().groupId
                 GroupSettingsScreen(
                     onBack = { nav.popBackStack() },
+                    onNewGroupWithPeople = { nav.navigate(NewGroupRoute(groupId)) },
                     onDeleted = { nav.popBackStack(HomeRoute, inclusive = false) },
                 )
             }

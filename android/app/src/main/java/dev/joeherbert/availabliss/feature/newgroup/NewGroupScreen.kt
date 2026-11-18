@@ -2,6 +2,12 @@ package dev.joeherbert.availabliss.feature.newgroup
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import dev.joeherbert.availabliss.designsystem.component.Avatar
+import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
+import dev.joeherbert.availabliss.designsystem.component.RowDivider
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.height
@@ -91,10 +97,13 @@ fun NewGroupScreen(
         onCreated(id)
     }
     var upgrading by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = state.step == NewGroupStep.Timing && !state.atLimit, onBack = viewModel::back)
+    BackHandler(enabled = state.step != NewGroupStep.Details && !state.atLimit, onBack = viewModel::back)
     when {
         state.atLimit -> GroupLimitContent(state.groupLimit, onBack, onSeePro = { upgrading = true })
-        state.step == NewGroupStep.Details -> NewGroupContent(state, onBack, viewModel::setName, viewModel::setColor, viewModel::next, viewModel::selectTemplate)
+        state.step == NewGroupStep.Details -> NewGroupContent(
+            state, onBack, viewModel::setName, viewModel::setColor, viewModel::next, viewModel::selectTemplate, viewModel::toggleCopiedTiming,
+        )
+        state.step == NewGroupStep.People -> NewGroupPeopleContent(state, viewModel::toggleInvitee, viewModel::back, viewModel::next)
         else -> {
             val editor = state.editor
             if (editor != null) {
@@ -156,7 +165,10 @@ fun GroupLimitContent(limit: Int, onBack: () -> Unit, onSeePro: () -> Unit) {
     }
 }
 
-/** Step 1: name, colour and (if you have any) a saved template to start from. */
+/**
+ * Step 1: name, colour and (if you have any) a saved template to start from. Starting from another
+ * group, its timing is offered (and picked) as "Same as <group>".
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NewGroupContent(
@@ -166,6 +178,7 @@ fun NewGroupContent(
     onColorChange: (TileColor) -> Unit,
     onNext: () -> Unit,
     onTemplate: (RequirementTemplate) -> Unit = {},
+    onCopiedTiming: () -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
     val focus = remember { FocusRequester() }
@@ -181,8 +194,14 @@ fun NewGroupContent(
                 .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            StepDots(total = 2, step = 1)
-            ScreenHeader(title = "New group", subtitle = "Name it and pick a colour. Timing comes next.", onBack = onBack)
+            StepDots(total = state.steps.size, step = state.stepNumber)
+            ScreenHeader(
+                title = if (state.basedOnName != null) "New group with these people" else "New group",
+                subtitle = state.basedOnName?.let { "Starting from $it. Name it and pick a colour; you'll choose who to invite next." }
+                    ?: "Name it and pick a colour. Timing comes next.",
+                subtitleMaxLines = 2,
+                onBack = onBack,
+            )
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Spacing.l),
@@ -197,7 +216,11 @@ fun NewGroupContent(
                                 color = if (state.name.isBlank()) colors.muted else colors.ink,
                                 maxLines = 1,
                             )
-                            Text("Invite people once it's created", style = AvailablissTheme.type.caption, color = colors.muted)
+                            Text(
+                                if (state.people.isNotEmpty()) "You'll choose who to invite next" else "Invite people once it's created",
+                                style = AvailablissTheme.type.caption,
+                                color = colors.muted,
+                            )
                         }
                     }
                     AvTextField(
@@ -215,10 +238,11 @@ fun NewGroupContent(
                     SectionLabel("Colour")
                     GroupColorPicker(state.color, state.monogramPreview, onColorChange)
                 }
-                if (state.templates.isNotEmpty()) {
+                if (state.templates.isNotEmpty() || state.basedOnName != null) {
                     GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SectionLabel("Start from a template")
+                        SectionLabel(if (state.basedOnName != null) "Timing" else "Start from a template")
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            state.basedOnName?.let { from -> Chip("Same as $from", selected = state.copiesTiming, onClick = onCopiedTiming) }
                             state.templates.forEach { t ->
                                 Chip(t.name, selected = state.templateId == t.id, onClick = { onTemplate(t) })
                             }
@@ -227,7 +251,7 @@ fun NewGroupContent(
                 }
             }
             PrimaryButton(
-                text = "Next: timing",
+                text = if (state.steps.getOrNull(1) == NewGroupStep.People) "Next: people" else "Next: timing",
                 onClick = onNext,
                 style = ButtonStyle.Accent,
                 icon = AvIcons.ArrowRight,
@@ -238,12 +262,81 @@ fun NewGroupContent(
     }
 }
 
+/** "New group with these people", step 2: the other group's members, ticked to get an invite. */
+@Composable
+fun NewGroupPeopleContent(state: NewGroupUiState, onToggle: (String) -> Unit, onBack: () -> Unit, onNext: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    AvailablissBackground(OrbLayout.Main) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            StepDots(total = state.steps.size, step = state.stepNumber)
+            ScreenHeader(
+                title = "Who's in?",
+                subtitle = "Everyone ticked gets an invite to ${state.name.trim()} to accept. Untick anyone you'd rather leave out.",
+                subtitleMaxLines = 3,
+                onBack = onBack,
+            )
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                GlassPanel(
+                    Modifier.fillMaxWidth(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 2.dp),
+                    verticalArrangement = Arrangement.Top,
+                ) {
+                    state.people.forEachIndexed { i, member ->
+                        if (i > 0) RowDivider()
+                        val ticked = member.userId in state.invitees
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .toggleable(value = ticked, role = Role.Checkbox, onValueChange = { onToggle(member.userId) }),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Avatar(AvatarPerson(member.userId, member.name, member.image), size = 34.dp)
+                            Text(member.name, style = AvailablissTheme.type.bodySmallStrong, color = colors.ink, maxLines = 1, modifier = Modifier.weight(1f))
+                            Box(
+                                Modifier
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .then(if (ticked) Modifier.background(colors.accent) else Modifier.border(1.5.dp, colors.line2, CircleShape)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (ticked) Icon(AvIcons.Check, null, tint = colors.onAccent, modifier = Modifier.size(12.dp))
+                            }
+                        }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SecondaryButton("Back", onClick = onBack, icon = AvIcons.Back, height = 48.dp, modifier = Modifier.weight(1f))
+                PrimaryButton(
+                    text = "Next: timing",
+                    onClick = onNext,
+                    style = ButtonStyle.Accent,
+                    icon = AvIcons.ArrowRight,
+                    height = 48.dp,
+                    shape = Shapes.control,
+                    textStyle = AvailablissTheme.type.bodyMedium,
+                    modifier = Modifier.weight(1.4f),
+                )
+            }
+        }
+    }
+}
+
 /** Step 2: the full timing editor, with the live fit count, Back and Create group pinned at the bottom. */
 @Composable
 fun NewGroupTimingContent(state: NewGroupUiState, editor: TimingEditorUiState, actions: TimingActions, onCreate: () -> Unit) {
     AvailablissBackground(OrbLayout.Timing) {
         Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
-            Box(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp)) { StepDots(total = 2, step = 2) }
+            Box(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp)) { StepDots(total = state.steps.size, step = state.stepNumber) }
             ScreenHeader(
                 title = "When are you looking for?",
                 subtitle = "Fine-tune the timing for ${state.name.trim()}. You can change it later.",

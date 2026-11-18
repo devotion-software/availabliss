@@ -51,7 +51,7 @@ val GroupTopBarHeight = 64.dp
 
 /**
  * A group: its calendar, under a pinned header (back, name, chat, "More"). Chat, Plans, Timing,
- * Members and Group settings are their own screens pushed on top. The app's tab bar stays at the bottom.
+ * Members, Group settings and "New group with these people" are their own screens pushed on top. The app's tab bar stays at the bottom.
  */
 @Composable
 fun GroupScreen(
@@ -61,6 +61,7 @@ fun GroupScreen(
     onOpenTiming: () -> Unit,
     onOpenMembers: () -> Unit,
     onOpenSettings: () -> Unit,
+    onNewGroupWithPeople: () -> Unit,
     onOpenProposal: (String) -> Unit,
     onCreateProposal: (ProposalPrefill) -> Unit,
     viewModel: GroupViewModel = hiltViewModel(),
@@ -74,7 +75,7 @@ fun GroupScreen(
         )
         GroupTopBar(
             state,
-            GroupTopBarActions(onBack, onOpenChat, onOpenPlans, onOpenTiming, onOpenMembers, onOpenSettings),
+            GroupTopBarActions(onBack, onOpenChat, onOpenPlans, onOpenTiming, onOpenMembers, onOpenSettings, onNewGroupWithPeople),
             Modifier.align(Alignment.TopCenter),
         )
     }
@@ -87,6 +88,7 @@ private class GroupTopBarActions(
     val onOpenTiming: () -> Unit,
     val onOpenMembers: () -> Unit,
     val onOpenSettings: () -> Unit,
+    val onNewGroupWithPeople: () -> Unit,
 )
 
 @Composable
@@ -109,7 +111,7 @@ private fun GroupTopBar(state: GroupShellUiState, actions: GroupTopBarActions, m
             Text(state.membersLine, style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted, maxLines = 1)
         }
         ChatButton(state.unreadCount, actions.onOpenChat)
-        MoreMenu(state.isAdmin, actions)
+        MoreMenu(state.isAdmin, state.hasOthers, actions)
     }
 }
 
@@ -136,18 +138,20 @@ private fun ChatButton(unread: Int, onClick: () -> Unit) {
 }
 
 @Composable
-private fun MoreMenu(isAdmin: Boolean, actions: GroupTopBarActions) {
+private fun MoreMenu(isAdmin: Boolean, hasOthers: Boolean, actions: GroupTopBarActions) {
     var open by remember { mutableStateOf(false) }
     val colors = AvailablissTheme.colors
     Box {
         GlassIconButton(AvIcons.More, "More", { open = true })
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bg) {
-            listOf(
+            listOfNotNull(
                 Triple("Plans", AvIcons.ProposalCheck, actions.onOpenPlans),
                 Triple("Timing", AvIcons.Sliders, actions.onOpenTiming),
                 // Only owners and admins can invite, so only they see "invites".
                 if (isAdmin) Triple("Members and invites", AvIcons.AddPerson, actions.onOpenMembers)
                 else Triple("Members", AvIcons.People, actions.onOpenMembers),
+                // Another group with the same people (anyone in it can start one).
+                if (hasOthers) Triple("New group with these people", AvIcons.Plus, actions.onNewGroupWithPeople) else null,
                 Triple("Group settings", AvIcons.Settings, actions.onOpenSettings),
             ).forEach { (label, icon, onClick) -> MenuItem(label, icon) { open = false; onClick() } }
         }
@@ -171,7 +175,7 @@ private fun GroupTopBarPreview() {
     AvailablissPreviewTheme {
         GroupTopBar(
             GroupShellUiState("Lake District crew", unreadCount = 3, isAdmin = true, membersLine = "6 members · you're an admin"),
-            GroupTopBarActions({}, {}, {}, {}, {}, {}),
+            GroupTopBarActions({}, {}, {}, {}, {}, {}, {}),
         )
     }
 }

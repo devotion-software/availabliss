@@ -92,12 +92,18 @@ import dev.joeherbert.availabliss.feature.newgroup.GroupColorPicker
  * card, so further settings slot in as more cards. [onDeleted] also follows leaving: back to the groups.
  */
 @Composable
-fun GroupSettingsScreen(onBack: () -> Unit, onDeleted: () -> Unit, viewModel: GroupSettingsViewModel = hiltViewModel()) {
+fun GroupSettingsScreen(
+    onBack: () -> Unit,
+    onDeleted: () -> Unit,
+    onNewGroupWithPeople: () -> Unit = {},
+    viewModel: GroupSettingsViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::messageShown)
     val currentOnDeleted by rememberUpdatedState(onDeleted)
     val currentOnBack by rememberUpdatedState(onBack)
+    val currentOnNewGroup by rememberUpdatedState(onNewGroupWithPeople)
     LaunchedEffect(state.deleted, state.left) { if (state.deleted || state.left) currentOnDeleted() }
 
     val pickPhoto = rememberPhotoPicker(onUnreadable = viewModel::photoUnreadable, onPicked = viewModel::setPhoto)
@@ -117,6 +123,7 @@ fun GroupSettingsScreen(onBack: () -> Unit, onDeleted: () -> Unit, viewModel: Gr
             onAutoArchive = viewModel::setAutoArchive,
             onDelete = viewModel::requestDelete,
             onLeave = viewModel::requestLeave,
+            onNewGroupWithPeople = { currentOnNewGroup() },
         )
     }
     GroupSettingsContent(state, snackbar, actions)
@@ -151,6 +158,7 @@ data class GroupSettingsActions(
     val onAutoArchive: (Boolean) -> Unit = {},
     val onDelete: () -> Unit = {},
     val onLeave: () -> Unit = {},
+    val onNewGroupWithPeople: () -> Unit = {},
 )
 
 @Composable
@@ -179,6 +187,7 @@ fun GroupSettingsContent(state: GroupSettingsUiState, snackbar: SnackbarHostStat
                     PhotoCard(state, actions)
                     DetailsCard(state, actions)
                     MyNameCard(state, actions)
+                    if (state.members.size > 1) NewGroupCard(actions)
                     if (state.canEdit) ArchiveCard(state, actions)
                     LeaveCard(state, actions)
                     if (state.canDelete) DeleteCard(actions)
@@ -367,6 +376,31 @@ private fun ArchiveCard(state: GroupSettingsUiState, actions: GroupSettingsActio
             checked = state.autoArchive,
             onCheckedChange = actions.onAutoArchive,
             modifier = Modifier.alpha(if (state.savingAutoArchive) 0.5f else 1f),
+        )
+    }
+}
+
+/** "Same people, new plan": opens New group starting from this group, with its people ticked. */
+@Composable
+private fun NewGroupCard(actions: GroupSettingsActions) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    GlassPanel(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Same people, new plan", style = type.bodySmallStrong, color = colors.ink)
+            Text(
+                "Start another group with everyone here. You choose who to invite, and each of them gets an invite to accept.",
+                style = type.caption.copy(fontWeight = FontWeight.Normal),
+                color = colors.muted,
+            )
+        }
+        SecondaryButton(
+            text = "New group with these people",
+            onClick = actions.onNewGroupWithPeople,
+            icon = AvIcons.Plus,
+            height = 44.dp,
+            shape = Shapes.controlSmall,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

@@ -261,6 +261,10 @@ interface AvailablissApi {
 
     @POST("api/v1/invites/{token}/accept")
     suspend fun acceptInvite(@Path("token") token: String): Group
+
+    /** Turns down an invite sent to you; it and its Activity item go. */
+    @POST("api/v1/invites/{token}/decline")
+    suspend fun declineInvite(@Path("token") token: String)
     // endregion
 
     // region Availability

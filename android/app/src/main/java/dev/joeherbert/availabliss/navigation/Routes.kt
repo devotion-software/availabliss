@@ -25,7 +25,8 @@ import kotlinx.serialization.Serializable
 /** Photo, name, colour, archive and delete. */
 @Serializable data class GroupSettingsRoute(val groupId: String)
 
-@Serializable data object NewGroupRoute
+/** New group; [fromGroupId]: "New group with these people", starting from that group. */
+@Serializable data class NewGroupRoute(val fromGroupId: String? = null)
 @Serializable data class MembersRoute(val groupId: String)
 @Serializable data class ProposalRoute(val proposalId: String)
 

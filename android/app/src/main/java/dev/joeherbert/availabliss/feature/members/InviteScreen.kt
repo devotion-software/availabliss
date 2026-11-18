@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
+import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
@@ -53,10 +54,12 @@ fun InviteScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.joinedGroupId) { state.joinedGroupId?.let(onAccepted) }
+    LaunchedEffect(state.declined) { if (state.declined) onBack() }
     InviteContent(
         state,
         onBack = onBack,
         onJoin = viewModel::join,
+        onDecline = viewModel::decline,
         onRetry = viewModel::load,
         onSwitchAccount = {
             viewModel.rememberInviteForSignIn()
@@ -100,7 +103,14 @@ private fun GroupNameSheet(state: InviteUiState, onNameChange: (String) -> Unit,
 }
 
 @Composable
-fun InviteContent(state: InviteUiState, onBack: () -> Unit, onJoin: () -> Unit, onRetry: () -> Unit, onSwitchAccount: () -> Unit = {}) {
+fun InviteContent(
+    state: InviteUiState,
+    onBack: () -> Unit,
+    onJoin: () -> Unit,
+    onRetry: () -> Unit,
+    onSwitchAccount: () -> Unit = {},
+    onDecline: () -> Unit = {},
+) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
     AvailablissBackground(OrbLayout.SignIn) {
@@ -160,7 +170,11 @@ fun InviteContent(state: InviteUiState, onBack: () -> Unit, onJoin: () -> Unit, 
                             )
                             PrimaryButton("Sign in as $invited", onSwitchAccount, modifier = Modifier.fillMaxWidth())
                         } else {
-                            PrimaryButton("Join group", onJoin, loading = state.joining, modifier = Modifier.fillMaxWidth())
+                            PrimaryButton("Join group", onJoin, loading = state.joining, enabled = !state.declining, modifier = Modifier.fillMaxWidth())
+                            // Sent to you in Activity: you can turn it down.
+                            if (state.personal) {
+                                SecondaryButton("Decline", onClick = onDecline, enabled = !state.joining && !state.declining, modifier = Modifier.fillMaxWidth())
+                            }
                         }
                         TextAction("Not now", onBack, modifier = Modifier.align(Alignment.CenterHorizontally))
                     }

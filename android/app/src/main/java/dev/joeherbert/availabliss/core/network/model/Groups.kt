@@ -128,10 +128,15 @@ data class NudgeResponse(val nudged: Int)
 
 /**
  * Neither: a link anyone can use. Emails: one invite each, emailed, only for that person.
- * Usernames: one invite each, to the person's Activity, only for them. At most 20 people in all.
+ * Usernames: one invite each, to the person's Activity, only for them. User ids: the same, for
+ * people already in a group with you. At most 20 people in all.
  */
 @Serializable
-data class CreateInviteRequest(val emails: List<String>? = null, val usernames: List<String>? = null)
+data class CreateInviteRequest(
+    val emails: List<String>? = null,
+    val usernames: List<String>? = null,
+    val userIds: List<String>? = null,
+)
 
 @Serializable
 data class InviteLink(
@@ -149,10 +154,12 @@ data class GroupInvite(
     val email: String? = null,
     /** Who it was sent to by username (no "@"). */
     val username: String? = null,
+    /** The account name of the person it was sent to in Activity (older servers omit it). */
+    val name: String? = null,
     val url: String,
     val expiresAt: String,
 ) {
-    val isLink: Boolean get() = email == null && username == null
+    val isLink: Boolean get() = email == null && username == null && name == null
 }
 
 @Serializable
@@ -168,6 +175,8 @@ data class InvitePreview(
     val email: String? = null,
     /** Who an invite sent by username is for (no "@"); null otherwise. */
     val username: String? = null,
+    /** Sent to one person's Activity, so they can decline it (older servers omit it). */
+    val personal: Boolean = false,
 )
 
 @Serializable

@@ -34,6 +34,11 @@ data class InviteUiState(
     val invalid: Boolean = false,
     val error: String? = null,
     val joining: Boolean = false,
+    /** Sent to you in Activity (by username, or as one of a group's people): you can decline it. */
+    val personal: Boolean = false,
+    val declining: Boolean = false,
+    /** Set once declined; the screen goes back. */
+    val declined: Boolean = false,
     /** Set once joined (and the name sheet is done); the screen navigates to the group. */
     val joinedGroupId: String? = null,
     /** Just joined: the sheet asking what name to go by in the group is open for it. */
@@ -84,6 +89,7 @@ class InviteViewModel @Inject constructor(
                             invalid = expired,
                             invitedOtherEmail = p.email?.takeIf { invited -> !invited.equals(mine, ignoreCase = true) },
                             signedInEmail = mine,
+                            personal = p.personal,
                             invitedOtherUsername = p.username?.takeIf { invited -> !invited.equals(myUsername, ignoreCase = true) },
                             preview = InvitePreviewUi(
                                 groupName = p.groupName,
@@ -130,6 +136,18 @@ class InviteViewModel @Inject constructor(
 
     /** Keeps the invite for after sign-in (where its email is prefilled); the caller then signs out. */
     fun rememberInviteForSignIn() = deepLinks.post(DeepLink.Invite(token))
+
+    /** Turns the invite down: it goes, with its Activity item, and nobody is told. */
+    fun decline() {
+        if (_state.value.declining || _state.value.joining) return
+        _state.update { it.copy(declining = true, error = null) }
+        viewModelScope.launch {
+            when (val result = groups.declineInvite(token)) {
+                is ApiResult.Success -> _state.update { it.copy(declining = false, declined = true) }
+                is ApiResult.Failure -> _state.update { it.copy(declining = false, error = result.error.message) }
+            }
+        }
+    }
 
     fun join() {
         if (_state.value.joining) return
