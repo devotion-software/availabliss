@@ -103,6 +103,8 @@ sealed interface DeepLink {
                 // Someone invited you by username: open the invite, as `/invite/:token` does.
                 "invite.received" -> token?.let(::Invite) ?: Activity
                 "nudge" -> MyTime
+                // The catch-up after quiet hours: its group when it was all one, else Activity.
+                "quiet.summary" -> groupId?.let(::GroupCalendar) ?: Activity
                 // Before a plan: the proposal it came from (or that needs a reply), else the group.
                 "reminder" -> proposalId?.let(::Proposal) ?: groupId?.let(::GroupCalendar) ?: Activity
                 else -> proposalId?.let(::Proposal) ?: groupId?.let(::GroupCalendar) ?: Activity

@@ -124,6 +124,9 @@ final class Router {
         case .myPlans:
             tab = .activity
             activityPath = [.myPlans]
+        case .activity:
+            tab = .activity
+            activityPath = []
         }
     }
 

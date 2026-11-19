@@ -140,7 +140,7 @@ export const notificationSettingsSchema = z
 	.object({
 		off: z.array(z.enum(NOTIFICATION_CATEGORIES)).max(NOTIFICATION_CATEGORIES.length),
 		quietHours: z
-			.object({ from: clock, to: clock })
+			.object({ from: clock, to: clock, catchUp: z.boolean().optional() })
 			.refine((q) => q.from !== q.to, 'Pick different start and end times')
 			.nullable()
 	})

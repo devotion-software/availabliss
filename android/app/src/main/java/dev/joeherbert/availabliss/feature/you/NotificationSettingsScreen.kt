@@ -135,6 +135,8 @@ class NotificationSettingsViewModel @Inject constructor(
 
     fun setQuietTo(time: LocalTime) = setQuietHours { it.copy(to = DateTimes.toWireTime(time)) }
 
+    fun setCatchUp(on: Boolean) = setQuietHours { it.copy(catchUp = on) }
+
     fun onMessageShown(shown: UserMessage) {
         if (message.value?.id == shown.id) message.value = null
     }
@@ -176,6 +178,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit, viewModel: NotificationSettin
             onQuietHoursChange = viewModel::setQuietHoursOn,
             onQuietFromChange = viewModel::setQuietFrom,
             onQuietToChange = viewModel::setQuietTo,
+            onCatchUpChange = viewModel::setCatchUp,
         )
         AvSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
@@ -190,6 +193,7 @@ fun NotificationSettingsContent(
     onQuietHoursChange: (Boolean) -> Unit = {},
     onQuietFromChange: (LocalTime) -> Unit = {},
     onQuietToChange: (LocalTime) -> Unit = {},
+    onCatchUpChange: (Boolean) -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
     Column(
@@ -207,7 +211,7 @@ fun NotificationSettingsContent(
         when {
             settings != null -> {
                 CategoriesPanel(settings, onCategoryChange)
-                QuietHoursPanel(settings.quietHours, onQuietHoursChange, onQuietFromChange, onQuietToChange)
+                QuietHoursPanel(settings.quietHours, onQuietHoursChange, onQuietFromChange, onQuietToChange, onCatchUpChange)
                 Text(
                     "Invites and changes to your role always come through. To mute one group, use More in that group.",
                     style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
@@ -241,6 +245,7 @@ private fun QuietHoursPanel(
     onToggle: (Boolean) -> Unit,
     onFromChange: (LocalTime) -> Unit,
     onToChange: (LocalTime) -> Unit,
+    onCatchUpChange: (Boolean) -> Unit,
 ) {
     var picking by rememberSaveable { mutableStateOf<QuietEnd?>(null) }
     GlassPanel(
@@ -259,6 +264,13 @@ private fun QuietHoursPanel(
             TimeRow("From", quietHours.from) { picking = QuietEnd.From }
             RowDivider()
             TimeRow("To", quietHours.to) { picking = QuietEnd.To }
+            RowDivider()
+            ToggleRow(
+                "Catch me up afterwards",
+                checked = quietHours.catchUp,
+                onCheckedChange = onCatchUpChange,
+                subtitle = "One push when quiet hours end, if anything came in that you haven't seen.",
+            )
         }
     }
     val end = picking

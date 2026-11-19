@@ -8,6 +8,8 @@ enum DeepLink: Equatable, Sendable {
     case proposal(id: String)
     /// `availabliss://app/my-plans` — My plans (from the Next plan widget when nothing's coming up).
     case myPlans
+    /// The Activity tab (the catch-up push after quiet hours, when it spans several groups).
+    case activity
     /// `availabliss://calendars` — OAuth return / calendar settings. `complete` is the
     /// one-time code to finish a Google / Microsoft connection with.
     case calendars(complete: String?, error: String?)
@@ -44,7 +46,9 @@ enum DeepLink: Equatable, Sendable {
 
     /// Maps push / notification `data` (`{ kind, groupId, proposalId?, eventId?, messageId?, token? }`).
     init?(data: [String: String]) {
-        if data["kind"] == AppNotification.Kind.inviteReceived.rawValue, let token = data["token"], !token.isEmpty {
+        if data["kind"] == "quiet.summary", data["groupId"]?.isEmpty ?? true {
+            self = .activity
+        } else if data["kind"] == AppNotification.Kind.inviteReceived.rawValue, let token = data["token"], !token.isEmpty {
             self = .invite(token: token)
         } else if let proposalId = data["proposalId"], !proposalId.isEmpty {
             self = .proposal(id: proposalId)

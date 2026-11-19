@@ -11866,18 +11866,22 @@
 									},
 									"to": {
 										"type": "string"
+									},
+									"catchUp": {
+										"type": "boolean"
 									}
 								},
 								"required": [
 									"from",
-									"to"
+									"to",
+									"catchUp"
 								]
 							},
 							{
 								"type": "null"
 							}
 						],
-						"description": "No pushes between these local times (in your time zone), e.g. 22:00–07:00; null for none."
+						"description": "No pushes between these local times (in your time zone), e.g. 22:00–07:00; null for none. With `catchUp`, one push when they end says what came in meanwhile (if anything did)."
 					},
 					"mutes": {
 						"type": "array",
@@ -11937,6 +11941,9 @@
 									"to": {
 										"type": "string",
 										"pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+									},
+									"catchUp": {
+										"type": "boolean"
 									}
 								},
 								"required": [

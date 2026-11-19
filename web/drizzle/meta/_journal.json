@@ -295,6 +295,13 @@
       "when": 1795089835984,
       "tag": "0041_auto_archive_new_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "5",
+      "when": 1795090056127,
+      "tag": "0042_quiet_hours_catch_up",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { autoArchiveGroups } from '#lib/server/auto-archive';
 import { REMINDER_CHECK_INTERVAL_MS, sendDueReminders } from '#lib/server/reminders';
 import { promptNextPlans } from '#lib/server/rhythm';
+import { sendQuietHoursCatchUps } from '#lib/server/notification-settings';
 import { deleteAbandonedUploads } from '#lib/server/attachments';
 import { checkCaldavConnections, syncStaleConnections } from '#lib/server/calendars';
 import { isForbiddenCrossSite, selfOrigins } from '#lib/server/csrf';
@@ -74,6 +75,7 @@ export const init: ServerInit = () => {
 			if (!(await kv.setIfAbsent('lock:reminders', String(process.pid), REMINDER_CHECK_INTERVAL_MS / 1000 - 10))) return;
 			await sendDueReminders();
 			await promptNextPlans();
+			await sendQuietHoursCatchUps();
 		} catch (err) {
 			log.error('reminders', 'sending failed', { err });
 		}

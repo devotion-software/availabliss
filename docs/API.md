@@ -264,7 +264,7 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/me/notification-settings` | | `NotificationSettings` |
-| PATCH 🔒 | `/me/notification-settings` | `{ off?: NotificationCategory[], quietHours?: { from: 'HH:MM', to: 'HH:MM' } \| null }` | `NotificationSettings` |
+| PATCH 🔒 | `/me/notification-settings` | `{ off?: NotificationCategory[], quietHours?: { from: 'HH:MM', to: 'HH:MM', catchUp?: boolean } \| null }` | `NotificationSettings`. Leaving `catchUp` out keeps it as it was |
 | PUT 🔒 | `/groups/:id/mute` | `{ until: string \| null }` (ISO instant; null = until unmuted) | `NotificationSettings` |
 | DELETE 🔒 | `/groups/:id/mute` | | `NotificationSettings` |
 
@@ -272,7 +272,7 @@ Legend: 🔒 signed in · 👑 group admin or owner · ⭐ group owner
 type NotificationCategory = 'chat' | 'proposals' | 'plans' | 'reminders' | 'nudges';
 interface NotificationSettings {
   off: NotificationCategory[];                 // pushes (and the confirmation email) turned off
-  quietHours: { from: string; to: string } | null; // local times in User.timezone; may wrap midnight
+  quietHours: { from: string; to: string; catchUp: boolean } | null; // local times in User.timezone; may wrap midnight. catchUp: when they end, one push (`kind: 'quiet.summary'`, with `groupId` if it was all one group) says how many updates came in meanwhile that are still unread
   mutes: { groupId: string; until: string | null }[]; // active mutes only
 }
 ```

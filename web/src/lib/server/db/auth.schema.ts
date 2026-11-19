@@ -31,9 +31,11 @@ export const user = mysqlTable('user', {
 	showAddToCalendar: boolean('show_add_to_calendar').default(true).notNull(),
 	// Groups you create start with auto-archive on (archived once their latest plan has passed).
 	autoArchiveNewGroups: boolean('auto_archive_new_groups').default(false).notNull(),
-	// Push categories turned off (["chat", …]) and quiet hours ({ from: "22:00", to: "07:00" }).
+	// Push categories turned off (["chat", …]) and quiet hours ({ from: "22:00", to: "07:00", catchUp: true }).
 	notificationOff: json('notification_off').$type<string[]>(),
-	quietHours: json('quiet_hours').$type<{ from: string; to: string } | null>()
+	quietHours: json('quiet_hours').$type<{ from: string; to: string; catchUp?: boolean } | null>(),
+	// The first push held back by quiet hours (with catchUp on) since the last catch-up: one summary push is due when they end.
+	quietHeldSince: timestamp('quiet_held_since', { fsp: 3 })
 });
 
 export const session = mysqlTable(

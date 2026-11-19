@@ -75,6 +75,7 @@ class NotificationSettingsRepository @Inject constructor(
                     buildJsonObject {
                         put("from", JsonPrimitive(it.from))
                         put("to", JsonPrimitive(it.to))
+                        put("catchUp", JsonPrimitive(it.catchUp))
                     }
                 } ?: JsonNull,
             )

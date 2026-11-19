@@ -1,0 +1,1 @@
+ALTER TABLE `user` ADD `quiet_held_since` timestamp(3);

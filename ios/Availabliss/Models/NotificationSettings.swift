@@ -30,6 +30,9 @@ enum NotificationCategory: String, Codable, Sendable, CaseIterable, Identifiable
 struct QuietHours: Codable, Sendable, Equatable {
     var from: String
     var to: String
+    /// One push when they end, if anything came in meanwhile. Nil from an older server (off), and left
+    /// out of a save when nil, which keeps it as it was.
+    var catchUp: Bool? = nil
 
     static let `default` = QuietHours(from: "22:00", to: "07:00")
 }

@@ -59,14 +59,25 @@
 		save({ off: NOTIFICATION_CATEGORIES.filter((c) => off.includes(c)) });
 	}
 
+	// Like the times, kept while quiet hours are off.
+	let catchUp = $state(false);
+	$effect(() => {
+		if (settings?.quietHours) catchUp = settings.quietHours.catchUp;
+	});
+
 	function setQuiet(on: boolean) {
-		save({ quietHours: on ? { from: quietFrom || DEFAULT_QUIET.from, to: quietTo || DEFAULT_QUIET.to } : null });
+		save({ quietHours: on ? { from: quietFrom || DEFAULT_QUIET.from, to: quietTo || DEFAULT_QUIET.to, catchUp } : null });
 	}
 
 	function saveTimes() {
 		if (!settings?.quietHours || !quietFrom || !quietTo) return;
 		if (quietFrom === settings.quietHours.from && quietTo === settings.quietHours.to) return;
-		save({ quietHours: { from: quietFrom, to: quietTo } });
+		save({ quietHours: { from: quietFrom, to: quietTo, catchUp: settings.quietHours.catchUp } });
+	}
+
+	function setCatchUp(on: boolean) {
+		if (!settings?.quietHours) return;
+		save({ quietHours: { ...settings.quietHours, catchUp: on } });
 	}
 </script>
 
@@ -95,6 +106,13 @@
 				<div class="times">
 					<TextField label="From" type="time" bind:value={quietFrom} onchange={saveTimes} />
 					<TextField label="Until" type="time" bind:value={quietTo} onchange={saveTimes} />
+				</div>
+				<div class="row">
+					<span class="text">
+						<span class="label" id="notify-catch-up">Catch me up afterwards</span>
+						<span class="hint">One push when quiet hours end, if anything came in that you haven't seen</span>
+					</span>
+					<Toggle checked={settings.quietHours.catchUp} labelledby="notify-catch-up" onchange={setCatchUp} />
 				</div>
 			{/if}
 		</div>

@@ -101,9 +101,12 @@ enum class NotificationCategory(override val wire: String) : WireEnum {
     Nudges("nudges"),
 }
 
-/** No pushes between [from] and [to] (`HH:MM` in your time zone; may wrap midnight). */
+/**
+ * No pushes between [from] and [to] (`HH:MM` in your time zone; may wrap midnight). With [catchUp], one
+ * push when they end says what came in meanwhile (missing from an older server: off).
+ */
 @Serializable
-data class QuietHours(val from: String, val to: String)
+data class QuietHours(val from: String, val to: String, val catchUp: Boolean = false)
 
 /** A group you've muted, [until] an ISO instant or for good when null. */
 @Serializable

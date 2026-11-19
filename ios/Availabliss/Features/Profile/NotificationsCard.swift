@@ -68,14 +68,25 @@ struct NotificationsCard: View {
         .toggleStyle(.glassSwitch)
         if let hours = settings.quietHours {
             HStack(spacing: 8) {
-                timePicker("From", time: hours.from) { QuietHours(from: $0, to: hours.to) }
+                timePicker("From", time: hours.from) { QuietHours(from: $0, to: hours.to, catchUp: hours.catchUp) }
                 Image(systemName: "arrow.right")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(theme.muted)
                     .accessibilityHidden(true)
-                timePicker("To", time: hours.to) { QuietHours(from: hours.from, to: $0) }
+                timePicker("To", time: hours.to) { QuietHours(from: hours.from, to: $0, catchUp: hours.catchUp) }
                 Spacer(minLength: 0)
             }
+            .transition(.opacity)
+            Toggle(isOn: Binding(get: { hours.catchUp == true }, set: { setCatchUp($0, hours) })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Catch me up afterwards").bodyFont(15, .semibold)
+                    Text("One push when quiet hours end, if anything came in that you haven\u{2019}t seen.")
+                        .bodyFont(13, relativeTo: .subheadline)
+                        .foregroundStyle(theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.glassSwitch)
             .transition(.opacity)
         }
     }
@@ -112,6 +123,13 @@ struct NotificationsCard: View {
                 save(NotificationSettingsPatch(off: off, keeping: settings.unknownOff)) { $0.off = off }
             }
         )
+    }
+
+    private func setCatchUp(_ on: Bool, _ hours: QuietHours) {
+        var next = hours
+        next.catchUp = on
+        lastQuietHours = next
+        save(NotificationSettingsPatch(quietHours: .some(next))) { $0.quietHours = next }
     }
 
     private func setQuietHours(_ on: Bool) {
