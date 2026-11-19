@@ -20,7 +20,7 @@ struct GroupAvailabilityView: View {
     @State private var showsUpgrade = false
     /// Picked in the planner; opened as a proposal once the planner sheet has gone.
     @State private var plannedDraft: ProposalDraft?
-    /// Times shortlisted from Best options, in the order picked, to ask the group about in a date poll.
+    /// Times shortlisted (from Best options or a tapped day), in the order picked, to ask the group about in a date poll.
     @State private var shortlist: [Slot] = []
     @State private var showsAskGroup = false
     /// With a rhythm: the free time nearest the group's next meet-up.
@@ -315,10 +315,13 @@ struct GroupAvailabilityView: View {
             }
             // Only once a day's been tapped: nothing is selected to begin with.
             if let day = model.selection {
-                DayDetailCard(model: model, day: day, group: group, me: app.session.user?.id) { draft in
+                DayDetailCard(model: model, day: day, shortlist: $shortlist, group: group, me: app.session.user?.id) { draft in
                     proposalDraft = draft
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            if !shortlist.isEmpty {
+                ShortlistBar(shortlist: $shortlist) { showsAskGroup = true }
             }
             if model.mode == .month {
                 BestOptionsCard(

@@ -28,71 +28,11 @@ struct BestOptionsCard: View {
                     if index > 0 { Rectangle().fill(theme.line).frame(height: 1) }
                     row(slot, isTop: index == 0)
                 }
-                if !shortlist.isEmpty { shortlistBar }
             }
             .padding(14)
             .glass(cornerRadius: 22)
             .animation(.spring(response: 0.3, dampingFraction: 0.85), value: shortlist.map(\.id))
         }
-    }
-
-    /// "3 picked · Ask the group" once two or more are shortlisted; "Pick one more to ask the group" before.
-    private var shortlistBar: some View {
-        let ready = Self.pollRange.contains(shortlist.count)
-        return HStack(spacing: 10) {
-            Text(ready ? "\(shortlist.count) picked" : "Pick one more to ask the group")
-                .bodyFont(13, .semibold, relativeTo: .subheadline)
-                .foregroundStyle(ready ? theme.ink : theme.muted)
-            Spacer(minLength: 4)
-            Button("Clear") { shortlist = [] }
-                .buttonStyle(.textAction)
-            if ready {
-                Button(action: onAsk) {
-                    LoadingLabel(title: "Ask the group", systemImage: "bubble.left")
-                }
-                .buttonStyle(.filled(.primary, height: 36, cornerRadius: 12, fontSize: 13, fullWidth: false))
-            }
-        }
-        .padding(.top, 4)
-        .transition(.opacity.combined(with: .move(edge: .bottom)))
-        .accessibilityElement(children: .contain)
-    }
-
-    private func isShortlisted(_ slot: Slot) -> Bool { shortlist.contains { $0.id == slot.id } }
-
-    private func toggleShortlist(_ slot: Slot) {
-        if isShortlisted(slot) {
-            shortlist.removeAll { $0.id == slot.id }
-        } else if shortlist.count < Self.pollRange.upperBound {
-            shortlist.append(slot)
-        }
-    }
-
-    /// "Shortlist" / "Shortlisted": picks the time for a date poll.
-    private func shortlistToggle(_ slot: Slot) -> some View {
-        let isOn = isShortlisted(slot)
-        let isFull = !isOn && shortlist.count >= Self.pollRange.upperBound
-        return Button {
-            toggleShortlist(slot)
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: isOn ? "checkmark.circle.fill" : "plus.circle").font(.system(size: 12, weight: .semibold))
-                Text(isOn ? "Shortlisted" : "Shortlist")
-            }
-            .bodyFont(12, .semibold, relativeTo: .caption)
-            .foregroundStyle(isOn ? theme.accentInk : theme.muted)
-            .padding(.horizontal, 10)
-            .frame(height: 28)
-            .background(Capsule().fill(isOn ? theme.accentSoft : theme.line))
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(isFull)
-        .opacity(isFull ? 0.5 : 1)
-        .accessibilityLabel("Shortlist \(slot.label)")
-        .accessibilityAddTraits(isOn ? .isSelected : [])
-        .accessibilityHint(isFull ? "Five are shortlisted already" : "Adds it to a date poll for the group")
     }
 
     private func row(_ slot: Slot, isTop: Bool) -> some View {
@@ -108,7 +48,7 @@ struct BestOptionsCard: View {
                         .foregroundStyle(theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                shortlistToggle(slot).padding(.vertical, -6)
+                ShortlistToggle(slot: slot, shortlist: $shortlist).padding(.vertical, -6)
             }
             Spacer(minLength: 4)
             Button("Propose") { propose(ProposalDraft(slot: slot, requirement: group.requirement)) }
@@ -185,5 +125,72 @@ struct AskGroupSheet: View {
             .buttonStyle(.accent)
             .disabled(trimmedQuestion.isEmpty || isPosting)
         }
+    }
+}
+
+/// "Shortlist" / "Shortlisted": picks a time for a date poll (from Best options or a tapped day).
+struct ShortlistToggle: View {
+    let slot: Slot
+    @Binding var shortlist: [Slot]
+    @Environment(\.theme) private var theme
+
+    private var isOn: Bool { shortlist.contains { $0.id == slot.id } }
+
+    var body: some View {
+        let isFull = !isOn && shortlist.count >= BestOptionsCard.pollRange.upperBound
+        Button {
+            if isOn {
+                shortlist.removeAll { $0.id == slot.id }
+            } else if shortlist.count < BestOptionsCard.pollRange.upperBound {
+                shortlist.append(slot)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: isOn ? "checkmark.circle.fill" : "plus.circle").font(.system(size: 12, weight: .semibold))
+                Text(isOn ? "Shortlisted" : "Shortlist")
+            }
+            .bodyFont(12, .semibold, relativeTo: .caption)
+            .foregroundStyle(isOn ? theme.accentInk : theme.muted)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .background(Capsule().fill(isOn ? theme.accentSoft : theme.line))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isFull)
+        .opacity(isFull ? 0.5 : 1)
+        .accessibilityLabel("Shortlist \(slot.label)")
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+        .accessibilityHint(isFull ? "Five are shortlisted already" : "Adds it to a date poll for the group")
+    }
+}
+
+/// "3 picked · Ask the group" once two or more are shortlisted; "Pick one more to ask the group" before.
+/// Under the calendar in either view, so times shortlisted from a tapped day can be asked about too.
+struct ShortlistBar: View {
+    @Binding var shortlist: [Slot]
+    let onAsk: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let ready = BestOptionsCard.pollRange.contains(shortlist.count)
+        HStack(spacing: 10) {
+            Text(ready ? "\(shortlist.count) picked" : "Pick one more to ask the group")
+                .bodyFont(13, .semibold, relativeTo: .subheadline)
+                .foregroundStyle(ready ? theme.ink : theme.muted)
+            Spacer(minLength: 4)
+            Button("Clear") { shortlist = [] }
+                .buttonStyle(.textAction)
+            if ready {
+                Button(action: onAsk) {
+                    LoadingLabel(title: "Ask the group", systemImage: "bubble.left")
+                }
+                .buttonStyle(.filled(.primary, height: 36, cornerRadius: 12, fontSize: 13, fullWidth: false))
+            }
+        }
+        .padding(12)
+        .glass(cornerRadius: 20)
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
 }

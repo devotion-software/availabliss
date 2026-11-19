@@ -5,6 +5,8 @@ struct DayDetailCard: View {
     let model: GroupAvailabilityViewModel
     /// The day tapped.
     let day: CalendarDay
+    /// Times picked for a date poll; a day that works can be added beside Propose.
+    @Binding var shortlist: [Slot]
     let group: Group
     let me: String?
     let propose: (ProposalDraft) -> Void
@@ -54,10 +56,13 @@ struct DayDetailCard: View {
     @ViewBuilder
     private func proposeButton(works: Bool, slot: Slot?) -> some View {
         if works, let slot {
-            Button("Propose this \(group.requirement.slotNoun.rawValue)") {
-                propose(ProposalDraft(slot: slot, requirement: group.requirement))
+            HStack(spacing: 8) {
+                Button("Propose this \(group.requirement.slotNoun.rawValue)") {
+                    propose(ProposalDraft(slot: slot, requirement: group.requirement))
+                }
+                .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))
+                ShortlistToggle(slot: slot, shortlist: $shortlist)
             }
-            .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))
         } else if let free = model.dayDetails[day]?.everyoneFree.first {
             let nextDay = day.adding(days: 1).startDate()
             let allDay = free.start <= day.startDate() && free.end >= nextDay

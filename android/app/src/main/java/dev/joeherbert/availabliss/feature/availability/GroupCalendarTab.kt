@@ -268,7 +268,7 @@ fun GroupCalendarContent(
                     modifier = Modifier.swipeToStep(onPrevious = previous, onNext = next),
                 ) { page ->
                     when (page.view) {
-                        CalendarView.Month -> MonthSection(page, onSelectDate, onPlanWithAi, onPropose, onToggleShortlist, onAskGroup)
+                        CalendarView.Month -> MonthSection(page, onSelectDate, onPlanWithAi, onPropose, onToggleShortlist)
                         CalendarView.Week -> if (page.weekLoading && page.weekColumns.isEmpty()) LoadingIndicator()
                         // The time grid needs width: cards in portrait, the grid in landscape.
                         else if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -278,8 +278,10 @@ fun GroupCalendarContent(
                         }
                     }
                 }
-                // The selected day: whether it works, who's free when, and Propose.
-                state.detail?.let { DetailCard(it, state, onPropose, onProposeDay, onProposeSpan) }
+                // The selected day: whether it works, who's free when, Propose and Shortlist.
+                state.detail?.let { DetailCard(it, state, onPropose, onProposeDay, onProposeSpan, onToggleShortlist) }
+                // Picked times can come from other months, weeks and tapped days, so the bar shows in either view.
+                if (state.shortlist.isNotEmpty()) ShortlistBar(state.shortlist.size, onAskGroup)
             }
             Box(Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.tabBarClearance)) { snackbar() }
         }
@@ -459,7 +461,6 @@ private fun MonthSection(
     onPlanWithAi: (() -> Unit)?,
     onPropose: (Slot) -> Unit,
     onToggleShortlist: (Slot) -> Unit,
-    onAskGroup: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
         if (state.loading && state.monthRows.all { row -> row.all { it == null } }) {
@@ -482,8 +483,6 @@ private fun MonthSection(
         } else {
             onPlanWithAi?.let { PlanWithAiRow(it) }
         }
-        // Picked times can come from other months too, so the bar stays while paging.
-        if (state.shortlist.isNotEmpty()) ShortlistBar(state.shortlist.size, onAskGroup)
     }
 }
 
@@ -708,6 +707,7 @@ private fun DetailCard(
     onPropose: (Slot) -> Unit,
     onProposeDay: (LocalDate) -> Unit,
     onProposeSpan: (String, String) -> Unit,
+    onToggleShortlist: (Slot) -> Unit,
 ) {
     val colors = AvailablissTheme.colors
     Column(
@@ -734,15 +734,19 @@ private fun DetailCard(
         val slot = detail.slot
         val free = state.dayFree
         when {
-            slot != null && detail.proposeLabel != null -> PrimaryButton(
-                text = detail.proposeLabel,
-                onClick = { onPropose(slot) },
-                style = ButtonStyle.Accent,
-                height = 44.dp,
-                shape = Shapes.controlSmall,
-                textStyle = AvailablissTheme.type.bodySmallStrong,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            slot != null && detail.proposeLabel != null -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PrimaryButton(
+                    text = detail.proposeLabel,
+                    onClick = { onPropose(slot) },
+                    style = ButtonStyle.Accent,
+                    height = 44.dp,
+                    shape = Shapes.controlSmall,
+                    textStyle = AvailablissTheme.type.bodySmallStrong,
+                    modifier = Modifier.weight(1f),
+                )
+                val picked = state.shortlist.any { Shortlist.key(it) == Shortlist.key(slot) }
+                ShortlistToggle(picked, enabled = picked || state.shortlist.size < Shortlist.MAX, onToggle = { onToggleShortlist(slot) })
+            }
             free != null -> PrimaryButton(
                 text = run {
                     val start = DateTimes.localDateTime(free.first)
