@@ -246,7 +246,7 @@ struct TimingForm: View {
                 FlowLayout(spacing: 8) {
                     // With every day allowed, bank holidays are already included.
                     if !model.allowsEveryDay {
-                        Chip(label: (model.draft.bankHolidays ? "\u{2713} " : "+ ") + "Bank holidays count as weekends", isOn: model.draft.bankHolidays) {
+                        Chip(label: (model.draft.bankHolidays ? "\u{2713} " : "+ ") + "Include bank holidays", isOn: model.draft.bankHolidays) {
                             model.draft.bankHolidays.toggle()
                         }
                     }

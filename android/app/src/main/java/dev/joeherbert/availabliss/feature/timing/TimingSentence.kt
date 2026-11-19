@@ -191,7 +191,7 @@ internal fun TimingSentenceSection(state: TimingEditorUiState, canEdit: Boolean,
             // With every day allowed (none picked means any), bank holidays are already included.
             if (draft.isSpan || (draft.days.isNotEmpty() && draft.days.size < 7)) {
                 Chip(
-                    (if (draft.bankHolidays) "✓ " else "+ ") + "Bank holidays count as weekends",
+                    (if (draft.bankHolidays) "✓ " else "+ ") + "Include bank holidays",
                     selected = draft.bankHolidays,
                     onClick = { if (canEdit) actions.onBankHolidays(!draft.bankHolidays) },
                 )

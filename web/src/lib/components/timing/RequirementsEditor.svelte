@@ -40,7 +40,7 @@
 			<!-- With every day allowed (none picked means any), bank holidays are already included. -->
 			{#if requirement.length.type === 'span' || (requirement.days.length > 0 && new Set(requirement.days).size < 7)}
 				<Chip selected={requirement.bankHolidays} disabled={readonly} onclick={() => (requirement.bankHolidays = !requirement.bankHolidays)}>
-					{requirement.bankHolidays ? '✓' : '+'} Bank holidays count as weekends{regionLabel ? ` (${regionLabel})` : ''}
+					{requirement.bankHolidays ? '✓' : '+'} Include bank holidays{regionLabel ? ` (${regionLabel})` : ''}
 				</Chip>
 			{/if}
 			<Chip
