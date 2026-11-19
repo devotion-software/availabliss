@@ -21,13 +21,15 @@ object AvIcons {
     val Close = line("Close", "M6 6l12 12M18 6L6 18", stroke = 2.6f)
     val Check = line("Check", "M5 12l5 5L20 7", stroke = 3f)
     val Calendar = line("Calendar", rect(3f, 5f, 18f, 16f, 3f), "M3 10h18M8 3v4M16 3v4")
-    /** Connected calendars: a calendar with a sync arrow in the corner. */
+    /** Connected calendars: a calendar with two sync arrows going round in the corner. */
     val CalendarSync = line(
         "CalendarSync",
         "M3 10h18M8 3v4M16 3v4",
-        "M21 11V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h5",
-        "M21.5 17.5a4 4 0 1 1-1.17-2.83",
-        "M20.6 12.2v2.7h-2.7",
+        "M21 10V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h4.5",
+        "M13.33 16.02A3.8 3.8 0 0 1 20.11 14.82",
+        "M20.41 12.44L20.11 14.82L17.77 14.28",
+        "M20.67 17.98A3.8 3.8 0 0 1 13.89 19.18",
+        "M13.59 21.56L13.89 19.18L16.23 19.72",
     )
     val CalendarAdd = line("CalendarAdd", rect(3f, 5f, 18f, 16f, 3f), "M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5")
     /** Seven circles in a hexagon, like iOS's circle.hexagongrid. */

@@ -12,7 +12,7 @@
 		x: '<path d="M6 6l12 12M18 6L6 18"/>',
 		calendar: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',
 		'calendar-sync':
-			'<path d="M3 10h18M8 3v4M16 3v4"/><path d="M21 11V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h5"/><path d="M21.5 17.5a4 4 0 1 1-1.17-2.83"/><path d="M20.6 12.2v2.7h-2.7"/>',
+			'<path d="M3 10h18M8 3v4M16 3v4"/><path d="M21 10V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h4.5"/><path d="M13.33 16.02A3.8 3.8 0 0 1 20.11 14.82"/><path d="M20.41 12.44L20.11 14.82L17.77 14.28"/><path d="M20.67 17.98A3.8 3.8 0 0 1 13.89 19.18"/><path d="M13.59 21.56L13.89 19.18L16.23 19.72"/>',
 		'calendar-search':
 			'<path d="M3 10h18M8 3v4M16 3v4"/><path d="M21 11V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h5"/><circle cx="17.5" cy="17.5" r="3"/><path d="M19.7 19.7L22 22"/>',
 		'calendar-plus': '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/>',
