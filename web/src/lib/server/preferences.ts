@@ -45,31 +45,47 @@ export interface PreferenceInput {
 	window?: { from: string; to: string } | null;
 }
 
-export async function addPreference(groupId: string, userId: string, input: PreferenceInput): Promise<GroupPreference> {
-	await requireMember(groupId, userId);
+function validate(input: PreferenceInput): void {
 	if (input.kind === 'dates') {
 		if (!input.from || !input.to) throw badRequest('Choose the dates you prefer');
 		if (input.to < input.from) throw badRequest('The end date is before the start');
 	}
 	if (input.window && input.window.to <= input.window.from && input.window.to !== '00:00') throw badRequest('The end time is before the start');
+}
+
+/** The stored columns for a preference (the fields its kind doesn't use are cleared). */
+const columns = (input: PreferenceInput) => ({
+	kind: input.kind,
+	fromDate: input.kind === 'dates' ? input.from! : null,
+	toDate: input.kind === 'dates' ? input.to! : null,
+	days: input.kind === 'weekly' ? [...new Set(input.days ?? [])].sort() : [],
+	windowFrom: input.kind === 'weekly' ? (input.window?.from ?? null) : null,
+	windowTo: input.kind === 'weekly' ? (input.window?.to ?? null) : null
+});
+
+export async function addPreference(groupId: string, userId: string, input: PreferenceInput): Promise<GroupPreference> {
+	await requireMember(groupId, userId);
+	validate(input);
 	const mine = await db
 		.select({ id: groupPreferences.id })
 		.from(groupPreferences)
 		.where(and(eq(groupPreferences.groupId, groupId), eq(groupPreferences.userId, userId)));
 	if (mine.length >= MAX_PER_MEMBER) throw badRequest(`You can have up to ${MAX_PER_MEMBER} preferences in a group`);
 	const id = newId();
-	await db.insert(groupPreferences).values({
-		id,
-		groupId,
-		userId,
-		kind: input.kind,
-		fromDate: input.kind === 'dates' ? input.from! : null,
-		toDate: input.kind === 'dates' ? input.to! : null,
-		days: input.kind === 'weekly' ? [...new Set(input.days ?? [])].sort() : [],
-		windowFrom: input.kind === 'weekly' ? (input.window?.from ?? null) : null,
-		windowTo: input.kind === 'weekly' ? (input.window?.to ?? null) : null
-	});
+	await db.insert(groupPreferences).values({ id, groupId, userId, ...columns(input) });
 	const row = (await db.query.groupPreferences.findFirst({ where: eq(groupPreferences.id, id) }))!;
+	return toPreference(row, (await getGroupRow(groupId)).requirement.timezone);
+}
+
+/** Changes one of your own preferences in place (its kind too), keeping its place in the list. */
+export async function updatePreference(groupId: string, userId: string, id: string, input: PreferenceInput): Promise<GroupPreference> {
+	await requireMember(groupId, userId);
+	validate(input);
+	const mine = and(eq(groupPreferences.id, id), eq(groupPreferences.groupId, groupId), eq(groupPreferences.userId, userId));
+	const existing = await db.query.groupPreferences.findFirst({ where: mine });
+	if (!existing) throw notFound('Preference not found');
+	await db.update(groupPreferences).set(columns(input)).where(mine);
+	const row = (await db.query.groupPreferences.findFirst({ where: mine }))!;
 	return toPreference(row, (await getGroupRow(groupId)).requirement.timezone);
 }
 

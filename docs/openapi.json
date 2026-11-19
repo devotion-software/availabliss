@@ -5088,6 +5088,84 @@
 			}
 		},
 		"/api/v1/groups/{id}/preferences/{prefId}": {
+			"put": {
+				"operationId": "putGroupsByIdPreferencesByPrefId",
+				"tags": [
+					"Preferences"
+				],
+				"summary": "Change one of your preferred times",
+				"description": "Signed in.",
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "prefId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/PreferenceBody"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/GroupPreference"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "validation_error: the body or query is invalid",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "unauthorized: not signed in",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "rate_limited (see Retry-After)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					}
+				}
+			},
 			"delete": {
 				"operationId": "deleteGroupsByIdPreferencesByPrefId",
 				"tags": [

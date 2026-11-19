@@ -170,6 +170,9 @@ class GroupsRepository @Inject constructor(
     suspend fun addPreference(groupId: String, body: dev.joeherbert.availabliss.core.network.model.NewGroupPreference) =
         call { api.addPreference(groupId, body) }
 
+    suspend fun updatePreference(groupId: String, id: String, body: dev.joeherbert.availabliss.core.network.model.NewGroupPreference) =
+        call { api.updatePreference(groupId, id, body) }
+
     suspend fun removePreference(groupId: String, id: String): ApiResult<Unit> = call { api.removePreference(groupId, id) }
 
     suspend fun invites(groupId: String): ApiResult<List<GroupInvite>> = call { api.invites(groupId).invites }

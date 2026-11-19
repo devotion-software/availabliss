@@ -174,6 +174,10 @@ enum API {
         static func addPreference(groupId: String, _ body: NewGroupPreference) -> Endpoint<GroupPreference> {
             .init(.post, "/groups/\(groupId.pathEncoded)/preferences", body: body)
         }
+        /// Changes one of your preferred times in place (same body as adding one).
+        static func updatePreference(groupId: String, id: String, _ body: NewGroupPreference) -> Endpoint<GroupPreference> {
+            .init(.put, "/groups/\(groupId.pathEncoded)/preferences/\(id.pathEncoded)", body: body)
+        }
         static func removePreference(groupId: String, id: String) -> Endpoint<EmptyResponse> {
             .init(.delete, "/groups/\(groupId.pathEncoded)/preferences/\(id.pathEncoded)")
         }

@@ -243,6 +243,7 @@ export const endpoints: Endpoint[] = [
 	{ method: 'PATCH', path: '/groups/{id}/members/me', tag: 'Members', auth: 'user', summary: 'The name you go by in this group', body: s.memberNameSchema, response: 'Member' },
 	{ method: 'GET', path: '/groups/{id}/preferences', tag: 'Preferences', auth: 'user', summary: "Every member's preferred times", response: obj({ preferences: list('GroupPreference') }) },
 	{ method: 'POST', path: '/groups/{id}/preferences', tag: 'Preferences', auth: 'user', summary: 'Add a preferred time', body: s.preferenceSchema, status: 201, response: 'GroupPreference' },
+	{ method: 'PUT', path: '/groups/{id}/preferences/{prefId}', tag: 'Preferences', auth: 'user', summary: 'Change one of your preferred times', body: s.preferenceSchema, response: 'GroupPreference' },
 	{ method: 'DELETE', path: '/groups/{id}/preferences/{prefId}', tag: 'Preferences', auth: 'user', summary: 'Delete one of your preferred times', status: 204 },
 
 	// Invites

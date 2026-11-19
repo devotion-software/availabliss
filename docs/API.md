@@ -532,6 +532,7 @@ muted and can't be tapped, and the date pickers start at today (or an edited blo
 | POST 👑 | `/groups/:id/nudge` | | `{ nudged: number }` (push/email to unsynced members, rate limited to once per 12h) |
 | GET 🔒 | `/groups/:id/preferences` | | `{ preferences: GroupPreference[] }` (every member's) |
 | POST 🔒 | `/groups/:id/preferences` | `{ kind: 'dates', from, to }` or `{ kind: 'weekly', days?: Weekday[], window?: { from, to } \| null }` | `GroupPreference` |
+| PUT 🔒 | `/groups/:id/preferences/:prefId` | as POST (the kind can change too) | `GroupPreference`: changes one of your own in place (`404` for anyone else's) |
 | DELETE 🔒 | `/groups/:id/preferences/:prefId` | | 204 (your own only) |
 | GET 👑 | `/groups/:id/invites` | | `{ invites: GroupInvite[] }` (live ones, newest first: unexpired and not used up; joining also removes any other invites to that group sent to you) |
 | POST 👑 | `/groups/:id/invites` | `{ emails?: string[], usernames?: string[], userIds?: string[], email?: string, maxUses?: number \| null }` (≤ 20 people; `maxUses` 1–1000 or null for a link) | `{ token, url, expiresAt, invites: GroupInvite[] }` (token/url/expiresAt: the first) |

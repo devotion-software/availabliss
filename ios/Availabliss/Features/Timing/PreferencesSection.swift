@@ -10,6 +10,8 @@ struct PreferencesSection: View {
     @Environment(\.theme) private var theme
     @State private var preferences: [GroupPreference] = []
     @State private var adding = false
+    /// One of yours being changed in the same sheet.
+    @State private var editing: GroupPreference?
     @State private var error: String?
 
     private var me: String? { app.session.user?.id }
@@ -35,9 +37,21 @@ struct PreferencesSection: View {
             if !mine.isEmpty {
                 Text("Yours").sectionLabelStyle().padding(.top, 4)
                 ForEach(mine) { pref in
-                    HStack {
-                        Text(pref.label).bodyFont(15, .medium)
-                        Spacer()
+                    HStack(spacing: 14) {
+                        // Tap it (or Change) to change it in place.
+                        Button {
+                            editing = pref
+                        } label: {
+                            Text(pref.label).bodyFont(15, .medium).foregroundStyle(theme.ink)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Change \(pref.label)")
+                        Button("Change") { editing = pref }
+                            .bodyFont(13, .semibold, relativeTo: .subheadline)
+                            .foregroundStyle(theme.accentInk)
+                            .accessibilityHidden(true)
                         Button("Remove") { Task { await remove(pref) } }
                             .bodyFont(13, .semibold, relativeTo: .subheadline)
                             .foregroundStyle(theme.warnInk)
@@ -70,6 +84,12 @@ struct PreferencesSection: View {
                 preferences.append(made)
             }
         }
+        .sheet(item: $editing) { pref in
+            AddPreferenceSheet(editing: pref) { body in
+                let changed = try await api.send(API.Groups.updatePreference(groupId: group.id, id: pref.id, body))
+                if let index = preferences.firstIndex(where: { $0.id == changed.id }) { preferences[index] = changed }
+            }
+        }
         .errorAlert($error)
     }
 
@@ -88,6 +108,8 @@ struct PreferencesSection: View {
 }
 
 private struct AddPreferenceSheet: View {
+    /// Changing one of yours: the sheet starts filled in with it.
+    var editing: GroupPreference?
     let save: (NewGroupPreference) async throws -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
@@ -105,7 +127,7 @@ private struct AddPreferenceSheet: View {
     @State private var error: String?
 
     var body: some View {
-        BottomSheet(title: "Add a preferred time") {
+        BottomSheet(title: editing == nil ? "Add a preferred time" : "Change a preferred time") {
             SegmentedControl(
                 selection: $kind,
                 options: [SegmentOption(value: .weekly, label: "Repeating"), SegmentOption(value: .dates, label: "Specific dates")],
@@ -153,12 +175,39 @@ private struct AddPreferenceSheet: View {
             Button {
                 Task { await submit() }
             } label: {
-                LoadingLabel(title: "Save preference", isLoading: isSaving)
+                LoadingLabel(title: editing == nil ? "Save preference" : "Save changes", isLoading: isSaving)
             }
             .buttonStyle(.filled(.primary, height: 54, cornerRadius: 18))
             .disabled(isSaving || (kind == .dates && dates == nil))
         }
         .errorAlert($error)
+        .onAppear(perform: fill)
+    }
+
+    /// Starts from the preference being changed.
+    private func fill() {
+        guard let pref = editing else { return }
+        switch pref.kind {
+        case .dates:
+            kind = .dates
+            if let from = pref.from.flatMap(CalendarDay.init(string:)), let to = pref.to.flatMap(CalendarDay.init(string:)) {
+                dates = DateRange(from: from, to: to)
+            }
+        case .weekly:
+            kind = .weekly
+            days = Set(pref.days)
+            if let window = pref.window, let start = WallTime(string: window.from) {
+                from = start.date()
+                if window.to == "23:59" || window.to == "00:00" {
+                    timing = .after
+                } else {
+                    timing = .between
+                    if let end = WallTime(string: window.to) { to = end.date() }
+                }
+            } else {
+                timing = .any
+            }
+        }
     }
 
     private func submit() async {

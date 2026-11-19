@@ -283,6 +283,14 @@ interface AvailablissApi {
     @POST("api/v1/groups/{id}/preferences")
     suspend fun addPreference(@Path("id") groupId: String, @Body body: dev.joeherbert.availabliss.core.network.model.NewGroupPreference): dev.joeherbert.availabliss.core.network.model.GroupPreference
 
+    /** Changes one of your preferred times in place (same body as adding one). */
+    @PUT("api/v1/groups/{id}/preferences/{prefId}")
+    suspend fun updatePreference(
+        @Path("id") groupId: String,
+        @Path("prefId") prefId: String,
+        @Body body: dev.joeherbert.availabliss.core.network.model.NewGroupPreference,
+    ): dev.joeherbert.availabliss.core.network.model.GroupPreference
+
     @DELETE("api/v1/groups/{id}/preferences/{prefId}")
     suspend fun removePreference(@Path("id") groupId: String, @Path("prefId") prefId: String)
 

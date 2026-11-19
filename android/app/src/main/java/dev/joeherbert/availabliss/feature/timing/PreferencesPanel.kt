@@ -68,7 +68,7 @@ data class PreferencesUiState(
     val others get() = preferences.filter { it.userId != meId }
 }
 
-/** A group's preferred times: everyone's, and adding / removing your own. */
+/** A group's preferred times: everyone's, and adding, changing and removing your own. */
 @HiltViewModel
 class PreferencesViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -101,20 +101,29 @@ class PreferencesViewModel @Inject constructor(
         }
     }
 
-    /** Saves a preference; returns via [onDone] when it worked. */
-    fun add(body: NewGroupPreference, onDone: () -> Unit) {
+    /** Saves a new preference, or changes [editing] in place; returns via [onDone] when it worked. */
+    fun save(body: NewGroupPreference, editing: GroupPreference? = null, onDone: () -> Unit) {
         if (_state.value.saving) return
         _state.update { it.copy(saving = true, error = null) }
         viewModelScope.launch {
-            when (val result = groups.addPreference(groupId, body)) {
+            val result = if (editing == null) groups.addPreference(groupId, body) else groups.updatePreference(groupId, editing.id, body)
+            when (result) {
                 is ApiResult.Success -> {
-                    _state.update { it.copy(saving = false, preferences = it.preferences + result.value) }
+                    val saved = result.value
+                    _state.update {
+                        it.copy(
+                            saving = false,
+                            preferences = if (editing == null) it.preferences + saved else it.preferences.map { p -> if (p.id == saved.id) saved else p },
+                        )
+                    }
                     onDone()
                 }
                 is ApiResult.Failure -> _state.update { it.copy(saving = false, error = result.error.message) }
             }
         }
     }
+
+    fun clearError() = _state.update { it.copy(error = null) }
 
     fun remove(pref: GroupPreference) {
         viewModelScope.launch {
@@ -135,6 +144,8 @@ fun PreferencesPanel(viewModel: PreferencesViewModel = hiltViewModel()) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
     var adding by remember { mutableStateOf(false) }
+    // One of yours being changed in the same sheet.
+    var editing by remember { mutableStateOf<GroupPreference?>(null) }
     GlassPanel(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(AvIcons.Heart, null, tint = colors.accentInk, modifier = Modifier.padding(end = 6.dp))
@@ -150,7 +161,14 @@ fun PreferencesPanel(viewModel: PreferencesViewModel = hiltViewModel()) {
             Text("Yours", style = type.label, color = colors.muted)
             state.mine.forEach { pref ->
                 Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(pref.label, style = type.bodyMedium, color = colors.ink, modifier = Modifier.weight(1f))
+                    // Tap it (or Change) to change it in place.
+                    Text(
+                        pref.label,
+                        style = type.bodyMedium,
+                        color = colors.ink,
+                        modifier = Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Change") { editing = pref },
+                    )
+                    TextAction("Change", { editing = pref }, color = colors.accentInk)
                     TextAction("Remove", { viewModel.remove(pref) }, color = colors.warnInk)
                 }
             }
@@ -165,21 +183,41 @@ fun PreferencesPanel(viewModel: PreferencesViewModel = hiltViewModel()) {
             }
         }
     }
-    if (adding) AddPreferenceSheet(state.saving, state.error, onDismiss = { adding = false }) { body -> viewModel.add(body) { adding = false } }
+    if (adding) {
+        AddPreferenceSheet(state.saving, state.error, onDismiss = {
+            adding = false
+            viewModel.clearError()
+        }) { body -> viewModel.save(body) { adding = false } }
+    }
+    editing?.let { pref ->
+        AddPreferenceSheet(state.saving, state.error, editing = pref, onDismiss = {
+            editing = null
+            viewModel.clearError()
+        }) { body -> viewModel.save(body, editing = pref) { editing = null } }
+    }
 }
 
 @Composable
-private fun AddPreferenceSheet(saving: Boolean, error: String?, onDismiss: () -> Unit, onSave: (NewGroupPreference) -> Unit) {
+private fun AddPreferenceSheet(
+    saving: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    // Changing one of yours: the sheet starts filled in with it.
+    editing: GroupPreference? = null,
+    onSave: (NewGroupPreference) -> Unit,
+) {
     val colors = AvailablissTheme.colors
-    var kind by remember { mutableStateOf("weekly") }
-    var days by remember { mutableStateOf(setOf(5, 6)) }
-    var timing by remember { mutableStateOf("any") }
-    var from by remember { mutableStateOf("16:00") }
-    var to by remember { mutableStateOf("22:00") }
-    var fromDate by remember { mutableStateOf(DateTimes.today()) }
-    var toDate by remember { mutableStateOf(DateTimes.today()) }
+    val window = editing?.window
+    val untilEnd = window != null && (window.to == "23:59" || window.to == "00:00")
+    var kind by remember { mutableStateOf(editing?.kind ?: "weekly") }
+    var days by remember { mutableStateOf(editing?.days?.toSet() ?: setOf(5, 6)) }
+    var timing by remember { mutableStateOf(if (window == null) "any" else if (untilEnd) "after" else "between") }
+    var from by remember { mutableStateOf(window?.from ?: "16:00") }
+    var to by remember { mutableStateOf(window?.takeIf { !untilEnd }?.to ?: "22:00") }
+    var fromDate by remember { mutableStateOf(editing?.from?.let(DateTimes::parseDate) ?: DateTimes.today()) }
+    var toDate by remember { mutableStateOf(editing?.to?.let(DateTimes::parseDate) ?: DateTimes.today()) }
     var pickingDates by remember { mutableStateOf(false) }
-    AvBottomSheet(title = "Add a preferred time", onDismissRequest = onDismiss) {
+    AvBottomSheet(title = if (editing == null) "Add a preferred time" else "Change a preferred time", onDismissRequest = onDismiss) {
         SegmentedControl(segments = listOf(Segment("weekly", "Repeating"), Segment("dates", "Specific dates")), selected = kind, onSelect = { kind = it })
         if (kind == "weekly") {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -211,7 +249,7 @@ private fun AddPreferenceSheet(saving: Boolean, error: String?, onDismiss: () ->
         }
         error?.let { Text(it, color = colors.warnInk, style = AvailablissTheme.type.caption) }
         PrimaryButton(
-            "Save preference",
+            if (editing == null) "Save preference" else "Save changes",
             {
                 onSave(
                     if (kind == "dates") NewGroupPreference(kind = "dates", from = fromDate.toString(), to = toDate.toString())

@@ -145,4 +145,7 @@ export const addPreference = (
 	groupId: string,
 	body: { kind: 'dates'; from: string; to: string } | { kind: 'weekly'; days: Weekday[]; window: { from: string; to: string } | null }
 ) => api.post<GroupPreference>(`/groups/${groupId}/preferences`, body);
+/** Changes one of your preferred times in place (same body as adding one). */
+export const updatePreference = (groupId: string, id: string, body: Parameters<typeof addPreference>[1]) =>
+	api.put<GroupPreference>(`/groups/${groupId}/preferences/${id}`, body);
 export const removePreference = (groupId: string, id: string) => api.del(`/groups/${groupId}/preferences/${id}`);
