@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// "Best options" under the month: the top three upcoming times, fewest missing first, then by the
-/// Pro best-date score, each with Propose. Shown to Pro viewers, and to anyone once the group's
-/// timing lets a time work without everyone (so who's missing is worth ranking). Shortlist two to five
+/// Pro best-date score, then by members' preferred times, each with Propose. Shown to Pro viewers,
+/// to anyone once the group's timing lets a time work without everyone (so who's missing is worth
+/// ranking), and whenever a time fits someone's preferences. Shortlist two to five
 /// of them (across months too) to ask the group in a date poll.
 struct BestOptionsCard: View {
     let model: GroupAvailabilityViewModel
@@ -21,7 +22,8 @@ struct BestOptionsCard: View {
     var body: some View {
         let options = model.bestOptions()
         let hasMissing = model.availability?.slots.contains { $0.missingMemberIds != nil } ?? false
-        if !options.isEmpty, isPro || hasMissing {
+        let hasPreferences = options.contains { !($0.preferredBy ?? []).isEmpty }
+        if !options.isEmpty, isPro || hasMissing || hasPreferences {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Best options").sectionLabelStyle()
                 ForEach(Array(options.enumerated()), id: \.element.id) { index, slot in
@@ -67,6 +69,7 @@ struct BestOptionsCard: View {
         } else {
             lines.append("Everyone\u{2019}s free")
         }
+        if let prefers = Clash.prefers(slot.preferredBy ?? [], group: group, me: me) { lines.append(prefers) }
         return lines
     }
 }

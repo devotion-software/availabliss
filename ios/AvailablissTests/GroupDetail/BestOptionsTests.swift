@@ -45,7 +45,8 @@ struct BestOptionsTests {
             slot(11, missing: ["ana", "tom"], score: 9),
         ])
         #expect(model.availability?.slots.count == 6)
-        #expect(labels(model.bestOptions(limit: 10, now: now)) == ["Day 14", "Day 13", "Day 15", "Day 16", "Day 12", "Day 11"])
+        // Preferences come before soonest: Day 16 (Ana prefers it) above Day 15.
+        #expect(labels(model.bestOptions(limit: 10, now: now)) == ["Day 14", "Day 13", "Day 16", "Day 15", "Day 12", "Day 11"])
     }
 
     @Test func pastSlotsAreSkippedAndTheTopThreeKept() async {

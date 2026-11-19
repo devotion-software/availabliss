@@ -37,6 +37,15 @@ enum Clash {
         return "Fair for \(listNames(mine ? ["you"] + others : others)), who missed out last time"
     }
 
+    /// "Ana prefers it", "You prefer it", "You and Ana prefer it": whose preferred times it fits.
+    static func prefers(_ ids: [String], group: Group?, me: String?) -> String? {
+        guard !ids.isEmpty else { return nil }
+        let mine = me.map(ids.contains) ?? false
+        let others = ids.filter { $0 != me }.map { firstName($0, group) }
+        let names = mine ? ["You"] + others : others
+        return "\(listNames(names)) \(names.count == 1 && !mine ? "prefers" : "prefer") it"
+    }
+
     /// "Priya", "Priya and Alex", "Priya, Alex and Jo", "Priya, Alex, Jo and 2 others".
     static func listNames(_ names: [String], max: Int = 3) -> String {
         guard names.count > 1 else { return names.first ?? "" }
