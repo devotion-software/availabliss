@@ -42,6 +42,9 @@
 			activity.markAllRead();
 		});
 	});
+
+	/** The group's tile colour behind the icon (`var(--t3)`), or nothing for items without a group. */
+	const tileOf = (n: AppNotification) => (n.groupColor && /^t[1-5]$/.test(n.groupColor) ? `var(--${n.groupColor})` : undefined);
 </script>
 
 <svelte:head><title>Activity · Availabliss</title></svelte:head>
@@ -58,7 +61,7 @@
 			{#each items as n (n.id)}
 				<li>
 					<a href={notificationHref(n)} class:unread={unreadIds.has(n.id) || !n.readAt}>
-						<span class="icon"><Icon name={ICON[n.kind] ?? 'bell'} size={18} /></span>
+						<span class="icon" class:grouped={!!tileOf(n)} style:--tile={tileOf(n)}><Icon name={ICON[n.kind] ?? 'bell'} size={18} /></span>
 						<span class="text">
 							<span class="title">
 								{n.title}{#if n.kind === 'message' && !n.readAt && Number(n.data.count) > 1}<span class="count">{n.data.count} new</span>{/if}
@@ -123,6 +126,11 @@
 	.unread .icon {
 		background: var(--accent-soft);
 		color: var(--accent-ink);
+	}
+	/* On the group's own colour, so you can tell groups apart at a glance. */
+	.icon.grouped {
+		background: var(--tile);
+		color: var(--ink);
 	}
 	.text {
 		flex: 1;

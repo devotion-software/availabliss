@@ -8173,6 +8173,13 @@
 							"null"
 						]
 					},
+					"groupColor": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "The group's tile colour token (`t1`–`t5`), behind the item's icon; null without a group."
+					},
 					"kind": {
 						"$ref": "#/components/schemas/NotificationKind"
 					},
@@ -8201,6 +8208,7 @@
 				"required": [
 					"id",
 					"groupId",
+					"groupColor",
 					"kind",
 					"title",
 					"body",

@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { AppNotification, NotificationKind } from '#lib/types';
 import { db } from './db';
-import { devices, notifications } from './db/schema';
+import { devices, groups, notifications } from './db/schema';
 import { newId } from './ids';
 import { publishToUsers } from './realtime';
 import { sendPush } from './push';
@@ -29,9 +29,10 @@ interface NotifyInput {
 
 type Row = typeof notifications.$inferSelect;
 
-const toNotification = (row: Row): AppNotification => ({
+const toNotification = (row: Row, groupColor: string | null): AppNotification => ({
 	id: row.id,
 	groupId: row.groupId,
+	groupColor: row.groupId ? groupColor : null,
 	kind: row.kind,
 	title: row.title,
 	body: row.body,
@@ -39,6 +40,13 @@ const toNotification = (row: Row): AppNotification => ({
 	readAt: row.readAt?.toISOString() ?? null,
 	createdAt: row.createdAt.toISOString()
 });
+
+/** The group's tile colour, sent with its Activity items. */
+async function colorOf(groupId: string | null | undefined): Promise<string | null> {
+	if (!groupId) return null;
+	const [row] = await db.select({ color: groups.color }).from(groups).where(eq(groups.id, groupId)).limit(1);
+	return row?.color ?? null;
+}
 
 /** Records an Activity item, publishes it live, and sends a push to each user. */
 export async function notify(userIds: string[], input: NotifyInput): Promise<void> {
@@ -61,11 +69,12 @@ export async function notify(userIds: string[], input: NotifyInput): Promise<voi
 			createdAt: now
 		}));
 		await db.insert(notifications).values(rows);
+		const color = await colorOf(input.groupId);
 		for (const row of rows) {
 			publishToUsers([row.userId], {
 				type: 'notification.created',
 				groupId: row.groupId,
-				payload: toNotification(row)
+				payload: toNotification(row, color)
 			});
 		}
 	}
@@ -87,6 +96,7 @@ async function upsertPerGroup(userIds: string[], groupId: string, input: NotifyI
 		.where(and(inArray(notifications.userId, userIds), eq(notifications.groupId, groupId), eq(notifications.kind, input.kind)));
 	const byUser = new Map(existing.map((row) => [row.userId, row]));
 	const now = new Date();
+	const color = await colorOf(groupId);
 	for (const userId of userIds) {
 		const prev = byUser.get(userId);
 		const count = prev && !prev.readAt ? (Number(prev.data.count) || 1) + 1 : 1;
@@ -109,7 +119,7 @@ async function upsertPerGroup(userIds: string[], groupId: string, input: NotifyI
 		} else {
 			await db.insert(notifications).values(row);
 		}
-		publishToUsers([userId], { type: 'notification.created', groupId, payload: toNotification(row) });
+		publishToUsers([userId], { type: 'notification.created', groupId, payload: toNotification(row, color) });
 	}
 }
 
@@ -132,8 +142,9 @@ export async function markChatRead(userId: string, groupId: string): Promise<voi
 				unread.map((r) => r.id)
 			)
 		);
+	const color = await colorOf(groupId);
 	for (const row of unread) {
-		publishToUsers([userId], { type: 'notification.created', groupId, payload: toNotification({ ...row, readAt }) });
+		publishToUsers([userId], { type: 'notification.created', groupId, payload: toNotification({ ...row, readAt }, color) });
 	}
 }
 
@@ -152,13 +163,19 @@ export async function removeInviteNotification(userId: string, token: string): P
 
 export async function listNotifications(userId: string) {
 	const [rows, [{ unread }]] = await Promise.all([
-		db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(100),
+		db
+			.select({ row: notifications, color: groups.color })
+			.from(notifications)
+			.leftJoin(groups, eq(groups.id, notifications.groupId))
+			.where(eq(notifications.userId, userId))
+			.orderBy(desc(notifications.createdAt))
+			.limit(100),
 		db
 			.select({ unread: sql<number>`count(*)` })
 			.from(notifications)
 			.where(and(eq(notifications.userId, userId), isNull(notifications.readAt)))
 	]);
-	return { notifications: rows.map(toNotification), unread: Number(unread) };
+	return { notifications: rows.map(({ row, color }) => toNotification(row, color)), unread: Number(unread) };
 }
 
 /**

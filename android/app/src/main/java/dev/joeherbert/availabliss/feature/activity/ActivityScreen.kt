@@ -193,8 +193,10 @@ private fun NotificationRow(item: NotificationUi, onClick: () -> Unit) {
         onClickLabel = "Open",
     ) {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
-            Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(colors.accentSoft), contentAlignment = Alignment.Center) {
-                Icon(item.kind.icon(), null, tint = colors.accentInk, modifier = Modifier.size(17.dp))
+            // On the group's own colour, so groups are easy to tell apart.
+            val tile = item.groupColor?.let(colors::tile)
+            Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(tile ?: colors.accentSoft), contentAlignment = Alignment.Center) {
+                Icon(item.kind.icon(), null, tint = if (tile != null) colors.ink else colors.accentInk, modifier = Modifier.size(17.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {

@@ -12,6 +12,7 @@ import dev.joeherbert.availabliss.core.live.LivePayload
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.AppNotification
 import dev.joeherbert.availabliss.core.network.model.NotificationKind
+import dev.joeherbert.availabliss.core.network.model.TileColor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +32,8 @@ data class NotificationUi(
     val link: DeepLink?,
     /** "3 new" on a group's unread chat item with more than one message. */
     val newCount: Int? = null,
+    /** The group's colour behind the icon; null without a group. */
+    val groupColor: TileColor? = null,
 )
 
 data class ActivityUiState(
@@ -144,6 +147,7 @@ class ActivityViewModel @Inject constructor(
         body = body,
         time = DateTimes.relative(createdAt),
         unread = readAt == null,
+        groupColor = TileColor.entries.firstOrNull { it.name.equals(groupColor, ignoreCase = true) },
         newCount = data["count"]?.toIntOrNull()?.takeIf { kind == NotificationKind.Message && readAt == null && it > 1 },
         link = DeepLink.fromPushData(
             buildMap {

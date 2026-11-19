@@ -502,6 +502,8 @@ export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 export interface AppNotification {
 	id: string;
 	groupId: string | null;
+	/** The group's tile colour token (`t1`–`t5`), behind the item's icon; null without a group. */
+	groupColor: string | null;
 	kind: NotificationKind;
 	title: string;
 	body: string;

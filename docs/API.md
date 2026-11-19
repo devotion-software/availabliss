@@ -845,6 +845,7 @@ Native apps keep this open while foregrounded and rely on push otherwise.
 ```ts
 interface Notification {
   id: string; groupId: string | null;
+  groupColor: string | null;           // the group's tile colour (t1–t5), behind the item's icon
   kind: 'proposal.created' | 'proposal.confirmed' | 'proposal.changed' | 'nudge' | 'invite.accepted' | 'invite.received' | 'message' | 'event.created' | 'reminder'
       | 'role.changed';                // clients show kinds they don't know with a generic icon and open the group (or proposal) from `data`
   title: string; body: string;

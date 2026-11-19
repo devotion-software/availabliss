@@ -167,8 +167,10 @@ private struct NotificationRow: View {
         }
     }
 
+    /// On the group's own colour, so groups are easy to tell apart; the kind's colour without a group.
     private var tint: (background: Color, foreground: Color) {
-        switch notification.kind {
+        if let color = notification.groupColor { return (theme.tile(color), theme.ink) }
+        return switch notification.kind {
         case .proposalConfirmed: (theme.okBg, theme.okInk)
         case .nudge, .proposalChanged: (theme.warnBg, theme.warnInk)
         default: (theme.accentSoft, theme.accentInk)

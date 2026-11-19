@@ -38,6 +38,8 @@ object NotificationKindSerializer :
 data class AppNotification(
     val id: String,
     val groupId: String? = null,
+    /** The group's tile colour token (`t1`–`t5`), behind the item's icon. A string so an unknown one can't fail the list. */
+    val groupColor: String? = null,
     val kind: NotificationKind,
     val title: String,
     val body: String,

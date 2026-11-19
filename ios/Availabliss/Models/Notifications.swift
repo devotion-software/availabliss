@@ -28,6 +28,8 @@ struct AppNotification: Decodable, Sendable, Identifiable, Equatable {
 
     let id: String
     let groupId: String?
+    /// The group's tile colour token (`t1`–`t5`), behind the item's icon.
+    var groupColor: String?
     let kind: Kind
     let title: String
     let body: String
