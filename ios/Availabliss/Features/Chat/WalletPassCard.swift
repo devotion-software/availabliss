@@ -177,12 +177,17 @@ struct WalletPassCard: View {
             .buttonStyle(.plain)
             .accessibilityHint("Opens it in Wallet")
         } else {
-            AddPassButton(action: add)
-                .frame(height: 40)
-                .frame(maxWidth: .infinity)
-                .opacity(isPreparing ? 0.5 : 1)
-                .overlay { if isPreparing { ProgressView().tint(.white) } }
-                .accessibilityLabel("Add to Apple Wallet")
+            Button(action: add) {
+                AddPassButton()
+                    .frame(height: 40)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.pressable)
+            .disabled(isPreparing)
+            .opacity(isPreparing ? 0.5 : 1)
+            .overlay { if isPreparing { ProgressView().tint(.white) } }
+            .accessibilityLabel("Add to Apple Wallet")
         }
     }
 
@@ -236,27 +241,18 @@ private struct PassLogo: View {
     }
 }
 
-/// Apple's own Add to Apple Wallet button.
+/// Apple's own Add to Apple Wallet button, drawn only: the SwiftUI button around it takes the tap.
+/// (As a live UIKit control it kept the touch, so a scroll that started on it didn't move the chat.)
 private struct AddPassButton: UIViewRepresentable {
-    let action: () -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
-
     func makeUIView(context: Context) -> PKAddPassButton {
         let button = PKAddPassButton(addPassButtonStyle: .black)
-        button.addTarget(context.coordinator, action: #selector(Coordinator.tapped), for: .touchUpInside)
+        button.isUserInteractionEnabled = false
         button.setContentHuggingPriority(.defaultLow, for: .horizontal)
         button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return button
     }
 
-    func updateUIView(_ button: PKAddPassButton, context: Context) { context.coordinator.action = action }
-
-    final class Coordinator: NSObject {
-        var action: () -> Void
-        init(action: @escaping () -> Void) { self.action = action }
-        @objc func tapped() { action() }
-    }
+    func updateUIView(_ button: PKAddPassButton, context: Context) {}
 }
 
 /// Wallet's own add-pass screen.
