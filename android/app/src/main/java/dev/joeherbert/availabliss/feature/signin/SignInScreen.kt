@@ -182,7 +182,7 @@ fun SignInContent(
                     ) { step ->
                         when (step) {
                             SignInStep.Email -> EmailStep(state, onEmailChange, onSendCode)
-                            SignInStep.Code -> CodeStep(state, onCodeChange, onUseDifferentEmail)
+                            SignInStep.Code -> CodeStep(state, onCodeChange, onUseDifferentEmail, onSendCode)
                         }
                     }
 
@@ -243,7 +243,7 @@ private fun EmailStep(state: SignInUiState, onEmailChange: (String) -> Unit, onS
 }
 
 @Composable
-private fun CodeStep(state: SignInUiState, onCodeChange: (String) -> Unit, onUseDifferentEmail: () -> Unit) {
+private fun CodeStep(state: SignInUiState, onCodeChange: (String) -> Unit, onUseDifferentEmail: () -> Unit, onSendAgain: () -> Unit) {
     val colors = AvailablissTheme.colors
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -262,12 +262,10 @@ private fun CodeStep(state: SignInUiState, onCodeChange: (String) -> Unit, onUse
             )
         }
         OtpInput(code = state.code, onCodeChange = onCodeChange, focusRequester = focus)
-        TextAction(
-            "Use a different email",
-            onUseDifferentEmail,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = state.busy == null,
-        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextAction("Use a different email", onUseDifferentEmail, enabled = state.busy == null)
+            TextAction("Send again", onSendAgain, enabled = state.busy == null)
+        }
     }
 }
 

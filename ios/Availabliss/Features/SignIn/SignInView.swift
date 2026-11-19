@@ -166,9 +166,15 @@ private struct SignInForm: View {
             }
             OneTimeCodeField(code: $model.code, length: SignInViewModel.codeLength, isBusy: model.busyMethod == .email)
                 .onChange(of: model.code) { _, _ in Task { await model.codeChanged() } }
-            Button("Use a different email") { model.useDifferentEmail() }
-                .buttonStyle(.textAction)
-                .frame(maxWidth: .infinity)
+            HStack {
+                Button("Use a different email") { model.useDifferentEmail() }
+                    .buttonStyle(.textAction)
+                Spacer(minLength: 8)
+                Button("Send again") { Task { await model.sendCode() } }
+                    .buttonStyle(.textAction)
+                    .disabled(model.busyMethod != nil)
+                    .accessibilityHint("Emails you a new code")
+            }
         }
         .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
     }
