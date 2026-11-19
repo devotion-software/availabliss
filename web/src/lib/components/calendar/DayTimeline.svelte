@@ -38,6 +38,14 @@
 			}))
 	);
 
+	// The Everyone track's width. A band's times go inside it only if every band is wide enough
+	// (about 6.2px a character at 11px, plus padding); otherwise they go on a line under the row.
+	let trackWidth = $state(0);
+	const fits = (spans: { from: number; to: number }[]) =>
+		trackWidth === 0 || spans.every((f) => ((f.to - f.from) / (axis.end - axis.start)) * trackWidth >= spanText(f.from, f.to).length * 6.2 + 12);
+	const freeInside = $derived(fits(free));
+	const mostInside = $derived(most ? fits(most) : true);
+
 	const style = (from: number, to: number) => `left:${pct(from, axis)}%;width:${pct(to, axis) - pct(from, axis)}%`;
 </script>
 
@@ -49,13 +57,19 @@
 
 	<div class="rows">
 		<span class="who everyone">Everyone</span>
-		<div class="track shared">
+		<div class="track shared" bind:clientWidth={trackWidth}>
 			{#each free as f (f.from)}
-				<div class="free" style={style(f.from, f.to)}><span>{spanText(f.from, f.to)}</span></div>
+				<div class="free" style={style(f.from, f.to)}>
+					{#if freeInside}<span>{spanText(f.from, f.to)}</span>{/if}
+				</div>
 			{:else}
 				<span class="none">No time when everyone's free</span>
 			{/each}
 		</div>
+		{#if !freeInside}
+			<span></span>
+			<span class="times">{free.map((f) => spanText(f.from, f.to)).join(' · ')}</span>
+		{/if}
 
 		{#if most}
 			<span class="who most-who">Most free</span>
@@ -67,11 +81,17 @@
 					: 'No time when most of the group is free'}
 			>
 				{#each most as f (f.from)}
-					<div class="free most" style={style(f.from, f.to)}><span>{spanText(f.from, f.to)}</span></div>
+					<div class="free most" style={style(f.from, f.to)}>
+						{#if mostInside}<span>{spanText(f.from, f.to)}</span>{/if}
+					</div>
 				{:else}
 					<span class="none">No time when most are free</span>
 				{/each}
 			</div>
+			{#if !mostInside}
+				<span></span>
+				<span class="times most-times">{most.map((f) => spanText(f.from, f.to)).join(' · ')}</span>
+			{/if}
 		{/if}
 
 		{#each rows as m (m.userId)}
@@ -178,6 +198,16 @@
 		background: var(--accent-soft);
 		color: var(--accent-ink);
 		box-shadow: inset 0 0 0 1.5px var(--accent);
+	}
+	/* Times for bands too narrow to hold them, under their row. */
+	.times {
+		margin-top: -4px;
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--accent-ink);
+	}
+	.most-times {
+		color: var(--muted);
 	}
 	.most-who {
 		font-weight: 600;

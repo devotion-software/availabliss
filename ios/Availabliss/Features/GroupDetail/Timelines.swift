@@ -361,6 +361,8 @@ struct DayTimeline: View {
     let group: Group
     let me: String?
     @Environment(\.theme) private var theme
+    /// The Everyone track's width, to tell whether each band's times fit inside it.
+    @State private var trackWidth: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -394,7 +396,7 @@ struct DayTimeline: View {
                     ForEach(detail.mostFreeSpans, id: \.self) { span in
                         let left = axis.fraction(span.start, on: date) * width
                         let right = axis.fraction(span.end, on: date) * width
-                        Text(detail.mostFreeOnly.contains(span) ? spanText(span) : "")
+                        Text(labelsInside && detail.mostFreeOnly.contains(span) ? spanText(span) : "")
                             .bodyFont(11, .semibold, relativeTo: .caption2)
                             .foregroundStyle(theme.accentInk)
                             .lineLimit(1)
@@ -407,20 +409,34 @@ struct DayTimeline: View {
                     ForEach(detail.everyoneFree, id: \.self) { span in
                         let left = axis.fraction(span.start, on: date) * width
                         let right = axis.fraction(span.end, on: date) * width
-                        Text(
-                            span.end >= date.adding(days: 1).startDate()
-                                ? "\(Formatting.time(span.start)) – late" : "\(Formatting.time(span.start)) – \(Formatting.time(span.end))"
-                        )
-                        .bodyFont(11, .semibold, relativeTo: .caption2)
-                        .foregroundStyle(theme.onAccent)
-                        .lineLimit(1)
-                        .padding(.leading, 8)
-                        .frame(width: max(0, right - left), height: 30, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 9).fill(theme.accent))
-                        .offset(x: left)
+                        Text(labelsInside ? spanText(span) : "")
+                            .bodyFont(11, .semibold, relativeTo: .caption2)
+                            .foregroundStyle(theme.onAccent)
+                            .lineLimit(1)
+                            .padding(.leading, 8)
+                            .frame(width: max(0, right - left), height: 30, alignment: .leading)
+                            .background(RoundedRectangle(cornerRadius: 9).fill(theme.accent))
+                            .offset(x: left)
                     }
                 }
+                .onGeometryChange(for: CGFloat.self) {
+                    $0.size.width
+                } action: {
+                    trackWidth = $0
+                }
                 .accessibilityLabel(everyoneAccessibilityText)
+            }
+            // Bands too narrow for their times: the times go on a line under the row instead.
+            if !labelsInside, let times = timesLine {
+                GridRow {
+                    Color.clear.frame(width: 1, height: 1)
+                    times
+                        .bodyFont(11, .semibold, relativeTo: .caption2)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, -4)
+                        .accessibilityHidden(true)
+                }
             }
             ForEach(detail.members) { member in
                 GridRow {
@@ -441,6 +457,29 @@ struct DayTimeline: View {
                 .accessibilityHidden(true)
             }
         }
+    }
+
+    /// The bands' times fit inside them (roughly 6.2pt a character at 11pt, plus padding).
+    private var labelsInside: Bool {
+        guard trackWidth > 0 else { return true }
+        let labelled = detail.everyoneFree + detail.mostFreeOnly
+        return labelled.allSatisfy { span in
+            let axis = TimeAxis(startHour: 0, endHour: 24)
+            let width = (axis.fraction(span.end, on: date) - axis.fraction(span.start, on: date)) * trackWidth
+            return width >= CGFloat(spanText(span).count) * 6.2 + 12
+        }
+    }
+
+    /// "18:00 – 19:00 · 23:00 – late", then "Most of us 12:00 – 14:00" in the softer colour.
+    private var timesLine: Text? {
+        let all = detail.everyoneFree.map(spanText).joined(separator: " · ")
+        let most = detail.mostFreeOnly.map(spanText).joined(separator: " · ")
+        guard !all.isEmpty || !most.isEmpty else { return nil }
+        var line = Text(all).foregroundColor(theme.accentInk)
+        if !most.isEmpty {
+            line = line + Text((all.isEmpty ? "" : "   ") + "Most of us " + most).foregroundColor(theme.muted)
+        }
+        return line
     }
 
     private func spanText(_ span: TimeSpan) -> String {

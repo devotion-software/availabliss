@@ -23,10 +23,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,52 +90,77 @@ fun DayTimeline(
 fun DayTimelineRows(everyone: List<EveryoneBandUi>, rows: List<TimelineRowUi>, modifier: Modifier = Modifier) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TimelineLine(label = "Everyone", labelColor = colors.accentInk, labelBold = true) {
-                BoxWithConstraints(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(30.dp)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(colors.line)
-                        .semantics {
-                            val all = everyone.filter { it.everyone }.joinToString { it.label }.ifEmpty { "no shared time" }
-                            val most = everyone.filterNot { it.everyone }.joinToString { it.label }
-                            contentDescription = "Everyone free: $all" + if (most.isNotEmpty()) ". Most of us free: $most" else ""
-                        },
-                ) {
-                    val w = maxWidth
-                    everyone.forEach { band ->
-                        Box(
-                            Modifier
-                                .offset(x = w * band.start)
-                                .width(w * (band.end - band.start))
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(9.dp))
-                                .background(if (band.everyone) colors.accent else colors.accentSoft)
-                                .then(if (band.everyone) Modifier else Modifier.border(1.dp, colors.accent, RoundedCornerShape(9.dp)))
-                                .padding(start = 8.dp),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            Text(band.label, style = type.micro, color = if (band.everyone) colors.onAccent else colors.accentInk, maxLines = 1, overflow = TextOverflow.Clip)
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        // The track is the width less the 64dp name column and 8dp gap. A band's times go inside it
+        // only if every band is wide enough (about 6.2dp a character at 11sp, plus padding);
+        // otherwise they all go on a line under the row.
+        val trackWidth = maxWidth - 72.dp
+        val labelsInside = everyone.all { band -> trackWidth * (band.end - band.start) >= (band.label.length * 6.2f + 12).dp }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                TimelineLine(label = "Everyone", labelColor = colors.accentInk, labelBold = true) {
+                    BoxWithConstraints(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(30.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(colors.line)
+                            .semantics {
+                                val all = everyone.filter { it.everyone }.joinToString { it.label }.ifEmpty { "no shared time" }
+                                val most = everyone.filterNot { it.everyone }.joinToString { it.label }
+                                contentDescription = "Everyone free: $all" + if (most.isNotEmpty()) ". Most of us free: $most" else ""
+                            },
+                    ) {
+                        val w = maxWidth
+                        everyone.forEach { band ->
+                            Box(
+                                Modifier
+                                    .offset(x = w * band.start)
+                                    .width(w * (band.end - band.start))
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(if (band.everyone) colors.accent else colors.accentSoft)
+                                    .then(if (band.everyone) Modifier else Modifier.border(1.dp, colors.accent, RoundedCornerShape(9.dp)))
+                                    .padding(start = 8.dp),
+                                contentAlignment = Alignment.CenterStart,
+                            ) {
+                                if (labelsInside) {
+                                    Text(band.label, style = type.micro, color = if (band.everyone) colors.onAccent else colors.accentInk, maxLines = 1, overflow = TextOverflow.Clip)
+                                }
+                            }
                         }
                     }
                 }
+                if (!labelsInside && everyone.isNotEmpty()) {
+                    val all = everyone.filter { it.everyone }.joinToString(" · ") { it.label }
+                    val most = everyone.filterNot { it.everyone }.joinToString(" · ") { it.label }
+                    Row(Modifier.fillMaxWidth().clearAndSetSemantics {}) {
+                        Spacer(Modifier.width(72.dp))
+                        Text(
+                            buildAnnotatedString {
+                                withStyle(SpanStyle(color = colors.accentInk)) { append(all) }
+                                if (most.isNotEmpty()) withStyle(SpanStyle(color = colors.muted)) { append((if (all.isEmpty()) "" else "   ") + "Most of us $most") }
+                            },
+                            style = type.micro,
+                            maxLines = 2,
+                            modifier = Modifier.weight(1f).offset(y = (-4).dp),
+                        )
+                    }
+                }
+                rows.forEach { row -> MemberTrack(row) }
             }
-            rows.forEach { row -> MemberTrack(row) }
-        }
-        Row(Modifier.fillMaxWidth()) {
-            Spacer(Modifier.width(72.dp))
-            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
-                DayTimelineHours.forEach { Text("%02d".format(it), fontSize = 10.sp, color = colors.muted) }
+            Row(Modifier.fillMaxWidth()) {
+                Spacer(Modifier.width(72.dp))
+                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
+                    DayTimelineHours.forEach { Text("%02d".format(it), fontSize = 10.sp, color = colors.muted) }
+                }
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            LegendSwatch(colors.okBg, "Free")
-            LegendSwatch(colors.busyFill, "Busy")
-            LegendSwatch(colors.accent, "Everyone free")
-            if (everyone.any { !it.everyone }) LegendSwatch(colors.accentSoft, "Most of us free")
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                LegendSwatch(colors.okBg, "Free")
+                LegendSwatch(colors.busyFill, "Busy")
+                LegendSwatch(colors.accent, "Everyone free")
+                if (everyone.any { !it.everyone }) LegendSwatch(colors.accentSoft, "Most of us free")
+            }
         }
     }
 }
