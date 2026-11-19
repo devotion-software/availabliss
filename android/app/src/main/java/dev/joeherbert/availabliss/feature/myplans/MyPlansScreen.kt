@@ -50,6 +50,8 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissPreviewTheme
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 import dev.joeherbert.availabliss.designsystem.theme.Spacing
+import dev.joeherbert.availabliss.feature.calendars.CalendarFeedCard
+import dev.joeherbert.availabliss.feature.calendars.CalendarFeedViewModel
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
 
 /**
@@ -62,10 +64,13 @@ fun MyPlansScreen(
     onOpenProposal: (String) -> Unit,
     onOpenGroup: (String) -> Unit,
     viewModel: MyPlansViewModel = hiltViewModel(),
+    feedViewModel: CalendarFeedViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val feedState by feedViewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(state.message, snackbar, viewModel::messageShown)
+    UserMessageEffect(feedState.message, snackbar) { feedViewModel.onMessageShown() }
     AddToCalendarEffect(state.calendar, viewModel::onIntentHandled, viewModel::chooseCalendar, viewModel::cancelCalendarChoice)
     MyPlansContent(
         state = state,
@@ -74,6 +79,16 @@ fun MyPlansScreen(
         onOpen = { row -> row.proposalId?.let(onOpenProposal) ?: onOpenGroup(row.groupId) },
         onAddAll = viewModel::addAll,
         onRetry = viewModel::refresh,
+        feedCard = {
+            CalendarFeedCard(
+                state = feedState,
+                onLoad = feedViewModel::load,
+                onCopied = feedViewModel::onCopied,
+                onAskReset = feedViewModel::askReset,
+                onCancelReset = feedViewModel::cancelReset,
+                onReset = feedViewModel::reset,
+            )
+        },
     )
 }
 
@@ -85,6 +100,8 @@ fun MyPlansContent(
     onOpen: (MyPlanRowUi) -> Unit,
     onAddAll: () -> Unit,
     onRetry: () -> Unit,
+    /** "Subscribe to your plans", at the end. */
+    feedCard: @Composable () -> Unit = {},
 ) {
     val sections = state.sections
     AvailablissBackground(OrbLayout.Proposal) {
@@ -138,6 +155,7 @@ fun MyPlansContent(
                     item(key = "past-label") { SectionLabel("Past", Modifier.padding(top = 8.dp)) }
                     items(sections.past, key = { "past-" + it.id }) { row -> PlanRow(row, muted = true, onClick = { onOpen(row) }) }
                 }
+                if (!state.loading || !sections.isEmpty) item(key = "feed") { Box(Modifier.padding(top = 8.dp)) { feedCard() } }
             }
         }
         AvSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())

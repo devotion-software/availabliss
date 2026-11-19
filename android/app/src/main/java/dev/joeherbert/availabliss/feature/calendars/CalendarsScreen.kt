@@ -34,12 +34,10 @@ fun CalendarsScreen(
     onBack: () -> Unit,
     viewModel: CalendarSourcesViewModel = hiltViewModel(),
     bufferViewModel: BusyBufferViewModel = hiltViewModel(),
-    feedViewModel: CalendarFeedViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val bufferMinutes by bufferViewModel.minutes.collectAsStateWithLifecycle()
     val bufferMessage by bufferViewModel.message.collectAsStateWithLifecycle()
-    val feedState by feedViewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     val requestPermission = rememberCalendarPermissionRequest(
         blocked = state.permissionBlocked,
@@ -51,7 +49,6 @@ fun CalendarsScreen(
     PendingUrlEffect(state.pendingUrl, viewModel::onUrlOpened)
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
     UserMessageEffect(bufferMessage, snackbar) { bufferViewModel.onMessageShown() }
-    UserMessageEffect(feedState.message, snackbar) { feedViewModel.onMessageShown() }
 
     val currentRequestPermission by rememberUpdatedState(requestPermission)
     // One instance for the screen's lifetime so unchanged rows skip recomposition.
@@ -88,14 +85,6 @@ fun CalendarsScreen(
                     actions = actions,
                 )
                 BusyBufferCard(bufferMinutes, bufferViewModel::select)
-                CalendarFeedCard(
-                    state = feedState,
-                    onLoad = feedViewModel::load,
-                    onCopied = feedViewModel::onCopied,
-                    onAskReset = feedViewModel::askReset,
-                    onCancelReset = feedViewModel::cancelReset,
-                    onReset = feedViewModel::reset,
-                )
             }
         }
         AvSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())

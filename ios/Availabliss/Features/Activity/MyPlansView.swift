@@ -58,6 +58,10 @@ struct MyPlansView: View {
             VStack(alignment: .leading, spacing: 14) {
                 ScreenHeader(title: "My plans", subtitle: "Every plan across your groups", onBack: { app.router.pop() })
                 content
+                if !model.isLoading {
+                    CalendarFeedCard(api: app.api, toast: $toast, error: $error)
+                        .padding(.top, 10)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -110,6 +114,7 @@ struct MyPlansView: View {
                     planButton(plan)
                 }
             }
+
         }
     }
 

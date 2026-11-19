@@ -8,6 +8,7 @@
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import PlanRow from '#lib/components/plans/PlanRow.svelte';
+	import CalendarFeedSection from '#lib/components/calendars/CalendarFeedSection.svelte';
 
 	let { data } = $props();
 	const plans = $derived(data.plans);
@@ -79,6 +80,7 @@
 			</div>
 		{/if}
 	</section>
+	<CalendarFeedSection />
 </div>
 
 <style>
