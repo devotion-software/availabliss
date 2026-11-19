@@ -78,6 +78,8 @@ struct LegendItem<Swatch: View>: View {
 struct ToastModifier: ViewModifier {
     @Binding var message: String?
     @Environment(\.theme) private var theme
+    /// Set on screens under a group's header, whose blur reaches 48pt down over the content.
+    @Environment(TopBarScrollState.self) private var topBar: TopBarScrollState?
 
     func body(content: Content) -> some View {
         content.overlay(alignment: .top) {
@@ -88,7 +90,8 @@ struct ToastModifier: ViewModifier {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .glass(in: Capsule())
-                    .padding(.top, 8)
+                    // Under a group's header, clear of its blur so it isn't hidden behind it.
+                    .padding(.top, topBar == nil ? 8 : 56)
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .task(id: message) {
                         try? await Task.sleep(for: .seconds(2.5))
