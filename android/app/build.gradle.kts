@@ -8,6 +8,11 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+composeCompiler {
+    // Lists in UI models are never mutated: treat them as stable so equal rows skip recomposition.
+    stabilityConfigurationFiles.add(project.layout.projectDirectory.file("compose_stability.conf"))
+}
+
 // Firebase is optional: the google-services plugin is only applied when the
 // (git-ignored) google-services.json is present, so the app builds without it.
 val hasGoogleServices = file("google-services.json").exists()

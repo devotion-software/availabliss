@@ -259,7 +259,8 @@ fun GroupChatTab(
         )
     }
 
-    GroupChatContent(state = state, draft = viewModel.draft, actions = actions)
+    // The draft is read only by the composer, so a keystroke doesn't recompose the whole screen.
+    GroupChatContent(state = state, draft = { viewModel.draft }, actions = actions)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         AvSnackbarHost(snackbar, Modifier.statusBarsPadding().padding(top = 72.dp))
     }
@@ -341,7 +342,7 @@ fun GroupChatTab(
 }
 
 @Composable
-fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
+fun GroupChatContent(state: ChatUiState, draft: () -> String, actions: ChatActions) {
     val listState = rememberLazyListState()
     AvailablissBackground(OrbLayout.Chat) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
@@ -361,7 +362,7 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
                 }
             }
             ChatComposer(
-                text = draft,
+                text = draft(),
                 onTextChange = actions.onDraftChange,
                 onSend = actions.onSend,
                 menuOpen = state.menuOpen,
@@ -685,7 +686,7 @@ private fun GroupChatPreview() {
                     ChatItem.Day("Today", "2026-11-01"),
                 ),
             ),
-            draft = "",
+            draft = { "" },
             actions = ChatActions(),
         )
     }

@@ -137,9 +137,11 @@ fun buildChatItems(
     val latestOwn = messages.lastOrNull { directory.isMe(it.authorId) && it.kind != MessageKind.System && !it.deleted }
     val repliedTo = messages.mapNotNullTo(HashSet()) { it.replyTo?.id }
     var lastDate: LocalDate? = null
+    // Each message's date parsed once (it's needed for the message and its neighbours).
+    val dates = messages.map { DateTimes.localDate(it.createdAt) }
 
     messages.forEachIndexed { index, m ->
-        val date = DateTimes.localDate(m.createdAt)
+        val date = dates[index]
         if (date != null && date != lastDate) {
             items += ChatItem.Day(dayLabel(date, today), date.toString())
             lastDate = date
@@ -201,17 +203,17 @@ fun buildChatItems(
                     own -> "You deleted this message"
                     else -> "This message was deleted"
                 }
-                val attachments = if (m.deleted) emptyList() else m.attachments.map { it.toUi() }
+                val attachments = if (m.deleted || m.attachments.isEmpty()) emptyList() else m.attachments.map { it.toUi() }
                 val location = if (m.deleted) null else m.location
                 if (text.isNotBlank() || attachments.isNotEmpty() || location != null) {
                     val place = location?.let { listOfNotNull("Location: ${it.name ?: "shared location"}", it.address).joinToString(", ") }.orEmpty()
                     val spoken = listOf(attachmentsSpoken(m.attachments), place, text).filter { it.isNotBlank() }.joinToString(", ")
                     val next = messages.getOrNull(index + 1)
                     val continues = next != null && next.authorId == m.authorId && next.kind == MessageKind.Text &&
-                        DateTimes.localDate(next.createdAt) == date
+                        dates[index + 1] == date
                     val prev = messages.getOrNull(index - 1)
                     val startsRun = prev == null || prev.authorId != m.authorId || prev.kind != MessageKind.Text ||
-                        DateTimes.localDate(prev.createdAt) != date
+                        dates[index - 1] != date
                     items += ChatItem.Text(
                         id = m.id,
                         text = text,

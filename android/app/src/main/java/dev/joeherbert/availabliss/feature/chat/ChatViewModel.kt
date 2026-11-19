@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -80,11 +81,14 @@ class ChatViewModel @Inject constructor(
      * the menu, a sheet or the sending flag does.
      */
     private val items = combine(
-        data.map { ItemInputs(it.group, it.messages, it.proposals, it.events, it.conflicts) }.distinctUntilChanged(),
+        // A short debounce turns the burst of card fetches when a chat opens into one rebuild.
+        data.map { ItemInputs(it.group, it.messages, it.proposals, it.events, it.conflicts) }.distinctUntilChanged().debounce(24),
         meIds,
     ) { inputs, me -> inputs.toItems(me) }.flowOn(Dispatchers.Default)
 
+    // Built off the main thread too: it runs on every change (menu, sheets, upload progress).
     val state: StateFlow<ChatUiState> = combine(data, items, meIds, addToCalendar.state) { d, items, me, cal -> d.toUi(items, me, cal) }
+        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     /**
