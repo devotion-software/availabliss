@@ -57,7 +57,10 @@ struct DayDetailCard: View {
     private func proposeButton(works: Bool, slot: Slot?) -> some View {
         if works, let slot {
             HStack(spacing: 8) {
-                Button("Propose this \(group.requirement.slotNoun.rawValue)") {
+                Button(
+                    group.requirement.slotNoun.proposeLabel(
+                        multiDay: !Calendar.current.isDate(slot.start, inSameDayAs: slot.end.addingTimeInterval(-1)))
+                ) {
                     propose(ProposalDraft(slot: slot, requirement: group.requirement))
                 }
                 .buttonStyle(.filled(.accent, height: 44, cornerRadius: 14, fontSize: 14))

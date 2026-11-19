@@ -37,11 +37,14 @@ data class MemberPreview(val userId: String, val name: String, val image: String
 /** Drives the badge on the groups list. Unknown kinds fall back to [Searching]. */
 @Serializable(with = GroupStatusSerializer::class)
 sealed interface GroupStatus {
-    /** "2 weekends work". [noun] is weekend | evening | day | week | trip | slot. */
+    /** "2 weekends work". [noun] is weekend | evening | day | week | date | slot ("trip" from older servers reads as "date"). */
     @Serializable
     data class Matches(val count: Int, val noun: String = "slot") : GroupStatus {
         /** "2 weekends work", "1 evening works". */
-        val label: String get() = "$count ${if (count == 1) noun else noun + "s"} ${if (count == 1) "works" else "work"}"
+        val label: String get() {
+            val word = if (noun == "trip") "date" else noun
+            return "$count ${if (count == 1) word else word + "s"} ${if (count == 1) "works" else "work"}"
+        }
     }
 
     @Serializable

@@ -17,6 +17,7 @@ import {
 	PRESETS,
 	presetOf,
 	previewRequirement,
+	proposeLabel,
 	spanLabel,
 	summarize,
 	summarizeDays
@@ -117,7 +118,15 @@ describe('labels', () => {
 
 	test('fitCountLabel', () => {
 		expect(fitCountLabel(base('week'), 1)).toBe('1 week');
-		expect(fitCountLabel(withLength({ type: 'days', count: 3 }), 4)).toBe('4 options');
+		expect(fitCountLabel(withLength({ type: 'days', count: 3 }), 4)).toBe('4 dates');
+		expect(fitCountLabel(base('tue-thu'), 14)).toBe('14 dates');
+		expect(fitCountLabel(withLength({ type: 'duration', minutes: 90 }), 2)).toBe('2 times');
+	});
+
+	test('proposeLabel', () => {
+		expect(proposeLabel('weekend', true)).toBe('Propose this weekend');
+		expect(proposeLabel('date', true)).toBe('Propose these dates');
+		expect(proposeLabel('date', false)).toBe('Propose this date');
 	});
 });
 

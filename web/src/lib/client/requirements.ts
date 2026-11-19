@@ -16,8 +16,6 @@ export type PresetId = '2h' | '4h' | 'evening' | 'day' | 'weekend' | 'tue-thu' |
 interface Preset {
 	id: PresetId;
 	label: string;
-	/** Noun for "2 weekends work". */
-	noun: string;
 	length?: RequirementLength;
 	window?: TimeWindow | null;
 }
@@ -25,33 +23,30 @@ interface Preset {
 const ACTIVE_HOURS: TimeWindow = { from: '08:00', to: '23:00' };
 
 export const PRESETS: readonly Preset[] = [
-	{ id: '2h', label: '2 hours', noun: 'time', length: { type: 'duration', minutes: 120 }, window: ACTIVE_HOURS },
-	{ id: '4h', label: '4 hours', noun: 'time', length: { type: 'duration', minutes: 240 }, window: ACTIVE_HOURS },
-	{ id: 'evening', label: 'An evening', noun: 'evening', length: { type: 'days', count: 1 }, window: { from: '18:00', to: '23:59' } },
-	{ id: 'day', label: 'One day', noun: 'day', length: { type: 'days', count: 1 }, window: null },
+	{ id: '2h', label: '2 hours', length: { type: 'duration', minutes: 120 }, window: ACTIVE_HOURS },
+	{ id: '4h', label: '4 hours', length: { type: 'duration', minutes: 240 }, window: ACTIVE_HOURS },
+	{ id: 'evening', label: 'An evening', length: { type: 'days', count: 1 }, window: { from: '18:00', to: '23:59' } },
+	{ id: 'day', label: 'One day', length: { type: 'days', count: 1 }, window: null },
 	{
 		id: 'weekend',
 		label: 'A weekend',
-		noun: 'weekend',
 		length: { type: 'span', startDay: 4, startTime: '18:00', endDay: 6, endTime: '23:59', weeksLater: 0 },
 		window: null
 	},
 	{
 		id: 'tue-thu',
 		label: 'Tue → Thu',
-		noun: 'option',
 		length: { type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '23:59', weeksLater: 0 },
 		window: null
 	},
 	{
 		id: 'tue-next-thu',
 		label: 'Tue → following Thu',
-		noun: 'option',
 		length: { type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '23:59', weeksLater: 1 },
 		window: null
 	},
-	{ id: 'week', label: 'A week', noun: 'week', length: { type: 'days', count: 7 }, window: null },
-	{ id: 'custom', label: 'Custom', noun: 'option' }
+	{ id: 'week', label: 'A week', length: { type: 'days', count: 7 }, window: null },
+	{ id: 'custom', label: 'Custom' }
 ];
 
 const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -173,10 +168,25 @@ export interface RequirementPreview {
 /** How many candidate slots a requirement produces, before anyone's busy time. */
 export const previewRequirement = (requirement: Requirement) => api.post<RequirementPreview>('/requirements/preview', { requirement });
 
-/** "13 weekends", "40 evenings", "1 day". */
+/** What one slot of a requirement is called, as the server's `slotNoun`, with "time" for durations. */
+export function slotNounOf(req: Requirement): string {
+	const l = req.length;
+	if (l.type === 'duration') return 'time';
+	if (l.type === 'span') return l.startDay === 4 && l.endDay === 6 && l.weeksLater === 0 ? 'weekend' : 'date';
+	if (l.count === 7) return 'week';
+	if (l.count === 1) return isEvening(req) ? 'evening' : 'day';
+	return 'date';
+}
+
+/** "13 weekends", "40 evenings", "14 dates", "1 day". */
 export function fitCountLabel(req: Requirement, count: number): string {
-	const noun = PRESETS.find((p) => p.id === presetOf(req))?.noun ?? 'option';
-	return plural(count, noun);
+	return plural(count, slotNounOf(req));
+}
+
+/** "Propose this weekend"; "Propose these dates" for a slot over several days ("this date" for one). */
+export function proposeLabel(noun: string, multiDay: boolean): string {
+	if (noun === 'date') return multiDay ? 'Propose these dates' : 'Propose this date';
+	return `Propose this ${noun}`;
 }
 
 /** The range in `ranges` that already holds every day of `range`, if any (an identical one included). */

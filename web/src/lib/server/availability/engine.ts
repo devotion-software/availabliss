@@ -99,13 +99,7 @@ function lookback(req: Requirement): number {
  *   time the day after.
  * Repeats for bank holidays in a row (Christmas and Boxing Day).
  */
-function stretchOverBankHolidays(
-	ctx: Ctx,
-	first: string,
-	last: string,
-	startMinutes: number,
-	endMinutes: number
-): { first: string; last: string } {
+function stretchOverBankHolidays(ctx: Ctx, first: string, last: string, startMinutes: number, endMinutes: number): { first: string; last: string } {
 	for (let i = 0; i < MAX_BANK_HOLIDAY_DAYS; i++) {
 		const before = addDays(first, -1);
 		const grows = startMinutes > 0 ? ctx.isBankHoliday(first) : ctx.isBankHoliday(before);

@@ -205,17 +205,24 @@ object RequirementPresets {
     )
 }
 
-/** Singular / plural noun for a matching slot: "weekend", "evening", "day", "week", "time". */
+/** Singular / plural noun for a matching slot: "weekend", "evening", "day", "week", "date", "time" (as the server's slotNoun). */
 fun Requirement.slotNoun(plural: Boolean = false): String {
     val singular = when (val l = length) {
-        is RequirementLength.Span -> if (l == RequirementPresets.WEEKEND) "weekend" else "trip"
+        is RequirementLength.Span -> if (l == RequirementPresets.WEEKEND) "weekend" else "date"
         is RequirementLength.Days -> when {
             l.count == 7 -> "week"
-            l.count == 1 && window == RequirementPresets.EVENING_WINDOW -> "evening"
+            l.count == 1 && window != null && window.from >= RequirementPresets.EVENING_FROM -> "evening"
             l.count == 1 -> "day"
-            else -> "stretch"
+            else -> "date"
         }
         is RequirementLength.Duration -> "time"
     }
     return if (plural) "${singular}s" else singular
+}
+
+/** "Propose this weekend"; "Propose these dates" for a slot over several days ("this date" for one). */
+fun proposeLabel(noun: String, multiDay: Boolean): String = when {
+    noun != "date" -> "Propose this $noun"
+    multiDay -> "Propose these dates"
+    else -> "Propose this date"
 }

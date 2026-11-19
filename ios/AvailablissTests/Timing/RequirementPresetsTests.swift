@@ -103,7 +103,11 @@ struct RequirementPresetsTests {
         #expect(fresh(.twoHours).slotNoun == .slot)
         var custom = fresh(.oneDay)
         custom.length = .days(count: 3)
-        #expect(custom.slotNoun == .trip)
+        #expect(custom.slotNoun == .date)
+        #expect(SlotNoun.date.counted(14) == "14 dates")
+        #expect(SlotNoun.trip.counted(1) == "1 date")
+        #expect(SlotNoun.date.proposeLabel(multiDay: true) == "Propose these dates")
+        #expect(SlotNoun.weekend.proposeLabel(multiDay: true) == "Propose this weekend")
         custom.length = .duration(minutes: 90)
         #expect(custom.slotNoun == .slot)
     }

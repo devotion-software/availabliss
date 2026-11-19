@@ -144,7 +144,8 @@ export interface Member {
 }
 
 /** What one slot is called: "2 weekends work", "3 evenings work". */
-export type SlotNoun = 'weekend' | 'evening' | 'day' | 'week' | 'trip' | 'slot';
+/** What one slot is called: "2 weekends work", "14 dates fit this timing". */
+export type SlotNoun = 'weekend' | 'evening' | 'day' | 'week' | 'date' | 'slot';
 
 export interface MemberPreview {
 	userId: string;

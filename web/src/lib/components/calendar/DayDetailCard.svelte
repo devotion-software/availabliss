@@ -6,6 +6,7 @@
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import Spinner from '#lib/components/ui/Spinner.svelte';
 	import DayTimeline from './DayTimeline.svelte';
+	import { proposeLabel } from '#lib/client/requirements';
 	import { busyNames } from './grid';
 
 	/** What the selected day means for the group, who's free when, and the next steps. */
@@ -85,7 +86,9 @@
 	{/if}
 	<div class="actions">
 		{#if works && slot}
-			<Button variant="accent" size="sm" class="act" onclick={() => onpropose(slot)}>Propose this {noun}</Button>
+			<Button variant="accent" size="sm" class="act" onclick={() => onpropose(slot)}>
+				{proposeLabel(noun, fmt.current.dayKey(slot.start) !== fmt.current.dayKey(new Date(Date.parse(slot.end) - 1).toISOString()))}
+			</Button>
 			{#if onshortlist}
 				<Button
 					variant="secondary"

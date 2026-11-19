@@ -6,7 +6,7 @@
 	import { formatDayRange, monthTitle, useFormat } from '#lib/client/format';
 	import { live } from '#lib/client/live.svelte';
 	import { isAdminRole, memberMap } from '#lib/client/members';
-	import { detailLabel, lengthLabel, PRESETS, presetOf } from '#lib/client/requirements';
+	import { detailLabel, lengthLabel, slotNounOf } from '#lib/client/requirements';
 	import { toasts } from '#lib/client/toast.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import MonthGrid from '#lib/components/calendar/MonthGrid.svelte';
@@ -36,7 +36,7 @@
 	const group = $derived(data.group);
 	const members = $derived(memberMap(group));
 	const isAdmin = $derived(isAdminRole(group.role));
-	const noun = $derived(PRESETS.find((p) => p.id === presetOf(group.requirement))?.noun ?? 'time');
+	const noun = $derived(slotNounOf(group.requirement));
 	const base = $derived(`/app/groups/${group.id}`);
 
 	// The Propose and AI planner sheets, and the times shortlisted for a date poll.

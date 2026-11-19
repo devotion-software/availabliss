@@ -87,11 +87,12 @@ describe('requirementSummary', () => {
 describe('slotNoun', () => {
 	test('per shape', () => {
 		expect(slotNoun(req(WEEKEND))).toBe('weekend');
-		expect(slotNoun(req({ ...WEEKEND, weeksLater: 1 } as RequirementLength))).toBe('trip');
+		expect(slotNoun(req({ ...WEEKEND, weeksLater: 1 } as RequirementLength))).toBe('date');
 		expect(slotNoun(req({ type: 'days', count: 7 }))).toBe('week');
 		expect(slotNoun(req({ type: 'days', count: 1 }))).toBe('day');
 		expect(slotNoun(req({ type: 'days', count: 1 }, { window: { from: '18:00', to: '23:59' } }))).toBe('evening');
-		expect(slotNoun(req({ type: 'days', count: 3 }))).toBe('trip');
+		expect(slotNoun(req({ type: 'days', count: 3 }))).toBe('date');
+		expect(slotNoun(req({ type: 'days', count: 1 }, { window: { from: '09:00', to: '17:00' } }))).toBe('day');
 		expect(slotNoun(req({ type: 'duration', minutes: 120 }))).toBe('slot');
 	});
 });

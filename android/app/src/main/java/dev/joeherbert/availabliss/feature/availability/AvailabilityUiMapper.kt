@@ -21,6 +21,7 @@ import dev.joeherbert.availabliss.designsystem.component.availability.WeekBlockU
 import dev.joeherbert.availabliss.designsystem.component.availability.WeekColumnUi
 import dev.joeherbert.availabliss.designsystem.component.availability.dayFraction
 import dev.joeherbert.availabliss.designsystem.component.availability.timelineFraction
+import dev.joeherbert.availabliss.feature.timing.proposeLabel
 import dev.joeherbert.availabliss.feature.timing.slotNoun
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -206,7 +207,7 @@ object AvailabilityUiMapper {
                 },
                 missing = BestOptions.missingLine(missing) { displayName(group, it, meId) },
                 works = true,
-                proposeLabel = "Propose this $noun",
+                proposeLabel = proposeLabel(noun, multiDay = local.start.toLocalDate() != local.end.minusNanos(1).toLocalDate()),
                 slot = local.slot,
                 preferredBy = day?.preferredBy.orEmpty().map { name(group, it, meId) }.takeIf { it.isNotEmpty() }
                     ?.let { "${it.joinNames()} ${if (it.size == 1 && it.first() != "You") "prefers" else "prefer"} this" },
@@ -220,7 +221,7 @@ object AvailabilityUiMapper {
             busy.size == 1 -> "${busy.first()} is busy"
             busy.isNotEmpty() -> "${busy.joinNames()} are busy"
             date.isBefore(today) -> "This day has already passed"
-            else -> "Everyone's free, but not for a whole ${group?.requirement?.slotNoun() ?: "slot"}"
+            else -> "Everyone's free, but not for the whole timing"
         }
         val anyway = (day?.status == DayStatus.Busy || day?.status == DayStatus.Free) && !date.isBefore(today)
         return DayDetailUi(date, dayTitle, subtitle + holiday, works = false, proposeLabel = null, slot = null, canProposeAnyway = anyway)

@@ -64,9 +64,19 @@ enum GroupStatus: Codable, Sendable, Equatable {
 
 /// What one matching slot is called ("2 weekends work").
 enum SlotNoun: String, Codable, Sendable {
-    case weekend, evening, day, week, trip, slot
+    /// `trip` is what older servers called `date`.
+    case weekend, evening, day, week, date, trip, slot
 
-    func counted(_ count: Int) -> String { "\(count) \(rawValue)\(count == 1 ? "" : "s")" }
+    /// The word: "weekend", "date" ("trip" from older servers reads as "date").
+    var word: String { self == .trip ? "date" : rawValue }
+
+    func counted(_ count: Int) -> String { "\(count) \(word)\(count == 1 ? "" : "s")" }
+
+    /// "Propose this weekend"; "Propose these dates" for a slot over several days ("this date" for one).
+    func proposeLabel(multiDay: Bool) -> String {
+        guard word == "date" else { return "Propose this \(word)" }
+        return multiDay ? "Propose these dates" : "Propose this date"
+    }
 }
 
 /// `GroupSummary.memberPreview` entry (first 5 members).

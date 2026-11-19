@@ -13322,10 +13322,10 @@
 					"evening",
 					"day",
 					"week",
-					"trip",
+					"date",
 					"slot"
 				],
-				"description": "What one slot is called: \"2 weekends work\", \"3 evenings work\"."
+				"description": "What one slot is called: \"2 weekends work\", \"14 dates fit this timing\"."
 			},
 			"SlotPosition": {
 				"type": "string",

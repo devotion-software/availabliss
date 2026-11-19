@@ -177,7 +177,7 @@ interface GroupSummary {
   syncedCount: number;
   requirementSummary: string; // "A weekend · Fri 18:00 → Sun · Nov – Jan"
   status:                     // drives the badge on the groups list
-    | { kind: 'matches'; count: number; noun: 'weekend' | 'evening' | 'day' | 'week' | 'trip' | 'slot' } // "2 weekends work"
+    | { kind: 'matches'; count: number; noun: 'weekend' | 'evening' | 'day' | 'week' | 'date' | 'slot' } // "2 weekends work"
     | { kind: 'needs_reply'; proposalId: string }
     | { kind: 'confirmed'; eventId: string; start: string }
     | { kind: 'searching' };

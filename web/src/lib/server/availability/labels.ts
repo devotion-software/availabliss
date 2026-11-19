@@ -96,7 +96,7 @@ export function requirementSummary(req: Requirement): string {
 /** The word for one slot of this requirement. */
 export function slotNoun(req: Requirement): SlotNoun {
 	const l = req.length;
-	if (l.type === 'span') return l.startDay === 4 && l.endDay === 6 && l.weeksLater === 0 ? 'weekend' : 'trip';
-	if (l.type === 'days') return l.count === 7 ? 'week' : l.count === 1 ? (req.window ? 'evening' : 'day') : 'trip';
+	if (l.type === 'span') return l.startDay === 4 && l.endDay === 6 && l.weeksLater === 0 ? 'weekend' : 'date';
+	if (l.type === 'days') return l.count === 7 ? 'week' : l.count === 1 ? (req.window && req.window.from >= '16:00' ? 'evening' : 'day') : 'date';
 	return 'slot';
 }

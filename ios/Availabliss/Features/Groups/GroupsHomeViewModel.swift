@@ -71,7 +71,7 @@ extension Requirement {
         case .twoHours: .slot
         case .custom:
             switch length {
-            case .span, .days: .trip
+            case .span, .days: .date
             case .duration: .slot
             }
         }

@@ -94,6 +94,10 @@ class RequirementPresetsTest {
     fun slotNoun_matchesPreset() {
         assertEquals("weekends", requirementFor(TimingPreset.Weekend).slotNoun(plural = true))
         assertEquals("evening", requirementFor(TimingPreset.Evening).slotNoun())
+        val tueToThu = requirementFor(TimingPreset.Weekend).copy(length = RequirementPresets.TUE_TO_THU)
+        assertEquals("dates", tueToThu.slotNoun(plural = true))
+        assertEquals("Propose these dates", proposeLabel("date", multiDay = true))
+        assertEquals("Propose this weekend", proposeLabel("weekend", multiDay = true))
     }
 
     @Test
