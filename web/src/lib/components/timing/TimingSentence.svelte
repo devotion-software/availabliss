@@ -278,6 +278,8 @@
 		padding: 0 2px;
 		border-radius: 6px 6px 0 0;
 		cursor: pointer;
+		/* The highlight fades in and out with its sheet rather than snapping. */
+		transition: background-color 0.3s ease;
 	}
 	/* Only the part being changed (its sheet is open) is highlighted. */
 	.token.active,

@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.feature.timing
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -150,6 +152,8 @@ internal fun TimingSentenceSection(state: TimingEditorUiState, canEdit: Boolean,
                     is Piece.Words -> piece.text.split(" ").forEach { Text(it, style = style, color = colors.ink) }
                     is Piece.Part -> Row {
                         val underline = colors.accentInk.copy(alpha = 0.6f)
+                        // Fades in and out with its sheet rather than snapping.
+                        val highlightAlpha by animateFloatAsState(if (piece.part == open) 1f else 0f, tween(300), label = "highlight")
                         val highlight = colors.accentSoft
                         Text(
                             piece.text,
@@ -159,9 +163,15 @@ internal fun TimingSentenceSection(state: TimingEditorUiState, canEdit: Boolean,
                                 // Only the part being changed (its sheet is open) is highlighted, drawn wider
                                 // than the text so highlighting it doesn't move the sentence.
                                 .drawBehind {
-                                    if (piece.part == open) {
+                                    if (highlightAlpha > 0f) {
                                         val inset = 5.dp.toPx()
-                                        drawRoundRect(highlight, Offset(-inset, 0f), Size(size.width + 2 * inset, size.height), CornerRadius(8.dp.toPx()))
+                                        drawRoundRect(
+                                            highlight,
+                                            Offset(-inset, 0f),
+                                            Size(size.width + 2 * inset, size.height),
+                                            CornerRadius(8.dp.toPx()),
+                                            alpha = highlightAlpha,
+                                        )
                                     }
                                 }
                                 .clickable(enabled = canEdit, role = Role.Button, onClickLabel = "Change") { open = piece.part }

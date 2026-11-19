@@ -340,7 +340,10 @@ struct TimingSentence: View {
                                 .padding(.horizontal, 1)
                                 // Drawn wider than the text so highlighting a part doesn't move the sentence.
                                 .background {
-                                    if sheet == active { RoundedRectangle(cornerRadius: 8).fill(theme.accentSoft).padding(.horizontal, -5) }
+                                    // Fades in and out with its editor rather than snapping.
+                                    RoundedRectangle(cornerRadius: 8).fill(theme.accentSoft).padding(.horizontal, -5)
+                                        .opacity(sheet == active ? 1 : 0)
+                                        .animation(.easeInOut(duration: 0.3), value: active)
                                 }
                                 .overlay(alignment: .bottom) {
                                     if isEnabled {
