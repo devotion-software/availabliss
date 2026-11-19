@@ -26,6 +26,7 @@ struct TimingEditorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 header
+                if model.changedElsewhere, canEdit { changedElsewhereNote }
                 TimingForm(model: model)
                     .disabled(!canEdit)
                 WhoNeedsToBeFreeSection(model: model, members: group.members)
@@ -54,6 +55,7 @@ struct TimingEditorView: View {
             }
         }
         .onDisappear { LeaveGuard.shouldLeave = nil }
+        .onChange(of: group.requirement) { _, saved in model.savedTimingChanged(to: saved) }
         .sheet(isPresented: $confirmsLeave, onDismiss: finishLeaving) {
             UnsavedTimingSheet { choice in
                 leaveChoice = choice
@@ -78,6 +80,21 @@ struct TimingEditorView: View {
                 onDone()
             }
         }
+    }
+
+    /// Someone else saved the timing while you were editing.
+    private var changedElsewhereNote: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "info.circle").foregroundStyle(theme.accentInk).accessibilityHidden(true)
+            Text("Someone else changed the timing. Saving replaces it with yours.")
+                .bodyFont(13, relativeTo: .subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Button("Load theirs") { model.loadSaved() }
+                .buttonStyle(.filled(.secondary, height: 34, cornerRadius: 10, fontSize: 13, fullWidth: false))
+        }
+        .padding(12)
+        .glass(cornerRadius: 18)
     }
 
     private var header: some View {

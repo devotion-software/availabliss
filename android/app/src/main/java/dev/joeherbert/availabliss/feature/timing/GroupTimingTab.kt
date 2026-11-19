@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -59,6 +60,7 @@ import dev.joeherbert.availabliss.designsystem.component.Chip
 import dev.joeherbert.availabliss.designsystem.component.DashedChip
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.FieldTile
+import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.PillTone
@@ -73,6 +75,7 @@ import dev.joeherbert.availabliss.designsystem.component.Segment
 import dev.joeherbert.availabliss.designsystem.component.SegmentedControl
 import dev.joeherbert.availabliss.designsystem.component.SegmentedStyle
 import dev.joeherbert.availabliss.designsystem.component.StatusPill
+import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.ToggleRow
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.ValueBox
@@ -110,7 +113,7 @@ fun GroupTimingTab(
     BackHandler(enabled = state.canEdit && state.dirty) { if (!state.saving) confirmsLeave = true }
     GroupTimingContent(
         state = state,
-        actions = viewModel.editor.actions(onBack = guardedBack, onRetry = viewModel::load, onSave = viewModel::save)
+        actions = viewModel.editor.actions(onBack = guardedBack, onRetry = viewModel::load, onSave = viewModel::save).copy(onLoadTheirs = viewModel::loadTheirs)
             .copy(onSaveTemplate = viewModel::saveTemplate),
         snackbar = { AvSnackbarHost(snackbar) },
     )
@@ -139,9 +142,28 @@ private fun UnsavedTimingSheet(onSave: () -> Unit, onDiscard: () -> Unit, onDism
     }
 }
 
+/** "Someone else changed the timing. Saving replaces it with yours." with Load theirs, as on web. */
+@Composable
+private fun ChangedElsewhereNote(onLoadTheirs: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    GlassPanel(contentPadding = PaddingValues(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                "Someone else changed the timing. Saving replaces it with yours.",
+                style = AvailablissTheme.type.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal),
+                color = colors.ink,
+                modifier = Modifier.weight(1f),
+            )
+            TextAction("Load theirs", onLoadTheirs)
+        }
+    }
+}
+
 /** All callbacks of the timing editor, bundled to keep signatures readable. */
 data class TimingActions(
     val onBack: () -> Unit = {},
+    /** "Load theirs" when someone else saved the timing meanwhile. */
+    val onLoadTheirs: () -> Unit = {},
     val onRetry: () -> Unit = {},
     val onPreset: (TimingPreset) -> Unit = {},
     val onCustomKind: (CustomKind) -> Unit = {},
@@ -209,6 +231,7 @@ fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackb
                             color = AvailablissTheme.colors.muted,
                         )
                     }
+                    if (state.changedElsewhere && state.canEdit) ChangedElsewhereNote(actions.onLoadTheirs)
                     TimingEditorSections(editor, state.canEdit, actions)
                     // Anyone can keep a copy of a group's timing, not just admins.
                     SaveTemplateRow(state.templateSave, actions.onSaveTemplate, suggestion = state.groupName, bottomClearance = 110.dp, savedAs = state.savedAsTemplate)

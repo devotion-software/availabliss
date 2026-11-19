@@ -13,6 +13,8 @@ final class TimingEditorViewModel {
     private(set) var isPreviewing = false
     var error: String?
     var toast: String?
+    /// Someone else saved a different timing while you had unsaved edits (saving replaces theirs).
+    private(set) var changedElsewhere = false
 
     private var original: Requirement
     private let groupId: String?
@@ -37,6 +39,25 @@ final class TimingEditorViewModel {
     func reset(to requirement: Requirement) {
         draft = requirement
         original = requirement
+    }
+
+    /// The group's saved timing changed (someone else saved, live). With no unsaved edits it's taken
+    /// as it is; over unsaved edits it says so instead, as web does, and saving replaces theirs.
+    func savedTimingChanged(to saved: Requirement) {
+        guard saved != original, !isSaving else { return }
+        if draft == original || draft == saved {
+            draft = saved
+            changedElsewhere = false
+        } else {
+            changedElsewhere = true
+        }
+        original = saved
+    }
+
+    /// "Load theirs": drops your edits for the timing someone else saved.
+    func loadSaved() {
+        draft = original
+        changedElsewhere = false
     }
 
     /// A fresh timing for a new group: "A week" needs every day, "A weekend" Fri–Sun, and so on.
@@ -252,6 +273,7 @@ final class TimingEditorViewModel {
         do {
             let group = try await api.send(API.Groups.update(id: groupId, UpdateGroupBody(requirement: draft)))
             original = draft
+            changedElsewhere = false
             toast = "Timing saved"
             return group
         } catch {
