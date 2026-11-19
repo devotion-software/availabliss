@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { z } from 'zod';
 	import type { GroupInvite } from '#lib/types';
-	import { createInvite, LINK_LIMITS, linkSummary, linkUsage, listInvites, revokeInvite } from '#lib/client/groups';
+	import { clampLinkUses, createInvite, LINK_MAX_USES, linkSummary, linkUsage, listInvites, revokeInvite } from '#lib/client/groups';
 	import { live } from '#lib/client/live.svelte';
 	import { checkUsername } from '#lib/client/usernames';
 	import { normalizeUsername, usernameProblem } from '#lib/usernames';
@@ -25,8 +25,10 @@
 	const fmt = useFormat();
 	let invites = $state<GroupInvite[]>([]);
 	let creating = $state(false);
-	// How many people can join with the next link (null: no limit), and whether it's being chosen for another link.
-	let limit = $state<number | null>(1);
+	// How many people can join with the next link (as typed; or no limit), and whether it's being chosen for another link.
+	let uses = $state<number | null>(1);
+	let unlimited = $state(false);
+	const limit = $derived(unlimited ? null : clampLinkUses(uses ?? 1));
 	let makingAnother = $state(false);
 	let copied = $state(false);
 	let peopleText = $state('');
@@ -62,7 +64,8 @@
 			const made = await createInvite(groupId, [], [], [], limit);
 			invites = [...made.invites, ...invites];
 			makingAnother = false;
-			limit = 1;
+			uses = 1;
+			unlimited = false;
 		} catch (err) {
 			toasts.error(err);
 		} finally {
@@ -163,9 +166,21 @@
 		<p class="lead">{choosing || !link ? 'Choose how many people can join with it.' : linkSummary(link)}</p>
 		{#if choosing}
 			<div class="limits" role="group" aria-label="People who can join with the link">
-				{#each LINK_LIMITS as choice (choice ?? 'unlimited')}
-					<Chip size="sm" selected={limit === choice} onclick={() => (limit = choice)}>{choice ?? 'Unlimited'}</Chip>
-				{/each}
+				<label class="uses" class:off={unlimited}>
+					<span class="sr-only">Number of people</span>
+					<input
+						type="number"
+						inputmode="numeric"
+						min="1"
+						max={LINK_MAX_USES}
+						step="1"
+						bind:value={uses}
+						disabled={unlimited}
+						onblur={() => (uses = clampLinkUses(uses ?? 1))}
+					/>
+					<span aria-hidden="true">{limit === 1 ? 'person' : 'people'}</span>
+				</label>
+				<Chip selected={unlimited} onclick={() => (unlimited = !unlimited)}>Unlimited</Chip>
 			</div>
 			<div class="buttons">
 				<Button variant="accent" icon="link" loading={creating} onclick={makeLink}>Create invite link</Button>
@@ -271,8 +286,35 @@
 	}
 	.limits {
 		display: flex;
+		align-items: center;
 		gap: 8px;
 		flex-wrap: wrap;
+	}
+	.uses {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.uses.off {
+		opacity: 0.45;
+	}
+	.uses input {
+		width: 88px;
+		height: 44px;
+		border-radius: var(--radius-control);
+		border: 1px solid var(--line-2);
+		background: var(--surface);
+		padding: 0 12px;
+		font-size: 16px;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+	}
+	.uses input:focus {
+		outline: none;
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px var(--accent-soft);
 	}
 	.buttons {
 		display: flex;

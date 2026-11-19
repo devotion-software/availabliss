@@ -73,6 +73,9 @@ export const setMemberRole = (groupId: string, userId: string, role: 'admin' | '
 	api.patch<Member>(`/groups/${groupId}/members/${userId}`, { role });
 /** Sets (or with null, clears) the name you go by in the group. */
 export const setMyName = (groupId: string, displayName: string | null) => api.patch<Member>(`/groups/${groupId}/members/me`, { displayName });
+/** Sets (or with null, clears) the name someone goes by in the group: your own, or as an admin anyone's. */
+export const setMemberName = (groupId: string, userId: string, displayName: string | null) =>
+	api.patch<Member>(`/groups/${groupId}/members/${userId}`, { displayName });
 /** Removes someone (an admin removing another member). */
 export const removeMember = (groupId: string, userId: string) => api.del(`/groups/${groupId}/members/${userId}`);
 /** Leaves the group. The owner names the admin who becomes the owner. */
@@ -99,8 +102,13 @@ export const createInvite = (groupId: string, emails: string[] = [], usernames: 
 		...(maxUses !== undefined && { maxUses })
 	});
 
-/** How many people can join with a link, as offered when making one (null: no limit; one is what links always were). */
-export const LINK_LIMITS: (number | null)[] = [1, 5, 10, 25, null];
+/** The most people a link can be for, short of no limit. */
+export const LINK_MAX_USES = 1000;
+/** What's typed for how many people can join with a link, as a whole number from 1 to {@link LINK_MAX_USES}. */
+export function clampLinkUses(value: number): number {
+	const n = Math.round(Number(value));
+	return Number.isFinite(n) ? Math.min(Math.max(n, 1), LINK_MAX_USES) : 1;
+}
 
 /** How many people can still join with a link (null: no limit). */
 const usesLeft = (i: GroupInvite) => (i.maxUses === null ? null : Math.max(i.maxUses - i.uses, 0));

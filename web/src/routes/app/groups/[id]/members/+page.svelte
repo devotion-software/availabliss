@@ -2,7 +2,7 @@
 	import { invalidate } from '$app/navigation';
 	import type { Member } from '#lib/types';
 	import { removeMember, setMemberRole } from '#lib/client/groups';
-	import { isAdminRole, memberMap, memberLabel, ROLE_LABEL, groupSubtitle } from '#lib/client/members';
+	import { accountName, isAdminRole, memberMap, memberLabel, ROLE_LABEL, groupSubtitle } from '#lib/client/members';
 	import { toasts } from '#lib/client/toast.svelte';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
 	import Avatar from '#lib/components/ui/Avatar.svelte';
@@ -11,6 +11,7 @@
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import InvitePanel from '#lib/components/members/InvitePanel.svelte';
 	import MemberActionsSheet from '#lib/components/members/MemberActionsSheet.svelte';
+	import MemberNameSheet from '#lib/components/members/MemberNameSheet.svelte';
 
 	let { data } = $props();
 
@@ -25,8 +26,12 @@
 	let actionsOpen = $state(false);
 	let removing = $state<Member | null>(null);
 	let removeOpen = $state(false);
+	let renaming = $state<Member | null>(null);
+	let renameOpen = $state(false);
 
 	const canManage = (m: Member) => admin && m.userId !== me && m.role !== 'owner';
+	// The name someone goes by here: your own, or as an admin anyone's.
+	const canRename = (m: Member) => admin || m.userId === me;
 
 	async function changeRole(m: Member, role: 'admin' | 'member') {
 		try {
@@ -69,6 +74,9 @@
 					<Avatar name={m.name} id={m.userId} image={m.image} size={38} />
 					<div class="who">
 						<span class="name">{memberLabel(members, m.userId, me)}</span>
+						{#if m.nameInGroup !== null}
+							<span class="alias">Name in this group</span>
+						{/if}
 						<span class="sync" class:pending={!m.synced}>
 							<span class="dot" aria-hidden="true"></span>
 							{m.synced ? 'Synced' : 'Not synced yet'}
@@ -79,10 +87,10 @@
 							{ROLE_LABEL[m.role]}
 						</StatusPill>
 					{/if}
-					{#if canManage(m)}
+					{#if canRename(m)}
 						<IconButton
 							icon="more"
-							label="Manage {m.name}"
+							label={m.userId === me ? 'Manage your membership' : `Manage ${m.name}`}
 							variant="plain"
 							onclick={() => {
 								actionsFor = m;
@@ -109,11 +117,28 @@
 	<MemberActionsSheet
 		bind:open={actionsOpen}
 		member={target}
+		isMe={target.userId === me}
+		canManage={canManage(target)}
+		onrename={() => {
+			renaming = target;
+			renameOpen = true;
+		}}
 		onrole={(role) => changeRole(target, role)}
 		onremove={() => {
 			removing = target;
 			removeOpen = true;
 		}}
+	/>
+{/if}
+{#if renaming}
+	<MemberNameSheet
+		bind:open={renameOpen}
+		groupId={group.id}
+		groupName={group.name}
+		member={renaming}
+		isMe={renaming.userId === me}
+		myAccountName={renaming.userId === me ? accountName(data.user) : undefined}
+		onsaved={() => invalidate('app:group')}
 	/>
 {/if}
 <ConfirmSheet
@@ -164,6 +189,10 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.alias {
+		font-size: 12px;
+		color: var(--muted);
 	}
 	.sync {
 		display: inline-flex;
