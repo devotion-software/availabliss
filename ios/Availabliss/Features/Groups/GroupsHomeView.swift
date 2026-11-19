@@ -79,11 +79,17 @@ struct GroupsHomeView: View {
             Button {
                 app.router.tab = .you
             } label: {
-                Text(Avatar.initials(app.session.user?.name ?? "?"))
-                    .bodyFont(15, .semibold)
-                    .foregroundStyle(theme.ink)
-                    .frame(width: 44, height: 44)
-                    .glass(in: Circle(), shadow: false)
+                // Your photo when you've set one (as on You), else your initials.
+                if let image = app.session.user?.image, !image.isEmpty {
+                    Avatar(name: app.session.user?.name ?? "?", imageURL: image, color: theme.tiles[0], size: 44)
+                        .overlay(Circle().strokeBorder(theme.line, lineWidth: 1))
+                } else {
+                    Text(Avatar.initials(app.session.user?.name ?? "?"))
+                        .bodyFont(15, .semibold)
+                        .foregroundStyle(theme.ink)
+                        .frame(width: 44, height: 44)
+                        .glass(in: Circle(), shadow: false)
+                }
             }
             .buttonStyle(.pressable)
             .accessibilityLabel("Your profile")
