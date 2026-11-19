@@ -15,7 +15,9 @@ struct IntroView: View {
     @State private var seen: Set<Int> = [0]
     @State private var name = IntroName.saved ?? ""
     /// The name's own size (at 15pt), so every page can leave a space that fits it.
-    @State private var nameSize = CGSize(width: 60, height: 20)
+    @State private var nameSize = CGSize(width: 180, height: 60)
+    /// The page dots step aside while the keyboard is up, to leave the name field room.
+    @State private var keyboardUp = false
 
     private var current: Int { page ?? 0 }
     private var isLast: Bool { current == IntroPage.all.count - 1 }
@@ -35,7 +37,7 @@ struct IntroView: View {
                             .id(item.id)
                             // Added to the page's own name space (a plain preference would replace it).
                             .transformAnchorPreference(key: IntroAnchors.self, value: .bounds) { value, anchor in
-                                if item.id == 0 { value[IntroAnchors.firstPage] = IntroSlot(anchor: anchor, muted: false) }
+                                if item.id == 0 { value[IntroAnchors.firstPage] = IntroSlot(anchor: anchor, tone: .ink) }
                             }
                     }
                 }
@@ -54,7 +56,7 @@ struct IntroView: View {
         .overlayPreferenceValue(IntroAnchors.self) { slots in
             GeometryReader { proxy in
                 let placement = namePlacement(slots, in: proxy)
-                TravellingName(name: firstName, muted: placement?.muted ?? 0)
+                TravellingName(name: firstName, muted: placement?.muted ?? 0, accent: placement?.accent ?? 0)
                     .scaleEffect(placement?.scale ?? 1)
                     .position(placement?.center ?? .zero)
                     .opacity(placement == nil ? 0 : 1)
@@ -66,7 +68,7 @@ struct IntroView: View {
         .background {
             // The name's size, measured on a hidden copy: measuring the moving one fed back into the
             // spaces it moves between, and never settled. Whole points, so it can't jitter either.
-            TravellingName(name: firstName, muted: 0)
+            TravellingName(name: firstName, muted: 0, accent: 0)
                 .hidden()
                 .onGeometryChange(for: CGSize.self) {
                     CGSize(width: $0.size.width.rounded(.up), height: $0.size.height.rounded(.up))
@@ -81,6 +83,8 @@ struct IntroView: View {
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.9), value: current)
         }
         .sensoryFeedback(.selection, trigger: current)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
         .onChange(of: current) { _, new in
             seen.insert(new)
             Self.dismissKeyboard()
@@ -90,7 +94,7 @@ struct IntroView: View {
     /// Where the name sits: between the spaces left for it on the two pages either side of the scroll
     /// position, in proportion. (Both pages move with the scroll, so the scroll itself cancels out and
     /// the name glides straight from one space to the next.)
-    private func namePlacement(_ slots: [Int: IntroSlot], in proxy: GeometryProxy) -> (center: CGPoint, scale: CGFloat, muted: CGFloat)? {
+    private func namePlacement(_ slots: [Int: IntroSlot], in proxy: GeometryProxy) -> (center: CGPoint, scale: CGFloat, muted: CGFloat, accent: CGFloat)? {
         guard let first = slots[IntroAnchors.firstPage].map({ proxy[$0.anchor] }), first.width > 0 else { return nil }
         let position = min(max(-first.minX / first.width, 0), CGFloat(IntroPage.all.count - 1))
         let from = Int(position.rounded(.down))
@@ -102,8 +106,8 @@ struct IntroView: View {
         let t = (a != nil && b != nil) ? fraction : 0
         let center = CGPoint(x: start.midX + (end.midX - start.midX) * t, y: start.midY + (end.midY - start.midY) * t)
         let height = start.height + (end.height - start.height) * t
-        let muted = (startSlot.muted ? 1 : 0) * (1 - t) + (endSlot.muted ? 1 : 0) * t
-        return (center, nameSize.height > 0 ? height / nameSize.height : 1, muted)
+        func blend(_ tone: IntroSlot.Tone) -> CGFloat { (startSlot.tone == tone ? 1 : 0) * (1 - t) + (endSlot.tone == tone ? 1 : 0) * t }
+        return (center, nameSize.height > 0 ? height / nameSize.height : 1, blend(.muted), blend(.accent))
     }
 
     private func next() {
@@ -136,7 +140,7 @@ struct IntroView: View {
 
     private var controls: some View {
         VStack(spacing: 22) {
-            PageDots(count: IntroPage.all.count, current: current)
+            if !keyboardUp { PageDots(count: IntroPage.all.count, current: current) }
             Button(action: next) {
                 ZStack {
                     // Both labels are laid out so the button never changes size; they cross-fade.
@@ -178,47 +182,51 @@ enum IntroName {
     }
 }
 
-/// Your first name: the one element that moves through the whole intro. Drawn at 15pt semibold (like the
-/// scenes' names) and scaled to each space; `muted` (0–1) blends it from ink to the muted grey that
-/// the chat's author names use.
+/// Your first name: the one element that moves through the whole intro. Drawn large (3× the scenes'
+/// 15pt names, so it stays sharp) and scaled down to each space; `muted` and `accent` (0–1) blend it
+/// from ink to the muted grey the chat's author names use, or to the accent of the welcome's "Hi,".
 private struct TravellingName: View {
     let name: String
     let muted: CGFloat
+    let accent: CGFloat
     @Environment(\.theme) private var theme
 
     var body: some View {
-        // Before a name is typed, the welcome says "Hello, there".
-        let text = name.isEmpty ? "there" : name
         ZStack {
-            Text(text).foregroundStyle(theme.ink).opacity(name.isEmpty ? 0 : 1 - muted)
-            Text(text).foregroundStyle(theme.muted).opacity(name.isEmpty ? 1 : muted)
+            Text(name).foregroundStyle(theme.ink).opacity(max(0, 1 - muted - accent))
+            Text(name).foregroundStyle(theme.muted).opacity(muted)
+            Text(name).foregroundStyle(theme.accent).opacity(accent)
         }
-        .bodyFont(15, .semibold)
+        .bodyFont(15 * IntroNameSlot.drawScale, .semibold)
         .lineLimit(1)
         .fixedSize()
+        .opacity(name.isEmpty ? 0 : 1)
     }
 }
 
-/// The space a scene leaves for your name on `page`, at `scale` of 15pt (so 13pt is 13 / 15), in the
-/// muted grey when `muted`. The name itself is drawn over the pages and slides between these.
+/// The space a scene leaves for your name on `page`, at `scale` of 15pt (so 13pt is 13 / 15), in `tone`.
+/// The name itself is drawn over the pages and slides between these.
 struct IntroNameSlot: View {
+    /// The travelling name is drawn at this multiple of 15pt and scaled down into each space.
+    static let drawScale: CGFloat = 3
     let page: Int
     var scale: CGFloat = 1
-    var muted = false
+    var tone: IntroSlot.Tone = .ink
     @Environment(\.introNameSize) private var size
 
     var body: some View {
         Color.clear
-            .frame(width: size.width * scale, height: size.height * scale)
-            .anchorPreference(key: IntroAnchors.self, value: .bounds) { [page: IntroSlot(anchor: $0, muted: muted)] }
+            .frame(width: size.width * scale / Self.drawScale, height: size.height * scale / Self.drawScale)
+            .anchorPreference(key: IntroAnchors.self, value: .bounds) { [page: IntroSlot(anchor: $0, tone: tone)] }
             .accessibilityHidden(true)
     }
 }
 
 /// A space for the name, and how it's drawn there.
 struct IntroSlot {
+    enum Tone { case ink, muted, accent }
     let anchor: Anchor<CGRect>
-    let muted: Bool
+    let tone: Tone
 }
 
 /// Each page's name space, by page, plus the first page's frame (for the scroll position).
@@ -231,7 +239,7 @@ private struct IntroAnchors: PreferenceKey {
 }
 
 extension EnvironmentValues {
-    @Entry var introNameSize = CGSize(width: 60, height: 20)
+    @Entry var introNameSize = CGSize(width: 180, height: 60)
     /// Your first name, for the scenes' avatars.
     @Entry var introName = ""
 }
@@ -277,8 +285,10 @@ private struct IntroPageView: View {
                 // Drawn at 340 × 320 and scaled to fit.
                 illustration
                     .frame(width: 340, height: 320)
-                    .scaleEffect(min(art / 320, (proxy.size.width - 24) / 340))
-                    .frame(maxWidth: .infinity)
+                    // The welcome's "Hi," lines up with the text under it, so it shrinks towards the left.
+                    .scaleEffect(min(art / 320, (proxy.size.width - 24) / 340), anchor: page.kind == .welcome ? .leading : .center)
+                    .padding(.leading, page.kind == .welcome ? 24 : 0)
+                    .frame(maxWidth: .infinity, alignment: page.kind == .welcome ? .leading : .center)
                     .frame(height: art)
                     .accessibilityHidden(true)
                     // Parallax: the picture travels a little further than the page as you swipe.
@@ -301,7 +311,7 @@ private struct IntroPageView: View {
                         .accessibilityAddTraits(.isHeader)
                         .entrance(shown, delay: 0.07, reduceMotion: reduceMotion)
                     if page.kind == .welcome {
-                        InputField(placeholder: "Your first name", text: $name)
+                        InputField(placeholder: "First name", text: $name)
                             .textContentType(.givenName)
                             .textInputAutocapitalization(.words)
                             .autocorrectionDisabled()
@@ -311,12 +321,14 @@ private struct IntroPageView: View {
                             .padding(.top, 4)
                             .entrance(shown, delay: 0.14, reduceMotion: reduceMotion)
                     }
-                    Text(page.body)
-                        .bodyFont(page.kind == .welcome ? 14 : 16)
-                        .lineSpacing(2)
-                        .foregroundStyle(theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .entrance(shown, delay: page.kind == .welcome ? 0.21 : 0.14, reduceMotion: reduceMotion)
+                    if !page.body.isEmpty {
+                        Text(page.body)
+                            .bodyFont(16)
+                            .lineSpacing(2)
+                            .foregroundStyle(theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .entrance(shown, delay: 0.14, reduceMotion: reduceMotion)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 28)
@@ -365,8 +377,8 @@ struct IntroPage: Identifiable {
     static let all: [IntroPage] = [
         IntroPage(
             id: 0, kind: .welcome, eyebrow: "Welcome to Availabliss",
-            title: "First things first: what's your name?",
-            body: "So your friends know it's you.",
+            title: "What should we call you?",
+            body: "",
             orbs: OrbLayout.appearance
         ),
         IntroPage(

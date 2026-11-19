@@ -69,19 +69,37 @@ private let friends = [
 
 // MARK: - 0. Welcome
 
-/// The logo and "Hello," with your name under it, filled in as you type.
+/// A big "Hi," with your name under it in the accent, filled in as you type ("Hi" alone until then).
 struct WelcomeIllustration: View {
     let page: Int
+    @Environment(\.theme) private var theme
+    @Environment(\.introName) private var name
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        VStack(spacing: 18) {
-            VennLogo(size: 84)
-            VStack(spacing: 6) {
-                Text("Hello,").displayFont(34, .heavy)
-                IntroNameSlot(page: page, scale: 34 / 15)
+        VStack(alignment: .leading, spacing: 0) {
+            Text(name.isEmpty ? "Hi" : "Hi,")
+                .bodyFont(Self.size, .semibold)
+                .contentTransition(.identity)
+            if !name.isEmpty {
+                HStack(spacing: 0) {
+                    IntroNameSlot(page: page, scale: Self.size / 15, tone: .accent)
+                    Text(".").bodyFont(Self.size, .semibold).foregroundStyle(theme.accent)
+                }
+                .transition(.opacity)
             }
+            Capsule()
+                .fill(theme.tile("t1"))
+                .frame(width: 52, height: 6)
+                .padding(.top, 18)
         }
-        .offset(y: 6)
+        .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, 4)
+        .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.85), value: name.isEmpty)
     }
+
+    private static let size: CGFloat = 64
 }
 
 // MARK: - 1. Make a group
@@ -579,7 +597,7 @@ struct ChatIllustration: View {
             Spacer(minLength: 50)
             // Your name lands over your message, where the others' names go over theirs.
             VStack(alignment: .trailing, spacing: 4) {
-                IntroNameSlot(page: page, scale: 11 / 15, muted: true).padding(.trailing, 4)
+                IntroNameSlot(page: page, scale: 11 / 15, tone: .muted).padding(.trailing, 4)
                 yourBubble(text)
             }
         }

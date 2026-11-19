@@ -98,8 +98,8 @@ import kotlin.math.abs
 internal enum class IntroPage(val eyebrow: String, val title: String, val body: String, val orbs: OrbLayout) {
     Welcome(
         "Welcome to Availabliss",
-        "First things first: what's your name?",
-        "So your friends know it's you.",
+        "What should we call you?",
+        "",
         OrbLayout.Appearance,
     ),
     Group(
@@ -231,14 +231,20 @@ fun IntroScreen(initialName: String = "", onFinish: (String) -> Unit) {
     }
 }
 
-/** A space a scene leaves for your name (in root pixels), and whether names there are muted grey. */
-internal data class IntroSlot(val rect: Rect, val muted: Boolean)
+/** A space a scene leaves for your name (in root pixels), and the colour of names there. */
+internal data class IntroSlot(val rect: Rect, val tone: IntroNameTone)
+
+/** The colour the name takes in a space: ink, the chat's muted grey, or the accent of the welcome's "Hi,". */
+internal enum class IntroNameTone { Ink, Muted, Accent }
+
+/** The travelling name is drawn at this multiple of 15sp and scaled down into each space, so it stays sharp. */
+private const val NAME_DRAW_SCALE = 3f
 
 /** The travelling name's own size and where it's drawn from, and the space each page leaves for it. */
 @Stable
 internal class IntroChipLayout {
     val slots = mutableStateMapOf<Int, IntroSlot>()
-    var size by mutableStateOf(IntSize(150, 50))
+    var size by mutableStateOf(IntSize(450, 150))
     var origin by mutableStateOf(Offset.Zero)
 }
 
@@ -250,26 +256,27 @@ internal val LocalIntroName = compositionLocalOf { "" }
 internal fun firstNameOf(name: String): String = name.trim().split(" ").firstOrNull().orEmpty()
 
 /**
- * The space a scene leaves for your name on [page], at [scale] of 15sp (so 13sp is 13 / 15), in the
- * muted grey when [muted]. The name itself is drawn over the pages and slides between these.
+ * The space a scene leaves for your name on [page], at [scale] of 15sp (so 13sp is 13 / 15), in [tone].
+ * The name itself is drawn over the pages and slides between these.
  */
 @Composable
-internal fun IntroNameSlot(page: Int, scale: Float = 1f, muted: Boolean = false, modifier: Modifier = Modifier) {
+internal fun IntroNameSlot(page: Int, scale: Float = 1f, tone: IntroNameTone = IntroNameTone.Ink, modifier: Modifier = Modifier) {
     val chip = LocalIntroChip.current
     val density = LocalDensity.current
-    val size = with(density) { DpSize(chip.size.width.toDp() * scale, chip.size.height.toDp() * scale) }
+    val fit = scale / NAME_DRAW_SCALE
+    val size = with(density) { DpSize(chip.size.width.toDp() * fit, chip.size.height.toDp() * fit) }
     DisposableEffect(page) { onDispose { chip.slots.remove(page) } }
     Box(
         modifier.size(size).onGloballyPositioned { coordinates ->
             val topLeft = coordinates.localToRoot(Offset.Zero)
             val bottomRight = coordinates.localToRoot(Offset(coordinates.size.width.toFloat(), coordinates.size.height.toFloat()))
-            chip.slots[page] = IntroSlot(Rect(topLeft, bottomRight), muted)
+            chip.slots[page] = IntroSlot(Rect(topLeft, bottomRight), tone)
         },
     )
 }
 
-/** Where the travelling name is drawn: its centre (relative to the intro), scale and how muted (0–1). */
-private class NamePlacement(val center: Offset, val scale: Float, val muted: Float)
+/** Where the travelling name is drawn: its centre (relative to the intro), scale, and how muted and how accent (0–1). */
+private class NamePlacement(val center: Offset, val scale: Float, val muted: Float, val accent: Float)
 
 /**
  * Between the spaces left on the two pages either side of the scroll position, in proportion: both
@@ -286,25 +293,24 @@ private fun IntroChipLayout.placement(pager: PagerState, count: Int, height: Int
     val cx = start.rect.center.x + (end.rect.center.x - start.rect.center.x) * t - origin.x
     val cy = start.rect.center.y + (end.rect.center.y - start.rect.center.y) * t - origin.y
     val h = start.rect.height + (end.rect.height - start.rect.height) * t
-    val muted = (if (start.muted) 1f else 0f) * (1 - t) + (if (end.muted) 1f else 0f) * t
-    return NamePlacement(Offset(cx, cy), if (height > 0) h / height else 1f, muted)
+    fun blend(tone: IntroNameTone) = (if (start.tone == tone) 1f else 0f) * (1 - t) + (if (end.tone == tone) 1f else 0f) * t
+    return NamePlacement(Offset(cx, cy), if (height > 0) h / height else 1f, blend(IntroNameTone.Muted), blend(IntroNameTone.Accent))
 }
 
 /**
- * Your first name: the one element that moves through the whole intro. Drawn at 15sp semibold (like the
- * scenes' names) and scaled to each space, blending from ink to the muted grey the chat's author names use.
+ * Your first name: the one element that moves through the whole intro. Drawn large (3× the scenes' 15sp
+ * names, so it stays sharp) and scaled down to each space, blending from ink to the muted grey the chat's
+ * author names use, or to the accent of the welcome's "Hi,".
  */
 @Composable
 private fun TravellingName(name: String, chip: IntroChipLayout, pager: PagerState, count: Int) {
     val colors = AvailablissTheme.colors
-    // Before a name is typed, the welcome says "Hello, there".
-    val text = name.ifEmpty { "there" }
     Box(
         Modifier
             .onSizeChanged { chip.size = it }
             .graphicsLayer {
                 val place = chip.placement(pager, count, size.height.toInt())
-                if (place == null) {
+                if (place == null || name.isEmpty()) {
                     alpha = 0f
                     return@graphicsLayer
                 }
@@ -317,25 +323,21 @@ private fun TravellingName(name: String, chip: IntroChipLayout, pager: PagerStat
             }
             .clearAndSetSemantics { },
     ) {
-        val style = AvailablissTheme.type.bodyMedium
+        val base = AvailablissTheme.type.bodyMedium
+        val style = base.copy(fontSize = base.fontSize * NAME_DRAW_SCALE, lineHeight = base.lineHeight * NAME_DRAW_SCALE)
+        val place = { chip.placement(pager, count, chip.size.height) }
         Text(
-            text,
+            name,
             style = style,
             color = colors.ink,
             maxLines = 1,
             modifier = Modifier.graphicsLayer {
-                alpha = if (name.isEmpty()) 0f else 1f - (chip.placement(pager, count, chip.size.height)?.muted ?: 0f)
-            },
+                val p = place()
+                alpha = (1f - (p?.muted ?: 0f) - (p?.accent ?: 0f)).coerceAtLeast(0f)
+            }
         )
-        Text(
-            text,
-            style = style,
-            color = colors.muted,
-            maxLines = 1,
-            modifier = Modifier.graphicsLayer {
-                alpha = if (name.isEmpty()) 1f else chip.placement(pager, count, chip.size.height)?.muted ?: 0f
-            },
-        )
+        Text(name, style = style, color = colors.muted, maxLines = 1, modifier = Modifier.graphicsLayer { alpha = place()?.muted ?: 0f })
+        Text(name, style = style, color = colors.accent, maxLines = 1, modifier = Modifier.graphicsLayer { alpha = place()?.accent ?: 0f })
     }
 }
 
@@ -407,17 +409,22 @@ private fun IntroPageContent(
                         alpha = 1f - abs(o).coerceAtMost(1f) * 0.6f
                     }
                     .clearAndSetSemantics { },
-                contentAlignment = Alignment.Center,
+                // The welcome's "Hi," lines up with the text under it, so it shrinks towards the left.
+                contentAlignment = if (page == IntroPage.Welcome) Alignment.CenterStart else Alignment.Center,
             ) {
                 Box(
-                    Modifier.requiredSize(340.dp, 320.dp).graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    },
+                    Modifier
+                        .then(if (page == IntroPage.Welcome) Modifier.padding(start = 24.dp) else Modifier)
+                        .requiredSize(340.dp, 320.dp)
+                        .graphicsLayer {
+                            if (page == IntroPage.Welcome) transformOrigin = TransformOrigin(0f, 0.5f)
+                            scaleX = scale
+                            scaleY = scale
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     when (page) {
-                        IntroPage.Welcome -> WelcomeScene(index)
+                        IntroPage.Welcome -> WelcomeScene(index, reduceMotion)
                         IntroPage.Group -> GroupScene(index, active, reduceMotion)
                         IntroPage.Calendars -> CalendarScene(index, active, reduceMotion)
                         IntroPage.Grid -> MonthScene(index, active, reduceMotion)
@@ -454,7 +461,7 @@ private fun IntroPageContent(
                     AvTextField(
                         value = name,
                         onValueChange = onNameChange,
-                        placeholder = "Your first name",
+                        placeholder = "First name",
                         capitalization = KeyboardCapitalization.Words,
                         imeAction = ImeAction.Next,
                         onImeAction = onSubmitName,
@@ -465,12 +472,14 @@ private fun IntroPageContent(
                             .entrance(shown, 140, reduceMotion),
                     )
                 }
-                Text(
-                    page.body,
-                    style = if (page == IntroPage.Welcome) AvailablissTheme.type.body else AvailablissTheme.type.bodyLarge,
-                    color = colors.muted,
-                    modifier = Modifier.entrance(shown, if (page == IntroPage.Welcome) 210 else 140, reduceMotion),
-                )
+                if (page.body.isNotEmpty()) {
+                    Text(
+                        page.body,
+                        style = AvailablissTheme.type.bodyLarge,
+                        color = colors.muted,
+                        modifier = Modifier.entrance(shown, 140, reduceMotion),
+                    )
+                }
             }
             Spacer(Modifier.weight(1f))
         }

@@ -59,7 +59,6 @@ import androidx.compose.ui.zIndex
 import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.GroupTile
-import dev.joeherbert.availabliss.designsystem.component.VennLogo
 import dev.joeherbert.availabliss.designsystem.component.availability.LegendItem
 import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.component.softShadow
@@ -161,17 +160,30 @@ private fun ScenePill(modifier: Modifier = Modifier, content: @Composable RowSco
 
 // region 0. Welcome
 
-/** The logo and "Hello," with your name under it, filled in as you type. */
+/** A big "Hi," with your name under it in the accent, filled in as you type ("Hi" alone until then). */
 @Composable
-internal fun WelcomeScene(page: Int) {
-    Column(Modifier.offset(y = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        VennLogo(84.dp, contentDescription = null)
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Hello,", style = AvailablissTheme.type.displayMedium.copy(fontSize = 34.sp), color = AvailablissTheme.colors.ink)
-            IntroNameSlot(page, scale = 34f / 15f)
+internal fun WelcomeScene(page: Int, reduceMotion: Boolean) {
+    val colors = AvailablissTheme.colors
+    val name = LocalIntroName.current
+    val base = AvailablissTheme.type.bodyMedium
+    val style = base.copy(fontSize = WELCOME_SIZE.sp, lineHeight = (WELCOME_SIZE * 1.15f).sp)
+    Column(Modifier.fillMaxWidth().padding(start = 4.dp)) {
+        Text(if (name.isEmpty()) "Hi" else "Hi,", style = style, color = colors.ink, maxLines = 1)
+        AnimatedVisibility(
+            visible = name.isNotEmpty(),
+            enter = if (reduceMotion) fadeIn() else fadeIn() + expandVertically(),
+            exit = if (reduceMotion) fadeOut() else fadeOut() + shrinkVertically(),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IntroNameSlot(page, scale = WELCOME_SIZE / 15f, tone = IntroNameTone.Accent)
+                Text(".", style = style, color = colors.accent, maxLines = 1)
+            }
         }
+        Box(Modifier.padding(top = 18.dp).size(52.dp, 6.dp).clip(CircleShape).background(colors.t1))
     }
 }
+
+private const val WELCOME_SIZE = 64f
 
 // endregion
 
@@ -652,7 +664,7 @@ private fun Mine(page: Int, text: String, hearted: Boolean) {
     val colors = AvailablissTheme.colors
     // Your name lands over your message, where the others' names go over theirs.
     Column(Modifier.fillMaxWidth().padding(start = 50.dp, bottom = 10.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        IntroNameSlot(page, scale = 11f / 15f, muted = true, modifier = Modifier.padding(end = 4.dp))
+        IntroNameSlot(page, scale = 11f / 15f, tone = IntroNameTone.Muted, modifier = Modifier.padding(end = 4.dp))
         Box {
             Text(
                 text,
