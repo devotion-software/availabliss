@@ -2,7 +2,7 @@ import './setup';
 import { afterAll, describe, expect, test } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db';
-import { notifications } from '#lib/server/db/schema';
+import { notifications, user } from '#lib/server/db/schema';
 import { acceptInvite, createGroup, createInvite, declineInvite, listInvites, memberIds, previewInvite } from '#lib/server/groups';
 import { POST as invite } from '../../src/routes/api/v1/groups/[id]/invites/+server';
 import { apiError, fixture } from './fixtures';
@@ -71,6 +71,20 @@ describe('a new group with the same people', () => {
 		expect((await invitePeople(old.id, sam, { userIds: [ana] })).status).toBe(409);
 		// A plain member can't invite.
 		expect((await invitePeople(old.id, ana, { userIds: [sam] })).status).toBe(403);
+	});
+});
+
+describe('inviting by email', () => {
+	test('someone who already has an account also gets it in Activity; a stranger only gets the email', async () => {
+		const [sam, ana] = await fx.users(2);
+		const group = await createGroup(sam, { name: 'Quiz night' }, 'UTC');
+		const [{ email }] = await db.select({ email: user.email }).from(user).where(eq(user.id, ana));
+
+		const res = await invitePeople(group.id, sam, { emails: [email.toUpperCase(), 'nobody-here@example.com'] });
+		expect(res.status).toBe(201);
+		const [item] = await inviteItems(ana);
+		expect(item).toMatchObject({ title: 'Quiz night', groupId: null });
+		expect(await acceptInvite(item.data.token, ana)).toEqual({ groupId: group.id, joined: true });
 	});
 });
 

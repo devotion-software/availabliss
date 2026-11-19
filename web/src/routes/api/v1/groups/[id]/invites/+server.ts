@@ -104,6 +104,24 @@ export const POST = authed<{ id: string }>(async ({ event, params, userId }) => 
 		await Promise.all(
 			created.filter((c) => c.email).map((c) => sendInviteEmail({ email: c.email!, inviterName, groupName: group.name, url: c.url }))
 		);
+		// An emailed invite to someone who already has an account reaches them in the app too
+		// (Activity and a push), like an invite by username.
+		const emailed = created.filter((c) => c.email).map((c) => c.email!.toLowerCase());
+		const accounts = emailed.length
+			? await db.select({ id: user.id, email: user.email }).from(user).where(inArray(user.email, emailed))
+			: [];
+		const inGroup = accounts.length ? new Set(await memberIds(params.id)) : new Set<string>();
+		for (const c of created.filter((c) => c.email)) {
+			const account = accounts.find((a) => a.email.toLowerCase() === c.email!.toLowerCase());
+			if (!account || inGroup.has(account.id)) continue;
+			await notify([account.id], {
+				kind: 'invite.received',
+				groupId: null,
+				title: group.name,
+				body: `${inviterName} invited you to join`,
+				data: { token: c.token }
+			});
+		}
 		for (const c of created.filter((c) => c.invitedUserId)) {
 			await notify([c.invitedUserId!], {
 				kind: 'invite.received',
