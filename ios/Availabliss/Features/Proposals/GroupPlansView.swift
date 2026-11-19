@@ -30,6 +30,7 @@ struct GroupPlansView: View {
             .padding(.top, 20)
             .padding(.bottom, 16)
         }
+        .tracksScrollUnderTopBar()
         .screenBackground(OrbLayout.proposal)
         .task { if !detail.plansLoaded { await load() } }
         .refreshable { await load() }

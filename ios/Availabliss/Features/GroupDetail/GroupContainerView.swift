@@ -13,6 +13,8 @@ struct GroupContainerView: View {
     /// From muting or unmuting in the More menu.
     @State private var toast: String?
     @State private var error: String?
+    /// How far the section under the header is scrolled, so the header's fade shows only once it is.
+    @State private var topBarScroll = TopBarScrollState()
 
     init(groupId: String, section: GroupSection?, app: AppModel) {
         self.section = section
@@ -21,11 +23,12 @@ struct GroupContainerView: View {
 
     var body: some View {
         content
+            .environment(topBarScroll)
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let group = detail.group {
                     GroupTopBar(
                         detail: detail, group: group, section: section, unreadCount: detail.unreadCount,
-                        onNewGroup: { showsNewGroup = true }, toast: $toast, error: $error)
+                        onNewGroup: { showsNewGroup = true }, toast: $toast, error: $error, scroll: topBarScroll)
                 }
             }
             .sheet(isPresented: $showsNewGroup) {
@@ -98,8 +101,11 @@ private struct GroupTopBar: View {
     let onNewGroup: () -> Void
     @Binding var toast: String?
     @Binding var error: String?
+    let scroll: TopBarScrollState
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
+
+    private static let fadeHeight: CGFloat = 48
 
     /// The group's photo, or its monogram on the group's colour, beside its name in the chat's header (as on
     /// Android and web). The calendar's header leaves it out: with Chat and More beside it there's no room.
@@ -131,22 +137,36 @@ private struct GroupTopBar: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
-        .padding(.bottom, 30)
+        .padding(.bottom, 16)
         .background {
-            // Mostly see-through: the thinnest material twice over (a stronger blur without the
-            // thicker materials' milky tint) and only a hint of the page colour, fading out at the
-            // bottom so the calendar scrolls away under the name without a hard edge.
-            ZStack {
-                Rectangle().fill(.ultraThinMaterial)
-                Rectangle().fill(.ultraThinMaterial)
-                theme.bg.opacity(0.1)
-            }
-            .mask(
-                LinearGradient(
-                    stops: [.init(color: .black, location: 0.72), .init(color: .clear, location: 1)],
-                    startPoint: .top, endPoint: .bottom)
-            )
-            .ignoresSafeArea(edges: .top)
+            // Just a blur of the calendar behind, with no grey wash (the system materials add one,
+            // which looked like a flat grey band), at full strength behind the name and buttons and a
+            // short band under them. Below that it eases out over 48pt that hang over the content, so the
+            // calendar scrolls away under it gradually rather than hitting a hard edge. That fade only
+            // shows once the content is scrolled: at the top it would blur the first card, and keeping
+            // it out of the header's own height means no big gap above the content.
+            ClearBlur(style: .systemUltraThinMaterial)
+                .mask {
+                    VStack(spacing: 0) {
+                        Color.black
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0),
+                                .init(color: .black.opacity(0.82), location: 0.25),
+                                .init(color: .black.opacity(0.5), location: 0.5),
+                                .init(color: .black.opacity(0.18), location: 0.78),
+                                .init(color: .clear, location: 1),
+                            ],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                        .frame(height: Self.fadeHeight)
+                        .opacity(scroll.fadeProgress)
+                    }
+                }
+                .padding(.bottom, -Self.fadeHeight)
+                .allowsHitTesting(false)
+                .ignoresSafeArea(edges: .top)
+                .animation(.easeOut(duration: 0.15), value: scroll.fadeProgress)
         }
     }
 }
@@ -312,6 +332,40 @@ private enum MuteChoice: CaseIterable, Identifiable {
         case .eightHours: now.addingTimeInterval(8 * 60 * 60)
         case .week: Calendar.current.date(byAdding: .day, value: 7, to: now)
         case .untilUnmuted: nil
+        }
+    }
+}
+
+/// How far a group screen's content is scrolled under its pinned header. Each section's scroll view
+/// reports into it with `tracksScrollUnderTopBar()`; the header shows its bottom fade as it grows.
+@Observable
+final class TopBarScrollState {
+    var offset: CGFloat = 0
+
+    /// 0 at the top, 1 once scrolled 24pt.
+    var fadeProgress: Double { Double(min(max(offset / 24, 0), 1)) }
+}
+
+extension View {
+    /// Reports this scroll view's offset to the group header above it (if any). Needs iOS 18; on
+    /// iOS 17 the header simply keeps its fade off.
+    func tracksScrollUnderTopBar() -> some View { modifier(TracksScrollUnderTopBar()) }
+}
+
+private struct TracksScrollUnderTopBar: ViewModifier {
+    @Environment(TopBarScrollState.self) private var state: TopBarScrollState?
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *), let state {
+            content.onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, offset in
+                // Only the 0...24pt range matters; skip the rest to avoid needless header updates.
+                let clamped = min(max(offset, 0), 24)
+                if clamped != state.offset { state.offset = clamped }
+            }
+        } else {
+            content
         }
     }
 }

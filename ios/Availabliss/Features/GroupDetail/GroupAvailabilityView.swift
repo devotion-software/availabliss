@@ -61,6 +61,7 @@ struct GroupAvailabilityView: View {
             .padding(.top, 20)
             .padding(.bottom, 16)
         }
+        .tracksScrollUnderTopBar()
         .screenBackground(OrbLayout.groupCalendar)
         .task { await model.load() }
         .task { await loadPlan() }

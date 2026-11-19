@@ -151,6 +151,7 @@ struct ChatView: View {
                 }
             }
             .coordinateSpace(name: Self.scrollSpace)
+            .tracksScrollUnderTopBar()
             .onGeometryChange(for: CGFloat.self) {
                 $0.size.height
             } action: {

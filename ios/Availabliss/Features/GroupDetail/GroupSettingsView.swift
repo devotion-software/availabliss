@@ -58,6 +58,7 @@ struct GroupSettingsView: View {
             .padding(.top, 20)
             .padding(.bottom, 24)
         }
+        .tracksScrollUnderTopBar()
         .screenBackground(OrbLayout.groups)
         .foregroundStyle(theme.ink)
         // Renamed elsewhere (or by someone else): show the new name unless you're mid-edit.

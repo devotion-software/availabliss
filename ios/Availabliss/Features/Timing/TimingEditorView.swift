@@ -39,6 +39,7 @@ struct TimingEditorView: View {
             .padding(.top, 20)
             .padding(.bottom, 16)
         }
+        .tracksScrollUnderTopBar()
         .safeAreaInset(edge: .bottom) { saveBar }
         .screenBackground(OrbLayout.timing)
         .task { await model.loadAuthorities(country: app.session.user?.country) }
