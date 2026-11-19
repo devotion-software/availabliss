@@ -101,11 +101,12 @@
 </div>
 
 <style>
+	/* On the narrowest phones the Month / Week switch wraps under the heading. */
 	.cal-head {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		flex-wrap: nowrap;
+		gap: 6px 8px;
+		flex-wrap: wrap;
 	}
 	h2 {
 		flex: 0 1 auto;

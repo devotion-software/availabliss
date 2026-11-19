@@ -159,16 +159,17 @@
 	.actions:empty {
 		display: none;
 	}
+	/* On narrow phones Shortlist drops below Propose rather than pushing the card wider. */
 	.actions {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 8px;
 	}
 	.actions :global(.act.shortlist) {
-		flex: 0 1 auto;
 		padding: 0 14px;
 	}
 	.actions :global(.act) {
-		flex: 1;
+		flex: 1 0 auto;
 		height: 44px;
 		border-radius: 14px;
 		font-size: 14px;

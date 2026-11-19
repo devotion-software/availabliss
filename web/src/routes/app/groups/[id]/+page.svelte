@@ -392,6 +392,8 @@
 	.main {
 		flex: 999 1 520px;
 		min-width: 0;
+		/* Full width, not the width of its widest content (the page is a column aligned to the start). */
+		align-self: stretch;
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
@@ -439,10 +441,12 @@
 		flex-direction: column;
 		gap: 10px;
 	}
-	/* Also matched the calendar's inner page before it moved into CalendarPager; kept as it was. */
+	/* Also matched the calendar's inner page before it moved into CalendarPager; kept as it was.
+	   No wrapping: a wrapping column is as wide as its widest content. */
 	.page {
 		display: flex;
 		flex-direction: column;
+		flex-wrap: nowrap;
 		gap: 10px;
 	}
 	.desk-only {
