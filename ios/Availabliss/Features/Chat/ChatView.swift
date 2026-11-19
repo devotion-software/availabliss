@@ -22,6 +22,9 @@ struct ChatView: View {
     @State private var viewportHeight: CGFloat = 0
     /// Messages from others that arrived while you were scrolled back, shown on the jump button.
     @State private var unseenCount = 0
+    /// The list has been put at the latest message after the first load. Until then older messages
+    /// aren't fetched: the lazy list can briefly show its top (or nothing) while it measures.
+    @State private var hasLandedAtBottom = false
     /// A message to scroll to and flash ("Show in chat" from a thread).
     @State private var showRequest: String?
     /// A message's photos open full screen, at the one tapped.
@@ -98,7 +101,7 @@ struct ChatView: View {
                     if model.hasMore {
                         ProgressView()
                             .frame(height: 32)
-                            .onAppear { Task { await model.loadOlder() } }
+                            .onAppear { if hasLandedAtBottom { Task { await model.loadOlder() } } }
                     }
                     if model.isLoading { StatusView(kind: .loading) }
                     let repliedTo = Set(model.messages.compactMap(\.replyTo?.id))
@@ -172,6 +175,11 @@ struct ChatView: View {
                 newestChanged(from: oldId, to: newId, proxy: proxy)
             }
             .onChange(of: isScrolledBack) { _, back in if !back { unseenCount = 0 } }
+            // The bottom anchor alone left the list blank on opening (the lazy rows weren't laid out
+            // yet), until a scroll brought them in with a jump: go to the latest message explicitly.
+            .onChange(of: model.messages.isEmpty, initial: true) { _, isEmpty in
+                if !isEmpty { landAtBottom(proxy: proxy) }
+            }
             .onChange(of: showRequest) { _, id in
                 guard let id else { return }
                 showRequest = nil
@@ -181,6 +189,19 @@ struct ChatView: View {
                     if await model.loadUntil(id) { showOriginal(id, proxy: proxy) }
                 }
             }
+        }
+    }
+
+    /// Once, after the first messages load: shows the latest without animation. Twice over a frame,
+    /// since the first pass can land short while rows above it are still being measured.
+    private func landAtBottom(proxy: ScrollViewProxy) {
+        guard !hasLandedAtBottom else { return }
+        Task { @MainActor in
+            await Task.yield()
+            if let last = model.messages.last?.id { proxy.scrollTo(last, anchor: .bottom) }
+            try? await Task.sleep(for: .milliseconds(60))
+            if let last = model.messages.last?.id { proxy.scrollTo(last, anchor: .bottom) }
+            hasLandedAtBottom = true
         }
     }
 
