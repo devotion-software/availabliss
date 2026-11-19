@@ -97,30 +97,33 @@ async function upsertPerGroup(userIds: string[], groupId: string, input: NotifyI
 	const byUser = new Map(existing.map((row) => [row.userId, row]));
 	const now = new Date();
 	const color = await colorOf(groupId);
-	for (const userId of userIds) {
-		const prev = byUser.get(userId);
-		const count = prev && !prev.readAt ? (Number(prev.data.count) || 1) + 1 : 1;
-		const row: Row = {
-			id: prev?.id ?? newId(),
-			userId,
-			groupId,
-			kind: input.kind,
-			title: input.title,
-			body: input.body,
-			data: { ...data, count: String(count) },
-			readAt: null,
-			createdAt: now
-		};
-		if (prev) {
-			await db
-				.update(notifications)
-				.set({ title: row.title, body: row.body, data: row.data, readAt: null, createdAt: now })
-				.where(eq(notifications.id, prev.id));
-		} else {
-			await db.insert(notifications).values(row);
-		}
-		publishToUsers([userId], { type: 'notification.created', groupId, payload: toNotification(row, color) });
-	}
+	// One write per member, all at once rather than one after another (the sender's request waits on this).
+	await Promise.all(
+		userIds.map(async (userId) => {
+			const prev = byUser.get(userId);
+			const count = prev && !prev.readAt ? (Number(prev.data.count) || 1) + 1 : 1;
+			const row: Row = {
+				id: prev?.id ?? newId(),
+				userId,
+				groupId,
+				kind: input.kind,
+				title: input.title,
+				body: input.body,
+				data: { ...data, count: String(count) },
+				readAt: null,
+				createdAt: now
+			};
+			if (prev) {
+				await db
+					.update(notifications)
+					.set({ title: row.title, body: row.body, data: row.data, readAt: null, createdAt: now })
+					.where(eq(notifications.id, prev.id));
+			} else {
+				await db.insert(notifications).values(row);
+			}
+			publishToUsers([userId], { type: 'notification.created', groupId, payload: toNotification(row, color) });
+		})
+	);
 }
 
 /** Reading a group's chat reads its Activity item; the user's other devices are told. */

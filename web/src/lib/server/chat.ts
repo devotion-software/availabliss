@@ -166,8 +166,15 @@ async function receiptSummaries(rows: MessageRow[], groupSize: number): Promise<
 		.from(messageReceipts)
 		.where(inArray(messageReceipts.messageId, ids))
 		.orderBy(asc(messageReceipts.seenAt));
+	// Grouped once, rather than filtering every receipt for every message.
+	const byMessage = new Map<string, typeof receipts>();
+	for (const r of receipts) {
+		const list = byMessage.get(r.messageId);
+		if (list) list.push(r);
+		else byMessage.set(r.messageId, [r]);
+	}
 	for (const id of ids) {
-		const forMessage = receipts.filter((r) => r.messageId === id);
+		const forMessage = byMessage.get(id) ?? [];
 		const seenBy = forMessage.filter((r) => r.seenAt).map((r) => r.userId);
 		result.set(id, {
 			messageId: id,
