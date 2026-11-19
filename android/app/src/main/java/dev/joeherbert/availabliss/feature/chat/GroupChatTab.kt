@@ -235,7 +235,7 @@ fun GroupChatTab(
             onOpenAttachment = viewModel::openAttachment,
             onPhotos = {
                 viewModel.closeMenu()
-                photoPicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
+                photoPicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageAndVideo))
             },
             onFiles = {
                 viewModel.closeMenu()

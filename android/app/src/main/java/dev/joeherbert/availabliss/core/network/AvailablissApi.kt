@@ -459,7 +459,12 @@ interface AvailablissApi {
     /** One photo, GIF or file (multipart field `file`); returns it unsent, to send by id with [sendAttachments]. */
     @Multipart
     @POST("api/v1/groups/{id}/attachments")
-    suspend fun uploadAttachment(@Path("id") groupId: String, @Part file: okhttp3.MultipartBody.Part): Attachment
+    suspend fun uploadAttachment(
+        @Path("id") groupId: String,
+        @Part file: okhttp3.MultipartBody.Part,
+        /** A video's poster (JPEG); skipped when null. */
+        @Part poster: okhttp3.MultipartBody.Part?,
+    ): Attachment
 
     @POST("api/v1/groups/{id}/messages")
     suspend fun sendLocation(@Path("id") groupId: String, @Body body: SendLocationRequest): Message

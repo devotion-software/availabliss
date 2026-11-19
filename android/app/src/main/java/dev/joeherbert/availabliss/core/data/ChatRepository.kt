@@ -23,8 +23,10 @@ import dev.joeherbert.availabliss.core.network.model.SendPollRequest
 import dev.joeherbert.availabliss.core.network.model.SendTextRequest
 import dev.joeherbert.availabliss.core.network.model.UpdatePollRequest
 import dev.joeherbert.availabliss.core.network.model.VoteRequest
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -56,9 +58,15 @@ class ChatRepository @Inject constructor(
     suspend fun sendAttachments(groupId: String, attachmentIds: List<String>, caption: String, replyToId: String? = null): ApiResult<Message> =
         call { api.sendAttachments(groupId, SendAttachmentsRequest(attachmentIds, caption.trim().takeIf { it.isNotEmpty() }, replyToId)) }
 
-    /** Uploads one file as [name] (not yet sent). */
-    suspend fun upload(groupId: String, name: String, body: RequestBody): ApiResult<Attachment> =
-        call { api.uploadAttachment(groupId, MultipartBody.Part.createFormData("file", name, body)) }
+    /** Uploads one file as [name] (not yet sent); a video also sends its [poster] frame (JPEG). */
+    suspend fun upload(groupId: String, name: String, body: RequestBody, poster: ByteArray? = null): ApiResult<Attachment> =
+        call {
+            api.uploadAttachment(
+                groupId,
+                MultipartBody.Part.createFormData("file", name, body),
+                poster?.let { MultipartBody.Part.createFormData("poster", "poster.jpg", it.toRequestBody("image/jpeg".toMediaType())) },
+            )
+        }
 
     /** Shares a place (your position, or one you found). */
     suspend fun sendLocation(groupId: String, location: MessageLocation, replyToId: String? = null): ApiResult<Message> =

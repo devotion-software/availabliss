@@ -212,6 +212,7 @@ class ChatAttachmentsTest {
         assertNull(uploadLimitError("image/jpeg", 40_000_000))
         assertEquals("GIFs can be up to 15 MB", uploadLimitError("image/gif", 16L * 1024 * 1024))
         assertEquals("Files can be up to 25 MB", uploadLimitError("application/pdf", 26L * 1024 * 1024))
+        assertNull(uploadLimitError("video/mp4", 400_000_000))
         assertNull(uploadLimitError("application/pdf", 1_000))
         assertNull(uploadLimitError("application/pdf", null))
     }

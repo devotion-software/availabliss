@@ -285,9 +285,11 @@ enum API {
         /// Edits your poll: question, pick-one / pick-any, and a text poll's options (an id keeps one and its votes).
         static func updatePoll(pollId: String, _ body: UpdatePollBody) -> Endpoint<Poll> { .init(.patch, "/polls/\(pollId.pathEncoded)", body: body) }
         /// Uploads one photo, GIF or file for the chat (multipart, field `file`); send its id with a message.
-        static func upload(groupId: String, data: Data, name: String, mime: String) -> Endpoint<Attachment> {
-            var endpoint = Endpoint<Attachment>(.post, "/groups/\(groupId.pathEncoded)/attachments", timeout: 120)
-            let form = MultipartForm(file: data, field: "file", name: name, mime: mime)
+        /// A video goes with `poster` (a JPEG frame from it) for its preview.
+        static func upload(groupId: String, data: Data, name: String, mime: String, poster: Data? = nil) -> Endpoint<Attachment> {
+            // Videos can be up to 300 MB.
+            var endpoint = Endpoint<Attachment>(.post, "/groups/\(groupId.pathEncoded)/attachments", timeout: poster != nil || mime.hasPrefix("video/") ? 900 : 120)
+            let form = MultipartForm(file: data, field: "file", name: name, mime: mime, poster: poster)
             endpoint.rawBody = (form.body, form.contentType)
             return endpoint
         }

@@ -24,6 +24,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.Buffer
 import okio.BufferedSink
@@ -40,6 +41,7 @@ import javax.inject.Singleton
 data class PickedFile(val uri: Uri, val name: String, val mime: String, val size: Long?) {
     val isImage: Boolean get() = mime.startsWith("image/")
     val isGif: Boolean get() = mime == "image/gif"
+    val isVideo: Boolean get() = mime.startsWith("video/")
 }
 
 /** A picked file ready to upload: the name to send it as and its body. */
@@ -92,6 +94,21 @@ class AttachmentFiles @Inject constructor(
             UploadSource(file.name, UriRequestBody(file.uri, file.mime.toMediaTypeOrNull(), file.size ?: -1))
         }
         UploadSource(source.name, ProgressRequestBody(source.body, onProgress))
+    }
+
+    /**
+     * A picked video shrunk to 720p MP4 with a poster frame ([onProgress] 0–1 while it's converted),
+     * and the body to upload it with, reporting bytes written. Throws [VideoExportException] with a
+     * reason to show when it can't be sent.
+     */
+    suspend fun prepareVideo(
+        file: PickedFile,
+        onConverting: (Float) -> Unit,
+        onProgress: (written: Long, total: Long) -> Unit,
+    ): Pair<PreparedVideo, UploadSource> {
+        val video = VideoExport.prepare(context, file.uri, file.name, onConverting)
+        val body = video.file.asRequestBody("video/mp4".toMediaTypeOrNull())
+        return video to UploadSource(video.name, ProgressRequestBody(body, onProgress))
     }
 
     private fun photoAsJpeg(uri: Uri, maxSide: Int?): ByteArray? = runCatching {
@@ -177,13 +194,16 @@ class AttachmentFiles @Inject constructor(
     /** Copies a downloaded photo into Pictures/Availabliss (Android 10+, no permission needed). */
     suspend fun saveToPictures(file: File, mime: String): Boolean = withContext(Dispatchers.IO) {
         if (Build.VERSION.SDK_INT < 29) return@withContext false
+        // Videos go to Movies, photos to Pictures (the columns are the same MediaColumns).
+        val video = mime.startsWith("video/")
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, file.name)
             put(MediaStore.Images.Media.MIME_TYPE, mime)
-            put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/Availabliss")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "${if (video) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES}/Availabliss")
             put(MediaStore.Images.Media.IS_PENDING, 1)
         }
-        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return@withContext false
+        val collection = if (video) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        val uri = resolver.insert(collection, values) ?: return@withContext false
         runCatching {
             resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: error("No stream")
             resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)

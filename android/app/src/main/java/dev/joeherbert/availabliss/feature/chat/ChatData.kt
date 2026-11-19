@@ -27,12 +27,18 @@ internal data class PendingUpload(
     val progress: Float = 0f,
     val uploaded: Attachment? = null,
     val error: String? = null,
+    /** A video's poster frame (a cached JPEG), once it's been prepared. */
+    val poster: java.io.File? = null,
 ) {
     fun toUi() = ComposerAttachment(
         id = localId,
         kind = kind,
         name = name,
-        preview = uri.takeIf { kind != AttachmentUiKind.File },
+        preview = when (kind) {
+            AttachmentUiKind.File -> null
+            AttachmentUiKind.Video -> poster
+            else -> uri
+        },
         progress = progress,
         uploaded = uploaded != null,
         error = error,

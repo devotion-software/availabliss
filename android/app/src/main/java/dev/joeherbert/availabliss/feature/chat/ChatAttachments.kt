@@ -3,6 +3,8 @@ package dev.joeherbert.availabliss.feature.chat
 import android.net.Uri
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.AttachmentFiles
+import dev.joeherbert.availabliss.core.data.PreparedVideo
+import dev.joeherbert.availabliss.core.data.VideoExportException
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.Attachment
 import dev.joeherbert.availabliss.core.network.model.AttachmentKind
@@ -61,6 +63,7 @@ internal class ChatAttachments(
                 return@launch
             }
             val kind = when {
+                file.isVideo -> AttachmentUiKind.Video
                 file.isGif -> AttachmentUiKind.Gif
                 file.isImage -> AttachmentUiKind.Image
                 else -> AttachmentUiKind.File
@@ -71,22 +74,41 @@ internal class ChatAttachments(
                 return@launch
             }
             var reported = -1
-            val source = files.prepare(file) { written, total ->
-                if (total > 0) {
-                    val percent = (written * 100 / total).toInt().coerceIn(0, 100)
-                    if (percent != reported) {
-                        reported = percent
-                        updatePending(localId) { if (it.uploaded == null && it.error == null) it.copy(progress = percent / 100f) else it }
-                    }
+            // A video is converted first (the first half of its progress), then uploaded.
+            val share = if (file.isVideo) 0.5f else 1f
+            fun report(fraction: Float, base: Float) {
+                val percent = ((base + fraction * share) * 100).toInt().coerceIn(0, 100)
+                if (percent != reported) {
+                    reported = percent
+                    updatePending(localId) { if (it.uploaded == null && it.error == null) it.copy(progress = percent / 100f) else it }
                 }
+            }
+            val onBytes = { written: Long, total: Long -> if (total > 0) report(written.toFloat() / total, 1f - share) }
+            var video: PreparedVideo? = null
+            val source = if (file.isVideo) {
+                val prepared = try {
+                    files.prepareVideo(file, onConverting = { report(it, 0f) }, onProgress = onBytes)
+                } catch (e: VideoExportException) {
+                    updatePending(localId) { it.copy(error = e.message) }
+                    return@launch
+                }
+                video = prepared.first
+                updatePending(localId) { it.copy(poster = prepared.first.posterFile) }
+                prepared.second
+            } else {
+                files.prepare(file, onBytes)
             }
             if (source == null) {
                 updatePending(localId) { it.copy(error = "Couldn't read this photo") }
                 return@launch
             }
-            when (val result = session.chat.upload(session.groupId, source.name, source.body)) {
-                is ApiResult.Success -> updatePending(localId) { it.copy(uploaded = result.value, progress = 1f) }
-                is ApiResult.Failure -> updatePending(localId) { it.copy(error = result.error.message) }
+            try {
+                when (val result = session.chat.upload(session.groupId, source.name, source.body, video?.poster)) {
+                    is ApiResult.Success -> updatePending(localId) { it.copy(uploaded = result.value, progress = 1f) }
+                    is ApiResult.Failure -> updatePending(localId) { it.copy(error = result.error.message) }
+                }
+            } finally {
+                video?.file?.delete()
             }
             uploadJobs.remove(localId)
         }
@@ -124,7 +146,12 @@ internal class ChatAttachments(
 
     fun saveAttachment(attachment: Attachment) = withDownload(attachment) { file ->
         val saved = files.saveToPictures(file, attachment.mime)
-        data.update { it.copy(message = UserMessage(if (saved) "Saved to Pictures" else "Couldn't save the photo")) }
+        val video = attachment.kind == AttachmentKind.Video
+        val message = when {
+            saved -> if (video) "Saved to Movies" else "Saved to Pictures"
+            else -> if (video) "Couldn't save the video" else "Couldn't save the photo"
+        }
+        data.update { it.copy(message = UserMessage(message)) }
     }
 
     /** Downloads [attachment] to the cache (once at a time per attachment), then runs [then]. */
@@ -165,6 +192,8 @@ fun uploadLimitError(mime: String, size: Long?): String? {
     if (size == null) return null
     return when {
         mime == "image/gif" && size > MAX_PHOTO_BYTES -> "GIFs can be up to 15 MB"
+        // Videos are shrunk to 720p before sending; their length is checked then.
+        mime.startsWith("video/") -> null
         !mime.startsWith("image/") && size > MAX_FILE_BYTES -> "Files can be up to 25 MB"
         else -> null
     }

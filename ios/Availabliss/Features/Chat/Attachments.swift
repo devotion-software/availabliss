@@ -1,3 +1,4 @@
+import AVKit
 import ImageIO
 import QuickLook
 import SwiftUI
@@ -12,8 +13,10 @@ struct PendingUpload: Identifiable, Equatable {
     let name: String
     let mime: String
     let data: Data
-    /// A small preview for photos and GIFs.
+    /// A small preview for photos and GIFs (and a video's poster).
     let preview: UIImage?
+    /// A video's poster (JPEG), sent with it.
+    var poster: Data? = nil
     var progress: Double = 0
     var uploaded: Attachment?
     var error: String?
@@ -30,6 +33,9 @@ enum AttachmentFormat {
     static let maxPerMessage = 10
     static let maxPhotoBytes = 15 * 1024 * 1024
     static let maxFileBytes = 25 * 1024 * 1024
+    /// Videos up to 300 MB and 10 minutes (Pro; 100 MB and 3 minutes otherwise, which the server checks).
+    static let maxVideoBytes = 300 * 1024 * 1024
+    static let maxVideoSeconds: Double = 10 * 60
 
     /// "1.2 MB", "340 KB".
     static func size(_ bytes: Int) -> String {
@@ -174,10 +180,21 @@ struct AttachmentImage: View {
     @State private var failed = false
     @Environment(\.theme) private var theme
 
-    private var key: String { full || attachment.thumbnailUrl == nil ? "\(attachment.id)-full" : "\(attachment.id)-thumb" }
+    private var key: String {
+        attachment.kind == .video ? "\(attachment.id)-thumb" : full || attachment.thumbnailUrl == nil ? "\(attachment.id)-full" : "\(attachment.id)-thumb"
+    }
     private var url: String { full ? attachment.url : attachment.thumbnailUrl ?? attachment.url }
 
     var body: some View {
+        if attachment.kind == .video, attachment.thumbnailUrl == nil {
+            // No poster: a dark tile (the gallery puts the play button and length on it).
+            Rectangle().fill(Color.black.opacity(0.85))
+        } else {
+            picture
+        }
+    }
+
+    private var picture: some View {
         ZStack {
             if let image = image ?? AttachmentImages.shared.cached(key) {
                 AnimatedImageView(image: image, contentMode: contentMode)
@@ -269,7 +286,25 @@ struct AttachmentGallery: View {
                         Text("+\(extra)").font(.system(size: 22, weight: .bold)).foregroundStyle(.white)
                     }
                 }
+                .overlay {
+                    if attachment.kind == .video, extra == 0 {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 46, height: 46)
+                            .background(Circle().fill(.black.opacity(0.5)))
+                    }
+                }
                 .overlay(alignment: .bottomLeading) {
+                    if attachment.kind == .video, extra == 0 {
+                        Text(attachment.durationLabel)
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(.black.opacity(0.5)))
+                            .padding(6)
+                    }
                     if attachment.kind == .gif, extra == 0 {
                         Text("GIF")
                             .font(.system(size: 10, weight: .heavy))
@@ -283,8 +318,16 @@ struct AttachmentGallery: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(extra > 0 ? "\(attachment.kind == .gif ? "GIF" : "Photo"), and \(extra) more" : attachment.kind == .gif ? "GIF" : "Photo")
+        .accessibilityLabel(extra > 0 ? "\(label(attachment)), and \(extra) more" : label(attachment))
         .accessibilityHint("Opens it full screen")
+    }
+}
+
+private func label(_ attachment: Attachment) -> String {
+    switch attachment.kind {
+    case .gif: "GIF"
+    case .video: "Video, \(attachment.durationLabel)"
+    default: "Photo"
     }
 }
 
@@ -457,9 +500,15 @@ struct AttachmentViewer: View {
             Color.black.ignoresSafeArea()
             TabView(selection: $selection) {
                 ForEach(attachments) { attachment in
-                    ZoomableImage(attachment: attachment)
-                        .tag(attachment.id)
-                        .ignoresSafeArea()
+                    SwiftUI.Group {
+                        if attachment.kind == .video, let url = URL(string: attachment.url) {
+                            VideoPage(url: url, isShowing: selection == attachment.id)
+                        } else {
+                            ZoomableImage(attachment: attachment)
+                        }
+                    }
+                    .tag(attachment.id)
+                    .ignoresSafeArea()
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: attachments.count > 1 ? .automatic : .never))
@@ -625,5 +674,25 @@ enum AttachmentFiles {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try data.write(to: file, options: .atomic)
         return file
+    }
+}
+
+
+/// A video in the full-screen viewer: plays with the system controls while it's the one showing.
+private struct VideoPage: View {
+    let url: URL
+    let isShowing: Bool
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        VideoPlayer(player: player)
+            .onAppear {
+                if player == nil { player = AVPlayer(url: url) }
+                if isShowing { player?.play() }
+            }
+            .onChange(of: isShowing) { _, showing in
+                if showing { player?.play() } else { player?.pause() }
+            }
+            .onDisappear { player?.pause() }
     }
 }

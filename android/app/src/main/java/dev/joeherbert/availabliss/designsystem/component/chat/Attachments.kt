@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.designsystem.component.chat
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
@@ -46,7 +48,7 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import java.util.Locale
 import kotlin.math.roundToInt
 
-enum class AttachmentUiKind { Image, Gif, File }
+enum class AttachmentUiKind { Image, Gif, Video, File }
 
 /** What a file card's icon shows. */
 enum class FileIcon { Document, Archive, Audio, Video, Ticket, Generic }
@@ -86,21 +88,24 @@ data class AttachmentUi(
     val name: String,
     /** "1.2 MB". */
     val sizeLabel: String,
-    /** What the bubble shows: a photo's preview, a GIF itself; null for files. */
+    /** What the bubble shows: a photo's preview, a GIF itself, a video's poster; null for files. */
     val preview: String? = null,
     val width: Int? = null,
     val height: Int? = null,
     val icon: FileIcon = FileIcon.Generic,
     /** A Wallet pass (kind File): drawn as a pass card rather than a file card. */
     val pass: PassUi? = null,
+    /** A video's length in seconds. */
+    val duration: Int? = null,
 ) {
     val visual: Boolean get() = kind != AttachmentUiKind.File
 
-    /** "Photo", "GIF", "Wallet pass: Winter Gig, Roundhouse", or "File: Plan.pdf, 1.2 MB". */
+    /** "Photo", "GIF", "Video, 1:05", "Wallet pass: Winter Gig, Roundhouse", or "File: Plan.pdf, 1.2 MB". */
     val accessibilityLabel: String
         get() = when (kind) {
             AttachmentUiKind.Image -> "Photo"
             AttachmentUiKind.Gif -> "GIF"
+            AttachmentUiKind.Video -> duration?.let { "Video, ${formatDuration(it)}" } ?: "Video"
             AttachmentUiKind.File -> if (pass != null) "Wallet pass: ${pass.headline}, ${pass.organization}" else "File: $name, $sizeLabel"
         }
 }
@@ -175,6 +180,15 @@ fun singleImageSize(width: Int?, height: Int?, maxWidth: Float = 240f, maxHeight
         w = h * ratio
     }
     return w.coerceIn(minSide, maxWidth) to h.coerceIn(minSide, maxHeight)
+}
+
+/** A video's length: "0:07", "1:05", "1:02:03". */
+fun formatDuration(seconds: Int): String {
+    val s = seconds.coerceAtLeast(0)
+    val h = s / 3600
+    val m = (s % 3600) / 60
+    val sec = s % 60
+    return if (h > 0) "%d:%02d:%02d".format(Locale.UK, h, m, sec) else "%d:%02d".format(Locale.UK, m, sec)
 }
 
 /** Tiles per row of a gallery of [count] photos: pairs, with an odd one out full width; at most 4 tiles. */
@@ -260,6 +274,22 @@ private fun ImageTile(image: AttachmentUi, onOpen: (String) -> Unit, onLongClick
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
+        if (image.kind == AttachmentUiKind.Video) {
+            PlayBadge(Modifier.align(Alignment.Center))
+            image.duration?.let { seconds ->
+                Text(
+                    formatDuration(seconds),
+                    style = AvailablissTheme.type.micro.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                )
+            }
+        }
         if (image.kind == AttachmentUiKind.Gif) {
             Text(
                 "GIF",
@@ -278,6 +308,22 @@ private fun ImageTile(image: AttachmentUi, onOpen: (String) -> Unit, onLongClick
                 Text("+$overflow", style = AvailablissTheme.type.headlineSmall, color = Color.White)
             }
         }
+    }
+}
+
+/** A round, dark play button drawn over a video's poster. */
+@Composable
+fun PlayBadge(modifier: Modifier = Modifier, size: Dp = 44.dp) {
+    Canvas(modifier.size(size)) {
+        drawCircle(Color.Black.copy(alpha = 0.5f))
+        val w = this.size.width
+        val triangle = Path().apply {
+            moveTo(w * 0.40f, w * 0.30f)
+            lineTo(w * 0.72f, w * 0.50f)
+            lineTo(w * 0.40f, w * 0.70f)
+            close()
+        }
+        drawPath(triangle, Color.White)
     }
 }
 
@@ -467,6 +513,7 @@ private fun TrayItem(item: ComposerAttachment, onRemove: (String) -> Unit, onRet
     val label = when (item.kind) {
         AttachmentUiKind.Image -> "Photo"
         AttachmentUiKind.Gif -> "GIF"
+        AttachmentUiKind.Video -> "Video"
         AttachmentUiKind.File -> "File: ${item.name}"
     }
     val status = when {
@@ -504,6 +551,7 @@ private fun TrayItem(item: ComposerAttachment, onRemove: (String) -> Unit, onRet
                 }
             } else {
                 AsyncImage(model = item.preview, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                if (item.kind == AttachmentUiKind.Video && item.uploaded) PlayBadge(Modifier.align(Alignment.Center), size = 26.dp)
             }
             when {
                 item.error != null -> Box(Modifier.fillMaxSize().background(colors.warnBg.copy(alpha = 0.85f)), contentAlignment = Alignment.Center) {

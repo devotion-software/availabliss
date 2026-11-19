@@ -249,6 +249,7 @@ fun Attachment.toUi(): AttachmentUi = AttachmentUi(
     kind = when (kind) {
         AttachmentKind.Image -> AttachmentUiKind.Image
         AttachmentKind.Gif -> AttachmentUiKind.Gif
+        AttachmentKind.Video -> AttachmentUiKind.Video
         AttachmentKind.File, AttachmentKind.Pass -> AttachmentUiKind.File
     },
     name = name,
@@ -256,12 +257,14 @@ fun Attachment.toUi(): AttachmentUi = AttachmentUi(
     preview = when (kind) {
         AttachmentKind.Image -> thumbnailUrl ?: url
         AttachmentKind.Gif -> url
+        AttachmentKind.Video -> thumbnailUrl
         AttachmentKind.File, AttachmentKind.Pass -> null
     },
     width = width,
     height = height,
     icon = fileIconFor(name, mime),
     pass = pass?.takeIf { kind == AttachmentKind.Pass }?.toUi(thumbnailUrl),
+    duration = duration,
 )
 
 /** A pass's card: the event (or what it is), when, where and up to three other details. */

@@ -65,7 +65,7 @@ struct ChatComposerArea: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: state.editing?.id)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showsMenu)
         .photosPicker(
-            isPresented: $pickingPhotos, selection: $photoSelection, maxSelectionCount: AttachmentFormat.maxPerMessage, matching: .images, preferredItemEncoding: .current
+            isPresented: $pickingPhotos, selection: $photoSelection, maxSelectionCount: AttachmentFormat.maxPerMessage, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current
         )
         .onChange(of: photoSelection) { _, items in
             guard !items.isEmpty else { return }
@@ -124,11 +124,24 @@ struct ChatComposerArea: View {
         return target == .thread ? "Reply in thread" : "Message the group"
     }
 
-    /// Loads picked photos (GIFs as they are, others as JPEG where needed) and starts uploading them.
+    /// Loads picked photos (GIFs as they are, others as JPEG where needed) and videos (shrunk to 720p,
+    /// with a poster), and starts uploading them.
     private func attachPhotos(_ items: [PhotosPickerItem]) async {
         var picked: [(data: Data, name: String, mime: String, preview: UIImage?)] = []
+        var videos: [PreparedVideo] = []
         var failed = 0
         for item in items {
+            if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
+                do {
+                    guard let movie = try await item.loadTransferable(type: PickedMovie.self) else { failed += 1; continue }
+                    videos.append(try await VideoExport.prepare(movie.url, name: movie.url.lastPathComponent))
+                } catch let error as VideoExportError {
+                    model.report(error.message, target)
+                } catch {
+                    failed += 1
+                }
+                continue
+            }
             let type = item.supportedContentTypes.first { $0.conforms(to: .gif) } ?? item.supportedContentTypes.first
             guard let data = try? await item.loadTransferable(type: Data.self),
                 let photo = await Task.detached(priority: .userInitiated, operation: { AttachmentFormat.photo(data: data, type: type) }).value
@@ -136,7 +149,8 @@ struct ChatComposerArea: View {
             picked.append(photo)
         }
         model.attach(picked, to: target)
-        if failed > 0 { model.report(failed == 1 ? "One photo couldn't be loaded." : "\(failed) photos couldn't be loaded.", target) }
+        model.attachVideos(videos, to: target)
+        if failed > 0 { model.report(failed == 1 ? "One photo or video couldn't be loaded." : "\(failed) photos or videos couldn't be loaded.", target) }
     }
 
     /// Reads picked files and starts uploading them (the server says which types it takes).

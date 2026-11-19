@@ -80,6 +80,15 @@ struct ChatMediaSheet: View {
                         .aspectRatio(1, contentMode: .fit)
                         .overlay { AttachmentImage(attachment: item.attachment) }
                         .overlay(alignment: .bottomLeading) {
+                            if item.attachment.kind == .video {
+                                Text("\u{25B6} " + item.attachment.durationLabel)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 1)
+                                    .background(RoundedRectangle(cornerRadius: 6).fill(.black.opacity(0.55)))
+                                    .padding(6)
+                            }
                             if item.attachment.kind == .gif {
                                 Text("GIF")
                                     .font(.system(size: 11, weight: .bold))
@@ -94,7 +103,7 @@ struct ChatMediaSheet: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(item.attachment.kind == .gif ? "GIF" : "Photo") from \(author(item)), \(Formatting.chatDay(item.createdAt))")
+                .accessibilityLabel("\(item.attachment.kind == .gif ? "GIF" : item.attachment.kind == .video ? "Video" : "Photo") from \(author(item)), \(Formatting.chatDay(item.createdAt))")
                 .onAppear { loadMore(after: item) }
             }
         }

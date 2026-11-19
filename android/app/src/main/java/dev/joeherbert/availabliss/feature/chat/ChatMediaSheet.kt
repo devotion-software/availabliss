@@ -39,6 +39,7 @@ import dev.joeherbert.availabliss.designsystem.component.SegmentedControl
 import dev.joeherbert.availabliss.designsystem.component.SegmentedStyle
 import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.chat.fileIconFor
+import dev.joeherbert.availabliss.designsystem.component.chat.formatDuration
 import dev.joeherbert.availabliss.designsystem.component.chat.vector
 import dev.joeherbert.availabliss.designsystem.icon.AvIcons
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
@@ -114,14 +115,38 @@ private fun PhotoGrid(items: List<MediaItemUi>, onViewPhoto: (Int) -> Unit) {
                             .clip(RoundedCornerShape(10.dp))
                             .background(colors.surface)
                             .clickable(role = Role.Button, onClickLabel = "View") { onViewPhoto(index) }
-                            .semantics { contentDescription = "${if (a.kind == AttachmentKind.Gif) "GIF" else "Photo"}, ${item.meta}" },
+                            .semantics {
+                                val what = when (a.kind) {
+                                    AttachmentKind.Gif -> "GIF"
+                                    AttachmentKind.Video -> a.duration?.let { "Video, ${formatDuration(it)}" } ?: "Video"
+                                    else -> "Photo"
+                                }
+                                contentDescription = "$what, ${item.meta}"
+                            },
                     ) {
                         AsyncImage(
-                            model = if (a.kind == AttachmentKind.Gif) a.url else a.thumbnailUrl ?: a.url,
+                            model = when (a.kind) {
+                                AttachmentKind.Gif -> a.url
+                                AttachmentKind.Video -> a.thumbnailUrl
+                                else -> a.thumbnailUrl ?: a.url
+                            },
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
                         )
+                        if (a.kind == AttachmentKind.Video) {
+                            Text(
+                                "\u25B6 " + (a.duration?.let(::formatDuration) ?: ""),
+                                style = AvailablissTheme.type.micro.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White,
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(6.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.Black.copy(alpha = 0.55f))
+                                    .padding(horizontal = 6.dp, vertical = 1.dp),
+                            )
+                        }
                         if (a.kind == AttachmentKind.Gif) {
                             Text(
                                 "GIF",

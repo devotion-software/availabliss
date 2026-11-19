@@ -166,12 +166,12 @@ private final class UploadProgress: NSObject, URLSessionTaskDelegate, Sendable {
     }
 }
 
-/// A multipart/form-data body with one file.
+/// A multipart/form-data body with one file (and, for a video, its poster).
 struct MultipartForm {
     let body: Data
     let contentType: String
 
-    init(file: Data, field: String, name: String, mime: String) {
+    init(file: Data, field: String, name: String, mime: String, poster: Data? = nil) {
         let boundary = "availabliss-\(UUID().uuidString)"
         // Quotes and line breaks would end the header early.
         let safeName = name.replacingOccurrences(of: "\"", with: "'").components(separatedBy: .newlines).joined()
@@ -180,6 +180,12 @@ struct MultipartForm {
         body.append(Data("Content-Disposition: form-data; name=\"\(field)\"; filename=\"\(safeName)\"\r\n".utf8))
         body.append(Data("Content-Type: \(mime)\r\n\r\n".utf8))
         body.append(file)
+        if let poster {
+            body.append(Data("\r\n--\(boundary)\r\n".utf8))
+            body.append(Data("Content-Disposition: form-data; name=\"poster\"; filename=\"poster.jpg\"\r\n".utf8))
+            body.append(Data("Content-Type: image/jpeg\r\n\r\n".utf8))
+            body.append(poster)
+        }
         body.append(Data("\r\n--\(boundary)--\r\n".utf8))
         self.body = body
         contentType = "multipart/form-data; boundary=\(boundary)"

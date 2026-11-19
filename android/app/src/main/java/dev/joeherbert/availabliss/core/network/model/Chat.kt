@@ -66,6 +66,8 @@ enum class AttachmentKind(override val wire: String) : WireEnum {
     File("file"),
     /** An Apple Wallet pass (.pkpass / .pkpasses), with [Attachment.pass] for its card. */
     Pass("pass"),
+    /** An MP4 / MOV video: [Attachment.thumbnailUrl] is its poster, [Attachment.duration] its length. */
+    Video("video"),
 }
 
 object AttachmentKindSerializer :
@@ -88,9 +90,11 @@ data class Attachment(
     val thumbnailUrl: String? = null,
     /** For [AttachmentKind.Pass]: what its card shows. */
     val pass: WalletPass? = null,
+    /** Seconds, for videos. */
+    val duration: Int? = null,
 ) {
-    /** Shown in the chat as a picture (photos and GIFs). */
-    val isVisual: Boolean get() = kind == AttachmentKind.Image || kind == AttachmentKind.Gif
+    /** Shown in the chat as a picture (photos, GIFs and videos). */
+    val isVisual: Boolean get() = kind == AttachmentKind.Image || kind == AttachmentKind.Gif || kind == AttachmentKind.Video
 }
 
 /** An Apple Wallet pass's details, read by the server from its pass.json. */

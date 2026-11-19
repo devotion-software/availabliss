@@ -94,7 +94,7 @@ struct MessageLocation: Codable, Sendable, Equatable, Hashable {
 /// A photo, GIF, file or Wallet pass in a chat message. `url` / `thumbnailUrl` are signed links: no auth header needed.
 struct Attachment: Codable, Sendable, Identifiable, Equatable, Hashable {
     enum Kind: String, Codable, Sendable {
-        case image, gif, file, pass
+        case image, gif, file, pass, video
         /// A kind this version doesn't know is shown as a file.
         init(from decoder: Decoder) throws {
             self = Kind(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .file
@@ -113,8 +113,16 @@ struct Attachment: Codable, Sendable, Identifiable, Equatable, Hashable {
     let thumbnailUrl: String?
     /// For a Wallet pass: what its card shows.
     var pass: WalletPass?
+    /// For a video: its length in seconds (`thumbnailUrl` is then its poster).
+    var duration: Int?
 
-    var isVisual: Bool { kind == .image || kind == .gif }
+    var isVisual: Bool { kind == .image || kind == .gif || kind == .video }
+
+    /// A video's length: "0:07", "1:35".
+    var durationLabel: String {
+        let s = max(0, duration ?? 0)
+        return "\(s / 60):" + String(format: "%02d", s % 60)
+    }
     /// Width over height, when known.
     var aspectRatio: CGFloat? {
         guard let width, let height, width > 0, height > 0 else { return nil }
@@ -128,12 +136,14 @@ struct Attachment: Codable, Sendable, Identifiable, Equatable, Hashable {
             switch first.kind {
             case .gif: return "GIF"
             case .image: return "Photo"
+            case .video: return "Video"
             case .pass: return first.pass?.title ?? "Ticket"
             case .file: return first.name
             }
         }
         let files = list.filter { !$0.isVisual }.count
-        if files == 0 { return "\(list.count) photos" }
+        if list.allSatisfy({ $0.kind == .video }) { return "\(list.count) videos" }
+        if files == 0 { return list.contains { $0.kind == .video } ? "\(list.count) photos and videos" : "\(list.count) photos" }
         if list.allSatisfy({ $0.kind == .pass }) { return "\(list.count) passes" }
         return files == list.count ? "\(list.count) files" : "\(list.count) attachments"
     }

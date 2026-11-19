@@ -190,6 +190,22 @@ final class ChatViewModel {
         }
     }
 
+    /// Adds shrunk videos (with their posters) to the next message and starts uploading them.
+    func attachVideos(_ videos: [PreparedVideo], to target: ComposerTarget = .chat) {
+        let room = AttachmentFormat.maxPerMessage - composer(target).uploads.count
+        if videos.count > room { report("A message can have up to \(AttachmentFormat.maxPerMessage) photos and files.", target) }
+        for video in videos.prefix(max(room, 0)) {
+            guard video.data.count <= AttachmentFormat.maxVideoBytes else {
+                report("That video is too big: videos can be up to 300 MB.", target)
+                continue
+            }
+            var upload = PendingUpload(name: video.name, mime: "video/mp4", data: video.data, preview: video.preview)
+            upload.poster = video.poster
+            composers[target, default: ComposerState()].uploads.append(upload)
+            start(upload)
+        }
+    }
+
     /// The composer an upload belongs to.
     private func targetOf(_ id: UUID) -> ComposerTarget? {
         composers.first { $0.value.uploads.contains { $0.id == id } }?.key
@@ -213,7 +229,8 @@ final class ChatViewModel {
         let api = self.api, groupId = self.groupId, id = upload.id
         uploadTasks[id] = Task { [weak self] in
             do {
-                let attachment = try await api.upload(API.Chat.upload(groupId: groupId, data: upload.data, name: upload.name, mime: upload.mime)) { fraction in
+                let endpoint = API.Chat.upload(groupId: groupId, data: upload.data, name: upload.name, mime: upload.mime, poster: upload.poster)
+                let attachment = try await api.upload(endpoint) { fraction in
                     Task { @MainActor in self?.setProgress(id, fraction) }
                 }
                 self?.finishUpload(id, attachment: attachment, error: nil)

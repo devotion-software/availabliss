@@ -98,11 +98,40 @@ export async function getObject(
 			const value = res.headers.get(name);
 			if (value) headers.set(name, value);
 		}
+		// Video players (AVPlayer) want to know they can ask for parts.
+		headers.set('accept-ranges', 'bytes');
 		return { body: res.body!, status: res.status, headers };
 	}
 	const bytes = await readFile(join(LOCAL_DIR, key)).catch(() => null);
 	if (!bytes) return null;
-	return { body: new Uint8Array(bytes), status: 200, headers: new Headers({ 'content-length': String(bytes.byteLength) }) };
+	const part = byteRange(range, bytes.byteLength);
+	if (part) {
+		return {
+			body: new Uint8Array(bytes.subarray(part.start, part.end + 1)),
+			status: 206,
+			headers: new Headers({
+				'content-length': String(part.end - part.start + 1),
+				'content-range': `bytes ${part.start}-${part.end}/${bytes.byteLength}`,
+				'accept-ranges': 'bytes'
+			})
+		};
+	}
+	return { body: new Uint8Array(bytes), status: 200, headers: new Headers({ 'content-length': String(bytes.byteLength), 'accept-ranges': 'bytes' }) };
+}
+
+/** A single `bytes=start-end` (or `start-`, or `-suffix`) range within `size`, or null for the whole file. */
+export function byteRange(header: string | null, size: number): { start: number; end: number } | null {
+	const m = header?.match(/^bytes=(\d*)-(\d*)$/);
+	if (!m || (m[1] === '' && m[2] === '') || size === 0) return null;
+	let start: number, end: number;
+	if (m[1] === '') {
+		start = Math.max(0, size - Number(m[2]));
+		end = size - 1;
+	} else {
+		start = Number(m[1]);
+		end = m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1);
+	}
+	return start <= end && start < size ? { start, end } : null;
 }
 
 /** Deletes stored objects by key (best effort). */
