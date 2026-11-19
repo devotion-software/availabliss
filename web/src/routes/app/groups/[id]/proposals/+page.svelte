@@ -34,15 +34,15 @@
 	});
 </script>
 
-<svelte:head><title>Proposals · {data.group.name} · Availabliss</title></svelte:head>
+<svelte:head><title>{data.group.name} Plans · Availabliss</title></svelte:head>
 
 <div class="page">
 	<PageHeader
-		title="Proposals"
+		title="{data.group.name} Plans"
 		backHref="/app/groups/{data.group.id}"
 		backLabel="Back to calendar"
 		backOnPhoneOnly
-		crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Proposals' }]}
+		crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Plans' }]}
 	>
 		{#snippet actions()}
 			<Button variant="accent" size="sm" icon="plus" onclick={() => (proposing = true)}>Propose</Button>

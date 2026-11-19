@@ -111,7 +111,7 @@ private fun GroupProposalsContent(
     AvailablissBackground(OrbLayout.Proposal) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             ScreenHeader(
-                title = state.groupName.ifBlank { events.groupName.ifBlank { "Plans" } },
+                title = state.groupName.ifBlank { events.groupName }.let { if (it.isBlank()) "Plans" else "$it Plans" },
                 onBack = onBack,
                 backDescription = "Back to calendar",
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp),

@@ -113,6 +113,9 @@ private struct GroupTopBar: View {
         AnyView(GroupTile(monogram: group.monogram, colorToken: group.color, imageURL: group.image, size: 40, cornerRadius: 14))
     }
 
+    /// "Lake District crew Plans" on Plans; the group's name on its other sections.
+    private var sectionTitle: String { section == .plans ? "\(group.name) Plans" : group.name }
+
     var body: some View {
         SwiftUI.Group {
             if section == .settings {
@@ -121,12 +124,12 @@ private struct GroupTopBar: View {
                     backLabel: app.router.isOverGroup(group.id) ? "Back to calendar" : "Back", onBack: { app.router.back() })
             } else if let section, app.router.isOverGroup(group.id) {
                 ScreenHeader(
-                    title: group.name, titleSize: 22, backLabel: "Back to calendar", onBack: { app.router.back() },
+                    title: sectionTitle, titleSize: 22, backLabel: "Back to calendar", onBack: { app.router.back() },
                     leading: section == .chat ? tile : nil)
             } else if section != nil {
                 // Opened from elsewhere (Activity): back returns there; the name opens the group.
                 ScreenHeader(
-                    title: group.name, titleSize: 22, onBack: { app.router.back() },
+                    title: sectionTitle, titleSize: 22, onBack: { app.router.back() },
                     onTitle: {
                         app.router.pop(); app.open(.group(id: group.id))
                     },
