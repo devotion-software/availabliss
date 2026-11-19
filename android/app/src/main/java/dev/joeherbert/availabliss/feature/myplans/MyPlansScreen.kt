@@ -53,6 +53,7 @@ import dev.joeherbert.availabliss.designsystem.theme.Spacing
 import dev.joeherbert.availabliss.feature.calendars.CalendarFeedCard
 import dev.joeherbert.availabliss.feature.calendars.CalendarFeedViewModel
 import dev.joeherbert.availabliss.feature.common.AddToCalendarEffect
+import dev.joeherbert.availabliss.feature.common.LocalShowsAddToCalendar
 
 /**
  * My plans (from Activity): Coming up, Can't make it (quieter, only when there are any) and Past,
@@ -104,6 +105,7 @@ fun MyPlansContent(
     feedCard: @Composable () -> Unit = {},
 ) {
     val sections = state.sections
+    val showsAddToCalendar = LocalShowsAddToCalendar.current
     AvailablissBackground(OrbLayout.Proposal) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             ScreenHeader(
@@ -131,7 +133,7 @@ fun MyPlansContent(
                 }
                 if (sections.goingTo.isNotEmpty()) {
                     item(key = "going-label") { SectionLabel("Coming up", Modifier.padding(top = 4.dp)) }
-                    if (state.toAddCount > 0) {
+                    if (state.toAddCount > 0 && showsAddToCalendar) {
                         item(key = "add-all") {
                             PrimaryButton(
                                 text = "Add all to calendar",

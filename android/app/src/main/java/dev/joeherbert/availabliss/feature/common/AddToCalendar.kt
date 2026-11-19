@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -375,6 +376,9 @@ fun CalendarChoiceSheet(
     }
 }
 
+/** Whether plans show "Add to calendar": the account setting in You, provided at the app's root. */
+val LocalShowsAddToCalendar = staticCompositionLocalOf { true }
+
 /**
  * The "Add to calendar" button, which says "Added to your calendar" for a few seconds after you
  * add it. After that (and on later visits) the button goes: a quiet line says which calendar the
@@ -383,6 +387,8 @@ fun CalendarChoiceSheet(
  */
 @Composable
 fun AddToCalendarButton(status: CalendarStatus, onClick: () -> Unit, modifier: Modifier = Modifier, height: Dp = 54.dp) {
+    // Turned off in You (e.g. subscribed to their plans instead): nothing at all.
+    if (!LocalShowsAddToCalendar.current) return
     var confirmed by remember(status.justAdded) { mutableStateOf(false) }
     LaunchedEffect(status.justAdded) {
         if (!status.justAdded) return@LaunchedEffect

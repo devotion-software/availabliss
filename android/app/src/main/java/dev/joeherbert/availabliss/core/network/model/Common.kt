@@ -76,6 +76,8 @@ data class User(
     val busyBufferMinutes: Int = 0,
     /** Pushes before confirmed plans you're going to. Missing (older servers) means [EventReminders.Both]. */
     val eventReminders: EventReminders = EventReminders.Both,
+    /** "Add to calendar" on plans (off for people who subscribe to their plans instead). Missing means on. */
+    val showAddToCalendar: Boolean = true,
 ) {
     /** The name other people see (outside a group that has its own name for them): their name, or their email. */
     val accountName: String get() = name.trim().ifEmpty { email }

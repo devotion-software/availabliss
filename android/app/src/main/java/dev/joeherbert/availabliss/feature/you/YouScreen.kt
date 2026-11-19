@@ -89,10 +89,13 @@ fun YouScreen(
     onSignOut: () -> Unit,
     viewModel: YouViewModel = hiltViewModel(),
     remindersViewModel: PlanRemindersViewModel = hiltViewModel(),
+    addToCalendarViewModel: AddToCalendarSettingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val reminders by remindersViewModel.reminders.collectAsStateWithLifecycle()
     val remindersMessage by remindersViewModel.message.collectAsStateWithLifecycle()
+    val showsAddToCalendar by addToCalendarViewModel.show.collectAsStateWithLifecycle()
+    val addToCalendarMessage by addToCalendarViewModel.message.collectAsStateWithLifecycle()
     val username by viewModel.username.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // Credential Manager sheets run in this scope so the ViewModel never holds the Activity.
@@ -110,6 +113,7 @@ fun YouScreen(
     if (upgrading) UpgradeSheet(onDismiss = { upgrading = false }, onUpgraded = viewModel::upgraded)
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
     UserMessageEffect(remindersMessage, snackbar) { remindersViewModel.onMessageShown() }
+    UserMessageEffect(addToCalendarMessage, snackbar) { addToCalendarViewModel.onMessageShown() }
 
     AvailablissBackground(OrbLayout.Main) {
         YouContent(
@@ -128,6 +132,8 @@ fun YouScreen(
             onOpenPro = { upgrading = true },
             reminders = reminders,
             onSelectReminders = remindersViewModel::select,
+            showsAddToCalendar = showsAddToCalendar,
+            onShowAddToCalendar = addToCalendarViewModel::set,
             templateActions = TemplateActions(
                 onRename = viewModel::startRenamingTemplate,
                 onNameChange = viewModel::onTemplateNameChange,
@@ -195,6 +201,8 @@ fun YouContent(
     onOpenNotifications: () -> Unit = {},
     reminders: EventReminders = EventReminders.Both,
     onSelectReminders: (EventReminders) -> Unit = {},
+    showsAddToCalendar: Boolean = true,
+    onShowAddToCalendar: (Boolean) -> Unit = {},
     templateActions: TemplateActions = TemplateActions(),
 ) {
     val colors = AvailablissTheme.colors
@@ -234,6 +242,8 @@ fun YouContent(
         }
 
         PlanRemindersCard(reminders, onSelectReminders)
+
+        AddToCalendarSettingCard(showsAddToCalendar, onShowAddToCalendar)
 
         SignInMethodsPanel(state, onLink)
 

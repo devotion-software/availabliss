@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -58,6 +59,10 @@ class RootViewModel @Inject constructor(
             else -> RootState.Main
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, RootState.Loading())
+
+    /** Whether plans show "Add to calendar" (the account setting in You). */
+    val showsAddToCalendar: StateFlow<Boolean> = users.user.map { it?.showAddToCalendar ?: true }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     val pendingDeepLink: StateFlow<DeepLink?> = deepLinkBus.pending
     val unreadNotifications: StateFlow<Int> = notifications.unread
