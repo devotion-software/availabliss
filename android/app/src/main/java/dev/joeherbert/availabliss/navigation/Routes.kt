@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object HomeRoute
 @Serializable data object MyTimeRoute
 @Serializable data object ActivityRoute
+@Serializable data object ShareRoute
 @Serializable data object YouRoute
 
 /** Every plan across your groups, from Activity. */

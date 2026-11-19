@@ -27,6 +27,8 @@ sealed interface DeepLink {
     data object MyPlans : DeepLink
     /** The new group form; the "New group" app shortcut. */
     data object NewGroup : DeepLink
+    /** "Send to…": pick a group chat for what another app shared (see ShareInbox). Only from share intents. */
+    data object ShareTo : DeepLink
 
     /** A URI that [parse] maps back to this link; used for notification intents. */
     fun toUri(): Uri = when (this) {
@@ -41,6 +43,7 @@ sealed interface DeepLink {
         Activity -> Uri.parse("$SCHEME://app/activity")
         MyPlans -> Uri.parse("$SCHEME://app/my-plans")
         NewGroup -> Uri.parse("$SCHEME://app/new-group")
+        ShareTo -> Uri.parse("$SCHEME://app/share")
     }
 
     companion object {

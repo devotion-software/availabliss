@@ -66,13 +66,18 @@ final class TokenStore: Sendable {
             keychain.set(nil, for: Self.tokenKey)
             defaults.set(true, forKey: Self.installedKey)
         }
-        self.cache = OSAllocatedUnfairLock(initialState: keychain.string(for: Self.tokenKey))
+        let stored = keychain.string(for: Self.tokenKey)
+        self.cache = OSAllocatedUnfairLock(initialState: stored)
+        // Accounts signed in before the share extension existed get it shared too.
+        if SharedSession.token != stored { SharedSession.save(stored) }
     }
 
     var token: String? { cache.withLock { $0 } }
 
     func update(_ token: String?) {
         keychain.set(token, for: Self.tokenKey)
+        // The share extension sends as you (and stops once you sign out).
+        SharedSession.save(token)
         cache.withLock { $0 = token }
     }
 }

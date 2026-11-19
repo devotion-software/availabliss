@@ -66,6 +66,26 @@
                 <data android:pathPrefix="/app/proposals/" />
             </intent-filter>
 
+            <!-- On other apps' share sheets: photos, Wallet passes and files (and text) go to a group chat. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/*" />
+                <data android:mimeType="text/*" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/*" />
+                <data android:mimeType="text/*" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+
             <!-- Long-press shortcuts: My plans, New group, My time. -->
             <meta-data
                 android:name="android.app.shortcuts"

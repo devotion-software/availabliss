@@ -49,6 +49,7 @@ targets:
       - package: RevenueCat
         product: RevenueCat
       - target: AvailablissWidgets
+      - target: AvailablissShare
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER)
@@ -158,6 +159,44 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
   # Unit tests for the app's logic, hosted by the app (`make ios-test`). Swift Testing.
+  AvailablissShare:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: AvailablissShare
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(inherited).share
+        PRODUCT_NAME: AvailablissShare
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+    entitlements:
+      path: AvailablissShare/AvailablissShare.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.joeherbert.availabliss
+    info:
+      path: AvailablissShare/Info.plist
+      properties:
+        CFBundleDisplayName: Availabliss
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        AVAPIBaseURL: $(API_BASE_URL)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+              NSExtensionActivationSupportsFileWithMaxCount: 10
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+
   AvailablissTests:
     type: bundle.unit-test
     platform: iOS

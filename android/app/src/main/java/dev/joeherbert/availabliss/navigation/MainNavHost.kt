@@ -56,6 +56,7 @@ import dev.joeherbert.availabliss.feature.proposal.CreateProposalScreen
 import dev.joeherbert.availabliss.feature.proposal.GroupProposalsTab
 import dev.joeherbert.availabliss.feature.proposal.GroupProposalsViewModel
 import dev.joeherbert.availabliss.feature.proposal.ProposalScreen
+import dev.joeherbert.availabliss.feature.share.ShareScreen
 import dev.joeherbert.availabliss.feature.timing.GroupTimingTab
 import dev.joeherbert.availabliss.feature.you.NotificationSettingsScreen
 import dev.joeherbert.availabliss.feature.you.YouScreen
@@ -276,6 +277,15 @@ fun MainNavHost(root: RootViewModel) {
                 )
             }
             composable<EventEditorRoute> { EventEditorScreen(onBack = { nav.popBackStack() }, onSaved = { nav.popBackStack() }) }
+            composable<ShareRoute> {
+                ShareScreen(
+                    onBack = { nav.popBackStack() },
+                    onOpenChat = { groupId ->
+                        nav.popBackStack()
+                        nav.openGroupSection(groupId, GroupChatRoute(groupId))
+                    },
+                )
+            }
             composable<AppearanceRoute> { AppearanceScreen(onBack = { nav.popBackStack() }) }
             composable<NotificationSettingsRoute> { NotificationSettingsScreen(onBack = { nav.popBackStack() }) }
             composable<CalendarsRoute> { CalendarsScreen(onBack = { nav.popBackStack() }) }
@@ -333,6 +343,7 @@ internal fun NavHostController.open(link: DeepLink) {
             navigate(MyPlansRoute) { launchSingleTop = true }
         }
         DeepLink.NewGroup -> navigate(NewGroupRoute()) { launchSingleTop = true }
+        DeepLink.ShareTo -> navigate(ShareRoute) { launchSingleTop = true }
         is DeepLink.AuthCallback -> Unit // Already signed in.
     }
 }

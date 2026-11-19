@@ -19,6 +19,7 @@ import dev.joeherbert.availabliss.core.live.LiveEvents
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.Attachment
 import dev.joeherbert.availabliss.core.network.model.MessageLocation
+import dev.joeherbert.availabliss.core.share.ShareInbox
 import dev.joeherbert.availabliss.feature.common.AddToCalendarDelegate
 import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +54,7 @@ class ChatViewModel @Inject constructor(
     files: AttachmentFiles,
     places: PlaceSearch,
     liveEvents: LiveEvents,
+    shareInbox: ShareInbox,
 ) : ViewModel() {
 
     private val groupId = savedStateHandle.get<String>("groupId").orEmpty()
@@ -97,6 +99,11 @@ class ChatViewModel @Inject constructor(
 
     init {
         load()
+        // Shared from another app and sent here from "Send to…": attached, ready to send.
+        shareInbox.takeFor(groupId)?.let { shared ->
+            if (shared.uris.isNotEmpty()) onPicked(shared.uris)
+            shared.text?.takeIf { it.isNotBlank() }?.let(::onDraftChange)
+        }
         viewModelScope.launch { addToCalendar.loadCalendars() }
         viewModelScope.launch {
             liveEvents.payloadsFor(groupId).collect { live.onLive(it) }
