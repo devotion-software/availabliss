@@ -17,7 +17,19 @@ struct Availability: Decodable, Sendable {
         let until: Date
     }
 
-    func day(_ date: CalendarDay) -> AvailabilityDay? { days.first { $0.date == date } }
+    /// The day for `date`: `days` is in date order (one per date), so a binary search rather than a scan
+    /// (it's looked up several times per month cell on every redraw).
+    func day(_ date: CalendarDay) -> AvailabilityDay? {
+        var low = 0
+        var high = days.count - 1
+        while low <= high {
+            let mid = (low + high) / 2
+            let found = days[mid].date
+            if found == date { return days[mid] }
+            if found < date { low = mid + 1 } else { high = mid - 1 }
+        }
+        return nil
+    }
 
     /// The working slot that covers `date` (in the device calendar), if any.
     func slot(containing date: CalendarDay, calendar: Calendar = .current) -> Slot? {

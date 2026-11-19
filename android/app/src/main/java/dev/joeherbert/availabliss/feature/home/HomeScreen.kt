@@ -234,15 +234,14 @@ private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAdd
     val overhang = 44.dp
     val gap = 14.dp
     // The cards' heights blended by how far the swipe has got (natural size until all are measured).
-    val measured = plans.mapNotNull { heights[it.key] }
-    val height: Dp? = if (measured.size != plans.size) {
-        null
-    } else {
+    // Read in the layout phase below, so a swipe re-lays out the pager without recomposing it.
+    fun blendedHeightPx(): Int? {
+        val measured = plans.mapNotNull { heights[it.key] }
+        if (measured.size != plans.size) return null
         val position = (pager.currentPage + pager.currentPageOffsetFraction).coerceIn(0f, (plans.size - 1).toFloat())
         val index = position.toInt()
         val next = minOf(index + 1, plans.size - 1)
-        val px = measured[index] + (measured[next] - measured[index]) * (position - index)
-        with(density) { px.toDp() } + overhang
+        return (measured[index] + (measured[next] - measured[index]) * (position - index)).toInt()
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         HorizontalPager(
@@ -250,11 +249,15 @@ private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAdd
             // Spans the screen's full width, so the cards' shadows aren't cut off at the sides and the
             // next card slides in from the screen's edge; the padding puts each card back in line.
             modifier = Modifier
-                .then(if (height != null) Modifier.height(height) else Modifier)
                 .layout { measurable, constraints ->
                     val extra = (Spacing.screen * 2).roundToPx()
                     val width = constraints.maxWidth + extra
-                    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+                    val fixed = blendedHeightPx()?.let { it + overhang.roundToPx() }
+                    val placeable = measurable.measure(
+                        constraints.copy(minWidth = width, maxWidth = width).let { c ->
+                            if (fixed == null) c else c.copy(minHeight = fixed, maxHeight = fixed)
+                        },
+                    )
                     val hidden = (overhang - gap).roundToPx()
                     layout(constraints.maxWidth, (placeable.height - hidden).coerceAtLeast(0)) { placeable.place(-extra / 2, 0) }
                 }

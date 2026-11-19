@@ -34,6 +34,7 @@ import dev.joeherbert.availabliss.designsystem.component.availability.TimelineRo
 import dev.joeherbert.availabliss.designsystem.component.availability.WeekColumnUi
 import dev.joeherbert.availabliss.navigation.GroupRoute
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -42,6 +43,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -197,7 +199,8 @@ class GroupCalendarViewModel @Inject constructor(
             aiPlanner = plan?.aiPlanner ?: AiPlannerAccess(),
             hasSlots = r.availability?.slots.orEmpty().isNotEmpty(),
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GroupCalendarUiState())
+        // Months, best options, week columns and the day panel are rebuilt on every change: off the main thread.
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GroupCalendarUiState())
 
     init {
         // The group itself is fetched (and kept current) by GroupViewModel, the hosting screen.
