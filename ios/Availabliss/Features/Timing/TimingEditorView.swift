@@ -234,7 +234,7 @@ struct TimingForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             GlassPanel {
-                TimingSentence(requirement: model.draft) { sheet = $0 }
+                TimingSentence(requirement: model.draft, active: sheet) { sheet = $0 }
                 Text("Tap any underlined part to change it.")
                     .bodyFont(12, relativeTo: .caption)
                     .foregroundStyle(theme.muted)
@@ -277,6 +277,8 @@ struct TimingForm: View {
 /// The group's timing as one sentence, each underlined part opening its editor. Like web and Android.
 struct TimingSentence: View {
     let requirement: Requirement
+    /// The part being changed (its editor is open): the only one highlighted.
+    var active: TimingForm.SentenceSheet?
     let open: (TimingForm.SentenceSheet) -> Void
     @Environment(\.theme) private var theme
     @Environment(\.isEnabled) private var isEnabled
@@ -330,8 +332,11 @@ struct TimingSentence: View {
                         } label: {
                             Text(text)
                                 .foregroundStyle(theme.accentInk)
-                                .padding(.horizontal, sheet == .kind ? 6 : 1)
-                                .background(sheet == .kind ? RoundedRectangle(cornerRadius: 8).fill(theme.accentSoft) : nil)
+                                .padding(.horizontal, 1)
+                                // Drawn wider than the text so highlighting a part doesn't move the sentence.
+                                .background {
+                                    if sheet == active { RoundedRectangle(cornerRadius: 8).fill(theme.accentSoft).padding(.horizontal, -5) }
+                                }
                                 .overlay(alignment: .bottom) {
                                     if isEnabled {
                                         Rectangle().fill(theme.accentInk.opacity(0.6)).frame(height: 2)

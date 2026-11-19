@@ -19,7 +19,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -148,18 +150,25 @@ internal fun TimingSentenceSection(state: TimingEditorUiState, canEdit: Boolean,
                     is Piece.Words -> piece.text.split(" ").forEach { Text(it, style = style, color = colors.ink) }
                     is Piece.Part -> Row {
                         val underline = colors.accentInk.copy(alpha = 0.6f)
+                        val highlight = colors.accentSoft
                         Text(
                             piece.text,
                             style = style,
                             color = colors.accentInk,
                             modifier = Modifier
-                                .clip(Shapes.controlSmall)
-                                .then(if (piece.part == SentencePart.Kind) Modifier.background(colors.accentSoft) else Modifier)
+                                // Only the part being changed (its sheet is open) is highlighted, drawn wider
+                                // than the text so highlighting it doesn't move the sentence.
+                                .drawBehind {
+                                    if (piece.part == open) {
+                                        val inset = 5.dp.toPx()
+                                        drawRoundRect(highlight, Offset(-inset, 0f), Size(size.width + 2 * inset, size.height), CornerRadius(8.dp.toPx()))
+                                    }
+                                }
                                 .clickable(enabled = canEdit, role = Role.Button, onClickLabel = "Change") { open = piece.part }
                                 .drawBehind {
                                     if (canEdit) drawLine(underline, Offset(0f, size.height - 2.dp.toPx()), Offset(size.width, size.height - 2.dp.toPx()), 2.dp.toPx())
                                 }
-                                .padding(horizontal = if (piece.part == SentencePart.Kind) 6.dp else 1.dp),
+                                .padding(horizontal = 1.dp),
                         )
                         if (piece.after.isNotEmpty()) Text(piece.after, style = style, color = colors.ink)
                     }

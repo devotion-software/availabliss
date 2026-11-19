@@ -103,7 +103,14 @@
 </script>
 
 {#snippet token(id: SheetId, text: string)}
-	<button type="button" class="token" disabled={readonly} aria-haspopup="dialog" onclick={() => (id === 'range' ? openRange() : (open = id))}>
+	<button
+		type="button"
+		class="token"
+		class:active={open === id}
+		disabled={readonly}
+		aria-haspopup="dialog"
+		onclick={() => (id === 'range' ? openRange() : (open = id))}
+	>
 		{text}
 	</button>
 {/snippet}
@@ -272,11 +279,8 @@
 		border-radius: 6px 6px 0 0;
 		cursor: pointer;
 	}
-	.token:first-of-type {
-		background: var(--accent-soft);
-		border-bottom-style: solid;
-		padding: 0 6px;
-	}
+	/* Only the part being changed (its sheet is open) is highlighted. */
+	.token.active,
 	.token:hover:not(:disabled),
 	.token:focus-visible {
 		background: var(--accent-soft);
