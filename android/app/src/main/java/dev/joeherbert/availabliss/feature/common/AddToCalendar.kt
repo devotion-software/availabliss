@@ -397,7 +397,14 @@ val LocalShowsAddToCalendar = staticCompositionLocalOf { true }
  * from the calendar since is offered again.
  */
 @Composable
-fun AddToCalendarButton(status: CalendarStatus, onClick: () -> Unit, modifier: Modifier = Modifier, height: Dp = 54.dp) {
+fun AddToCalendarButton(
+    status: CalendarStatus,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    height: Dp = 54.dp,
+    // Off for compact cards (Home's Up next): once it's added the button just goes, with no "In Work" chip.
+    showAddedChip: Boolean = true,
+) {
     // Turned off in You (e.g. subscribed to their plans instead): nothing at all.
     if (!LocalShowsAddToCalendar.current) return
     var confirmed by remember(status.justAdded) { mutableStateOf(false) }
@@ -418,7 +425,7 @@ fun AddToCalendarButton(status: CalendarStatus, onClick: () -> Unit, modifier: M
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        if (status.inCalendar) AddedToCalendarRow(status, onChange = onClick)
+        if (status.inCalendar && showAddedChip) AddedToCalendarRow(status, onChange = onClick)
     }
 }
 

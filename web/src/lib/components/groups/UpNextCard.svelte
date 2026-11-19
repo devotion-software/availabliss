@@ -37,7 +37,7 @@
 		<h2>{event.allDay ? fmt.current.when(event.start, event.end, true) : fmt.current.dateTime(event.start)}</h2>
 		<span class="sub">{[event.title, event.location && `At ${event.location}`].filter(Boolean).join(' · ')}</span>
 	</div>
-	{#if showsAddToCalendar()}<div class="actions"><AddToCalendar eventId={event.id} item={event} /></div>{/if}
+	{#if showsAddToCalendar()}<div class="actions"><AddToCalendar eventId={event.id} item={event} hideWhenAdded /></div>{/if}
 </section>
 
 <style>

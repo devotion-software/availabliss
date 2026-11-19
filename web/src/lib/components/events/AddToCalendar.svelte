@@ -21,8 +21,10 @@
 		stacked?: boolean;
 		/** Put the Google Calendar link beside the button (for small cards, like the chat's "Everyone's in" banner). */
 		inline?: boolean;
+		/** Once it's added, show nothing instead of the "In your calendar" line (Home's Up next card). */
+		hideWhenAdded?: boolean;
 	}
-	let { eventId, item, size = 'md', stacked = false, inline = false }: Props = $props();
+	let { eventId, item, size = 'md', stacked = false, inline = false, hideWhenAdded = false }: Props = $props();
 
 	const CONFIRMATION_MS = 3000;
 	const fmt = useFormat();
@@ -56,13 +58,15 @@
 {#if !showsAddToCalendar()}
 	<!-- Turned off in Settings (e.g. subscribed to their plans instead). -->
 {:else if remembered && !added}
-	<p class="in-calendar">
-		<span class="chip">
-			<Icon name="check" size={13} strokeWidth={2.6} />
-			In your calendar
-		</span>
-		<button type="button" class="again" onclick={() => (remembered = false)}>Add again</button>
-	</p>
+	{#if !hideWhenAdded}
+		<p class="in-calendar">
+			<span class="chip">
+				<Icon name="check" size={13} strokeWidth={2.6} />
+				In your calendar
+			</span>
+			<button type="button" class="again" onclick={() => (remembered = false)}>Add again</button>
+		</p>
+	{/if}
 {:else}
 	<div class="add" class:stacked class:inline>
 		<Button

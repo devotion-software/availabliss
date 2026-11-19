@@ -12,6 +12,8 @@ struct AddToCalendarButton: View {
     var height: CGFloat = 54
     /// Centres the "In Work" chip once it's added (on a centred page); otherwise it sits at the leading edge.
     var centersChip = false
+    /// Off for compact cards (Home's Up next): once it's added the button just goes, with no "In Work" chip.
+    var showsAddedChip = true
     @Environment(AppModel.self) private var app
     @State private var justAdded = false
     @State private var isSaving = false
@@ -41,8 +43,10 @@ struct AddToCalendarButton: View {
                 addButton
             case .added(let calendar):
                 if justAdded { addButton }
-                AddedToCalendarRow(calendar: calendar, canChange: app.deviceCalendar.canChooseCalendar, centered: centersChip) {
-                    choice = .move(current: calendar)
+                if showsAddedChip {
+                    AddedToCalendarRow(calendar: calendar, canChange: app.deviceCalendar.canChooseCalendar, centered: centersChip) {
+                        choice = .move(current: calendar)
+                    }
                 }
             }
         }

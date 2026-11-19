@@ -290,7 +290,7 @@ private struct UpNextCard: View {
             }
             // In the pager a shorter card stretches to match the tallest, keeping its button at the foot.
             Spacer(minLength: 0)
-            AddToCalendarButton(event: event, height: 48)
+            AddToCalendarButton(event: event, height: 48, showsAddedChip: false)
         }
         .foregroundStyle(theme.ink)
         .padding(18)

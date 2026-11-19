@@ -316,7 +316,7 @@ private fun UpNextCard(upNext: UpNextUi, onOpen: () -> Unit, onAddToCalendar: ()
                 if (detail.isNotBlank()) Text(detail, style = AvailablissTheme.type.body, color = colors.muted)
             }
         }
-        AddToCalendarButton(upNext.calendar, onClick = onAddToCalendar, height = 48.dp, modifier = Modifier.padding(top = Spacing.xl))
+        AddToCalendarButton(upNext.calendar, onClick = onAddToCalendar, height = 48.dp, modifier = Modifier.padding(top = Spacing.xl), showAddedChip = false)
     }
 }
 
