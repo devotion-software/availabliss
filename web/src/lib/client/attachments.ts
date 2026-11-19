@@ -225,7 +225,9 @@ export const isHeic = (file: { name: string; type: string }) =>
 /** Why a picked file can't be sent (checked before uploading), or null if it looks fine. The server has the last word. */
 export function pickProblem(file: { name: string; type: string; size: number }): string | null {
 	const kind = pickedKind(file);
-	if (kind !== 'file') return file.size > MAX_IMAGE_BYTES ? `${file.name} is too big. Photos can be up to 15 MB.` : null;
+	// Photos over the limit are shrunk before uploading (attachment-draft); GIFs go as they are.
+	if (kind === 'gif') return file.size > MAX_IMAGE_BYTES ? `${file.name} is too big. GIFs can be up to 15 MB.` : null;
+	if (kind === 'image') return null;
 	if (!(FILE_EXTENSIONS as readonly string[]).includes(extensionOf(file.name)) && !file.type.startsWith('application/vnd.apple.pkpass'))
 		return `${file.name} can’t be sent. Try a PDF, document, spreadsheet, presentation, ZIP, audio, video or Wallet pass.`;
 	return file.size > MAX_FILE_BYTES ? `${file.name} is too big. Files can be up to 25 MB.` : null;

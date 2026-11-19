@@ -50,17 +50,29 @@ enum AttachmentFormat {
         return "doc.text"
     }
 
-    /// A photo from the library ready to upload: GIFs as they are (so they still move), HEIC and
-    /// other formats as JPEG (the server can't always read HEIC), JPEG / PNG as they are.
+    /// The longest side the server keeps a photo at (it resizes anything bigger).
+    static let photoSide: CGFloat = 2560
+
+    /// A photo from the library ready to upload: GIFs as they are (so they still move); JPEG / PNG as
+    /// they are when they're no bigger than the server keeps; anything else (HEIC, which the server
+    /// can't always read, or a big photo) as a JPEG at most 2560 px, so it uploads quickly and is
+    /// never over the size limit.
     static func photo(data: Data, type: UTType?) -> (data: Data, name: String, mime: String, preview: UIImage?)? {
         if type?.conforms(to: .gif) == true || data.starts(with: Data("GIF8".utf8)) {
             return (data, "GIF.gif", "image/gif", UIImage(data: data))
         }
         guard let image = UIImage(data: data) else { return nil }
         let preview = image.preparingThumbnail(of: CGSize(width: 240, height: 240 / max(image.size.width / max(image.size.height, 1), 0.01)))
-        if type?.conforms(to: .jpeg) == true { return (data, "Photo.jpg", "image/jpeg", preview ?? image) }
-        if type?.conforms(to: .png) == true, data.count <= maxPhotoBytes { return (data, "Photo.png", "image/png", preview ?? image) }
-        guard let jpeg = image.jpegData(compressionQuality: 0.9) else { return nil }
+        let pixels = max(image.size.width * image.scale, image.size.height * image.scale)
+        let fits = pixels <= photoSide && data.count <= maxPhotoBytes
+        if fits, type?.conforms(to: .jpeg) == true { return (data, "Photo.jpg", "image/jpeg", preview ?? image) }
+        if fits, type?.conforms(to: .png) == true { return (data, "Photo.png", "image/png", preview ?? image) }
+        let scale = min(1, photoSide / max(pixels, 1))
+        let size = CGSize(width: (image.size.width * image.scale * scale).rounded(), height: (image.size.height * image.scale * scale).rounded())
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let resized = UIGraphicsImageRenderer(size: size, format: format).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+        guard let jpeg = resized.jpegData(compressionQuality: 0.85) else { return nil }
         return (jpeg, "Photo.jpg", "image/jpeg", preview ?? image)
     }
 }

@@ -6,7 +6,7 @@
 import type { Attachment } from '#lib/types';
 import { errorMessage } from './api';
 import { uploadAttachment } from './chat';
-import { MAX_ATTACHMENTS, isHeic, pickProblem, pickedKind } from './attachments';
+import { MAX_ATTACHMENTS, MAX_IMAGE_BYTES, isHeic, pickProblem, pickedKind } from './attachments';
 import { toasts } from './toast.svelte';
 
 export interface DraftAttachment {
@@ -100,7 +100,7 @@ export class AttachmentDraft {
 		const abort = new AbortController();
 		this.#patch(key, { status: 'uploading', progress: 0, error: null, abort });
 		try {
-			const file = isHeic(item.file) ? await heicToJpeg(item.file) : item.file;
+			const file = isHeic(item.file) || (item.kind === 'image' && item.file.size > MAX_IMAGE_BYTES) ? await toJpeg(item.file) : item.file;
 			// The converted photo can show in the tray now.
 			if (file !== item.file && !item.preview) this.#patch(key, { preview: URL.createObjectURL(file) });
 			const attachment = await uploadAttachment(this.groupId, file, {
@@ -117,21 +117,26 @@ export class AttachmentDraft {
 	}
 }
 
+/** The longest side the server keeps a photo at (it resizes anything bigger). */
+const PHOTO_SIDE = 2560;
+
 /**
- * HEIC/HEIF photos become JPEG before uploading, where the browser can decode them (Safari);
- * elsewhere the original goes up and the server tries to read it.
+ * HEIC/HEIF photos, and photos too big to upload, become a JPEG no bigger than the server keeps
+ * (2560 px), where the browser can decode them (HEIC: Safari). Otherwise the original goes up and
+ * the server has the last word.
  */
-async function heicToJpeg(file: File): Promise<File> {
+async function toJpeg(file: File): Promise<File> {
 	try {
 		const bitmap = await createImageBitmap(file);
+		const scale = Math.min(1, PHOTO_SIDE / Math.max(bitmap.width, bitmap.height));
 		const canvas = document.createElement('canvas');
-		canvas.width = bitmap.width;
-		canvas.height = bitmap.height;
-		canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
+		canvas.width = Math.round(bitmap.width * scale);
+		canvas.height = Math.round(bitmap.height * scale);
+		canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 		bitmap.close();
 		const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
 		if (!blob) return file;
-		return new File([blob], file.name.replace(/\.(heic|heif)$/i, '') + '.jpg', { type: 'image/jpeg' });
+		return new File([blob], file.name.replace(/\.(heic|heif|jpe?g|png|webp|avif|tiff?)$/i, '') + '.jpg', { type: 'image/jpeg' });
 	} catch {
 		return file;
 	}

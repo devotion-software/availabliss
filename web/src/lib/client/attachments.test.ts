@@ -149,7 +149,9 @@ describe('picking', () => {
 	});
 	test('pickProblem', () => {
 		expect(pickProblem(file('a.jpg', 'image/jpeg'))).toBeNull();
-		expect(pickProblem(file('a.jpg', 'image/jpeg', 16 * 1024 * 1024))).toContain('15 MB');
+		// Big photos are shrunk before uploading; big GIFs can't be.
+		expect(pickProblem(file('a.jpg', 'image/jpeg', 16 * 1024 * 1024))).toBeNull();
+		expect(pickProblem(file('a.gif', 'image/gif', 16 * 1024 * 1024))).toContain('15 MB');
 		expect(pickProblem(file('a.pdf', 'application/pdf'))).toBeNull();
 		expect(pickProblem(file('a.pdf', 'application/pdf', 26 * 1024 * 1024))).toContain('25 MB');
 		expect(pickProblem(file('setup.exe', 'application/octet-stream'))).toContain('can’t be sent');
