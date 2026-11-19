@@ -20,6 +20,17 @@ class RequirementPresetsTest {
     }
 
     @Test
+    fun customHours_staysCustomAtAPresetsLength_andGoesDownTo15Minutes() {
+        var d = RequirementPresets.applyCustomKind(RequirementPresets.applyPreset(base, TimingPreset.Custom), CustomKind.Hours)
+        d = RequirementPresets.changeDuration(d.copy(length = RequirementLength.Duration(135)), -15)
+        // 2 hours with the usual window is the "2 hours" preset, but you're still in Custom.
+        assertEquals(RequirementLength.Duration(120), d.length)
+        assertEquals(TimingPreset.Custom, d.preset)
+        repeat(20) { d = RequirementPresets.changeDuration(d, -15) }
+        assertEquals(RequirementLength.Duration(15), d.length)
+    }
+
+    @Test
     fun evening_isOneDayFromSix() {
         val r = requirementFor(TimingPreset.Evening)
         assertEquals(RequirementLength.Days(1), r.length)

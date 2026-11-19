@@ -387,7 +387,7 @@ struct CustomLengthEditor: View {
             )
             switch model.customKind {
             case .hours:
-                Stepper(value: $model.durationMinutes, in: 30...(24 * 60), step: 30) {
+                Stepper(value: $model.durationMinutes, in: 15...(24 * 60), step: 15) {
                     Text(model.draft.lengthDescription).bodyFont(15, .semibold)
                 }
             case .days:

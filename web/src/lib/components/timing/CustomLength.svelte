@@ -31,9 +31,9 @@
 	<TextField
 		label="Hours"
 		type="number"
-		min="0.5"
+		min="0.25"
 		max="24"
-		step="0.5"
+		step="0.25"
 		inputmode="decimal"
 		value={String(requirement.length.minutes / 60)}
 		onchange={(e) => {

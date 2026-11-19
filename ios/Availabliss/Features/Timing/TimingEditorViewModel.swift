@@ -37,6 +37,7 @@ final class TimingEditorViewModel {
 
     /// Replaces the whole draft (a new preset or template picked before editing).
     func reset(to requirement: Requirement) {
+        isCustom = false
         draft = requirement
         original = requirement
     }
@@ -68,7 +69,10 @@ final class TimingEditorViewModel {
     }
 
     var hasChanges: Bool { draft != original }
-    var preset: TimingPreset { TimingPreset.detect(draft.length, window: draft.window) }
+    /// Custom stays chosen while you adjust it, even when the length happens to match a preset
+    /// (stepping down to 2 hours used to switch to "2 hours" and hide the stepper).
+    private var isCustom = false
+    var preset: TimingPreset { isCustom ? .custom : TimingPreset.detect(draft.length, window: draft.window) }
     var customKind: CustomLengthKind { CustomLengthKind(draft.length) }
     var isSpan: Bool { if case .span = draft.length { true } else { false } }
 
@@ -80,6 +84,7 @@ final class TimingEditorViewModel {
     // MARK: Length
 
     func choose(_ preset: TimingPreset) {
+        isCustom = preset == .custom
         guard preset.shape != nil else {
             // Custom: keep the current shape, just mark it as custom by nudging to a non-preset value.
             if TimingPreset.detect(draft.length, window: draft.window) != .custom { chooseCustom(.hours) }
@@ -89,6 +94,7 @@ final class TimingEditorViewModel {
     }
 
     func chooseCustom(_ kind: CustomLengthKind) {
+        isCustom = true
         switch kind {
         case .hours:
             draft.length = .duration(minutes: 180)
@@ -106,7 +112,7 @@ final class TimingEditorViewModel {
 
     var durationMinutes: Int {
         get { if case .duration(let minutes) = draft.length { minutes } else { 120 } }
-        set { draft.length = .duration(minutes: max(30, min(24 * 60, newValue))) }
+        set { draft.length = .duration(minutes: max(15, min(24 * 60, newValue))) }
     }
 
     var dayCount: Int {

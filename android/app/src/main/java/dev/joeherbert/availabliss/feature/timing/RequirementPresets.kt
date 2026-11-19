@@ -142,22 +142,25 @@ object RequirementPresets {
         return draft.copy(preset = TimingPreset.Custom, customKind = kind, length = length, window = window)
     }
 
-    /** The custom editor's hours stepper: [deltaMinutes] more or less, 30 minutes to 12 hours. */
+    /**
+     * The custom editor's hours stepper: [deltaMinutes] more or less, 15 minutes to 24 hours. It stays
+     * Custom even at a preset's length (stepping to 2 hours used to switch to "2 hours" and hide it).
+     */
     fun changeDuration(draft: TimingDraft, deltaMinutes: Int): TimingDraft {
         val l = draft.length as? RequirementLength.Duration ?: return draft
-        return withLength(draft, RequirementLength.Duration((l.minutes + deltaMinutes).coerceIn(30, 12 * 60)))
+        return withLength(draft, RequirementLength.Duration((l.minutes + deltaMinutes).coerceIn(15, 24 * 60))).copy(preset = TimingPreset.Custom)
     }
 
     /** The custom editor's days stepper: 1 to 31 days in a row. */
     fun changeDayCount(draft: TimingDraft, delta: Int): TimingDraft {
         val l = draft.length as? RequirementLength.Days ?: return draft
-        return withLength(draft, RequirementLength.Days((l.count + delta).coerceIn(1, 31)))
+        return withLength(draft, RequirementLength.Days((l.count + delta).coerceIn(1, 31))).copy(preset = TimingPreset.Custom)
     }
 
     /** A span that ends the following week (Tue → the Thursday after next), or the same week. */
     fun setWeeksLater(draft: TimingDraft, following: Boolean): TimingDraft {
         val l = draft.length as? RequirementLength.Span ?: return draft
-        return withLength(draft, l.copy(weeksLater = if (following) 1 else 0), null)
+        return withLength(draft, l.copy(weeksLater = if (following) 1 else 0), null).copy(preset = TimingPreset.Custom)
     }
 
     /** Re-detects the chip after an edit (e.g. changing the evening's start makes it Custom). */

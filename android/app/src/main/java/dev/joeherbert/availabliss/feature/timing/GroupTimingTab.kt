@@ -312,7 +312,7 @@ internal fun CustomLengthEditor(
         modifier = Modifier.fillMaxWidth(),
     )
     when (val l = draft.length) {
-        is RequirementLength.Duration -> Stepper(TimingLabels.duration(l.minutes), "duration", enabled, onMinus = { onDuration(-30) }, onPlus = { onDuration(30) })
+        is RequirementLength.Duration -> Stepper(TimingLabels.duration(l.minutes), "duration", enabled, onMinus = { onDuration(-15) }, onPlus = { onDuration(15) })
         is RequirementLength.Days -> Stepper(TimingLabels.days(l.count), "number of days", enabled, onMinus = { onDayCount(-1) }, onPlus = { onDayCount(1) })
         is RequirementLength.Span -> ToggleRow(
             title = "Ends the following week",
