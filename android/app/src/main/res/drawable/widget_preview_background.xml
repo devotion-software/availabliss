@@ -1,6 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The widgets' card, for their previews in the widget picker. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="@color/av_bg" />
-    <corners android:radius="20dp" />
-</shape>
+<!-- The widgets' card, for their previews in the widget picker: the app's background with its three
+     soft orbs (Dawn), like the live widgets (core/widget/WidgetUi.kt). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/av_bg" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:type="radial" android:centerX="0" android:centerY="0" android:gradientRadius="160dp"
+                android:startColor="@color/av_orb1" android:endColor="@color/av_orb1_edge" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:type="radial" android:centerX="1" android:centerY="0.45" android:gradientRadius="140dp"
+                android:startColor="@color/av_orb2" android:endColor="@color/av_orb2_edge" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:type="radial" android:centerX="0.2" android:centerY="1.05" android:gradientRadius="130dp"
+                android:startColor="@color/av_orb3" android:endColor="@color/av_orb3_edge" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+</layer-list>

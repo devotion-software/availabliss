@@ -8,4 +8,11 @@
     <color name="av_muted">#4D5072</color>
     <color name="av_accent_ink">#3B2FD0</color>
     <color name="av_accent_soft">#245546FF</color>
+    <!-- The widgets' background orbs (Dawn), centre and edge of each fade; fainter in dark. -->
+    <color name="av_orb1">#D9FFB894</color>
+    <color name="av_orb2">#D99DA6FF</color>
+    <color name="av_orb3">#BF8EE3CC</color>
+    <color name="av_orb1_edge">#00FFB894</color>
+    <color name="av_orb2_edge">#009DA6FF</color>
+    <color name="av_orb3_edge">#008EE3CC</color>
 </resources>

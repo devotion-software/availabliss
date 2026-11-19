@@ -196,3 +196,23 @@ enum WidgetSnapshots {
         Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone)
     }
 }
+
+/// Your appearance choice, for the widgets: the colour theme ("dawn", "lagoon", …) and light / dark /
+/// system. The app writes it whenever it changes (see `AppearanceStore`); the widgets read it as they
+/// draw. Kept apart from `WidgetSnapshot`, so changing it never races a snapshot write.
+enum WidgetAppearance {
+    private static let themeKey = "widget.colorTheme"
+    private static let modeKey = "widget.themeMode"
+
+    static var colorTheme: String { AppGroup.defaults.string(forKey: themeKey) ?? "dawn" }
+    static var mode: String { AppGroup.defaults.string(forKey: modeKey) ?? "system" }
+
+    /// Saves both; true when either changed (so the widgets should redraw).
+    @discardableResult
+    static func save(colorTheme: String, mode: String) -> Bool {
+        guard colorTheme != self.colorTheme || mode != self.mode else { return false }
+        AppGroup.defaults.set(colorTheme, forKey: themeKey)
+        AppGroup.defaults.set(mode, forKey: modeKey)
+        return true
+    }
+}

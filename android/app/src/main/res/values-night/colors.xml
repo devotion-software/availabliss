@@ -6,4 +6,7 @@
     <color name="av_muted">#A6A9C8</color>
     <color name="av_accent_ink">#B4ACFF</color>
     <color name="av_accent_soft">#3D8276FF</color>
+    <color name="av_orb1">#6BFFB894</color>
+    <color name="av_orb2">#6B9DA6FF</color>
+    <color name="av_orb3">#5E8EE3CC</color>
 </resources>

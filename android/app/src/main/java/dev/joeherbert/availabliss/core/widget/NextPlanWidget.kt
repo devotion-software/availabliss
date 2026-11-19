@@ -2,6 +2,7 @@ package dev.joeherbert.availabliss.core.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
@@ -40,7 +41,9 @@ class NextPlanWidget : GlanceAppWidget() {
             val snapshot by store.snapshot.collectAsState(initialSnapshot)
             val appearance by prefs.appearance.collectAsState(initialAppearance)
             GlanceTheme(colors = widgetColors(appearance)) {
-                Content(snapshot, Instant.now())
+                CompositionLocalProvider(LocalWidgetAppearance provides appearance) {
+                    Content(snapshot, Instant.now())
+                }
             }
         }
     }

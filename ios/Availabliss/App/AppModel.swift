@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SwiftUI
+import WidgetKit
 
 /// The app's dependency container and lifecycle coordinator. One instance, owned by the app delegate,
 /// injected into the view tree with `.environment(app)`.
@@ -292,5 +293,9 @@ final class AppearanceStore {
         self.colorTheme = colorTheme
         UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
         UserDefaults.standard.set(colorTheme.rawValue, forKey: Self.themeKey)
+        // The widgets draw in your theme too.
+        if WidgetAppearance.save(colorTheme: colorTheme.rawValue, mode: mode.rawValue) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
     }
 }
