@@ -51,6 +51,14 @@ describe('the name you go by in a group', () => {
 		await setMemberDisplayName(groupId, sam, 'Sammy');
 	});
 
+	test('admins can change anyone’s name in the group; members only their own', async () => {
+		expect((await apiError(setMemberDisplayName(groupId, sam, 'Boss', owner))).code).toBe('forbidden');
+		const renamed = await setMemberDisplayName(groupId, owner, 'Sam (uni)', sam);
+		expect(renamed).toMatchObject({ userId: sam, nameInGroup: 'Sam (uni)' });
+		expect((await apiError(setMemberDisplayName(groupId, owner, 'Ghost', outsider))).code).toBe('not_found');
+		await setMemberDisplayName(groupId, sam, 'Sammy');
+	});
+
 	test('only members can set one', async () => {
 		expect((await apiError(setMemberDisplayName(groupId, outsider, 'Nope'))).code).toBe('not_found');
 	});

@@ -3864,9 +3864,8 @@
 				"tags": [
 					"Members"
 				],
-				"summary": "Change a member's role",
-				"description": "Signed in as a group admin or the owner.",
-				"x-group-role": "admin",
+				"summary": "Change a member's role (admins) or name in the group (yourself, or an admin for anyone)",
+				"description": "Signed in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -3890,7 +3889,7 @@
 					"content": {
 						"application/json": {
 							"schema": {
-								"$ref": "#/components/schemas/MemberRoleBody"
+								"$ref": "#/components/schemas/MemberUpdateBody"
 							}
 						}
 					}
@@ -3918,16 +3917,6 @@
 					},
 					"401": {
 						"description": "unauthorized: not signed in",
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ApiErrorBody"
-								}
-							}
-						}
-					},
-					"403": {
-						"description": "Not a group admin",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -10865,7 +10854,7 @@
 					"image"
 				]
 			},
-			"MemberRoleBody": {
+			"MemberUpdateBody": {
 				"type": "object",
 				"properties": {
 					"role": {
@@ -10874,11 +10863,19 @@
 							"admin",
 							"member"
 						]
+					},
+					"displayName": {
+						"anyOf": [
+							{
+								"type": "string",
+								"maxLength": 80
+							},
+							{
+								"type": "null"
+							}
+						]
 					}
-				},
-				"required": [
-					"role"
-				]
+				}
 			},
 			"MergeCandidate": {
 				"type": "object",

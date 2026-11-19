@@ -1,14 +1,16 @@
 import { authed, body, json, noContent } from '#lib/server/http';
-import { removeMember, setMemberRole } from '#lib/server/groups';
+import { removeMember, setMemberDisplayName, setMemberRole } from '#lib/server/groups';
 import { onMemberLeft } from '#lib/server/proposals';
 import { publishToGroup, publishToUsers } from '#lib/server/realtime';
-import { memberRoleSchema } from '#lib/schemas';
+import { memberUpdateSchema } from '#lib/schemas';
 
+/** Change a member: their role (admins only), and/or their name in the group (yourself, or an admin for anyone). */
 export const PATCH = authed<{ id: string; userId: string }>(async ({ event, params, userId }) => {
-	const { role } = await body(event, memberRoleSchema);
-	const member = await setMemberRole(params.id, userId, params.userId, role);
-	await publishToGroup(params.id, 'member.changed', member);
-	return json(member);
+	const { role, displayName } = await body(event, memberUpdateSchema);
+	let member = role !== undefined ? await setMemberRole(params.id, userId, params.userId, role) : null;
+	if (displayName !== undefined) member = await setMemberDisplayName(params.id, userId, displayName, params.userId);
+	await publishToGroup(params.id, 'member.changed', member!);
+	return json(member!);
 });
 
 export const DELETE = authed<{ id: string; userId: string }>(async ({ params, userId }) => {

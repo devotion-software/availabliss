@@ -522,7 +522,7 @@ muted and can't be tapped, and the date pickers start at today (or an edited blo
 | PUT 👑 | `/groups/:id/image` | the image bytes (as `/me/avatar`) | `Group` (`image` shrunk to fit 512 px; publishes `group.updated`) |
 | DELETE 👑 | `/groups/:id/image` | | `Group` (no photo: the monogram tile) |
 | DELETE ⭐ | `/groups/:id` | | `204` |
-| PATCH 👑 | `/groups/:id/members/:userId` | `{ role: 'admin' \| 'member' }` | `Member` (they get a `role.changed` notification) |
+| PATCH 🔒 | `/groups/:id/members/:userId` | `{ role?: 'admin' \| 'member', displayName?: string \| null }` (at least one) | `Member`. `role`: admins only (they get a `role.changed` notification). `displayName`: the name they go by in this group (null or blank clears it); yours, or as an admin anyone's. Publishes `member.changed` |
 | PATCH 🔒 | `/groups/:id/members/me` | `{ displayName: string \| null }` (trimmed, ≤ 80; null or blank clears it) | `Member` (the name you go by in this group; publishes `member.changed`. See Names in a group) |
 | DELETE 👑/self | `/groups/:id/members/:userId` | | `204` (an admin removes someone; never the owner. Yourself = leave, as `POST /groups/:id/leave` with no new owner) |
 | POST 🔒 | `/groups/:id/leave` | `{ newOwnerId?: string }` (the owner only: the admin who becomes owner) | `204` (see Leaving a group) |

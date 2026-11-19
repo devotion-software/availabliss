@@ -233,14 +233,18 @@ export async function memberName(groupId: string, userId: string, fallback = 'So
 	return displayName(row, fallback);
 }
 
-/** Sets (or with null, clears) the name you go by in the group. */
-export async function setMemberDisplayName(groupId: string, userId: string, name: string | null): Promise<Member> {
-	await requireMember(groupId, userId);
+/**
+ * Sets (or with null, clears) the name someone goes by in the group: your own, or as an admin
+ * anyone's. `targetId` defaults to yourself.
+ */
+export async function setMemberDisplayName(groupId: string, actorId: string, name: string | null, targetId: string = actorId): Promise<Member> {
+	await requireMember(groupId, actorId, targetId === actorId ? 'member' : 'admin');
+	if (targetId !== actorId && !(await roleIn(groupId, targetId))) throw notFound('Member not found');
 	await db
 		.update(groupMembers)
 		.set({ displayName: name?.trim() || null })
-		.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)));
-	const member = (await listMembers(groupId)).find((m) => m.userId === userId);
+		.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, targetId)));
+	const member = (await listMembers(groupId)).find((m) => m.userId === targetId);
 	if (!member) throw notFound('Member not found');
 	return member;
 }

@@ -235,7 +235,7 @@ export const endpoints: Endpoint[] = [
 	{ method: 'DELETE', path: '/groups/{id}/mute', tag: 'Notifications', auth: 'user', summary: 'Unmute a group', response: 'NotificationSettings' },
 	{ method: 'POST', path: '/groups/{id}/nudge', tag: 'Groups', auth: 'admin', summary: "Nudge members who haven't synced (once per 12 hours)", response: obj({ nudged: num }) },
 	{ method: 'POST', path: '/groups/{id}/leave', tag: 'Members', auth: 'user', summary: 'Leave a group (the owner names the new owner)', body: s.leaveGroupSchema, status: 204, errors: { 409: "Nobody else is an admin, or you're the only member" } },
-	{ method: 'PATCH', path: '/groups/{id}/members/{userId}', tag: 'Members', auth: 'admin', summary: "Change a member's role", body: s.memberRoleSchema, response: 'Member' },
+	{ method: 'PATCH', path: '/groups/{id}/members/{userId}', tag: 'Members', auth: 'user', summary: "Change a member's role (admins) or name in the group (yourself, or an admin for anyone)", body: s.memberUpdateSchema, response: 'Member' },
 	{
 		method: 'DELETE', path: '/groups/{id}/members/{userId}', tag: 'Members', auth: 'user', summary: 'Remove a member (admin), or yourself (leave)',
 		description: 'An admin removes someone (never the owner); anyone can remove themselves.', status: 204

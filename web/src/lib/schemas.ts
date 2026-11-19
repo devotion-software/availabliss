@@ -176,6 +176,14 @@ export const memberNameSchema = z.object({
 		.transform((v) => v || null)
 });
 
+/**
+ * Changing a member: their role (admins), and/or the name they go by in the group (yourself, or
+ * an admin for anyone). At least one of the two.
+ */
+export const memberUpdateSchema = z
+	.object({ role: memberRoleSchema.shape.role.optional(), displayName: memberNameSchema.shape.displayName.optional() })
+	.refine((v) => v.role !== undefined || v.displayName !== undefined, 'Send a role or a displayName');
+
 /** Leaving: the owner names the admin who becomes owner. */
 export const leaveGroupSchema = z.object({ newOwnerId: z.string().min(1).nullish() });
 
