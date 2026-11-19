@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
-	import { detectRegion } from '#lib/client/regions';
 	import { updateMe } from '#lib/client/me';
 	import { browserTimeZone } from '#lib/client/dates';
 	import { toasts } from '#lib/client/toast.svelte';
@@ -28,18 +27,16 @@
 	let usernameError = $state<string | null>(null);
 	let busy = $state(false);
 
-	// First visit: fill in what we can guess from the browser and the request.
+	// First visit: fill in what the server guessed from the request (so it renders filled in), and the browser's time zone.
+	(() => {
+		const detected = data.detected;
+		if (data.user.country || !detected) return;
+		region.country = detected.country ?? '';
+		region.subdivision = detected.subdivision ?? '';
+		if (detected.timezone) region.timezone = detected.timezone;
+	})();
 	$effect(() => {
-		if (data.user.country) return;
-		region.timezone = browserTimeZone();
-		detectRegion()
-			.then((d) => {
-				if (region.country) return;
-				region.country = d.country ?? '';
-				region.subdivision = d.subdivision ?? '';
-				if (d.timezone) region.timezone = d.timezone;
-			})
-			.catch(() => {});
+		if (!data.user.country && !data.detected?.timezone) region.timezone = browserTimeZone();
 	});
 
 	async function next(e: SubmitEvent) {

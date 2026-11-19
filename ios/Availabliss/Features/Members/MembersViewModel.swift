@@ -23,6 +23,13 @@ final class MembersViewModel {
         self.draft = InviteDraft(api: api)
     }
 
+    /// Starts from a group already in hand (e.g. one just made, which has no invites yet), so
+    /// nothing needs loading first.
+    convenience init(group: Group, api: APIClient) {
+        self.init(groupId: group.id, api: api)
+        self.group = group
+    }
+
     var isAdmin: Bool { group?.role.isAdmin ?? false }
 
     var sortedMembers: [Member] {

@@ -2,8 +2,14 @@
 	import Orbs from '#lib/components/ui/Orbs.svelte';
 	import Logo from '#lib/components/ui/Logo.svelte';
 	import SignInForm from '#lib/components/auth/SignInForm.svelte';
+	import { listCountries } from '#lib/client/regions';
 
 	let { data } = $props();
+
+	// The sign-up wizard's first step lists countries; fetch them now so the browser has them cached.
+	$effect(() => {
+		listCountries().catch(() => {});
+	});
 </script>
 
 <svelte:head><title>Sign in · Availabliss</title></svelte:head>

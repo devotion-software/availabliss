@@ -12,6 +12,8 @@ import dev.joeherbert.availabliss.core.network.getOrNull
 import dev.joeherbert.availabliss.core.network.model.NamedCode
 import dev.joeherbert.availabliss.feature.common.UsernameEditor
 import dev.joeherbert.availabliss.feature.common.UsernameFieldState
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -105,6 +107,9 @@ class RegionViewModel @Inject constructor(
             var country = user?.country
             var subdivision = user?.subdivision
             var timezone = user?.timezone ?: ZoneId.systemDefault().id
+            // Sign-in starts these (RegionsRepository.prefetch), so they're usually here already.
+            // The countries come in alongside, and the country's details don't wait for them.
+            val countriesRequest = async { regions.countries() }
             if (country == null) {
                 regions.detect().getOrNull()?.let { detected ->
                     country = detected.country
@@ -112,7 +117,8 @@ class RegionViewModel @Inject constructor(
                     detected.timezone?.let { timezone = it }
                 }
             }
-            val countries = when (val result = regions.countries()) {
+            country?.let(regions::prefetchDetails)
+            val countries = when (val result = countriesRequest.await()) {
                 is ApiResult.Success -> result.value
                 is ApiResult.Failure -> {
                     _state.update { it.copy(message = UserMessage(result.error.message)) }
@@ -205,8 +211,11 @@ class RegionViewModel @Inject constructor(
     fun onMessageShown(message: UserMessage) = _state.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 
     private suspend fun loadCountryDetails(country: String) {
-        val subdivisions = regions.subdivisions(country).getOrNull().orEmpty()
-        val authorities = regions.schoolAuthorities(country).getOrNull().orEmpty().map { RegionOption(it.id, it.name) }
+        val (subdivisions, authorities) = coroutineScope {
+            val subs = async { regions.subdivisions(country).getOrNull().orEmpty() }
+            val auths = async { regions.schoolAuthorities(country).getOrNull().orEmpty().map { RegionOption(it.id, it.name) } }
+            subs.await() to auths.await()
+        }
         _state.update { s ->
             if (s.country != country) s
             else s.copy(subdivisions = subdivisions, authorities = authorities)

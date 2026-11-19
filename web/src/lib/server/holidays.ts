@@ -65,8 +65,10 @@ export async function bankHolidays(country: string | null, subdivision: string |
 	const first = Number(range.from.slice(0, 4));
 	const last = Number(range.to.slice(0, 4));
 	if (last - first > MAX_HOLIDAY_YEARS) throw badRequest(`Ask for at most ${MAX_HOLIDAY_YEARS} years of holidays at a time`);
-	for (let year = first; year <= last; year++) {
-		for (const h of await holidaysForYear(country, year)) {
+	// Each year may need a fetch from Nager.Date, so ask for them all at once.
+	const years = await Promise.all(Array.from({ length: last - first + 1 }, (_, i) => holidaysForYear(country, first + i)));
+	for (const holidays of years) {
+		for (const h of holidays) {
 			const applies = !h.subdivisions || (subdivision !== null && h.subdivisions.includes(subdivision));
 			if (applies && inRange(h.date, range)) result.set(h.date, h.name);
 		}
@@ -91,10 +93,19 @@ export async function schoolHolidayRanges(
 // ─── Region pickers ───────────────────────────────────────────────────────
 
 let countryCache: { at: number; countries: { code: string; name: string }[] } | null = null;
+let countryFetch: Promise<{ countryCode: string; name: string }[]> | null = null;
 
 export async function countries(): Promise<{ code: string; name: string }[]> {
 	if (countryCache && Date.now() - countryCache.at < 24 * 60 * 60 * 1000) return countryCache.countries;
-	const list = await fetchJson<{ countryCode: string; name: string }[]>(`${NAGER}/AvailableCountries`);
+	// One fetch at a time; if Nager.Date is down, yesterday's list is better than an error.
+	countryFetch ??= fetchJson<{ countryCode: string; name: string }[]>(`${NAGER}/AvailableCountries`).finally(() => (countryFetch = null));
+	let list: { countryCode: string; name: string }[];
+	try {
+		list = await countryFetch;
+	} catch (err) {
+		if (countryCache) return countryCache.countries;
+		throw err;
+	}
 	const result = list.map((c) => ({ code: c.countryCode, name: c.name })).sort((a, b) => a.name.localeCompare(b.name));
 	countryCache = { at: Date.now(), countries: result };
 	return result;
@@ -116,7 +127,19 @@ export async function subdivisions(country: string): Promise<{ code: string; nam
 	return [...codes].sort().map((code) => ({ code, name: SUBDIVISION_NAMES[code] ?? code }));
 }
 
-export async function schoolAuthorities(country: string): Promise<{ id: string; name: string }[]> {
+// Only changes when term dates are imported, so an hour in memory saves a table scan per ask.
+const authorityCache = new Map<string, { at: number; rows: Promise<{ id: string; name: string }[]> }>();
+
+export function schoolAuthorities(country: string): Promise<{ id: string; name: string }[]> {
+	const cached = authorityCache.get(country);
+	if (cached && Date.now() - cached.at < 60 * 60 * 1000) return cached.rows;
+	const rows = loadSchoolAuthorities(country);
+	authorityCache.set(country, { at: Date.now(), rows });
+	rows.catch(() => authorityCache.delete(country));
+	return rows;
+}
+
+async function loadSchoolAuthorities(country: string): Promise<{ id: string; name: string }[]> {
 	const rows = await db
 		.selectDistinct({ id: schoolHolidays.authority, name: schoolHolidays.authorityName })
 		.from(schoolHolidays)

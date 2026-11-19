@@ -84,7 +84,11 @@ class OnboardingViewModel @Inject constructor(
         editor.reset(RequirementPresets.applyPreset(RequirementPresets.defaultDraft(DateTimes.today(), timezone), TimingPreset.Weekend))
     }
 
-    fun goToCalendars() = _state.update { it.copy(step = OnboardingStep.Calendars) }
+    /** After the region is saved: the first group's count is redone with its bank holidays and school authority, ready for step 3. */
+    fun goToCalendars() {
+        editor.draft?.let { editor.reset(it) }
+        _state.update { it.copy(step = OnboardingStep.Calendars) }
+    }
 
     fun goToRegion() = _state.update { it.copy(step = OnboardingStep.Region) }
 

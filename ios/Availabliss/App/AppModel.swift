@@ -186,11 +186,22 @@ final class AppModel {
         live.start()
         startLiveHandling()
         deviceCalendar.startObservingChanges()
-        await push.requestAuthorizationAndRegister()
-        await refreshUnread()
-        await deviceCalendar.syncIfAuthorized()
         DeviceCalendarService.scheduleBackgroundRefresh()
-        await WidgetSync.shared.refresh()
+        // A new account is asked about notifications once the sign-up wizard is done
+        // (`didFinishOnboarding`), not over its first screen. None of these wait on each other.
+        let onboarded = session.user?.onboarded ?? true
+        async let pushReady: Void = onboarded ? push.requestAuthorizationAndRegister() : ()
+        async let unread: Void = refreshUnread()
+        async let calendars: Void = deviceCalendar.syncIfAuthorized()
+        async let widgets: Void = onboarded ? WidgetSync.shared.refresh() : ()
+        _ = await (pushReady, unread, calendars, widgets)
+    }
+
+    /// The end of the sign-up wizard: what `didSignIn` leaves until then.
+    func didFinishOnboarding() async {
+        async let pushReady: Void = push.requestAuthorizationAndRegister()
+        async let widgets: Void = WidgetSync.shared.refresh()
+        _ = await (pushReady, widgets)
     }
 
     private func didSignOut() {

@@ -56,6 +56,8 @@ struct SignInView: View {
         .screenBackground(OrbLayout.signIn)
         .foregroundStyle(theme.ink)
         .onAppear {
+            // The sign-up wizard's first step needs these; fetch them while the user signs in.
+            RegionCache.shared.prefetch(api: app.api)
             if model == nil {
                 model = SignInViewModel(auth: auth) { [app] token in try await app.signIn(token: token) }
             }

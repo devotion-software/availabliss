@@ -46,23 +46,27 @@ final class RegionViewModel {
             name = accountName.isEmpty ? (IntroName.saved ?? "") : accountName
         }
         username.prefill(user?.username)
+        // Shared with sign-in, which starts these early, so they're usually here already.
+        let cache = RegionCache.shared
+        let countriesRequest = cache.countries(api: api)
+        if let user, user.country != nil {
+            country = user.country
+            subdivision = user.subdivision
+            schoolAuthority = user.schoolAuthority
+            timezone = user.timezone
+        } else if let detected = await cache.detect(api: api) {
+            country = detected.country
+            subdivision = detected.subdivision
+            timezone = detected.timezone ?? timezone
+        }
+        // The country's regions and authorities don't wait for the list of countries.
+        async let details: Void = loadCountryDetails()
         do {
-            async let countriesRequest = api.send(API.Regions.countries())
-            if let user, user.country != nil {
-                country = user.country
-                subdivision = user.subdivision
-                schoolAuthority = user.schoolAuthority
-                timezone = user.timezone
-            } else if let detected = try? await api.send(API.Regions.detect()) {
-                country = detected.country
-                subdivision = detected.subdivision
-                timezone = detected.timezone ?? timezone
-            }
-            countries = try await countriesRequest.countries
-            await loadCountryDetails()
+            countries = try await countriesRequest.value
         } catch {
             self.error = error.userMessage
         }
+        await details
     }
 
     func selectCountry(_ code: String) async {
@@ -100,9 +104,11 @@ final class RegionViewModel {
             authorities = []
             return
         }
-        async let subs = try? api.send(API.Regions.subdivisions(country: country))
-        async let auths = try? api.send(API.Regions.schoolAuthorities(country: country))
-        subdivisions = await subs?.subdivisions ?? []
-        authorities = await auths?.authorities ?? []
+        let cache = RegionCache.shared
+        cache.prefetchDetails(country: country, api: api)
+        async let subs = cache.subdivisions(country: country, api: api)
+        async let auths = cache.authorities(country: country, api: api)
+        subdivisions = await subs
+        authorities = await auths
     }
 }

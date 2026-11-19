@@ -170,7 +170,7 @@ final class TimingEditorViewModel {
 
     func loadAuthorities(country: String?) async {
         guard let country, authorities.isEmpty else { return }
-        authorities = (try? await api.send(API.Regions.schoolAuthorities(country: country)).authorities) ?? []
+        authorities = await RegionCache.shared.authorities(country: country, api: api)
     }
 
     /// Adds a range, joining it with any it overlaps or runs straight on from. One already covered adds nothing.

@@ -136,7 +136,7 @@ struct BlocksResponse: Decodable, Sendable { let blocks: [ManualBlock] }
 
 // MARK: - Regions
 
-struct Country: Decodable, Sendable, Identifiable, Hashable {
+struct Country: Codable, Sendable, Identifiable, Hashable {
     let code: String
     let name: String
     var id: String { code }

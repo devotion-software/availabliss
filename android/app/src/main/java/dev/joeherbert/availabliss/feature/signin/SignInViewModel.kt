@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.auth.AuthRepository
 import dev.joeherbert.availabliss.core.auth.SignInResult
 import dev.joeherbert.availabliss.core.data.GroupsRepository
+import dev.joeherbert.availabliss.core.data.RegionsRepository
 import dev.joeherbert.availabliss.core.deeplink.DeepLink
 import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
 import dev.joeherbert.availabliss.core.network.ApiResult
@@ -53,12 +54,15 @@ class SignInViewModel @Inject constructor(
     private val auth: AuthRepository,
     private val deepLinks: DeepLinkBus,
     private val groups: GroupsRepository,
+    regions: RegionsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SignInUiState(googleAvailable = auth.isGoogleAvailable))
     val state: StateFlow<SignInUiState> = _state.asStateFlow()
 
     init {
+        // The sign-up wizard's first step needs these; fetch them while the user signs in.
+        regions.prefetch()
         // Return from the Apple web flow: availabliss://auth/callback?code=…
         viewModelScope.launch {
             deepLinks.pending.collect { link ->

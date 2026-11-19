@@ -70,6 +70,7 @@ struct OnboardingView: View {
         Task {
             do {
                 try await app.session.update(UserPatch(onboarded: true))
+                Task { await app.didFinishOnboarding() }
                 if let createdGroup {
                     app.router.groupsPath = [.group(id: createdGroup.id)]
                 } else if opensMyTime {
@@ -204,7 +205,8 @@ private struct InvitePeopleStep: View {
         self.group = group
         self.api = api
         self.onDone = onDone
-        _model = State(initialValue: MembersViewModel(groupId: group.id, api: api))
+        // The group was just made: it's in hand and has no invites, so there's nothing to load.
+        _model = State(initialValue: MembersViewModel(group: group, api: api))
     }
 
     var body: some View {
@@ -252,7 +254,6 @@ private struct InvitePeopleStep: View {
         }
         .screenBackground(OrbLayout.groups)
         .foregroundStyle(theme.ink)
-        .task { await model.load() }
         .errorAlert($model.error)
         .toast($model.toast)
     }
