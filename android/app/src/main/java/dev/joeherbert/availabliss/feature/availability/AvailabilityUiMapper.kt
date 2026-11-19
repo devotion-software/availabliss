@@ -166,6 +166,7 @@ object AvailabilityUiMapper {
             selected = date == selected,
             preferredCount = if (state == CellState.Match) day?.preferredBy.orEmpty().size else 0,
             partial = partial,
+            bankHoliday = day?.bankHoliday == true,
             accessibilityLabel = listOfNotNull(dateLabel, stateLabel, day?.holiday, if (date == today) "today" else null).joinToString(", "),
             today = date == today,
         )
@@ -335,6 +336,7 @@ object AvailabilityUiMapper {
         meId: String?,
         selected: LocalDate? = null,
         status: (LocalDate) -> DayStatus? = { null },
+        bankHoliday: (LocalDate) -> String? = { null },
     ): List<WeekColumnUi> = days.mapNotNull { day ->
         val date = DateTimes.parseDate(day.date) ?: return@mapNotNull null
         val free = day.everyoneFree.mapNotNull { clampToDate(it.start, it.end, date) }
@@ -360,7 +362,9 @@ object AvailabilityUiMapper {
             selected = date == selected,
             today = date == DateTimes.today(),
             works = !date.isBefore(DateTimes.today()) && status(date).let { it == null || it == DayStatus.Match },
-            accessibilityLabel = (if (date == DateTimes.today()) "Today, " else "") + DateTimes.shortDay(date) + ": " +
+            bankHoliday = bankHoliday(date) != null,
+            accessibilityLabel = (if (date == DateTimes.today()) "Today, " else "") + DateTimes.shortDay(date) +
+                (bankHoliday(date)?.let { " ($it)" } ?: "") + ": " +
                 (freeBlocks.joinToString { it.label }.ifEmpty { if (mostBlocks.isNotEmpty()) "most of the group free" else "no time when everyone's free" }),
         )
     }

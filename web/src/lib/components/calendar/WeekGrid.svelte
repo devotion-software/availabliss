@@ -2,6 +2,7 @@
 	import type { DayAvailability, Member } from '#lib/types';
 	import { formatDayKey, useFormat } from '#lib/client/format';
 	import Spinner from '#lib/components/ui/Spinner.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
 	import { busyNames, missingNote } from './grid';
 	import { axisFor, clampToAxis, hourTicks, mergeAxes, pct, spanText, subtractSpans, type Axis } from './timeline';
 
@@ -22,8 +23,10 @@
 		cards?: boolean;
 		/** Whether a day works for everyone (true while unknown). Days that don't are faded. */
 		works?: (date: string) => boolean;
+		/** A bank holiday's name on that date (shown as a flag by the date), or null. */
+		bankHoliday?: (date: string) => string | null;
 	}
-	let { dates, days, members, onselect, selected, cards = false, works = () => true }: Props = $props();
+	let { dates, days, members, onselect, selected, cards = false, works = () => true, bankHoliday = () => null }: Props = $props();
 
 	const fmt = useFormat();
 	const today = $derived(fmt.current.today());
@@ -124,7 +127,14 @@
 					aria-pressed={d === selected}
 					onclick={() => onselect?.(d)}
 				>
-					<span class="date" class:keep={d === today}><span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span></span>
+					<span class="date" class:keep={d === today}>
+						<span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span>{#if bankHoliday(d)}<span
+								class="bank"
+								title={bankHoliday(d)}
+							>
+								<Icon name="flag" size={11} strokeWidth={2.5} /><span class="sr-only">{bankHoliday(d)}</span>
+							</span>{/if}
+					</span>
 					<span class="info">
 						<span class="what" class:free={free.length > 0 || most.length > 0}>
 							{#if day === undefined}Loading…{:else if day === null}Outside the timing{:else}{free[0]?.label ??
@@ -157,6 +167,9 @@
 					aria-current={d === today ? 'date' : undefined}
 				>
 					<span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span>
+					{#if bankHoliday(d)}<span class="bank" title={bankHoliday(d)}>
+							<Icon name="flag" size={11} strokeWidth={2.5} /><span class="sr-only">{bankHoliday(d)}</span>
+						</span>{/if}
 				</button>
 			{/each}
 		</div>
@@ -222,6 +235,13 @@
 	.card.on {
 		outline: 2px solid var(--ink);
 		outline-offset: -2px;
+	}
+	/* A bank holiday: a small flag beside the date. */
+	.bank {
+		display: inline-flex;
+		margin-left: 4px;
+		vertical-align: -1px;
+		opacity: 0.75;
 	}
 	.date {
 		width: 56px;

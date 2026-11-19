@@ -18,6 +18,7 @@ import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.getOrNull
 import dev.joeherbert.availabliss.core.network.model.AiPlannerAccess
 import dev.joeherbert.availabliss.core.network.model.Availability
+import dev.joeherbert.availabliss.core.network.model.AvailabilityDay
 import dev.joeherbert.availabliss.core.network.model.DayAvailability
 import dev.joeherbert.availabliss.core.network.model.DayStatus
 import dev.joeherbert.availabliss.core.network.model.Group
@@ -577,7 +578,14 @@ class GroupCalendarViewModel @Inject constructor(
             syncBanner = AvailabilityUiMapper.syncBanner(r.availability, group, isAdmin),
             coverageNote = AvailabilityUiMapper.coverageNote(r.availability, group, meId),
             nudging = r.nudging,
-            weekColumns = AvailabilityUiMapper.weekColumns(r.week, group, meId, r.selection) { date -> dayStatus(r, date) },
+            weekColumns = AvailabilityUiMapper.weekColumns(
+                r.week,
+                group,
+                meId,
+                r.selection,
+                status = { date -> dayStatus(r, date) },
+                bankHoliday = { date -> monthDay(r, date)?.takeIf { it.bankHoliday }?.let { it.holiday ?: "Bank holiday" } },
+            ),
             weekDates = r.week.mapNotNull { DateTimes.parseDate(it.date) },
             dayFree = day?.everyoneFree?.firstOrNull()?.let { it.start to it.end },
             weekLoading = r.weekLoading,
@@ -633,9 +641,12 @@ class GroupCalendarViewModel @Inject constructor(
     }
 
     /** A day's status: from the month on screen, or a neighbouring month already fetched. */
-    private fun dayStatus(r: RawState, date: LocalDate): DayStatus? {
+    private fun dayStatus(r: RawState, date: LocalDate): DayStatus? = monthDay(r, date)?.status
+
+    /** A date's day from the loaded month availability (or the cached month it's in). */
+    private fun monthDay(r: RawState, date: LocalDate): AvailabilityDay? {
         val key = date.toString()
-        return (r.availability?.days?.firstOrNull { it.date == key } ?: months[YearMonth.from(date)]?.days?.firstOrNull { it.date == key })?.status
+        return r.availability?.days?.firstOrNull { it.date == key } ?: months[YearMonth.from(date)]?.days?.firstOrNull { it.date == key }
     }
 
     private companion object {

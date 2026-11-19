@@ -241,6 +241,8 @@ export interface AvailabilityDay {
 	busyMemberIds: string[];
 	slotPosition: SlotPosition | null;
 	holiday: string | null;
+	/** A bank holiday in the group owner's region (`holiday` is then its name); left out otherwise. */
+	bankHoliday?: true;
 	/** Members whose preferences this day's time that works fits (only on `match` days). */
 	preferredBy?: string[];
 	/** A `match` day whose best time only meets the group's quorum (someone's missing). */

@@ -36,12 +36,15 @@ struct AvailabilityDay: Decodable, Sendable, Hashable {
     let busyMemberIds: [String]
     let slotPosition: SlotPosition?
     let holiday: String?
+    /// A bank holiday in the group owner's region (`holiday` is then its name).
+    var bankHoliday: Bool?
     /// Members whose preferred times this day's time that works fits.
     var preferredBy: [String]?
     /// A `match` day whose best time only meets the group's quorum: someone's missing.
     var partial: Bool?
 
     var isPartial: Bool { partial == true }
+    var isBankHoliday: Bool { bankHoliday == true }
 }
 
 struct Slot: Decodable, Sendable, Hashable, Identifiable {

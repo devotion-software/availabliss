@@ -206,11 +206,20 @@
 		};
 	});
 
+	/** A day's availability from the loaded month (or the current one). */
+	const dayInfo = (date: string) => days.get(date) ?? cache.monthsReady.get(startOfMonth(date))?.days.find((d) => d.date === date);
+
 	/** Whether a day works for everyone (and isn't over); unknown days count as working, so nothing fades while it loads. */
 	function works(date: string): boolean {
 		if (date < todayKey) return false;
-		const status = (days.get(date) ?? cache.monthsReady.get(startOfMonth(date))?.days.find((d) => d.date === date))?.status;
+		const status = dayInfo(date)?.status;
 		return status === undefined || status === 'match';
+	}
+
+	/** A bank holiday's name on that date, for the week's flags. */
+	function bankHoliday(date: string): string | null {
+		const day = dayInfo(date);
+		return day?.bankHoliday ? (day.holiday ?? 'Bank holiday') : null;
 	}
 
 	/** A day tapped in the month or week: its detail shows underneath. Tapping it again clears it. */
@@ -372,7 +381,7 @@
 					{/if}
 				{:else}
 					<!-- Phones get a card per day; the time grid needs a wider screen. -->
-					<WeekGrid dates={week} days={weekDays} {members} selected={picked} onselect={select} cards={!desk && phoneWidth} {works} />
+					<WeekGrid dates={week} days={weekDays} {members} selected={picked} onselect={select} cards={!desk && phoneWidth} {works} {bankHoliday} />
 				{/if}
 			</CalendarPager>
 		</section>

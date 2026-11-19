@@ -69,7 +69,32 @@ data class MonthCellUi(
      * a soft accent fill with an accent outline, and [note] says who ("2 missing").
      */
     val partial: Boolean = false,
+    /** A bank holiday: a small flag after the date number. */
+    val bankHoliday: Boolean = false,
 )
+
+/** "25 ⚑": the date number, with a small flag on a bank holiday. */
+@Composable
+private fun DayNumber(cell: MonthCellUi, color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(
+            cell.date.dayOfMonth.toString(),
+            fontSize = 17.sp,
+            fontWeight = AvWeights.Display650,
+            lineHeight = 17.sp,
+            color = color,
+            modifier = modifier,
+        )
+        if (cell.bankHoliday) {
+            androidx.compose.material3.Icon(
+                dev.joeherbert.availabliss.designsystem.icon.AvIcons.Flag,
+                null,
+                tint = color.copy(alpha = 0.8f),
+                modifier = Modifier.size(10.dp),
+            )
+        }
+    }
+}
 
 /** How far cells that don't work fade; today's content doesn't, only its background. */
 private const val BUSY_FADE = 0.5f
@@ -192,11 +217,8 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
         ) {
             // Today's pill is inverted on a cell already filled with the accent.
             val onAccent = solid
-            Text(
-                cell.date.dayOfMonth.toString(),
-                fontSize = 17.sp,
-                fontWeight = AvWeights.Display650,
-                lineHeight = 17.sp,
+            DayNumber(
+                cell,
                 // Today on a partial day sits on an accent pill (the cell's own fill is soft).
                 color = when {
                     plainToday -> colors.accentInk
@@ -236,13 +258,7 @@ private fun HiddenCell(cell: MonthCellUi, modifier: Modifier = Modifier) {
             .padding(horizontal = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
-        Text(
-            cell.date.dayOfMonth.toString(),
-            fontSize = 17.sp,
-            fontWeight = AvWeights.Display650,
-            lineHeight = 17.sp,
-            color = if (cell.today) colors.accentInk else colors.ink,
-        )
+        DayNumber(cell, color = if (cell.today) colors.accentInk else colors.ink)
         Text(cell.note, style = AvailablissTheme.type.micro, color = if (cell.today) colors.muted else colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

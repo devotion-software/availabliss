@@ -120,12 +120,15 @@ struct DayCell: View {
         let onAccent = status == .match && !isPartial
         Button(action: action) {
             VStack(alignment: .leading, spacing: 4) {
-                if plainToday {
-                    Text("\(date.day)").font(AppFont.body(compact ? 15 : 17, .bold, relativeTo: .body))
-                        .foregroundStyle(theme.accentInk)
-                } else {
-                    Text("\(date.day)").font(AppFont.body(compact ? 15 : 17, .semibold, relativeTo: .body))
-                        .todayMark(date, onAccent: onAccent)
+                HStack(spacing: 3) {
+                    if plainToday {
+                        Text("\(date.day)").font(AppFont.body(compact ? 15 : 17, .bold, relativeTo: .body))
+                            .foregroundStyle(theme.accentInk)
+                    } else {
+                        Text("\(date.day)").font(AppFont.body(compact ? 15 : 17, .semibold, relativeTo: .body))
+                            .todayMark(date, onAccent: onAccent)
+                    }
+                    if info?.isBankHoliday == true { BankHolidayFlag(size: compact ? 8 : 9) }
                 }
                 if !compact || status == .match || isPast {
                     Text(note).bodyFont(compact ? 9 : 11, .semibold, relativeTo: .caption2).lineLimit(1)

@@ -8714,6 +8714,11 @@
 							"null"
 						]
 					},
+					"bankHoliday": {
+						"type": "boolean",
+						"const": true,
+						"description": "A bank holiday in the group owner's region (`holiday` is then its name); left out otherwise."
+					},
 					"preferredBy": {
 						"type": "array",
 						"items": {

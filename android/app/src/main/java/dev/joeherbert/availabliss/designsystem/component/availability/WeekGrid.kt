@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -56,7 +57,20 @@ data class WeekColumnUi(
     val today: Boolean = false,
     /** Works for everyone (or not known yet). Days that don't are faded so the ones that do stand out. */
     val works: Boolean = true,
+    /** A bank holiday: a small flag after the label. */
+    val bankHoliday: Boolean = false,
 )
+
+/** A small flag after a bank holiday's date. */
+@Composable
+private fun BankHolidayFlag(tint: androidx.compose.ui.graphics.Color) {
+    androidx.compose.material3.Icon(
+        dev.joeherbert.availabliss.designsystem.icon.AvIcons.Flag,
+        null,
+        tint = tint.copy(alpha = 0.8f),
+        modifier = Modifier.padding(start = 3.dp).size(9.dp),
+    )
+}
 
 /** How far a week day that doesn't work for everyone fades. */
 private const val WEEK_FADE = 0.5f
@@ -82,7 +96,7 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Spacer(Modifier.width(34.dp))
             columns.forEach {
-                Box(Modifier.weight(1f).alpha(it.dateAlpha()), contentAlignment = Alignment.Center) {
+                Row(Modifier.weight(1f).alpha(it.dateAlpha()), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         it.label,
                         style = type.micro,
@@ -90,6 +104,7 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
                         textAlign = TextAlign.Center,
                         modifier = Modifier.todayPill(it.today, colors.accent),
                     )
+                    if (it.bankHoliday) BankHolidayFlag(colors.muted)
                 }
             }
         }
@@ -185,13 +200,14 @@ fun WeekCards(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSele
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
-                Box(Modifier.width(56.dp).alpha(column.dateAlpha())) {
+                Row(Modifier.width(56.dp).alpha(column.dateAlpha()), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     Text(
                         column.label,
                         style = type.bodySmallStrong,
                         color = if (column.today) colors.onAccent else colors.ink,
                         modifier = Modifier.padding(start = if (column.today) 6.dp else 0.dp).todayPill(column.today, colors.accent),
                     )
+                    if (column.bankHoliday) BankHolidayFlag(colors.ink)
                 }
                 Column(Modifier.weight(1f).alpha(if (column.works) 1f else WEEK_FADE), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(

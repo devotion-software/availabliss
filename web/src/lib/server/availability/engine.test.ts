@@ -178,7 +178,8 @@ describe('holidays', () => {
 				bankHolidays: new Map([['2026-12-25', 'Christmas Day']])
 			})
 		);
-		expect(dayOf(result, '2026-12-25')).toMatchObject({ status: 'match', holiday: 'Christmas Day' });
+		expect(dayOf(result, '2026-12-25')).toMatchObject({ status: 'match', holiday: 'Christmas Day', bankHoliday: true });
+		expect(dayOf(result, '2026-12-26').bankHoliday).toBeUndefined();
 		expect(result.visibleWeekdays).toContain(weekdayOf('2026-12-25'));
 	});
 
@@ -194,6 +195,7 @@ describe('holidays', () => {
 		);
 		expect(dayOf(result, '2026-12-13').status).toBe('hidden');
 		expect(dayOf(result, '2026-12-19')).toMatchObject({ status: 'match', holiday: 'Christmas holidays' });
+		expect(dayOf(result, '2026-12-19').bankHoliday).toBeUndefined();
 	});
 });
 

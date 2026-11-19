@@ -300,6 +300,8 @@ data class AvailabilityDay(
     val busyMemberIds: List<String> = emptyList(),
     val slotPosition: SlotPosition? = null,
     val holiday: String? = null,
+    /** A bank holiday in the group owner's region ([holiday] is then its name). */
+    val bankHoliday: Boolean = false,
     /** Members whose preferred times this day's time that works fits. */
     val preferredBy: List<String> = emptyList(),
     /** A `match` day whose time only works with someone missing (a quorum or optional members). */

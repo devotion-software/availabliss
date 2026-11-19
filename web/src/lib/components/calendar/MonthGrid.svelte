@@ -78,6 +78,11 @@
 	}
 </script>
 
+<!-- A bank holiday: a small flag right after the date number. -->
+{#snippet bankFlag(day: AvailabilityDay)}{#if day.bankHoliday}<span class="bank" title={day.holiday ?? 'Bank holiday'}>
+			<Icon name="flag" size={10} strokeWidth={2.5} />
+		</span>{/if}{/snippet}
+
 <div class="month" class:compact style:--cols={columns.length}>
 	<div class="heads" aria-hidden="true">
 		{#each columns as c (c)}
@@ -94,7 +99,7 @@
 				{:else if day.status === 'hidden' || date < today}
 					<!-- Days that can't be part of any slot (outside the timing, or past) stay as quiet placeholders. -->
 					<span class="cell hidden-day" class:today={date === today} aria-hidden="true">
-						<span class="num">{dayNumber(date)}</span>
+						<span class="num">{dayNumber(date)}{@render bankFlag(day)}</span>
 						<span class="note">{date === today ? 'Today' : date < today ? 'Past' : ''}</span>
 					</span>
 				{:else}
@@ -110,7 +115,7 @@
 						aria-label={label(date, day)}
 						onclick={() => onselect?.(date)}
 					>
-						<span class="num">{dayNumber(date)}</span>
+						<span class="num">{dayNumber(date)}{@render bankFlag(day)}</span>
 						<span class="note">{note(date, day)}</span>
 						{#if day.preferredBy?.length}
 							<span class="pref" title="{day.preferredBy.length} prefer this">
@@ -285,6 +290,13 @@
 	}
 	.cell {
 		position: relative;
+	}
+	/* A bank holiday: a small flag right after the date number. */
+	.bank {
+		display: inline-flex;
+		margin-left: 3px;
+		vertical-align: 1px;
+		opacity: 0.8;
 	}
 	.pref {
 		position: absolute;

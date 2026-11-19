@@ -20,6 +20,7 @@ object AvIcons {
     val Plus = line("Plus", "M12 5v14M5 12h14", stroke = 2.4f)
     val Close = line("Close", "M6 6l12 12M18 6L6 18", stroke = 2.6f)
     val Check = line("Check", "M5 12l5 5L20 7", stroke = 3f)
+    val Flag = line("Flag", "M5 21V4", "M5 4h12l-2.5 4.5L17 13H5", stroke = 2.4f)
     val Question = line("Question", "M9 9a3 3 0 1 1 4 2.8c-.7.3-1 .9-1 1.6V14", "M12 18h.01", stroke = 2.6f)
     val Calendar = line("Calendar", rect(3f, 5f, 18f, 16f, 3f), "M3 10h18M8 3v4M16 3v4")
     /** Connected calendars: a calendar with two sync arrows going round in the corner. */

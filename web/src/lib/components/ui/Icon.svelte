@@ -24,6 +24,7 @@
 		'user-plus': '<circle cx="10" cy="8" r="4"/><path d="M3 20c1.2-3.5 3.8-5 7-5s5.8 1.5 7 5M19 8v6M16 11h6"/>',
 		users:
 			'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.3 3.5-5 6.5-5s5.5 1.7 6.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.5c2 .2 3.4 1.5 4 3.5"/>',
+		flag: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>',
 		heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
 		groups:
 			'<circle cx="12" cy="12" r="2.2"/><circle cx="18.8" cy="12.0" r="2.2"/><circle cx="15.4" cy="17.89" r="2.2"/><circle cx="8.6" cy="17.89" r="2.2"/><circle cx="5.2" cy="12.0" r="2.2"/><circle cx="8.6" cy="6.11" r="2.2"/><circle cx="15.4" cy="6.11" r="2.2"/>',

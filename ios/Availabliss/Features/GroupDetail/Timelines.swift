@@ -33,10 +33,13 @@ struct WeekGrid: View {
             HStack(spacing: 6) {
                 Color.clear.frame(width: 28, height: 1)
                 ForEach(model.weekDays, id: \.self) { day in
-                    Text(model.weekDays.count > 4 ? "\(Weekday.short(day.weekday()).prefix(1)) \(day.day)" : "\(Weekday.short(day.weekday())) \(day.day)")
-                        .todayMark(day)
-                        .frame(maxWidth: .infinity)
-                        .opacity(model.works(day) || day == .today() ? 1 : WeekFade.opacity)
+                    HStack(spacing: 2) {
+                        Text(model.weekDays.count > 4 ? "\(Weekday.short(day.weekday()).prefix(1)) \(day.day)" : "\(Weekday.short(day.weekday())) \(day.day)")
+                            .todayMark(day)
+                        if model.day(day)?.isBankHoliday == true { BankHolidayFlag(size: 8) }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .opacity(model.works(day) || day == .today() ? 1 : WeekFade.opacity)
                 }
             }
             .bodyFont(11, .semibold, relativeTo: .caption2)
@@ -164,6 +167,18 @@ private struct WeekColumn: View {
     }
 }
 
+/// A small flag beside a date that's a bank holiday (its name is in the day's label and detail).
+struct BankHolidayFlag: View {
+    var size: CGFloat = 9
+
+    var body: some View {
+        Image(systemName: "flag.fill")
+            .font(.system(size: size, weight: .bold))
+            .opacity(0.8)
+            .accessibilityLabel("Bank holiday")
+    }
+}
+
 // MARK: - Week cards
 
 /// Week view in portrait: a card per day saying when everyone's free, with a 24-hour strip
@@ -177,7 +192,8 @@ struct WeekCards: View {
         VStack(spacing: 8) {
             ForEach(model.weekDays, id: \.self) { day in
                 WeekDayCard(
-                    day: day, detail: model.dayDetails[day], status: model.day(day)?.status, works: model.works(day), group: group, isSelected: day == model.selection
+                    day: day, detail: model.dayDetails[day], status: model.day(day)?.status, works: model.works(day), group: group, isSelected: day == model.selection,
+                    bankHoliday: model.day(day)?.isBankHoliday == true
                 )
                 .onTapGesture { withAnimation(.spring(response: 0.3)) { model.pick(day) } }
                 .accessibilityAddTraits(day == model.selection ? [.isButton, .isSelected] : .isButton)
@@ -194,6 +210,7 @@ private struct WeekDayCard: View {
     let works: Bool
     let group: Group
     let isSelected: Bool
+    var bankHoliday = false
     private let axis = TimeAxis(startHour: 0, endHour: 24)
     @Environment(\.theme) private var theme
 
@@ -202,7 +219,10 @@ private struct WeekDayCard: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(spacing: 0) {
-                Text(Weekday.short(day.weekday())).bodyFont(11, .semibold, relativeTo: .caption2).foregroundStyle(theme.muted)
+                HStack(spacing: 2) {
+                    Text(Weekday.short(day.weekday())).bodyFont(11, .semibold, relativeTo: .caption2).foregroundStyle(theme.muted)
+                    if bankHoliday { BankHolidayFlag(size: 8).foregroundStyle(theme.muted) }
+                }
                 Text("\(day.day)").displayFont(20, .bold).monospacedDigit()
                     .todayMark(day)
                     .padding(.top, day == .today() ? 3 : 0)

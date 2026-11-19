@@ -195,14 +195,15 @@ export function computeAvailability(input: EngineInput): Availability {
 	const days: AvailabilityDay[] = eachDate(input.from, input.to).map((date) => {
 		const pieces = covered.get(date);
 		const holiday = input.bankHolidays.get(date) ?? ctx.schoolHoliday(date);
-		if (!pieces) return { date, status: 'hidden', busyMemberIds: [], slotPosition: null, holiday };
+		const bank = input.bankHolidays.has(date) ? { bankHoliday: true as const } : {};
+		if (!pieces) return { date, status: 'hidden', busyMemberIds: [], slotPosition: null, holiday, ...bank };
 
 		const relevant = merge(pieces);
 		const busyMemberIds = busyByMember.filter((m) => m.busy.some((b) => relevant.some((p) => overlaps(b, p)))).map((m) => m.userId);
 		const slotPosition = matched.get(date) ?? null;
 		const status = slotPosition ? 'match' : busyMemberIds.length ? 'busy' : 'free';
 		const partial = status === 'match' && partialDates.has(date) && !fullDates.has(date);
-		return { date, status, busyMemberIds, slotPosition, holiday, ...(partial && { partial }) };
+		return { date, status, busyMemberIds, slotPosition, holiday, ...bank, ...(partial && { partial }) };
 	});
 
 	slots.sort((a, b) => a.start.localeCompare(b.start));

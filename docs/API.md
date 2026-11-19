@@ -613,6 +613,7 @@ interface AvailabilityDay {
   busyMemberIds: string[];                // synced members busy during the relevant window that day
   slotPosition: 'start' | 'middle' | 'end' | 'single' | null; // for drawing multi-day slots as one band
   holiday: string | null;                 // bank / school holiday name
+  bankHoliday?: true;                     // a bank holiday in the owner's region (left out otherwise)
 }
 interface Slot { start: string; end: string; label: string } // label: "Fri 13 – Sun 15 Nov"
 
