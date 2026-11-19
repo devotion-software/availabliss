@@ -189,7 +189,7 @@ struct NewGroupSheet: View {
     @ViewBuilder
     private var peopleStep: some View {
         StepDots(current: stepIndex, total: steps.count)
-        Text("Everyone ticked gets an invite to \(trimmedName) to accept. Untick anyone you\u{2019}d rather leave out.")
+        Text("Everyone ticked gets an invite to \(trimmedName) to accept.")
             .bodyFont(14)
             .foregroundStyle(theme.muted)
             .fixedSize(horizontal: false, vertical: true)

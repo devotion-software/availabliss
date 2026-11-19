@@ -284,7 +284,7 @@ fun NewGroupPeopleContent(state: NewGroupUiState, onToggle: (String) -> Unit, on
             StepDots(total = state.steps.size, step = state.stepNumber)
             ScreenHeader(
                 title = "Who's in?",
-                subtitle = "Everyone ticked gets an invite to ${state.name.trim()} to accept. Untick anyone you'd rather leave out.",
+                subtitle = "Everyone ticked gets an invite to ${state.name.trim()} to accept.",
                 subtitleMaxLines = 3,
                 onBack = onBack,
             )

@@ -206,7 +206,7 @@
 				? `Starting from ${basedOn.name}. Name it and pick a colour; you’ll choose who to invite next.`
 				: 'Name it and pick a colour. Timing comes next.'
 			: step === 'people'
-				? `Everyone ticked gets an invite to ${name.trim()} to accept. Untick anyone you’d rather leave out.`
+				? `Everyone ticked gets an invite to ${name.trim()} to accept.`
 				: `Fine-tune the timing for ${name.trim()}. You can change it later.`}
 	width={step === 'timing' && !atLimit ? 640 : 480}
 >
