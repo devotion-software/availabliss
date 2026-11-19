@@ -188,7 +188,11 @@ fun CalendarFeedCard(
     }
 }
 
+/** Copies the feed link, marked sensitive: anyone with it can read your plans, so Android 13+ hides it in the preview. */
 private fun copyToClipboard(context: Context, label: String, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
+    val clip = ClipData.newPlainText(label, text).apply {
+        description.extras = android.os.PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE", true) }
+    }
+    clipboard.setPrimaryClip(clip)
 }

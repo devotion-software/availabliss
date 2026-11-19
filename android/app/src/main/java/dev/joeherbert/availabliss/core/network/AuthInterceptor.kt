@@ -12,7 +12,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Adds `Authorization: Bearer <token>` to every request and reports 401s that mean
+ * Adds `Authorization: Bearer <token>` to every request to our server and reports 401s that mean
  * the current session has expired so it can be cleared.
  *
  * Better Auth calls also get an `Origin` header for its CSRF origin check, which
@@ -33,8 +33,11 @@ class AuthInterceptor @Inject constructor(
         val token = tokenStore.token()
         val path = original.url.encodedPath
         val explicit = original.header("Authorization")
+        // Only our own server gets the session token (attachment and media links could one day
+        // point at a storage or CDN host).
+        val ours = original.url.host.equals(API_HOST, ignoreCase = true)
         val request = original.newBuilder().apply {
-            if (token != null && explicit == null) {
+            if (token != null && explicit == null && ours) {
                 header("Authorization", "Bearer $token")
             }
             if (path.startsWith(BetterAuthApi.AUTH_PATH_PREFIX) && original.header("Origin") == null) {
@@ -44,7 +47,7 @@ class AuthInterceptor @Inject constructor(
 
         val response = chain.proceed(request)
         // Read the token again: a sign-in or sign-out may have happened while this was in flight.
-        val sentToken = explicit?.removePrefix("Bearer ")?.trim() ?: token
+        val sentToken = explicit?.removePrefix("Bearer ")?.trim() ?: token.takeIf { ours }
         if (isSessionExpiry(response.code, path, sentToken, tokenStore.token())) {
             _unauthorized.tryEmit(sentToken!!)
         }
@@ -52,6 +55,8 @@ class AuthInterceptor @Inject constructor(
     }
 
     companion object {
+        private val API_HOST: String = java.net.URI(BuildConfig.API_BASE_URL).host.orEmpty()
+
         /**
          * Sign-in and account-link routes answer 401 for a bad credential or code, not
          * because the bearer token is invalid, so they never end the session.

@@ -14,11 +14,29 @@ export const ICLOUD_CALDAV = 'https://caldav.icloud.com';
 
 // ─── XML (namespace-prefix agnostic) ──────────────────────────────────────
 
-const tag = (name: string) => `(?:[A-Za-z0-9_-]+:)?${name}`;
+const tag = (name: string) => `(?:[A-Za-z0-9_-]{1,64}:)?${name}`;
 
+/**
+ * The contents of each `<name …>…</name>`, in order. A linear scan (each opening tag is matched with
+ * the first closing tag after it, and the search carries on from there): a hostile server's response
+ * full of unclosed tags can't make it take quadratic time, as a lazy `[\s\S]*?` regex would.
+ */
 export function xmlBlocks(xml: string, name: string): string[] {
-	const re = new RegExp(`<${tag(name)}\\b[^>]*>([\\s\\S]*?)</${tag(name)}>`, 'g');
-	return [...xml.matchAll(re)].map((m) => m[1]);
+	const open = new RegExp(`<${tag(name)}\\b[^<>]{0,2000}>`, 'g');
+	const close = new RegExp(`</${tag(name)}>`, 'g');
+	const out: string[] = [];
+	for (let from = 0; ;) {
+		open.lastIndex = from;
+		const start = open.exec(xml);
+		if (!start) break;
+		close.lastIndex = start.index + start[0].length;
+		const end = close.exec(xml);
+		// No closing tag anywhere after this one: none later can close either.
+		if (!end) break;
+		out.push(xml.slice(start.index + start[0].length, end.index));
+		from = end.index + end[0].length;
+	}
+	return out;
 }
 
 export function xmlText(xml: string, name: string): string | null {
@@ -116,7 +134,30 @@ async function dav(creds: CaldavCredentials, url: string, method: 'PROPFIND' | '
 	});
 	if (res.status === 401 || res.status === 403) throw new ReauthRequired('CalDAV credentials were rejected');
 	if (res.status !== 207 && !res.ok) throw new Error(`CalDAV ${method} ${url} → ${res.status}`);
-	return { xml: await res.text(), url: finalUrl.toString() };
+	return { xml: await readCapped(res, MAX_RESPONSE_BYTES), url: finalUrl.toString() };
+}
+
+/** Far more than any real calendar listing or a month of events; a bigger response is refused. */
+const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+
+/** The body as text, giving up past `max` bytes (so a hostile server can't send gigabytes). */
+async function readCapped(res: Response, max: number): Promise<string> {
+	if (Number(res.headers.get('content-length') ?? 0) > max) throw new Error('CalDAV response too large');
+	if (!res.body) return '';
+	const reader = res.body.getReader();
+	const chunks: Uint8Array[] = [];
+	let size = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		size += value.byteLength;
+		if (size > max) {
+			await reader.cancel();
+			throw new Error('CalDAV response too large');
+		}
+		chunks.push(value);
+	}
+	return Buffer.concat(chunks).toString('utf8');
 }
 
 const PROPFIND = (props: string) =>

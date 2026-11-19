@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// "Subscribe to your plans" (on My plans): a secret webcal link of your plans from every group, for
 /// Apple Calendar or another app to subscribe to, so edits and cancellations follow automatically.
@@ -31,7 +32,10 @@ struct CalendarFeedCard: View {
             HStack {
                 Button("Copy link", systemImage: "doc.on.doc") {
                     guard let feed else { return }
-                    UIPasteboard.general.url = feed.url
+                    // Anyone with the link can read your plans: kept off other devices (no
+                    // Universal Clipboard) and cleared after 10 minutes.
+                    UIPasteboard.general.setItems(
+                        [[UTType.url.identifier: feed.url]], options: [.localOnly: true, .expirationDate: Date.now.addingTimeInterval(600)])
                     toast = "Link copied"
                 }
                 .buttonStyle(.textAction)

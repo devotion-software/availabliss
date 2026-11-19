@@ -264,3 +264,21 @@ describe('parseBusyEvents titles', () => {
 		expect(parseBusyEvents(ics, 'UTC')[0].title).toBe('Tea, cake; chat later');
 	});
 });
+
+describe('xmlBlocks on hostile input', () => {
+	test('unclosed tags take linear time', () => {
+		const xml = '<d:current-user-principal>'.repeat(200_000);
+		const started = performance.now();
+		expect(xmlBlocks(xml, 'current-user-principal')).toEqual([]);
+		expect(performance.now() - started).toBeLessThan(500);
+	});
+	test('openings without a ">" stay fast too', () => {
+		const xml = '<d:response '.repeat(200_000);
+		const started = performance.now();
+		expect(xmlBlocks(xml, 'response')).toEqual([]);
+		expect(performance.now() - started).toBeLessThan(1000);
+	});
+	test('nested blocks of other names and several in a row', () => {
+		expect(xmlBlocks('<a:x>1</a:x><b:x y="2">2</b:x><x/>', 'x')).toEqual(['1', '2']);
+	});
+});

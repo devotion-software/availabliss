@@ -74,6 +74,8 @@ struct GroupFreeThisMonthIntent: AppIntent {
         IntentDescription("Says when everyone in a group is free for the rest of this month.")
     }
     static var openAppWhenRun: Bool { false }
+    /// Your groups' plans aren't for whoever's holding a locked phone.
+    static var authenticationPolicy: IntentAuthenticationPolicy { .requiresAuthentication }
 
     @Parameter(title: "Group", requestValueDialog: "Which group?")
     var group: GroupEntity

@@ -36,3 +36,10 @@ describe('safeRedirect (calendar OAuth)', () => {
 		expect(safeRedirect(value)).toBe('/app/calendars');
 	});
 });
+
+describe('dot segments that would leave the site', () => {
+	test('are refused', () => {
+		for (const p of ['/.//evil.com', '/..//evil.com', '/%2e%2e//evil.com', '/a/..//evil.com']) expect(safeRedirectPath(p)).toBeNull();
+		expect(safeRedirectPath('/a/../app')).toBe('/app');
+	});
+});

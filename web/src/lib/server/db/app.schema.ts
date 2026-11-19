@@ -239,6 +239,24 @@ export const groupInvites = mysqlTable(
 );
 
 /**
+ * People an admin removed from a group: a shared invite link no longer lets them back in (an invite
+ * sent to them personally, by email or username, still does, and clears this).
+ */
+export const groupRemovals = mysqlTable(
+	'group_removals',
+	{
+		groupId: varchar('group_id', { length: 36 })
+			.notNull()
+			.references(() => groups.id, { onDelete: 'cascade' }),
+		userId: varchar('user_id', { length: 36 })
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		removedAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.groupId, t.userId] })]
+);
+
+/**
  * A member's preferred times for one group: specific dates (`from`–`to`), or repeating
  * weekdays (`days`, empty = any) with an optional time window. Guidelines only: they never
  * block a date, they highlight and rank the times that work.

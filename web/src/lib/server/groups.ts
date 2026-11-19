@@ -6,7 +6,7 @@ import { TILE_COLORS } from '#lib/types';
 import { monogram } from '#lib/monogram';
 import { db } from './db';
 import { requireCanCreateGroup } from './billing';
-import { events, groupInvites, groupMembers, groups, user } from './db/schema';
+import { events, groupInvites, groupMembers, groupRemovals, groups, user } from './db/schema';
 import { deleteKeys, deleteStored, IMAGE_SIZES, processImage, putImage } from './media';
 import { groupAttachmentKeys } from './attachments';
 import { ApiError, forbidden, notFound } from './http';
@@ -293,6 +293,8 @@ export async function removeMember(groupId: string, actorId: string, targetId: s
 	if (targetRole === 'owner') throw forbidden('The owner can only delete the group');
 	if (!isAdmin(actorRole)) throw forbidden('Only group admins can remove people');
 	await db.delete(groupMembers).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, targetId)));
+	// A link they joined with (or any other shared link) doesn't let them straight back in.
+	await db.insert(groupRemovals).ignore().values({ groupId, userId: targetId });
 }
 
 /**
@@ -427,7 +429,8 @@ export async function previewInvite(token: string) {
 	]);
 	return {
 		groupName: group.name,
-		inviterName: displayName(inviter),
+		// Anyone holding the link sees this, so never the inviter's email address.
+		inviterName: displayName(inviter && { name: inviter.name, email: null }, 'A member'),
 		memberCount: members.length,
 		expiresAt: invite.expiresAt.toISOString(),
 		// Who an emailed invite is for (null for a link anyone can use): prefills sign-in.
@@ -462,6 +465,13 @@ export async function acceptInvite(token: string, userId: string): Promise<{ gro
 		const who = invitee?.username ? `@${invitee.username}` : 'someone else';
 		throw new ApiError('forbidden', `This invite was sent to ${who}. Sign in as ${who} to join.`);
 	}
+	const forOnePerson = invite.email !== null || invite.invitedUserId !== null;
+	if (!forOnePerson) {
+		const removed = await db.query.groupRemovals.findFirst({
+			where: and(eq(groupRemovals.groupId, invite.groupId), eq(groupRemovals.userId, userId))
+		});
+		if (removed) throw new ApiError('forbidden', 'An admin removed you from this group. Ask them to invite you again.');
+	}
 	// Joining and counting the use happen together: the count only goes up while there's room
 	// (the row is locked while it's checked), so people joining at once can't go past the limit,
 	// and whoever misses out isn't added.
@@ -479,7 +489,8 @@ export async function acceptInvite(token: string, userId: string): Promise<{ gro
 		// An invite for one person is gone once they join, as is any other invite to the group sent
 		// to them (by email or username). A link stays (used up, once full) until it expires.
 		const me = await db.query.user.findFirst({ where: eq(user.id, userId), columns: { email: true } });
-		const forOnePerson = invite.email !== null || invite.invitedUserId !== null;
+		// Invited back personally: no longer kept out.
+		await db.delete(groupRemovals).where(and(eq(groupRemovals.groupId, invite.groupId), eq(groupRemovals.userId, userId)));
 		await db
 			.delete(groupInvites)
 			.where(

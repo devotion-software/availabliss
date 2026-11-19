@@ -84,6 +84,25 @@ export const init: ServerInit = () => {
 
 const OTP_SEND_PATH = '/api/auth/email-otp/send-verification-otp';
 
+/**
+ * Only sign-in codes can be requested: the other kinds (password reset, email verification) email
+ * existing accounts only, so how long they take would say who has an account. Always on, unlike the
+ * rate limits.
+ */
+async function refuseOtherCodes(event: RequestEvent): Promise<Response | null> {
+	if (event.url.pathname !== OTP_SEND_PATH || event.request.method !== 'POST') return null;
+	const type = await event.request
+		.clone()
+		.json()
+		.then((b: { type?: unknown }) => b?.type)
+		.catch(() => null);
+	if (type === 'sign-in') return null;
+	return new Response(JSON.stringify({ code: 'validation_error', message: 'Only sign-in codes can be requested' }), {
+		status: 400,
+		headers: { 'content-type': 'application/json' }
+	});
+}
+
 /** A 429 response when the caller is over a limit, otherwise null. */
 async function rateLimit(event: RequestEvent): Promise<Response | null> {
 	if (!env.rateLimit) return null;
@@ -148,6 +167,8 @@ const handleRequest: Handle = async ({ event, resolve }) => {
 	if (ctx) ctx.userId = event.locals.user?.id ?? null;
 	event.locals.session = session?.session ?? null;
 
+	const refused = await refuseOtherCodes(event);
+	if (refused) return refused;
 	const limited = await rateLimit(event);
 	if (limited) return limited;
 

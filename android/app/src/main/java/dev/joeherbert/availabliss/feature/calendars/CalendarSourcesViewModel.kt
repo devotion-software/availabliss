@@ -90,6 +90,12 @@ class CalendarSourcesViewModel @Inject constructor(
     private var deviceCalendars: List<DeviceCalendarInfo> = emptyList()
     private var refreshJob: Job? = null
 
+    /**
+     * The provider whose sign-in this screen opened, until its return link arrives. A
+     * `availabliss://calendars?complete=…` link any other app or page fires is ignored.
+     */
+    private var pendingProvider: String? = null
+
     init {
         viewModelScope.launch {
             calendars.connections.collect { list ->
@@ -104,9 +110,13 @@ class CalendarSourcesViewModel @Inject constructor(
             deepLinks.pending.collect { link ->
                 if (link is DeepLink.Calendars) {
                     deepLinks.consume(link)
+                    val expected = pendingProvider
+                    pendingProvider = null
                     val text = when {
-                        link.error != null -> "Couldn't connect that calendar (${link.error})."
-                        link.complete != null && link.provider != null ->
+                        expected == null -> null
+                        // The provider's own words aren't shown: a link from anywhere could carry any text.
+                        link.error != null -> "Couldn't connect that calendar. Try again."
+                        link.complete != null && link.provider == expected ->
                             when (val result = calendars.completeOAuth(link.provider, link.complete)) {
                                 is ApiResult.Success -> "Calendar connected."
                                 is ApiResult.Failure -> result.error.message
@@ -237,7 +247,10 @@ class CalendarSourcesViewModel @Inject constructor(
     fun connectProvider(provider: String) {
         viewModelScope.launch {
             when (val result = calendars.oauthUrl(provider)) {
-                is ApiResult.Success -> _state.update { it.copy(pendingUrl = result.value, sheet = null) }
+                is ApiResult.Success -> {
+                    pendingProvider = provider
+                    _state.update { it.copy(pendingUrl = result.value, sheet = null) }
+                }
                 is ApiResult.Failure -> _state.update { it.copy(message = UserMessage(result.error.message)) }
             }
         }

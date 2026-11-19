@@ -19,5 +19,8 @@ export function safeRedirectPath(value: string | null | undefined): string | nul
 		return null;
 	}
 	if (url.origin !== BASE) return null;
+	// Dot segments are resolved away, so `/.//evil.com` comes out as `//evil.com`: protocol-relative,
+	// another site. Never return one of those.
+	if (url.pathname.startsWith('//')) return null;
 	return url.pathname + url.search + url.hash;
 }

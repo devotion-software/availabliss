@@ -1,6 +1,6 @@
 import './setup';
 import { afterAll, describe, expect, test } from 'bun:test';
-import { acceptInvite, createGroup, createInvite, listInvites, memberIds, previewInvite } from '#lib/server/groups';
+import { acceptInvite, createGroup, createInvite, leaveGroup, listInvites, memberIds, previewInvite, removeMember } from '#lib/server/groups';
 import { POST as invite } from '../../src/routes/api/v1/groups/[id]/invites/+server';
 import { apiError, fixture } from './fixtures';
 
@@ -87,5 +87,24 @@ describe('how many people can join with a link', () => {
 		expect(members).toHaveLength(4);
 		expect(joiners.filter((p) => members.includes(p))).toHaveLength(3);
 		expect((await listInvites(g.id, owner)).map((i) => i.id)).not.toContain(id);
+	});
+});
+
+describe('someone an admin removed', () => {
+	test("can't rejoin with a shared link, but can with an invite sent to them", async () => {
+		const [owner, mallory, friend] = await fx.users(3);
+		const g = await createGroup(owner, { name: 'Kept out' }, 'UTC');
+		const { token } = await createInvite(g.id, owner, null, null, null);
+		await acceptInvite(token, mallory);
+		await removeMember(g.id, owner, mallory);
+		expect((await apiError(acceptInvite(token, mallory))).code).toBe('forbidden');
+		expect(await memberIds(g.id)).not.toContain(mallory);
+		// Others still join with the link.
+		expect((await acceptInvite(token, friend)).joined).toBe(true);
+		// Invited back personally: in, and the link works for them again afterwards.
+		const personal = await createInvite(g.id, owner, null, mallory);
+		expect((await acceptInvite(personal.token, mallory)).joined).toBe(true);
+		await leaveGroup(g.id, mallory);
+		expect((await acceptInvite(token, mallory)).joined).toBe(true);
 	});
 });

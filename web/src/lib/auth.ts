@@ -36,6 +36,18 @@ export const auth = betterAuth({
 	database: drizzleAdapter(db, { provider: 'mysql', schema }),
 	// Passwordless only.
 	emailAndPassword: { enabled: false },
+	// Profile changes go through PATCH /me (validated) and PUT /me/avatar; Better Auth's own
+	// update-user would let anyone set any `image` URL (then deleted as "theirs" by DELETE /me/avatar).
+	// Password resets and email verification by code aren't used (sign-in by code verifies the
+	// address); left on, they'd email only existing accounts, so their timing would tell who has one.
+	disabledPaths: [
+		'/update-user',
+		'/email-otp/request-password-reset',
+		'/forget-password/email-otp',
+		'/email-otp/reset-password',
+		'/email-otp/verify-email',
+		'/email-otp/check-verification-otp'
+	],
 	socialProviders: socialProviders(),
 	// Apple's web flow posts back from appleid.apple.com; TRUSTED_ORIGINS adds dev hosts.
 	trustedOrigins: ['https://appleid.apple.com', ...env.trustedOrigins],
@@ -49,7 +61,9 @@ export const auth = betterAuth({
 	account: {
 		accountLinking: {
 			enabled: true,
-			trustedProviders: ['google', 'apple', 'email-otp'],
+			// Signing in with Apple links to an existing account with the same address straight away
+			// (Apple always verifies addresses). Google only does when it says the address is verified.
+			trustedProviders: ['apple'],
 			// Linking from You / settings: the Apple or Google address often differs from the
 			// account's (Hide My Email, a personal Gmail). The person is signed in and proves the
 			// other sign-in, so a different address is fine.
@@ -104,6 +118,8 @@ export const auth = betterAuth({
 			// Wrong guesses per code. Counted with the code in the database, so this backstop holds
 			// whatever happens to Redis: a fresh code is needed after three misses.
 			allowedAttempts: OTP_ATTEMPTS,
+			// Only a hash of each code is kept, so reading the database doesn't give live codes.
+			storeOTP: 'hashed',
 			sendVerificationOnSignUp: true,
 			async sendVerificationOTP({ email, otp, type }) {
 				await sendOtpEmail({ email, otp, type });
