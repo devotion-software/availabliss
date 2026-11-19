@@ -17,10 +17,13 @@ internal class ChatThreads(private val session: ChatSession) {
     var threadDraft by mutableStateOf("")
         private set
 
-    /** Opens the thread [messageId] is part of (fetched, since it may reach past what's loaded). */
+    /**
+     * Opens the thread [messageId] is part of (fetched, since it may reach past what's loaded). Your
+     * reply starts out going to [messageId], the message you opened it from.
+     */
     fun openThread(messageId: String) {
         threadDraft = ""
-        data.update { it.copy(thread = ThreadSession(messageId), menuOpen = false) }
+        data.update { it.copy(thread = ThreadSession(messageId, pickedId = messageId), menuOpen = false) }
         session.scope.launch {
             val result = chat.thread(messageId)
             data.update { d ->

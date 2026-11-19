@@ -265,10 +265,11 @@ final class ChatViewModel {
     // MARK: Threads
 
     /// Loads the thread `messageId` is part of (it may reach back past what's loaded in the chat).
+    /// Your reply starts out going to `messageId`, the message you opened it from.
     func openThread(for messageId: String) async {
         thread = []
         threadTruncated = false
-        threadReplyTargetId = nil
+        threadReplyTargetId = messageId
         resetComposer(.thread)
         isLoadingThread = true
         defer { isLoadingThread = false }

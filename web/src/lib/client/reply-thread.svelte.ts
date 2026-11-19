@@ -14,7 +14,7 @@ export class ReplyThread {
 	loading = $state(true);
 	/** More replies than the server returns (the earliest are kept). */
 	truncated = $state(false);
-	/** The message you picked to reply to; otherwise replies go to the latest. */
+	/** The message you picked to reply to (at first, the one the thread was opened from); otherwise replies go to the latest. */
 	pickedId = $state<string | null>(null);
 
 	readonly groupId: string;
@@ -26,6 +26,8 @@ export class ReplyThread {
 		this.groupId = groupId;
 		this.meId = meId;
 		this.focusId = focusId;
+		// Your reply starts out going to the message you opened the thread from.
+		this.pickedId = focusId;
 	}
 
 	/** Who your reply goes to. */
