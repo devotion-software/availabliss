@@ -3,7 +3,9 @@ package dev.joeherbert.availabliss.core.network
 import dev.joeherbert.availabliss.core.network.model.EmailOtpSignInRequest
 import dev.joeherbert.availabliss.core.network.model.NativeSignInCodeRequest
 import dev.joeherbert.availabliss.core.network.model.NativeSignInTokenResponse
+import dev.joeherbert.availabliss.core.network.model.PasskeyIdRequest
 import dev.joeherbert.availabliss.core.network.model.PasskeyRegisterRequest
+import dev.joeherbert.availabliss.core.network.model.PasskeySummary
 import dev.joeherbert.availabliss.core.network.model.PasskeyVerifyRequest
 import dev.joeherbert.availabliss.core.network.model.SendOtpRequest
 import dev.joeherbert.availabliss.core.network.model.SignInResponse
@@ -46,6 +48,13 @@ interface BetterAuthApi {
 
     @POST("api/auth/passkey/verify-registration")
     suspend fun passkeyVerifyRegistration(@Body body: PasskeyRegisterRequest): Response<JsonObject>
+
+    /** Passkeys on the signed-in account. */
+    @GET("api/auth/passkey/list-user-passkeys")
+    suspend fun listPasskeys(): Response<List<PasskeySummary>>
+
+    @POST("api/auth/passkey/delete-passkey")
+    suspend fun deletePasskey(@Body body: PasskeyIdRequest): Response<JsonObject>
 
     @POST("api/auth/sign-out")
     suspend fun signOut(): Response<JsonObject>

@@ -18,6 +18,7 @@ import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.LinkProviders
 import dev.joeherbert.availabliss.core.network.model.LinkedAccounts
 import dev.joeherbert.availabliss.core.network.model.MergeCandidate
+import dev.joeherbert.availabliss.core.network.model.PasskeySummary
 import dev.joeherbert.availabliss.core.network.model.Plan
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.feature.common.UsernameEditor
@@ -41,6 +42,10 @@ data class YouUiState(
     val uploadingPhoto: Boolean = false,
     val savingName: Boolean = false,
     val addingPasskey: Boolean = false,
+    /** Passkeys on the account; null until loaded. */
+    val passkeys: List<PasskeySummary>? = null,
+    /** Non-null while asking whether to remove this passkey. */
+    val removingPasskey: PasskeySummary? = null,
     /** Linked Apple / Google sign-ins; null until loaded. */
     val accounts: LinkedAccounts? = null,
     /** Providers this app can link itself (Google via Credential Manager; not Apple on Android). */
@@ -106,6 +111,7 @@ class YouViewModel @Inject constructor(
     val username: StateFlow<UsernameFieldState> = usernameEditor.state
 
     init {
+        refreshPasskeys()
         viewModelScope.launch { plans.plan.collect { plan -> _state.update { it.copy(plan = plan) } } }
         viewModelScope.launch {
             combine(users.user, prefs.appearance) { user, appearance -> user to appearance }
@@ -244,6 +250,7 @@ class YouViewModel @Inject constructor(
         }
         viewModelScope.launch {
             val error = auth.completePasskeyRegistration(outcome, name = android.os.Build.MODEL)
+            if (error == null) refreshPasskeys()
             _state.update {
                 it.copy(
                     addingPasskey = false,
@@ -253,6 +260,32 @@ class YouViewModel @Inject constructor(
                         else -> UserMessage(error)
                     },
                 )
+            }
+        }
+    }
+
+    fun refreshPasskeys() {
+        viewModelScope.launch {
+            when (val result = auth.passkeys()) {
+                is ApiResult.Success -> _state.update { it.copy(passkeys = result.value) }
+                is ApiResult.Failure -> _state.update { it.copy(passkeys = it.passkeys ?: emptyList()) }
+            }
+        }
+    }
+
+    fun askRemovePasskey(key: PasskeySummary) = _state.update { it.copy(removingPasskey = key) }
+
+    fun cancelRemovePasskey() = _state.update { it.copy(removingPasskey = null) }
+
+    fun confirmRemovePasskey() {
+        val key = _state.value.removingPasskey ?: return
+        _state.update { it.copy(removingPasskey = null) }
+        viewModelScope.launch {
+            when (val result = auth.deletePasskey(key.id)) {
+                is ApiResult.Success -> _state.update {
+                    it.copy(passkeys = it.passkeys?.filterNot { p -> p.id == key.id }, message = UserMessage("Passkey removed"))
+                }
+                is ApiResult.Failure -> _state.update { it.copy(message = UserMessage(result.error.message)) }
             }
         }
     }

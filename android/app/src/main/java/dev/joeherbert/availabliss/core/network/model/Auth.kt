@@ -43,3 +43,10 @@ data class PasskeyVerifyRequest(val response: JsonObject)
 
 @Serializable
 data class PasskeyRegisterRequest(val response: JsonObject, val name: String? = null)
+
+/** A passkey on the account (`GET /api/auth/passkey/list-user-passkeys`): its name and when it was added. */
+@Serializable
+data class PasskeySummary(val id: String, val name: String? = null, val createdAt: String)
+
+@Serializable
+data class PasskeyIdRequest(val id: String)

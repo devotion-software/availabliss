@@ -313,6 +313,11 @@ enum API {
         static func passkeyVerifyRegistration(_ response: PasskeyRegistrationJSON, name: String?) -> Endpoint<EmptyResponse> {
             .init(.post, "/passkey/verify-registration", mount: .auth, body: PasskeyVerifyBody(response: response, name: name))
         }
+        /// Passkeys on this account (Better Auth's own list, as web shows it).
+        static func listPasskeys() -> Endpoint<[PasskeySummary]> { .init(.get, "/passkey/list-user-passkeys", mount: .auth) }
+        static func deletePasskey(id: String) -> Endpoint<EmptyResponse> {
+            .init(.post, "/passkey/delete-passkey", mount: .auth, body: PasskeyIdBody(id: id))
+        }
         static func signOut() -> Endpoint<EmptyResponse> { .init(.post, "/sign-out", mount: .auth) }
     }
 }
@@ -342,3 +347,12 @@ struct PasskeyVerifyBody<Response: Encodable & Sendable>: Encodable, Sendable {
     let response: Response
     let name: String?
 }
+
+/// A passkey on the account: its name (often the device it was made on) and when it was added.
+struct PasskeySummary: Decodable, Sendable, Identifiable, Equatable {
+    let id: String
+    var name: String?
+    let createdAt: Date
+}
+
+struct PasskeyIdBody: Encodable, Sendable { let id: String }

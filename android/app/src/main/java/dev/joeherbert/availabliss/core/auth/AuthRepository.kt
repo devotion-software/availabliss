@@ -11,7 +11,9 @@ import dev.joeherbert.availabliss.core.network.apiCall
 import dev.joeherbert.availabliss.core.network.map
 import dev.joeherbert.availabliss.core.network.model.EmailOtpSignInRequest
 import dev.joeherbert.availabliss.core.network.model.NativeSignInCodeRequest
+import dev.joeherbert.availabliss.core.network.model.PasskeyIdRequest
 import dev.joeherbert.availabliss.core.network.model.PasskeyRegisterRequest
+import dev.joeherbert.availabliss.core.network.model.PasskeySummary
 import dev.joeherbert.availabliss.core.network.model.PasskeyVerifyRequest
 import dev.joeherbert.availabliss.core.network.model.SendOtpRequest
 import dev.joeherbert.availabliss.core.network.model.SignInResponse
@@ -108,6 +110,13 @@ class AuthRepository @Inject constructor(
         } ?: return CredentialOutcome.Failed("Couldn't start creating a passkey.")
         return keepCookiesOnSuccess { credentials.passkeyRegistration(activity, options.toString()) }
     }
+
+    /** Passkeys on the signed-in account, oldest first. */
+    suspend fun passkeys(): ApiResult<List<PasskeySummary>> =
+        authCall { authApi.listPasskeys() }.map { response -> response.body().orEmpty().sortedBy { it.createdAt } }
+
+    /** Removes a passkey: it can't sign in any more (email codes still work). */
+    suspend fun deletePasskey(id: String): ApiResult<Unit> = authCall { authApi.deletePasskey(PasskeyIdRequest(id)) }.map { }
 
     /** Adds the passkey to the signed-in account. Returns null on success, else a message (or "" if cancelled). */
     suspend fun completePasskeyRegistration(outcome: CredentialOutcome<String>, name: String?): String? = try {

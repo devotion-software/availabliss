@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -46,10 +47,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.BuildConfig
+import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.network.model.EventReminders
 import dev.joeherbert.availabliss.core.network.model.LinkProviders
 import dev.joeherbert.availabliss.core.network.model.LinkedAccount
 import dev.joeherbert.availabliss.core.network.model.LinkedAccounts
+import dev.joeherbert.availabliss.core.network.model.PasskeySummary
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
@@ -63,6 +66,7 @@ import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.PillTone
+import dev.joeherbert.availabliss.designsystem.component.PlainIconButton
 import dev.joeherbert.availabliss.designsystem.component.PrimaryButton
 import dev.joeherbert.availabliss.designsystem.component.RowDivider
 import dev.joeherbert.availabliss.designsystem.component.SectionLabel
@@ -126,6 +130,7 @@ fun YouScreen(
             onOpenRegion = onOpenRegion,
             onOpenNotifications = onOpenNotifications,
             onAddPasskey = { scope.launch { viewModel.addPasskey(context) } },
+            onRemovePasskey = viewModel::askRemovePasskey,
             onLink = { provider -> scope.launch { viewModel.link(provider, context) } },
             onSignOut = onSignOut,
             onDelete = viewModel::requestDelete,
@@ -172,6 +177,14 @@ fun YouScreen(
         )
     }
 
+    state.removingPasskey?.let { key ->
+        ConfirmSheet(
+            title = "Remove ${key.name?.ifBlank { null } ?: "this passkey"}?",
+            message = "You won't be able to sign in with it any more. Email codes still work.",
+            options = listOf(ConfirmOption("Remove passkey", viewModel::confirmRemovePasskey, AvIcons.Trash, ConfirmOption.Kind.Destructive)),
+            onDismiss = viewModel::cancelRemovePasskey,
+        )
+    }
     if (state.confirmingDelete) {
         ConfirmSheet(
             title = "Delete your account?",
@@ -194,6 +207,7 @@ fun YouContent(
     onOpenAppearance: () -> Unit,
     onOpenRegion: () -> Unit,
     onAddPasskey: () -> Unit,
+    onRemovePasskey: (PasskeySummary) -> Unit = {},
     onSignOut: () -> Unit,
     onDelete: () -> Unit,
     onLink: (provider: String) -> Unit = {},
@@ -227,14 +241,6 @@ fun YouContent(
             SettingsRow(AvIcons.Palette, "Appearance", state.appearanceSummary, onOpenAppearance)
             RowDivider()
             SettingsRow(AvIcons.Globe, "Region & holidays", state.regionSummary, onOpenRegion)
-            RowDivider()
-            SettingsRow(
-                AvIcons.Passkey,
-                "Add a passkey",
-                "Sign in with your fingerprint, face or screen lock",
-                onAddPasskey,
-                loading = state.addingPasskey,
-            )
         }
 
         GlassPanel(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp), verticalArrangement = Arrangement.Top) {
@@ -246,6 +252,8 @@ fun YouContent(
         AddToCalendarSettingCard(showsAddToCalendar, onShowAddToCalendar)
 
         SignInMethodsPanel(state, onLink)
+
+        PasskeysPanel(state, onAddPasskey, onRemovePasskey)
 
         PlanSection(state.plan, onOpenPro)
 
@@ -361,6 +369,37 @@ private fun SignInMethodsPanel(state: YouUiState, onLink: (String) -> Unit) {
                     linkable -> ({ Text("Link", style = AvailablissTheme.type.bodySmallStrong, color = colors.accentInk) })
                     else -> ({ Text("Not linked", style = AvailablissTheme.type.caption, color = colors.muted) })
                 },
+            )
+        }
+    }
+}
+
+/** "Passkeys": each one on the account (name, when added) with remove, then Add a passkey. */
+@Composable
+private fun PasskeysPanel(state: YouUiState, onAdd: () -> Unit, onRemove: (PasskeySummary) -> Unit) {
+    val colors = AvailablissTheme.colors
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel("Passkeys")
+        GlassPanel(contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp), verticalArrangement = Arrangement.Top) {
+            state.passkeys.orEmpty().forEach { key ->
+                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(AvIcons.Passkey, null, tint = colors.accentInk, modifier = Modifier.size(20.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(key.name?.ifBlank { null } ?: "Passkey", style = AvailablissTheme.type.bodyMedium, color = colors.ink, maxLines = 1)
+                        DateTimes.parseInstant(key.createdAt)?.let { added ->
+                            Text("Added ${DateTimes.dayMonthYear(added.atZone(DateTimes.zone).toLocalDate())}", style = AvailablissTheme.type.caption, color = colors.muted)
+                        }
+                    }
+                    PlainIconButton(AvIcons.Trash, "Remove ${key.name ?: "passkey"}", { onRemove(key) }, size = 40.dp, iconSize = 16.dp, tint = colors.muted)
+                }
+                RowDivider()
+            }
+            SettingsRow(
+                AvIcons.Plus,
+                "Add a passkey",
+                "Sign in with your fingerprint, face or screen lock",
+                onAdd,
+                loading = state.addingPasskey,
             )
         }
     }

@@ -6,7 +6,6 @@ struct ProfileView: View {
     @Environment(\.theme) private var theme
     @State private var confirmsSignOut = false
     @State private var confirmsDelete = false
-    @State private var isAddingPasskey = false
     @State private var error: String?
     @State private var toast: String?
     @State private var editsName = false
@@ -24,6 +23,7 @@ struct ProfileView: View {
                 NotificationsCard(error: $error)
                 PlanSection(toast: $toast)
                 SignInMethodsSection(toast: $toast, error: $error)
+                PasskeysCard(toast: $toast, error: $error)
                 TemplatesSection(api: app.api, toast: $toast, error: $error)
                 VStack(spacing: 4) {
                     Button("Sign out") { confirmsSignOut = true }.buttonStyle(.textAction)
@@ -165,11 +165,6 @@ struct ProfileView: View {
             ) {
                 app.router.push(.region)
             }
-            divider
-            SettingsRow(title: "Add a passkey", systemImage: "person.badge.key", value: isAddingPasskey ? "Adding…" : nil) {
-                Task { await addPasskey() }
-            }
-            .disabled(isAddingPasskey)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 4)
@@ -178,18 +173,6 @@ struct ProfileView: View {
 
     private var divider: some View { Rectangle().fill(theme.line).frame(height: 1) }
 
-    private func addPasskey() async {
-        guard !isAddingPasskey else { return }
-        isAddingPasskey = true
-        defer { isAddingPasskey = false }
-        do {
-            try await app.auth.registerPasskey(name: UIDevice.current.name)
-            toast = "Passkey added"
-        } catch  where error.isCancellation {
-        } catch {
-            self.error = error.userMessage
-        }
-    }
 }
 
 /// "Plan reminders": pushes a day and/or an hour before confirmed plans you're going to.
