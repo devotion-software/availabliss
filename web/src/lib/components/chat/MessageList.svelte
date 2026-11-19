@@ -103,33 +103,65 @@
 	}
 
 	const RUN_GAP_MS = 5 * 60_000;
+	// A message's day (in your time zone), worked out once per message: it's the costly part of
+	// laying out the list, which runs again whenever any message changes.
+	let dayCache = new Map<string, string>();
+	let dayCacheFormat: unknown = null;
+	function dayOf(iso: string): string {
+		if (dayCacheFormat !== fmt.current) {
+			dayCache = new Map();
+			dayCacheFormat = fmt.current;
+		}
+		let day = dayCache.get(iso);
+		if (day === undefined) {
+			day = fmt.current.dayKey(iso);
+			dayCache.set(iso, day);
+		}
+		return day;
+	}
+	// Reply previews kept while the quoted message and the members are the same, so unchanged rows
+	// keep the same props and don't re-render.
+	const quoteCache = $derived.by(() => {
+		void members;
+		void meId;
+		return new WeakMap<NonNullable<Message['replyTo']>, BubbleQuote>();
+	});
+	function cachedQuote(r: NonNullable<Message['replyTo']>): BubbleQuote {
+		let q = quoteCache.get(r);
+		if (!q) {
+			q = quoteFor(r);
+			quoteCache.set(r, q);
+		}
+		return q;
+	}
 	const items = $derived.by(() => {
 		const list = thread.messages;
 		// The read receipt sits under your newest text or poll (not a deleted one).
 		const lastMine = list.findLastIndex((m) => m.authorId === meId && !m.deleted && (m.kind === 'text' || m.kind === 'poll'));
-		return list.map((m, i) => {
-			const prev = list[i - 1];
-			const next = list[i + 1];
-			const day = fmt.current.dayKey(m.createdAt);
-			const divider = !prev || fmt.current.dayKey(prev.createdAt) !== day;
-			const joins = (a: Message | undefined, b: Message | undefined) =>
-				!!a &&
-				!!b &&
-				a.kind === 'text' &&
-				b.kind === 'text' &&
-				a.authorId === b.authorId &&
-				fmt.current.dayKey(a.createdAt) === fmt.current.dayKey(b.createdAt) &&
-				Math.abs(new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) < RUN_GAP_MS;
-			return {
-				m,
-				divider: divider ? fmt.current.dayDivider(m.createdAt) : null,
-				first: !joins(prev, m),
-				last: !joins(m, next),
-				mine: m.authorId === meId,
-				receipt: i === lastMine,
-				quote: m.replyTo && !m.deleted ? quoteFor(m.replyTo) : null
-			};
-		});
+		const days = list.map((m) => dayOf(m.createdAt));
+		const times = list.map((m) => Date.parse(m.createdAt));
+		const joins = (a: number, b: number) => {
+			const x = list[a];
+			const y = list[b];
+			return (
+				!!x &&
+				!!y &&
+				x.kind === 'text' &&
+				y.kind === 'text' &&
+				x.authorId === y.authorId &&
+				days[a] === days[b] &&
+				Math.abs(times[b] - times[a]) < RUN_GAP_MS
+			);
+		};
+		return list.map((m, i) => ({
+			m,
+			divider: i === 0 || days[i - 1] !== days[i] ? fmt.current.dayDivider(m.createdAt) : null,
+			first: !joins(i - 1, i),
+			last: !joins(i, i + 1),
+			mine: m.authorId === meId,
+			receipt: i === lastMine,
+			quote: m.replyTo && !m.deleted ? cachedQuote(m.replyTo) : null
+		}));
 	});
 
 	// Report whether the newest messages are on screen.

@@ -30,8 +30,16 @@ let tempSeq = 0;
 const newer = (a: Message, b: Message | null) => !b || a.createdAt > b.createdAt || (a.createdAt === b.createdAt && a.id > b.id);
 const isTemp = isTempMessage;
 
+/** Same delivered / seen counts and the same people seen by. */
+function sameReceipt(a: Message['receipt'], b: NonNullable<Message['receipt']>): boolean {
+	return (
+		!!a && a.delivered === b.delivered && a.seen === b.seen && a.recipients === b.recipients && (a.seenBy ?? []).join() === (b.seenBy ?? []).join()
+	);
+}
+
 export class ChatThread {
-	messages = $state<Message[]>([]);
+	/** Always replaced as a whole (never changed in place), so not deeply reactive: cheaper to read per row. */
+	messages = $state.raw<Message[]>([]);
 	hasMore = $state(false);
 	loading = $state(false);
 	loadingOlder = $state(false);
@@ -300,7 +308,16 @@ export class ChatThread {
 				if (groupId !== null && groupId !== this.groupId) return;
 				const updates = new Map(receiptUpdates(payload).map((u) => [u.id, u.receipt]));
 				if (!updates.size) return;
-				this.messages = this.messages.map((m) => (updates.has(m.id) ? { ...m, receipt: updates.get(m.id)! } : m));
+				// Each member's delivered / seen receipt arrives for every message: only your own messages
+				// show one, and only a real change is worth a new list (every row re-renders otherwise).
+				let changed = false;
+				const next = this.messages.map((m) => {
+					const receipt = updates.get(m.id);
+					if (!receipt || m.authorId !== this.meId || sameReceipt(m.receipt, receipt)) return m;
+					changed = true;
+					return { ...m, receipt };
+				});
+				if (changed) this.messages = next;
 			}),
 			// Messages sent while the stream was down never arrive live: merge the latest page.
 			live.onReconnect(() => this.#catchUp())
