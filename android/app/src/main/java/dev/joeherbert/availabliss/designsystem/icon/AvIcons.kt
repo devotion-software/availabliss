@@ -30,7 +30,8 @@ object AvIcons {
         "M20.6 12.2v2.7h-2.7",
     )
     val CalendarAdd = line("CalendarAdd", rect(3f, 5f, 18f, 16f, 3f), "M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5")
-    val Groups = line("Groups", circle(9f, 10f, 5.5f), circle(15f, 10f, 5.5f), circle(12f, 15f, 5.5f))
+    /** Seven circles in a hexagon, like iOS's circle.hexagongrid. */
+    val Groups = line("Groups", circle(12f, 12f, 2.2f), circle(18.8f, 12.0f, 2.2f), circle(15.4f, 17.89f, 2.2f), circle(8.6f, 17.89f, 2.2f), circle(5.2f, 12.0f, 2.2f), circle(8.6f, 6.11f, 2.2f), circle(15.4f, 6.11f, 2.2f), stroke = 1.8f)
     val Bell = line("Bell", "M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0")
     val BellOff = line(
         "BellOff",
