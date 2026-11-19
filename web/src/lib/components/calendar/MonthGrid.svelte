@@ -300,7 +300,7 @@
 	}
 	/* The selected day: a ring inside the cell, so it never reaches the neighbouring days. On today
 	   it takes over from the accent outline (the date stays in accent), so there's only ever one ring.
-	   On a day that works (filled with the accent), a light inner ring reads on the fill. */
+	   On a day that works (filled with the accent), a light ring at the edge reads on the fill. */
 	.selected:not(.match) {
 		border-color: var(--ink);
 		box-shadow: inset 0 0 0 1px var(--ink);
@@ -314,8 +314,7 @@
 	}
 	.selected.match {
 		box-shadow:
-			inset 0 0 0 2px var(--accent),
-			inset 0 0 0 4px var(--on-accent),
+			inset 0 0 0 2px var(--on-accent),
 			0 14px 28px -16px var(--accent);
 	}
 	.busy.selected {

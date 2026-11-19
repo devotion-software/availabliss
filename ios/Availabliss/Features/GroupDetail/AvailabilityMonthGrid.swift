@@ -158,10 +158,10 @@ struct DayCell: View {
             }
             .overlay {
                 // The selected day: a ring inside the cell, so it never reaches the neighbouring days.
-                // On a day that works (filled with the accent), a light inner ring reads on the fill.
+                // On a day that works (filled with the accent), a light ring at the edge reads on the fill.
                 if isSelected {
                     if onAccent {
-                        shape.inset(by: 2).strokeBorder(theme.onAccent, lineWidth: 2)
+                        shape.strokeBorder(theme.onAccent, lineWidth: 2)
                     } else {
                         shape.strokeBorder(theme.ink, lineWidth: 2)
                     }

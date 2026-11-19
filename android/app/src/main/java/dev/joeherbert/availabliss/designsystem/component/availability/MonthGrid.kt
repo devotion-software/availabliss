@@ -80,17 +80,6 @@ private const val HIDDEN_FADE = 0.35f
 private fun Modifier.todayOutline(today: Boolean, shape: Shape, fallback: Color): Modifier =
     if (today) border(1.5.dp, AvailablissTheme.colors.accent, shape) else border(1.dp, fallback, shape)
 
-/** A [width] ring [inset] inside the edge of [shape], drawn over the background. */
-private fun Modifier.insetRing(shape: Shape, color: Color, width: Dp = 2.dp, inset: Dp = 2.dp): Modifier = drawBehind {
-    val grow = inset.toPx() + width.toPx() / 2
-    val outline = shape.createOutline(Size(size.width - grow * 2, size.height - grow * 2), layoutDirection, this)
-    val path = Path().apply {
-        addOutline(outline)
-        translate(Offset(grow, grow))
-    }
-    drawPath(path, color, style = Stroke(width.toPx()))
-}
-
 /**
  * Picks out today's date with a pill behind it in [pill]. Drawn outside the layout, so cells keep
  * their size.
@@ -183,10 +172,10 @@ private fun MonthCell(cell: MonthCellUi, onClick: () -> Unit, modifier: Modifier
                 .clip(shape)
                 .background(if (plainToday) bg.copy(alpha = bg.alpha * fade) else bg)
                 // The selected day: a ring inside the cell, so it never reaches the neighbouring days. It takes over
-                // from today's outline (only ever one ring); on a day that works, a light inner ring reads on the fill.
+                // from today's outline (only ever one ring); on a day that works, a light ring at the edge reads on the fill.
                 .then(
                     when {
-                        cell.selected && solid -> Modifier.insetRing(shape, colors.onAccent, inset = 2.dp)
+                        cell.selected && solid -> Modifier.border(2.dp, colors.onAccent, shape)
                         cell.selected -> Modifier.border(2.dp, colors.ink, shape)
                         plainToday -> Modifier.todayOutline(true, shape, border)
                         partial -> Modifier.border(1.5.dp, border, shape)
