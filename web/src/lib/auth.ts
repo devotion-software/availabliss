@@ -8,6 +8,7 @@ import * as schema from './server/db/schema';
 import { androidPasskeyOrigins, env } from './server/env';
 import { sendOtpEmail } from './server/email';
 import { kv } from './server/redis';
+import { AUTH_RULES, OTP_ATTEMPTS, consumeAuthLimit } from './server/rate-limit';
 import { assignUsername } from './server/usernames';
 
 const rpID = new URL(env.baseUrl).hostname;
@@ -40,19 +41,10 @@ export const auth = betterAuth({
 	trustedOrigins: ['https://appleid.apple.com', ...env.trustedOrigins],
 	rateLimit: {
 		enabled: env.rateLimit,
-		customRules: {
-			// Each code is an email we send; per-address limits are in hooks.server.ts.
-			'/email-otp/send-verification-otp': { window: 60, max: 5 },
-			// Six-digit codes: keep guessing slow.
-			'/sign-in/email-otp': { window: 60, max: 10 }
-		},
-		// Counters live in the shared store (Redis) so limits hold across instances.
-		customStorage: {
-			async consume(key, rule) {
-				const { count, resetSeconds } = await kv.hit(`rl:auth:${key}`, rule.window);
-				return count <= rule.max ? { allowed: true, retryAfter: null } : { allowed: false, retryAfter: resetSeconds };
-			}
-		}
+		customRules: AUTH_RULES,
+		// Counters live in the shared store (Redis) so limits hold across instances. With Redis
+		// down the store counts in memory instead, so the limits still hold on each instance.
+		customStorage: { consume: (key, rule) => consumeAuthLimit(kv, key, rule) }
 	},
 	account: {
 		accountLinking: {
@@ -107,6 +99,9 @@ export const auth = betterAuth({
 		emailOTP({
 			otpLength: 6,
 			expiresIn: 10 * 60,
+			// Wrong guesses per code. Counted with the code in the database, so this backstop holds
+			// whatever happens to Redis: a fresh code is needed after three misses.
+			allowedAttempts: OTP_ATTEMPTS,
 			sendVerificationOnSignUp: true,
 			async sendVerificationOTP({ email, otp, type }) {
 				await sendOtpEmail({ email, otp, type });

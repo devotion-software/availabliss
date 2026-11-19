@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { MemoryStore } from './redis';
-import { GENERAL, OTP_PER_EMAIL, RULES, checkOtpEmail, checkRateLimit, matchRule, tooManyRequests } from './rate-limit';
+import { FallbackStore, MemoryStore, type KeyValueStore } from './redis';
+import { AUTH_RULES, GENERAL, OTP_PER_EMAIL, RULES, checkOtpEmail, checkRateLimit, consumeAuthLimit, matchRule, tooManyRequests } from './rate-limit';
 
 const signedIn = { userId: 'u1', ip: '1.1.1.1' };
 const anonymous = { userId: null, ip: '2.2.2.2' };
@@ -106,4 +106,27 @@ test('429 response carries the API error shape and Retry-After', async () => {
 	expect(await res.json()).toEqual({ message: 'Too many requests. Try again in 2 minutes.', code: 'rate_limited' });
 	expect((await tooManyRequests(60).json()).message).toBe('Too many requests. Try again in 1 minute.');
 	expect((await tooManyRequests(1).json()).message).toBe('Too many requests. Try again in 1 second.');
+});
+
+describe('with Redis down', () => {
+	/** Every command fails, like Redis timing out: the store falls back to counting in memory. */
+	const broken: KeyValueStore = new Proxy({} as KeyValueStore, {
+		get: () => () => Promise.reject(new Error('Command timed out'))
+	});
+	const down = () => new FallbackStore(broken, new MemoryStore(), () => true);
+
+	test('guessing sign-in codes is still limited', async () => {
+		const store = down();
+		const rule = AUTH_RULES['/sign-in/email-otp'];
+		for (let i = 0; i < rule.max; i++) expect((await consumeAuthLimit(store, '1.1.1.1/sign-in/email-otp', rule)).allowed).toBe(true);
+		const over = await consumeAuthLimit(store, '1.1.1.1/sign-in/email-otp', rule);
+		expect(over.allowed).toBe(false);
+		expect(over.retryAfter).toBeGreaterThan(0);
+	});
+
+	test('codes per email address are still limited', async () => {
+		const store = down();
+		expect((await hitTimes(OTP_PER_EMAIL.max, () => checkOtpEmail(store, 'a@b.co'))).allowed).toBe(true);
+		expect((await checkOtpEmail(store, 'a@b.co')).allowed).toBe(false);
+	});
 });

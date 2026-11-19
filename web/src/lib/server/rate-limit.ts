@@ -88,6 +88,23 @@ export async function checkRateLimit(store: KeyValueStore, method: string, path:
 	return { allowed: true };
 }
 
+/** Better Auth's own limits on its /api/auth routes (per IP), counted in the shared store. */
+export const AUTH_RULES = {
+	// Each code is an email we send; per-address limits are in hooks.server.ts (checkOtpEmail).
+	'/email-otp/send-verification-otp': { window: MINUTE, max: 5 },
+	// Six-digit codes: keep guessing slow.
+	'/sign-in/email-otp': { window: MINUTE, max: 10 }
+};
+
+/** Wrong guesses allowed per sign-in code (Better Auth keeps the count with the code, in the database). */
+export const OTP_ATTEMPTS = 3;
+
+/** Better Auth's `customStorage.consume`: one hit on `key` against `rule`. */
+export async function consumeAuthLimit(store: KeyValueStore, key: string, rule: { window: number; max: number }) {
+	const { count, resetSeconds } = await store.hit(`rl:auth:${key}`, rule.window);
+	return count <= rule.max ? { allowed: true, retryAfter: null } : { allowed: false, retryAfter: resetSeconds };
+}
+
 /** One sign-in code per email address is plenty; stops someone flooding another person's inbox from many IPs. */
 export const OTP_PER_EMAIL = { max: 5, windowSeconds: 15 * MINUTE };
 
