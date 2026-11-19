@@ -199,6 +199,80 @@ describe('holidays', () => {
 	});
 });
 
+describe('long weekends: start-to-end timings stretch over bank holidays', () => {
+	const easter = new Map([
+		['2027-03-26', 'Good Friday'],
+		['2027-03-29', 'Easter Monday']
+	]);
+	const free = [{ userId: 'sam', synced: true, busy: [] }];
+	const run = (overrides: Partial<Requirement>, bankHolidays: ReadonlyMap<string, string>, from: string, to: string) =>
+		computeAvailability(
+			input({
+				requirement: { ...weekend, range: { from: '2027-01-01', to: '2027-12-31' }, bankHolidays: true, ...overrides },
+				from,
+				to,
+				members: free,
+				bankHolidays,
+				now: at('2027-01-01T00:00:00Z')
+			})
+		);
+
+	test('Easter: Good Friday starts it the evening before, Easter Monday ends it that night', () => {
+		const result = run({}, easter, '2027-03-22', '2027-04-04');
+		const slot = result.slots.find((s) => s.label.includes('Mar'))!;
+		expect(slot.label).toBe('Thu 25 – Mon 29 Mar');
+		expect(slot.start).toBe('2027-03-25T18:00:00.000Z');
+		// British Summer Time from 28 March: Monday ends at 23:00 UTC.
+		expect(slot.end).toBe('2027-03-29T23:00:00.000Z');
+		expect(dayOf(result, '2027-03-25').slotPosition).toBe('start');
+		expect(dayOf(result, '2027-03-29')).toMatchObject({ status: 'match', slotPosition: 'end', bankHoliday: true });
+		// The calendar draws the Thursday and Monday columns.
+		expect(result.visibleWeekdays).toEqual(expect.arrayContaining([weekdayOf('2027-03-25'), weekdayOf('2027-03-29')]));
+		// The next weekend is a normal one.
+		expect(result.slots.map((s) => s.label)).toContain('Fri 2 – Sun 4 Apr');
+	});
+
+	test('a bank holiday Monday on its own', () => {
+		const result = run({}, new Map([['2027-05-31', 'Spring bank holiday']]), '2027-05-24', '2027-06-06');
+		expect(result.slots.map((s) => s.label)).toEqual(['Fri 28 – Mon 31 May', 'Fri 4 – Sun 6 Jun']);
+	});
+
+	test('a timing that starts at midnight takes in a bank holiday the day before', () => {
+		const tueToThu: Requirement['length'] = { type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '23:59', weeksLater: 0 };
+		const result = run({ length: tueToThu }, new Map([['2027-05-31', 'Spring bank holiday']]), '2027-05-31', '2027-06-03');
+		expect(result.slots[0].label).toBe('Mon 31 May – Thu 3 Jun');
+	});
+
+	test('bank holidays in a row (Christmas, Boxing Day and a substitute) all join on', () => {
+		const christmas = new Map([
+			['2027-12-24', 'Christmas Eve (made up)'],
+			['2027-12-27', 'Christmas Day (substitute)'],
+			['2027-12-28', 'Boxing Day (substitute)']
+		]);
+		const result = run({}, christmas, '2027-12-20', '2027-12-31');
+		expect(result.slots[0].label).toBe('Thu 23 – Tue 28 Dec');
+	});
+
+	test('only with Include bank holidays on, and never past the date range', () => {
+		expect(run({ bankHolidays: false }, easter, '2027-03-22', '2027-03-31').slots[0].label).toBe('Fri 26 – Sun 28 Mar');
+		const ending = run({ range: { from: '2027-01-01', to: '2027-03-28' } }, easter, '2027-03-22', '2027-03-28');
+		expect(ending.slots[0].label).toBe('Thu 25 – Sun 28 Mar');
+	});
+
+	test('the day view sees the stretched days', () => {
+		const day = computeDay(
+			input({
+				requirement: { ...weekend, range: { from: '2027-01-01', to: '2027-12-31' }, bankHolidays: true },
+				members: free,
+				bankHolidays: easter,
+				now: at('2027-01-01T00:00:00Z')
+			}),
+			'2027-03-25'
+		);
+		expect(day.window).toEqual({ start: '2027-03-25T18:00:00.000Z', end: '2027-03-26T00:00:00.000Z' });
+	});
+});
+
 describe('day view', () => {
 	test('returns the requirement window and who is busy', () => {
 		const day = computeDay(input(), '2026-11-13');

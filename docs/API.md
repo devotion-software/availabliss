@@ -152,7 +152,7 @@ interface Requirement {
         endDay: number; endTime: string; weeksLater: number };  // 0–4: 1 = "Tue → following Thu", 3 = "Tue → Thu 3 weeks later"
   window: { from: string; to: string } | null;  // daily time window, e.g. evening { "18:00", "23:59" }; null = whole day
   days: number[];                              // allowed weekdays (ignored for span)
-  bankHolidays: boolean;                       // bank holidays count as allowed days
+  bankHolidays: boolean;                       // include bank holidays: allowed days whatever `days` says; a start-to-end span stretches over adjacent ones (long weekends: Good Friday starts "Fri 18:00" on Thu 18:00, Easter Monday ends "Sun night" on Mon night)
   schoolHolidaysOnly: boolean;                 // only inside school holidays (group's authority or customSchoolHolidays)
   schoolAuthority: string | null;
   customSchoolHolidays: DateRange[];

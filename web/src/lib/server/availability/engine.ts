@@ -69,16 +69,56 @@ function context(input: EngineInput) {
 
 	const wholeDay = (date: string): Span => ({ start: startOfDate(date, tz), end: startOfDate(addDays(date, 1), tz) });
 
-	return { req, tz, dateAllowed, weekdayAllowed, dayWindow, wholeDay, schoolHoliday };
+	const isBankHoliday = (date: string) => input.bankHolidays.has(date);
+
+	return { req, tz, dateAllowed, weekdayAllowed, dayWindow, wholeDay, schoolHoliday, isBankHoliday };
 }
 
 type Ctx = ReturnType<typeof context>;
 
+/** The most days a start-to-end slot grows by at each end over bank holidays (Christmas and Boxing Day, plus a substitute). */
+const MAX_BANK_HOLIDAY_DAYS = 4;
+
+/** Start-to-end timings with bank holidays on stretch over them (long weekends). */
+const stretchesOverBankHolidays = (req: Requirement) => req.length.type === 'span' && req.bankHolidays;
+
 /** How many days before `from` a slot that still overlaps the range could start. */
 function lookback(req: Requirement): number {
 	if (req.length.type === 'days') return req.length.count - 1;
-	if (req.length.type === 'span') return spanDays(req.length) - 1;
+	if (req.length.type === 'span') return spanDays(req.length) - 1 + (stretchesOverBankHolidays(req) ? MAX_BANK_HOLIDAY_DAYS : 0);
 	return 0;
+}
+
+/**
+ * A start-to-end slot (first … last) stretched over the bank holidays next to it, as long as the days
+ * it takes in are allowed (in the range and so on):
+ * - Start: starting at a set time on a bank holiday starts at that time the day before (Good Friday:
+ *   "Fri 18:00" becomes Thu 18:00); starting at midnight takes in a bank holiday the day before.
+ * - End, the mirror: ending at the end of the day takes in a bank holiday the day after (Easter
+ *   Monday: "Sun night" becomes Mon night); ending at a set time on a bank holiday ends at that
+ *   time the day after.
+ * Repeats for bank holidays in a row (Christmas and Boxing Day).
+ */
+function stretchOverBankHolidays(
+	ctx: Ctx,
+	first: string,
+	last: string,
+	startMinutes: number,
+	endMinutes: number
+): { first: string; last: string } {
+	for (let i = 0; i < MAX_BANK_HOLIDAY_DAYS; i++) {
+		const before = addDays(first, -1);
+		const grows = startMinutes > 0 ? ctx.isBankHoliday(first) : ctx.isBankHoliday(before);
+		if (!grows || !ctx.dateAllowed(before)) break;
+		first = before;
+	}
+	for (let i = 0; i < MAX_BANK_HOLIDAY_DAYS; i++) {
+		const after = addDays(last, 1);
+		const grows = endMinutes < 24 * 60 ? ctx.isBankHoliday(last) : ctx.isBankHoliday(after);
+		if (!grows || !ctx.dateAllowed(after)) break;
+		last = after;
+	}
+	return { first, last };
 }
 
 function spanDays(l: Extract<Requirement['length'], { type: 'span' }>): number {
@@ -89,7 +129,9 @@ function* candidates(ctx: Ctx, from: string, to: string): Generator<Candidate> {
 	const { req, dateAllowed, weekdayAllowed, dayWindow, wholeDay, tz } = ctx;
 	const length = req.length;
 
-	for (const date of eachDate(addDays(from, -lookback(req)), to)) {
+	// A slot can start up to a few days earlier than its usual day when it stretches over bank holidays.
+	const ahead = stretchesOverBankHolidays(req) ? MAX_BANK_HOLIDAY_DAYS : 0;
+	for (const date of eachDate(addDays(from, -lookback(req)), addDays(to, ahead))) {
 		if (length.type === 'duration') {
 			if (!dateAllowed(date) || !weekdayAllowed(date)) continue;
 			const window = dayWindow(date);
@@ -101,12 +143,16 @@ function* candidates(ctx: Ctx, from: string, to: string): Generator<Candidate> {
 			yield { start: pieces.get(dates[0])!.start, end: pieces.get(dates[dates.length - 1])!.end, pieces, minLength: null };
 		} else {
 			if (weekdayOf(date) !== length.startDay) continue;
-			const dates = eachDate(date, addDays(date, spanDays(length) - 1));
-			if (!dates.every(dateAllowed)) continue;
-			const span = {
-				start: zonedInstant(date, minutesOf(length.startTime), tz),
-				end: zonedInstant(dates[dates.length - 1], minutesOf(length.endTime, { asEnd: true }), tz)
-			};
+			if (!eachDate(date, addDays(date, spanDays(length) - 1)).every(dateAllowed)) continue;
+			const startMinutes = minutesOf(length.startTime);
+			const endMinutes = minutesOf(length.endTime, { asEnd: true });
+			let first = date;
+			let last = addDays(date, spanDays(length) - 1);
+			if (stretchesOverBankHolidays(req)) ({ first, last } = stretchOverBankHolidays(ctx, first, last, startMinutes, endMinutes));
+			// Looked a few days past either end of the range only for slots that stretch into it.
+			if (first > to || last < from) continue;
+			const dates = eachDate(first, last);
+			const span = { start: zonedInstant(first, startMinutes, tz), end: zonedInstant(last, endMinutes, tz) };
 			const pieces = new Map<string, Span>();
 			for (const d of dates) {
 				const piece = clip(span, wholeDay(d));

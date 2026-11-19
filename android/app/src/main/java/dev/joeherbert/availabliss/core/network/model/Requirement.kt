@@ -18,7 +18,7 @@ data class Requirement(
     val window: TimeWindow?,
     /** Allowed weekdays, 0 = Monday. Empty = any weekday (ignored for span). */
     val days: List<Int>,
-    /** Bank holidays (from the group owner's region) count as allowed days. */
+    /** Include bank holidays (from the group owner's region): allowed days whatever [days] says, and start-to-end spans stretch over adjacent ones (long weekends). */
     val bankHolidays: Boolean,
     val schoolHolidaysOnly: Boolean,
     val schoolAuthority: String?,
