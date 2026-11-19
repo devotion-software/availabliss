@@ -174,8 +174,8 @@ struct GroupsHomeView: View {
 /// The next confirmed plans, one card each, swiped left and right with page dots under them
 /// (no dots when there's only one). Each card hugs its content and the pager's height follows the
 /// swipe, blending from one card's height to the next as you drag, so a short card doesn't leave a
-/// gap and nothing jumps. (iOS 17 can't read the scroll position: there every card's slot is as
-/// tall as the tallest.)
+/// gap and nothing jumps. (iOS 17 can't read the scroll position: there the pager takes the height
+/// of the card you're on, changing in one step when the page changes.)
 private struct UpNextPager: View {
     let events: [GroupEvent]
     let goingCount: (String) -> Int?
@@ -221,12 +221,12 @@ private struct UpNextPager: View {
         }
     }
 
-    /// The cards' heights blended by how far the swipe has got (the tallest until all are measured,
-    /// and on iOS 17).
+    /// The cards' heights blended by how far the swipe has got (the tallest until all are measured;
+    /// on iOS 17, the height of the card you're on).
     private var height: CGFloat? {
         let measured = events.compactMap { heights[$0.id] }
         guard measured.count == events.count, !measured.isEmpty else { return measured.max() }
-        guard #available(iOS 18.0, *) else { return measured.max() }
+        guard #available(iOS 18.0, *) else { return measured[currentIndex] }
         let clamped = min(max(position, 0), CGFloat(measured.count - 1))
         let index = Int(clamped.rounded(.down))
         let next = min(index + 1, measured.count - 1)
