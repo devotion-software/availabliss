@@ -76,6 +76,8 @@ fun ProposalCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     actionLabel: String? = "Reply",
+    // Sits in the card's bottom-right corner (your reply, on the group's Plans).
+    footer: (@Composable () -> Unit)? = null,
 ) {
     val colors = AvailablissTheme.colors
     GlassPanel(
@@ -111,6 +113,9 @@ fun ProposalCard(
                     Text(it, style = AvailablissTheme.type.label, color = colors.accentInk)
                 }
             }
+        }
+        footer?.let {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { it() }
         }
     }
 }

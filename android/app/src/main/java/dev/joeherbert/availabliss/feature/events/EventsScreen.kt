@@ -144,7 +144,15 @@ fun DeleteEventDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Uni
 
 /** A group event: date tile, title, time, place, and Add to calendar while it's coming up. */
 @Composable
-internal fun EventRow(row: EventRowUi, past: Boolean, onOpen: () -> Unit, onAddToCalendar: () -> Unit, onDelete: () -> Unit) {
+internal fun EventRow(
+    row: EventRowUi,
+    past: Boolean,
+    onOpen: () -> Unit,
+    onAddToCalendar: () -> Unit,
+    onDelete: () -> Unit,
+    // Sits in the bottom-right corner, beside the calendar chip (your reply on a confirmed plan).
+    accessory: (@Composable () -> Unit)? = null,
+) {
     val colors = AvailablissTheme.colors
     GlassPanel(Modifier.fillMaxWidth(), shape = Shapes.row, contentPadding = PaddingValues(12.dp), onClick = onOpen, onClickLabel = "Open ${row.title}") {
         row.image?.let { CoverPhoto(it, aspectRatio = 2.4f) }
@@ -157,7 +165,16 @@ internal fun EventRow(row: EventRowUi, past: Boolean, onOpen: () -> Unit, onAddT
             }
             if (row.canDelete) PlainIconButton(AvIcons.Trash, "Delete ${row.title}", onDelete, size = 40.dp, iconSize = 18.dp, tint = colors.muted)
         }
-        if (!past) AddToCalendarButton(row.calendar, onClick = onAddToCalendar, height = 44.dp)
+        if (accessory == null) {
+            if (!past) AddToCalendarButton(row.calendar, onClick = onAddToCalendar, height = 44.dp)
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.weight(1f)) {
+                    if (!past) AddToCalendarButton(row.calendar, onClick = onAddToCalendar, height = 44.dp)
+                }
+                accessory()
+            }
+        }
     }
 }
 

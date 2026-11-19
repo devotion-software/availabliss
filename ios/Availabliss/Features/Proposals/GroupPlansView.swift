@@ -62,15 +62,18 @@ struct GroupPlansView: View {
                 .glass(cornerRadius: 24)
         } else {
             ForEach(open) { proposal in
-                VStack(alignment: .leading, spacing: 6) {
+                // Your reply sits in the card's bottom-right corner, like the calendar chip on events.
+                VStack(alignment: .trailing, spacing: 10) {
                     Button {
                         app.router.push(.proposal(id: proposal.id))
                     } label: {
-                        ProposalCard(proposal: proposal, group: group, me: app.session.user?.id)
+                        ProposalCard(proposal: proposal, group: group, me: app.session.user?.id, framed: false)
                     }
                     .buttonStyle(.pressable)
                     replyMenu(for: proposal)
                 }
+                .padding(12)
+                .glass(cornerRadius: 20)
             }
         }
     }
@@ -96,20 +99,19 @@ struct GroupPlansView: View {
         if !detail.events.isEmpty {
             Text("Coming up").displayFont(19, .semibold).padding(.top, 6).accessibilityAddTraits(.isHeader)
             ForEach(detail.events) { event in
-                VStack(alignment: .leading, spacing: 6) {
-                    EventRow(event: event, canEdit: event.createdBy == app.session.user?.id || group.role.isAdmin) {
-                        editingEvent = .edit(event)
-                    }
-                    // A confirmed plan: change your reply here too.
-                    if let proposal = detail.proposals.first(where: { $0.id == event.proposalId && $0.status == .confirmed }) {
-                        replyMenu(for: proposal)
-                    }
+                // A confirmed plan: change your reply here too, beside the calendar chip.
+                let proposal = detail.proposals.first(where: { $0.id == event.proposalId && $0.status == .confirmed })
+                EventRow(event: event, canEdit: event.createdBy == app.session.user?.id || group.role.isAdmin) {
+                    editingEvent = .edit(event)
+                } accessory: {
+                    if let proposal { replyMenu(for: proposal) }
                 }
             }
         }
     }
 
-    /// "Your reply: Can make it ⌄", for proposals you were asked (members who joined later weren't).
+    /// "✓ You're in ⌃⌄": your reply as a chip matching the calendar one, for proposals you were asked
+    /// (members who joined later weren't). Opens the three replies.
     @ViewBuilder
     private func replyMenu(for proposal: Proposal) -> some View {
         if let me = app.session.user?.id, let mine = proposal.responses.first(where: { $0.userId == me })?.response {
@@ -124,16 +126,54 @@ struct GroupPlansView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
-                    Text("Your reply: \(Self.replyLabel(mine))").bodyFont(13, .semibold, relativeTo: .subheadline)
-                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
+                HStack(spacing: 6) {
+                    Image(systemName: Self.replyIcon(mine))
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(replyTint(mine))
+                    Text(Self.replyChipLabel(mine))
+                        .bodyFont(13, .medium, relativeTo: .subheadline)
+                        .foregroundStyle(mine == .pending ? theme.accentInk : theme.ink)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(theme.muted)
                 }
-                .foregroundStyle(mine == .pending ? theme.accentInk : theme.muted)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 32)
-                .contentShape(Rectangle())
+                .padding(.horizontal, 10)
+                .frame(minHeight: 28)
+                .background(Capsule().fill(theme.surface))
+                .overlay(Capsule().strokeBorder(theme.line, lineWidth: 1))
+                .contentShape(Capsule())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Your reply: \(Self.replyLabel(mine)). Change it")
+        }
+    }
+
+    /// The chip's short form of your reply.
+    static func replyChipLabel(_ kind: ResponseKind) -> String {
+        switch kind {
+        case .accepted: "You\u{2019}re in"
+        case .maybe: "You said maybe"
+        case .declined: "You can\u{2019}t make it"
+        case .pending: "Reply"
+        }
+    }
+
+    static func replyIcon(_ kind: ResponseKind) -> String {
+        switch kind {
+        case .accepted: "checkmark"
+        case .maybe: "questionmark"
+        case .declined: "xmark"
+        case .pending: "arrowshape.turn.up.left.fill"
+        }
+    }
+
+    private func replyTint(_ kind: ResponseKind) -> Color {
+        switch kind {
+        case .accepted: theme.okInk
+        case .maybe: theme.warnInk
+        case .declined: theme.muted
+        case .pending: theme.accentInk
         }
     }
 
@@ -262,9 +302,19 @@ struct ProposalCard: View {
     let proposal: Proposal
     let group: Group
     let me: String?
+    /// Off when the caller draws the card around it (Plans, where your reply sits in the corner).
+    var framed = true
     @Environment(\.theme) private var theme
 
     var body: some View {
+        if framed {
+            content.padding(12).glass(cornerRadius: 20)
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         HStack(spacing: 12) {
             DateBlock(date: proposal.start)
             VStack(alignment: .leading, spacing: 2) {
@@ -278,8 +328,7 @@ struct ProposalCard: View {
             Text(action).bodyFont(13, .semibold, relativeTo: .subheadline).foregroundStyle(theme.accentInk)
         }
         .foregroundStyle(theme.ink)
-        .padding(12)
-        .glass(cornerRadius: 20)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 
@@ -327,10 +376,12 @@ struct DateBlock: View {
 }
 
 /// An event with Add to calendar.
-struct EventRow: View {
+struct EventRow<Accessory: View>: View {
     let event: GroupEvent
     let canEdit: Bool
     let onEdit: () -> Void
+    /// Sits in the bottom-right corner, beside the calendar chip (your reply on a confirmed plan).
+    @ViewBuilder var accessory: () -> Accessory
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -350,9 +401,19 @@ struct EventRow: View {
                     IconButton(systemImage: "pencil", label: "Edit \(event.title)", size: 36, glass: false, action: onEdit)
                 }
             }
-            AddToCalendarButton(event: event, height: 44)
+            HStack(alignment: .center, spacing: 8) {
+                AddToCalendarButton(event: event, height: 44)
+                Spacer(minLength: 0)
+                accessory().fixedSize()
+            }
         }
         .padding(12)
         .glass(cornerRadius: 22)
+    }
+}
+
+extension EventRow where Accessory == EmptyView {
+    init(event: GroupEvent, canEdit: Bool, onEdit: @escaping () -> Void) {
+        self.init(event: event, canEdit: canEdit, onEdit: onEdit) { EmptyView() }
     }
 }

@@ -79,9 +79,11 @@
 								<Button variant="ghost" size="sm" icon="pencil" onclick={() => (editing = event)} aria-label="Edit {event.title}">Edit</Button>
 							{/if}
 						</div>
+						<!-- A confirmed plan: change your reply in the card's corner. -->
+						{#if confirmedPlan(event)}
+							{@const plan = confirmedPlan(event)!}
+							<div class="foot"><ReplySelect proposal={plan} meId={data.user.id} onchanged={() => invalidate('app:proposals')} /></div>{/if}
 					</div>
-					{@const plan = confirmedPlan(event)}
-					{#if plan}<ReplySelect proposal={plan} meId={data.user.id} onchanged={() => invalidate('app:proposals')} />{/if}
 				{/each}
 			</div>
 		</section>
@@ -108,10 +110,15 @@
 				<h2 id="sec-{section.title}" class="eyebrow">{section.title}</h2>
 				<div class="list">
 					{#each section.items as proposal (proposal.id)}
-						<div class="with-reply">
+						{#if proposal.status === 'open' && proposal.responses.some((r) => r.userId === data.user.id)}
+							<!-- Your reply in the card's bottom-right corner. -->
+							<div class="with-reply glass">
+								<ProposalRow {proposal} group={data.group} meId={data.user.id} bare />
+								<div class="foot"><ReplySelect {proposal} meId={data.user.id} onchanged={() => invalidate('app:proposals')} /></div>
+							</div>
+						{:else}
 							<ProposalRow {proposal} group={data.group} meId={data.user.id} />
-							{#if proposal.status === 'open'}<ReplySelect {proposal} meId={data.user.id} onchanged={() => invalidate('app:proposals')} />{/if}
-						</div>
+						{/if}
 					{/each}
 				</div>
 			</section>
@@ -193,8 +200,12 @@
 		color: var(--muted);
 	}
 	.with-reply {
+		border-radius: 20px;
+	}
+	.foot {
 		display: flex;
-		flex-direction: column;
-		gap: 2px;
+		justify-content: flex-end;
+		padding: 0 12px 12px;
+		margin-top: -4px;
 	}
 </style>

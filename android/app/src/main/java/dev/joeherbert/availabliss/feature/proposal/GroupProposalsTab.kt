@@ -1,5 +1,7 @@
 package dev.joeherbert.availabliss.feature.proposal
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -26,7 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -138,11 +143,17 @@ private fun GroupProposalsContent(
                 if (events.upcoming.isNotEmpty()) {
                     item { Heading("Coming up") }
                     items(events.upcoming, key = { "event-" + it.id }) { row ->
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            EventRow(row, past = false, onOpen = { onOpenEvent(row.id) }, onAddToCalendar = { onAddToCalendar(row.id) }, onDelete = { confirmDelete = row })
-                            // A confirmed plan: change your reply here too.
-                            state.confirmedByEvent[row.id]?.let { plan -> plan.myReply?.let { ReplyMenu(it) { kind -> onRespond(plan.id, kind) } } }
-                        }
+                        // A confirmed plan: change your reply here too, beside the calendar chip.
+                        val plan = state.confirmedByEvent[row.id]
+                        val mine = plan?.myReply
+                        EventRow(
+                            row,
+                            past = false,
+                            onOpen = { onOpenEvent(row.id) },
+                            onAddToCalendar = { onAddToCalendar(row.id) },
+                            onDelete = { confirmDelete = row },
+                            accessory = if (plan != null && mine != null) ({ ReplyMenu(mine) { kind -> onRespond(plan.id, kind) } }) else null,
+                        )
                     }
                 }
                 // Proposals, with Add event.
@@ -158,10 +169,12 @@ private fun GroupProposalsContent(
                 when {
                     state.open.isNotEmpty() ->
                         items(state.open, key = { it.id }) { item ->
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                ProposalCard(item.card, onClick = { onOpenProposal(item.id) })
-                                item.myReply?.let { ReplyMenu(it) { kind -> onRespond(item.id, kind) } }
-                            }
+                            val mine = item.myReply
+                            ProposalCard(
+                                item.card,
+                                onClick = { onOpenProposal(item.id) },
+                                footer = mine?.let { { ReplyMenu(it) { kind -> onRespond(item.id, kind) } } },
+                            )
                         }
                     events.upcoming.isEmpty() -> item {
                         EmptyState(
@@ -230,7 +243,7 @@ private fun GroupProposalsPreview() {
     }
 }
 
-/** "Your reply: Can make it ⌄", opening the three replies. */
+/** "✓ You're in ⌄": your reply as a chip matching the calendar one, opening the three replies. */
 @Composable
 private fun ReplyMenu(mine: ResponseKind, onChoose: (ResponseKind) -> Unit) {
     val colors = AvailablissTheme.colors
@@ -238,18 +251,30 @@ private fun ReplyMenu(mine: ResponseKind, onChoose: (ResponseKind) -> Unit) {
     Box {
         Row(
             Modifier
-                .heightIn(min = 36.dp)
+                .heightIn(min = 28.dp)
+                .clip(CircleShape)
+                .background(colors.surface)
+                .border(1.dp, colors.line, CircleShape)
                 .clickable(role = Role.Button, onClickLabel = "Change your reply") { open = true }
-                .padding(horizontal = 12.dp),
+                .semantics(mergeDescendants = true) { contentDescription = "Your reply: ${replyLabel(mine)}" }
+                .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            val (icon, tint) = when (mine) {
+                ResponseKind.Accepted -> AvIcons.Check to colors.okInk
+                ResponseKind.Maybe -> AvIcons.Question to colors.warnInk
+                ResponseKind.Declined -> AvIcons.Close to colors.muted
+                ResponseKind.Pending -> AvIcons.Reply to colors.accentInk
+            }
+            Icon(icon, null, tint = tint, modifier = Modifier.size(12.dp))
             Text(
-                "Your reply: ${replyLabel(mine)}",
-                style = AvailablissTheme.type.bodySmallStrong,
-                color = if (mine == ResponseKind.Pending) colors.accentInk else colors.muted,
+                replyChipLabel(mine),
+                style = AvailablissTheme.type.caption,
+                color = if (mine == ResponseKind.Pending) colors.accentInk else colors.ink,
+                maxLines = 1,
             )
-            Icon(AvIcons.ChevronDown, null, tint = colors.muted, modifier = Modifier.size(14.dp))
+            Icon(AvIcons.ChevronDown, null, tint = colors.muted, modifier = Modifier.size(12.dp))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bg) {
             listOf(ResponseKind.Accepted, ResponseKind.Maybe, ResponseKind.Declined).forEach { kind ->
@@ -264,6 +289,14 @@ private fun ReplyMenu(mine: ResponseKind, onChoose: (ResponseKind) -> Unit) {
             }
         }
     }
+}
+
+/** The chip's short form of your reply. */
+private fun replyChipLabel(kind: ResponseKind): String = when (kind) {
+    ResponseKind.Accepted -> "You're in"
+    ResponseKind.Maybe -> "You said maybe"
+    ResponseKind.Declined -> "You can't make it"
+    ResponseKind.Pending -> "Reply"
 }
 
 private fun replyLabel(kind: ResponseKind): String = when (kind) {

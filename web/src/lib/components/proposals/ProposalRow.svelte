@@ -14,8 +14,10 @@
 		meId: string;
 		/** Tighter, without its own glass: for rows inside another card (the calendar's Plans card). */
 		compact?: boolean;
+		/** Without its own glass or your reply pill: the Plans page draws the card, with your reply in its corner. */
+		bare?: boolean;
 	}
-	let { proposal, group, meId, compact = false }: Props = $props();
+	let { proposal, group, meId, compact = false, bare = false }: Props = $props();
 
 	const fmt = useFormat();
 	const members = $derived(memberMap(group));
@@ -26,7 +28,7 @@
 	const by = $derived(proposal.createdBy === meId ? 'You' : memberLabel(members, proposal.createdBy, meId, { first: true }));
 </script>
 
-<a class="row" class:glass={!compact} class:compact href="/app/proposals/{proposal.id}" class:muted={proposal.status !== 'open'}>
+<a class="row" class:glass={!compact && !bare} class:compact href="/app/proposals/{proposal.id}" class:muted={proposal.status !== 'open'}>
 	<span class="date" class:confirmed={proposal.status === 'confirmed'} aria-hidden="true">
 		<span class="mon">{monthShort(day).toUpperCase()}</span>
 		<span class="num">{dayNumber(day)}</span>
@@ -44,7 +46,9 @@
 			<span class="count off">Withdrawn</span>
 		{/if}
 	</span>
-	{#if proposal.status === 'open' && mine}
+	{#if bare}
+		<!-- Your reply is in the card's corner instead. -->
+	{:else if proposal.status === 'open' && mine}
 		<StatusPill tone={RESPONSE_PILL[mine].tone}>{mine === 'pending' ? 'Reply' : RESPONSE_PILL[mine].text}</StatusPill>
 	{:else if proposal.status === 'confirmed'}
 		<StatusPill tone="mint" icon="check">Confirmed</StatusPill>
