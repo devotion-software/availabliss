@@ -2072,6 +2072,48 @@
 				}
 			}
 		},
+		"/api/v1/chats": {
+			"get": {
+				"operationId": "getChats",
+				"tags": [
+					"Chat"
+				],
+				"summary": "Your group chats, latest message first",
+				"description": "Signed in.",
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ChatList"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "unauthorized: not signed in",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "rate_limited (see Retry-After)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
 		"/api/v1/csp-report": {
 			"post": {
 				"operationId": "postCspReport",
@@ -8927,6 +8969,130 @@
 					"caldav",
 					"device"
 				]
+			},
+			"ChatList": {
+				"type": "object",
+				"properties": {
+					"chats": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/ChatSummary"
+						}
+					}
+				},
+				"required": [
+					"chats"
+				],
+				"description": "GET /chats"
+			},
+			"ChatSummary": {
+				"type": "object",
+				"properties": {
+					"group": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "string"
+							},
+							"name": {
+								"type": "string"
+							},
+							"color": {
+								"$ref": "#/components/schemas/TileColor"
+							},
+							"monogram": {
+								"type": "string"
+							},
+							"image": {
+								"type": [
+									"string",
+									"null"
+								],
+								"description": "The group's photo, shown instead of the monogram tile; null for none."
+							},
+							"archived": {
+								"type": "boolean",
+								"description": "Archived by an admin: listed in the groups list's collapsed Archived section."
+							}
+						},
+						"required": [
+							"id",
+							"name",
+							"color",
+							"monogram",
+							"image",
+							"archived"
+						]
+					},
+					"lastMessage": {
+						"anyOf": [
+							{
+								"type": "object",
+								"properties": {
+									"createdAt": {
+										"type": "string"
+									},
+									"id": {
+										"type": "string"
+									},
+									"authorId": {
+										"type": [
+											"string",
+											"null"
+										]
+									},
+									"authorName": {
+										"type": [
+											"string",
+											"null"
+										]
+									},
+									"kind": {
+										"$ref": "#/components/schemas/MessageKind"
+									},
+									"text": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "A short one-line snippet: the text, or a poll's question. Null once deleted."
+									},
+									"deleted": {
+										"type": "boolean"
+									}
+								},
+								"required": [
+									"authorId",
+									"authorName",
+									"createdAt",
+									"deleted",
+									"id",
+									"kind",
+									"text"
+								]
+							},
+							{
+								"type": "null"
+							}
+						],
+						"description": "The latest message as a one-line preview (a group update has no author); null before any."
+					},
+					"unreadCount": {
+						"type": "number",
+						"description": "Messages from others you haven't seen."
+					},
+					"createdAt": {
+						"type": "string",
+						"description": "When the group was made (orders chats with no messages yet)."
+					}
+				},
+				"required": [
+					"group",
+					"lastMessage",
+					"unreadCount",
+					"createdAt"
+				],
+				"description": "A row of the chats list (GET /chats)."
 			},
 			"ColorTheme": {
 				"type": "string",

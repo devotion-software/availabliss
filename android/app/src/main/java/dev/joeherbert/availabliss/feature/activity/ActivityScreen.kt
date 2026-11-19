@@ -55,9 +55,12 @@ import dev.joeherbert.availabliss.designsystem.component.EmptyState
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
+import dev.joeherbert.availabliss.designsystem.component.GroupTile
 import dev.joeherbert.availabliss.designsystem.component.LoadingIndicator
 import dev.joeherbert.availabliss.designsystem.component.OrbLayout
 import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
+import dev.joeherbert.availabliss.designsystem.component.Segment
+import dev.joeherbert.availabliss.designsystem.component.SegmentedControl
 import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
@@ -92,6 +95,9 @@ fun ActivityScreen(
         onItem = { item -> viewModel.open(item)?.let(onOpenLink) },
         onRetry = viewModel::refresh,
         onOpenMyPlans = onOpenMyPlans,
+        onTab = viewModel::showTab,
+        onChat = { onOpenLink(DeepLink.GroupChat(it)) },
+        onRetryChats = viewModel::retryChats,
     )
 }
 
@@ -136,6 +142,9 @@ fun ActivityContent(
     onItem: (NotificationUi) -> Unit,
     onRetry: () -> Unit,
     onOpenMyPlans: () -> Unit = {},
+    onTab: (ActivityTab) -> Unit = {},
+    onChat: (groupId: String) -> Unit = {},
+    onRetryChats: () -> Unit = {},
 ) {
     val colors = AvailablissTheme.colors
     AvailablissBackground(OrbLayout.Main) {
@@ -147,6 +156,13 @@ fun ActivityContent(
             ) {
                 GlassIconButton(AvIcons.Calendar, "My plans", onOpenMyPlans)
             }
+            SegmentedControl(
+                segments = listOf(Segment(ActivityTab.Chats, "Chats", AvIcons.Chat), Segment(ActivityTab.Updates, "Updates", AvIcons.Bell)),
+                selected = state.tab,
+                onSelect = onTab,
+                fillWidth = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen, vertical = Spacing.s),
+            )
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, top = Spacing.s, bottom = Spacing.tabBarClearance + 24.dp),
@@ -154,6 +170,21 @@ fun ActivityContent(
             ) {
                 if (showPermissionCard) {
                     item(key = "permission") { PermissionCard(onOpenSettings) }
+                }
+                if (state.tab == ActivityTab.Chats) {
+                    when {
+                        !state.chatsLoaded -> item(key = "chats-loading") { LoadingIndicator() }
+                        state.chatsError != null -> item(key = "chats-error") { ErrorBanner(state.chatsError, onRetry = onRetryChats) }
+                        state.chats.isEmpty() -> item(key = "chats-empty") {
+                            EmptyState(
+                                title = "No chats yet",
+                                body = "Each group you're in has a chat. Make a group, or join one from an invite.",
+                                icon = AvIcons.Chat,
+                            )
+                        }
+                        else -> items(state.chats, key = { "chat-" + it.groupId }) { chat -> ChatRow(chat, onClick = { onChat(chat.groupId) }) }
+                    }
+                    return@LazyColumn
                 }
                 state.error?.let { error -> item(key = "error") { ErrorBanner(error, onRetry = onRetry) } }
                 when {
@@ -170,6 +201,58 @@ fun ActivityContent(
             }
         }
         AvSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = Spacing.tabBarClearance))
+    }
+}
+
+/** A chat: the group's tile, its name, the latest message and an unread count. Like web and iOS. */
+@Composable
+private fun ChatRow(chat: ChatRowUi, onClick: () -> Unit) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    GlassPanel(
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+            contentDescription = buildString {
+                append(chat.name).append(". ").append(chat.preview)
+                if (chat.time.isNotEmpty()) append(". ").append(chat.time)
+                if (chat.unread > 0) append(". ").append(chat.unread).append(" unread")
+            }
+        },
+        shape = Shapes.row,
+        contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.m),
+        onClick = onClick,
+        onClickLabel = "Open chat",
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
+            GroupTile(chat.monogram, colors.tile(chat.color), image = chat.image, size = 44.dp, radius = 14.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(chat.name, style = type.bodySmallStrong, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(
+                        chat.time,
+                        style = type.micro.copy(fontWeight = if (chat.unread > 0) FontWeight.Bold else FontWeight.Medium),
+                        color = if (chat.unread > 0) colors.accentInk else colors.muted,
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                    Text(
+                        chat.preview,
+                        style = type.caption.copy(fontWeight = FontWeight.Normal),
+                        color = colors.muted,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (chat.unread > 0) {
+                        Text(
+                            if (chat.unread > 99) "99+" else chat.unread.toString(),
+                            style = type.micro.copy(fontWeight = FontWeight.Bold),
+                            color = colors.onAccent,
+                            modifier = Modifier.clip(Shapes.pill).background(colors.accent).padding(horizontal = 7.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

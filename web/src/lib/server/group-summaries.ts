@@ -90,7 +90,7 @@ async function nextEventByGroup(groupIds: string[]): Promise<Map<string, { id: s
  * Messages from others this user hasn't seen, per group. History from before
  * they joined is readable but never counts as unread.
  */
-async function unreadByGroup(groupIds: string[], userId: string): Promise<Map<string, number>> {
+export async function unreadByGroup(groupIds: string[], userId: string): Promise<Map<string, number>> {
 	const rows = await db
 		.select({ groupId: messages.groupId, count: count() })
 		.from(messages)

@@ -326,3 +326,46 @@ data class UpdatePollRequest(val question: String, val multi: Boolean, val optio
 /** An option when editing a poll: an [id] keeps that option and its votes; none adds one. */
 @Serializable
 data class PollOptionEdit(val id: String? = null, val label: String)
+
+/** A row of the chats list (Activity's Chats tab, `GET /chats`). */
+@Serializable
+data class ChatSummary(
+    val group: ChatGroup,
+    /** The latest message as a one-line preview; null before any. */
+    val lastMessage: ChatLastMessage? = null,
+    val unreadCount: Int = 0,
+    val createdAt: String,
+)
+
+@Serializable
+data class ChatGroup(
+    val id: String,
+    val name: String,
+    val color: TileColor = TileColor.T1,
+    val monogram: String = "",
+    val image: String? = null,
+    val archived: Boolean = false,
+)
+
+@Serializable
+data class ChatLastMessage(
+    val id: String,
+    /** Null for a group update ("Sam joined"). */
+    val authorId: String? = null,
+    val authorName: String? = null,
+    val kind: MessageKind = MessageKind.Text,
+    val text: String? = null,
+    val deleted: Boolean = false,
+    val createdAt: String,
+) {
+    /** "You: See you there", "Mo: Poll: Pizza?", or a group update as it is. Same as web and iOS. */
+    fun preview(me: String?): String {
+        val line = MessageReply(id, authorId, authorName, kind, text, deleted).snippet
+        if (authorId == null) return line
+        val who = if (authorId == me) "You" else authorName?.substringBefore(' ')?.takeIf { it.isNotBlank() } ?: "Someone"
+        return "$who: $line"
+    }
+}
+
+@Serializable
+data class ChatListResponse(val chats: List<ChatSummary>)

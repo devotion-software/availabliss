@@ -255,6 +255,8 @@ enum API {
         static func messages(groupId: String, before: String? = nil, limit: Int = 50) -> Endpoint<MessagesPage> {
             .init(.get, "/groups/\(groupId.pathEncoded)/messages", query: ["before": before, "limit": String(limit)])
         }
+        /// Every group chat you're in, latest message first (Activity's Chats tab).
+        static func chats() -> Endpoint<ChatList> { .init(.get, "/chats") }
         /// A chat's media page: photos and GIFs (`media`) or files and passes (`files`), newest first;
         /// `before` is the last attachment's id, for the next page.
         static func media(groupId: String, kind: String, before: String? = nil) -> Endpoint<GroupMediaPage> {

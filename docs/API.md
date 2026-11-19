@@ -868,6 +868,7 @@ one too (`data.proposalId`, `reminder: 'reply'`). Android shows them in the `rem
 
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
+| GET 🔒 | `/chats` | | `{ chats: ChatSummary[] }`: every group chat you're in (Activity's Chats tab), latest message first; chats with no messages yet last (newest group first). Archived groups only appear while something in them is unread. `ChatSummary` is `{ group: { id, name, color, monogram, image, archived }, lastMessage: (MessageReply & { createdAt }) \| null, unreadCount, createdAt }`; `lastMessage` is a one-line preview like a reply's quote |
 | GET 🔒 | `/notifications` | | `{ notifications: Notification[]; unread: number }` |
 | POST 🔒 | `/notifications/read` | `{ ids?: string[] }` (omit = all except chats) | `204` |
 | POST 🔒 | `/devices` | `{ platform: 'ios' \| 'android', token, name? }` | `204` (registers APNs / FCM token) |

@@ -488,6 +488,17 @@ export interface MessageReply {
 	deleted: boolean;
 }
 
+/** A row of the chats list (GET /chats). */
+export interface ChatSummary {
+	group: Pick<GroupSummary, 'id' | 'name' | 'color' | 'monogram' | 'image' | 'archived'>;
+	/** The latest message as a one-line preview (a group update has no author); null before any. */
+	lastMessage: (MessageReply & { createdAt: string }) | null;
+	/** Messages from others you haven't seen. */
+	unreadCount: number;
+	/** When the group was made (orders chats with no messages yet). */
+	createdAt: string;
+}
+
 export interface MessageInfo {
 	messageId: string;
 	sentAt: string;

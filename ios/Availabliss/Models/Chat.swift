@@ -346,3 +346,47 @@ extension Message {
         return SearchSnippet(before: texts.first ?? body ?? "", match: "", after: "")
     }
 }
+
+// MARK: Chats list
+
+/// A row of the chats list (Activity's Chats tab, `GET /chats`).
+struct ChatSummary: Decodable, Sendable, Identifiable, Equatable {
+    struct GroupInfo: Decodable, Sendable, Equatable {
+        let id: String
+        let name: String
+        let color: String
+        let monogram: String
+        let image: String?
+        let archived: Bool
+    }
+
+    /// The latest message as a one-line preview, like a reply's quote.
+    struct LastMessage: Decodable, Sendable, Equatable {
+        let id: String
+        /// Nil for a group update ("Sam joined").
+        let authorId: String?
+        let authorName: String?
+        let kind: Message.Kind
+        let text: String?
+        let deleted: Bool
+        let createdAt: Date
+
+        /// "You: See you there", "Mo: Poll: Pizza?", or a group update as it is. Same as web and Android.
+        func preview(me: String?) -> String {
+            let line = Message.ReplyPreview(id: id, authorId: authorId, authorName: authorName, kind: kind, text: text, deleted: deleted).snippet
+            guard let authorId else { return line }
+            let who = authorId == me ? "You" : (authorName?.split(separator: " ").first.map(String.init) ?? "Someone")
+            return "\(who): \(line)"
+        }
+    }
+
+    let group: GroupInfo
+    let lastMessage: LastMessage?
+    let unreadCount: Int
+    let createdAt: Date
+    var id: String { group.id }
+}
+
+struct ChatList: Decodable, Sendable {
+    let chats: [ChatSummary]
+}

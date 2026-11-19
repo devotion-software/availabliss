@@ -3,6 +3,7 @@ package dev.joeherbert.availabliss.core.data
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.AvailablissApi
 import dev.joeherbert.availabliss.core.network.model.Attachment
+import dev.joeherbert.availabliss.core.network.model.ChatListResponse
 import dev.joeherbert.availabliss.core.network.model.GroupMediaPage
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
@@ -36,6 +37,9 @@ class ChatRepository @Inject constructor(
     /** A page of messages, newest last. Pass the oldest loaded id as [before] to page back. */
     suspend fun page(groupId: String, before: String? = null, limit: Int = PAGE_SIZE): ApiResult<MessagesResponse> =
         call { api.getMessages(groupId, before, limit) }
+
+    /** Every group chat you're in, latest message first. */
+    suspend fun chats(): ApiResult<ChatListResponse> = call { api.getChats() }
 
     /** A chat's photos and GIFs ([kind] "media") or files and passes ("files"), newest first; [before] is the last attachment id. */
     suspend fun media(groupId: String, kind: String, before: String? = null): ApiResult<GroupMediaPage> =

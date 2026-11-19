@@ -335,6 +335,7 @@ export const endpoints: Endpoint[] = [
 	},
 
 	// Notifications & devices
+	{ method: 'GET', path: '/chats', tag: 'Chat', auth: 'user', summary: 'Your group chats, latest message first', response: 'ChatList' },
 	{ method: 'GET', path: '/notifications', tag: 'Notifications', auth: 'user', summary: 'Your Activity', response: 'NotificationList' },
 	{ method: 'POST', path: '/notifications/read', tag: 'Notifications', auth: 'user', summary: 'Mark notifications read (no ids: all except chats)', body: s.readNotificationsSchema, status: 204 },
 	{ method: 'POST', path: '/devices', tag: 'Notifications', auth: 'user', summary: 'Register an APNs / FCM token', body: s.deviceSchema, status: 204 },

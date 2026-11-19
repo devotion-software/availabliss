@@ -8,6 +8,7 @@ import type { myPlans, upcomingFor } from './server/events';
 import type { getCalendarFeed } from './server/calendar-feeds';
 import type { nextSuggestion } from './server/rhythm';
 import type { listMessages, searchMessages } from './server/chat';
+import type { listChats } from './server/chats';
 import type { listGroupMedia } from './server/attachments';
 import type { listNotifications } from './server/notifications';
 import type { previewRequirement } from './server/availability/service';
@@ -31,6 +32,7 @@ export type ApiTypeChecks = [
 	Assert<Same<Returns<typeof listMessages>, A.MessagePage>>,
 	Assert<Same<Returns<typeof searchMessages>, A.MessageSearch>>,
 	Assert<Same<Returns<typeof listGroupMedia>, A.GroupMediaPage>>,
+	Assert<Same<Returns<typeof listChats>, A.ChatList['chats']>>,
 	Assert<Same<Returns<typeof listNotifications>, A.NotificationList>>,
 	// The route adds `summary` to what previewRequirement works out.
 	Assert<Same<Returns<typeof previewRequirement> & { summary: string }, A.RequirementPreview>>,

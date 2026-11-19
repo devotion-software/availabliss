@@ -8,6 +8,7 @@ import dev.joeherbert.availabliss.core.network.model.CalDavRequest
 import dev.joeherbert.availabliss.core.network.model.CalendarBusyRequest
 import dev.joeherbert.availabliss.core.network.model.CalendarConnection
 import dev.joeherbert.availabliss.core.network.model.CalendarFeed
+import dev.joeherbert.availabliss.core.network.model.ChatListResponse
 import dev.joeherbert.availabliss.core.network.model.ConflictsResponse
 import dev.joeherbert.availabliss.core.network.model.ConnectionsResponse
 import dev.joeherbert.availabliss.core.network.model.CountriesResponse
@@ -427,6 +428,10 @@ interface AvailablissApi {
         @Query("before") before: String? = null,
         @Query("limit") limit: Int = 50,
     ): MessagesResponse
+
+    /** Every group chat you're in, latest message first (Activity's Chats tab). */
+    @GET("api/v1/chats")
+    suspend fun getChats(): ChatListResponse
 
     /** A chat's photos and GIFs ([kind] "media") or files and passes ("files"), newest first; [before] is the last attachment id. */
     @GET("api/v1/groups/{id}/attachments")

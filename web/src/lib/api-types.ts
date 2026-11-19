@@ -7,6 +7,7 @@
 import type {
 	ApiErrorBody,
 	AppNotification,
+	ChatSummary,
 	Group,
 	GroupEvent,
 	GroupInvite,
@@ -121,6 +122,11 @@ export interface GroupMediaPage {
 	/** Newest first. */
 	items: GroupMediaItem[];
 	hasMore: boolean;
+}
+
+/** GET /chats */
+export interface ChatList {
+	chats: ChatSummary[];
 }
 
 /** GET /notifications */

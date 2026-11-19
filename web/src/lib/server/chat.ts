@@ -296,7 +296,7 @@ export const replySnippet = (text: string) => {
 };
 
 /** Previews of the messages being replied to, as they are now (edits and deletion included). */
-async function loadReplies(ids: string[]): Promise<Map<string, MessageReply>> {
+export async function loadReplies(ids: string[]): Promise<Map<string, MessageReply>> {
 	const result = new Map<string, MessageReply>();
 	if (!ids.length) return result;
 	const rows = await db
