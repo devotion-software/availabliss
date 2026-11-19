@@ -56,7 +56,8 @@ struct DayLayout: Sendable {
                 let start = interval.start.timeIntervalSince(midnight) / 60
                 let end = interval.end.timeIntervalSince(midnight) / 60
                 if end <= 0 || start >= length { continue }
-                if start <= 0 && end >= length {
+                // Ending at 23:59 or later reaches midnight (EventKit and some feeds end all-day events at 23:59:59).
+                if start <= 0 && end >= length - 1 {
                     whole.append(interval)
                     continue
                 }

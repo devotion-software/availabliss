@@ -66,6 +66,13 @@ class DaysLayoutTest {
     }
 
     @Test
+    fun aLastDayEndingAt235959StillCountsAsAllDay() {
+        val layout = layoutWeek(week, listOf(busy("2026-11-07T00:00:00Z", "2026-11-08T23:59:59Z", BusySource.Calendar)), london)
+        assertEquals(1, layout.allDay.getValue(date("2026-11-08")).size)
+        assertTrue(layout.timed.getValue(date("2026-11-08")).isEmpty())
+    }
+
+    @Test
     fun usesTheGivenTimeZone() {
         val layout = layoutWeek(week, listOf(busy("2026-11-03T09:00:00Z", "2026-11-03T10:00:00Z")), ZoneId.of("America/New_York"))
         val p = layout.timed.getValue(date("2026-11-03")).single()

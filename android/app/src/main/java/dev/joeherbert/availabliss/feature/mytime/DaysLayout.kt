@@ -122,7 +122,8 @@ fun layoutDays(days: List<LocalDate>, intervals: List<BusyInterval>, zone: ZoneI
             val end = minutesIntoDay(endInstant, day, zone)
             when {
                 end <= 0 || start >= length -> null
-                start <= 0 && end >= length -> {
+                // Ending at 23:59 or later reaches midnight (some calendars end all-day events at 23:59:59).
+                start <= 0 && end >= length - 1 -> {
                     allDay.getValue(day) += interval
                     null
                 }

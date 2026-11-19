@@ -55,6 +55,12 @@ struct DayLayoutTests {
         #expect(layout.hasAllDay)
     }
 
+    @Test func aLastDayEndingAt235959StillCountsAsAllDay() {
+        let layout = layoutWeek(from: week, [busy("2026-11-07T00:00:00Z", "2026-11-08T23:59:59Z", .calendar)], calendar: london)
+        #expect(layout.allDay[Fixtures.day("2026-11-08")]?.count == 1)
+        #expect(layout.timed[Fixtures.day("2026-11-08")]?.isEmpty == true)
+    }
+
     @Test func usesTheGivenTimeZone() throws {
         let newYork = Fixtures.calendar("America/New_York")
         let layout = layoutWeek(from: week, [busy("2026-11-03T09:00:00Z", "2026-11-03T10:00:00Z")], calendar: newYork)

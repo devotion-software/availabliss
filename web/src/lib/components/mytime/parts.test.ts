@@ -37,6 +37,12 @@ describe('layoutDays', () => {
 		expect(layout.timed.get('2026-11-07')).toEqual([]);
 	});
 
+	test('a last day ending at 23:59:59 still counts as all day', () => {
+		const layout = layoutWeek(week, [busy('2026-11-07T00:00:00Z', '2026-11-08T23:59:59Z', 'calendar')], TZ);
+		expect(layout.allDay.get('2026-11-08')).toHaveLength(1);
+		expect(layout.timed.get('2026-11-08')).toEqual([]);
+	});
+
 	test('uses the user time zone', () => {
 		const layout = layoutWeek(week, [busy('2026-11-03T09:00:00Z', '2026-11-03T10:00:00Z')], 'America/New_York');
 		expect(layout.timed.get('2026-11-03')![0]).toMatchObject({ from: 4 * 60, to: 5 * 60 });

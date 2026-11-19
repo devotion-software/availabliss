@@ -284,11 +284,19 @@ final class DeviceCalendarService {
             .filter { $0.availability != .free && $0.status != .canceled && !Self.isDeclined($0) }
             .map {
                 DeviceSync.BusyRange(
-                    calendarExternalId: $0.calendar.calendarIdentifier, start: $0.startDate, end: $0.endDate,
+                    calendarExternalId: $0.calendar.calendarIdentifier, start: $0.startDate, end: Self.busyEnd($0),
                     eventKey: Self.eventKey($0), title: $0.title?.trimmingCharacters(in: .whitespacesAndNewlines)
                 )
             }
             .sorted { ($0.start, $0.end, $0.calendarExternalId) < ($1.start, $1.end, $1.calendarExternalId) }
+    }
+
+    /// EventKit ends an all-day event at 23:59:59 on its last day; busy time runs to the midnight
+    /// after, so that day counts as busy all day like the ones before it.
+    static func busyEnd(_ event: EKEvent, calendar: Calendar = .current) -> Date {
+        guard event.isAllDay, let end = event.endDate else { return event.endDate }
+        let midnight = calendar.startOfDay(for: end)
+        return midnight == end ? end : calendar.date(byAdding: .day, value: 1, to: midnight) ?? end
     }
 
     /// SHA-256 of the payload plus the session, so another account on this phone

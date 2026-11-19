@@ -90,7 +90,8 @@ export function layoutDays(days: readonly string[], intervals: readonly BusyInte
 			const start = minutesIntoDay(interval.start, day, timeZone);
 			const end = minutesIntoDay(interval.end, day, timeZone);
 			if (end <= 0 || start >= length) continue;
-			if (start <= 0 && end >= length) {
+			// Ending at 23:59 or later reaches midnight (some calendars end all-day events at 23:59:59).
+			if (start <= 0 && end >= length - 1) {
 				allDay.get(day)!.push(interval);
 				continue;
 			}
