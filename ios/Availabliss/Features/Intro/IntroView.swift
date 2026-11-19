@@ -18,6 +18,9 @@ struct IntroView: View {
     @State private var nameSize = CGSize(width: 180, height: 60)
     /// The page dots step aside while the keyboard is up, to leave the name field room.
     @State private var keyboardUp = false
+    /// How far the keyboard reaches above the bottom safe area. The intro doesn't resize for the keyboard
+    /// (that relaid out every page and its scene); the buttons and the welcome's greeting just slide up.
+    @State private var keyboardLift: CGFloat = 0
     /// The name and its size as the other pages show them: caught up when you leave the welcome (or put
     /// the keyboard away) rather than on every key, so typing only redraws the welcome page.
     @State private var settledName = IntroName.first(of: IntroName.saved ?? "")
@@ -60,7 +63,10 @@ struct IntroView: View {
             .scrollDisabled(needsName)
             .scrollDismissesKeyboard(.immediately)
             controls
+                .offset(y: -keyboardLift)
         }
+        .ignoresSafeArea(.keyboard)
+        .environment(\.introKeyboardLift, keyboardLift)
         .overlayPreferenceValue(IntroAnchors.self) { slots in
             GeometryReader { proxy in
                 let placement = namePlacement(slots, in: proxy)
@@ -92,9 +98,17 @@ struct IntroView: View {
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.9), value: current)
         }
         .sensoryFeedback(.selection, trigger: current)
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { note in
+            keyboardUp = true
+            let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue ?? .zero
+            // The window's own bottom inset (the home indicator), which the buttons already sit above.
+            let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
+            let bottomInset = window?.safeAreaInsets.bottom ?? 0
+            withAnimation(Self.keyboardAnimation(note)) { keyboardLift = max(0, frame.height - bottomInset) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { note in
             keyboardUp = false
+            withAnimation(Self.keyboardAnimation(note)) { keyboardLift = 0 }
             settle()
         }
         .onChange(of: current) { _, new in
@@ -163,7 +177,10 @@ struct IntroView: View {
 
     private var controls: some View {
         VStack(spacing: 22) {
-            if !keyboardUp { PageDots(count: IntroPage.all.count, current: current) }
+            // Faded rather than removed, so the layout stays put while the keyboard is up.
+            PageDots(count: IntroPage.all.count, current: current)
+                .opacity(keyboardUp ? 0 : 1)
+                .animation(.easeOut(duration: 0.2), value: keyboardUp)
             Button(action: next) {
                 ZStack {
                     // Both labels are laid out so the button never changes size; they cross-fade.
@@ -181,6 +198,12 @@ struct IntroView: View {
         .padding(.horizontal, 24)
         .padding(.top, 8)
         .padding(.bottom, 12)
+    }
+
+    /// The keyboard's own timing, so the buttons and greeting move with it.
+    private static func keyboardAnimation(_ note: Notification) -> Animation {
+        let duration = (note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+        return .smooth(duration: duration)
     }
 
     private static func dismissKeyboard() {
@@ -265,6 +288,8 @@ extension EnvironmentValues {
     @Entry var introNameSize = CGSize(width: 180, height: 60)
     /// Your first name, for the scenes' avatars.
     @Entry var introName = ""
+    /// How far the keyboard reaches into the intro (it slides the welcome's greeting up).
+    @Entry var introKeyboardLift: CGFloat = 0
 }
 
 // MARK: - Pages
@@ -378,7 +403,7 @@ private struct IntroPageView: View, Equatable {
     }
 }
 
-/// The welcome: "Welcome to Availabliss" at the top, then a big "Hi" you type your name straight into.
+/// The welcome: a big "Hi" you type your name straight into, with "Welcome to Availabliss" under it.
 /// The field's own text is invisible: the travelling name is drawn over it (in the space left here), so
 /// the name you type is the very one that moves on through the intro. Long names shrink to fit.
 private struct WelcomePage: View {
@@ -389,6 +414,7 @@ private struct WelcomePage: View {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.introNameSize) private var nameSize
+    @Environment(\.introKeyboardLift) private var keyboardLift
     @FocusState private var focused: Bool
 
     private static let size: CGFloat = 56
@@ -397,12 +423,6 @@ private struct WelcomePage: View {
         GeometryReader { proxy in
             let nameFont = fittedSize(width: proxy.size.width - 56)
             VStack(alignment: .leading, spacing: 0) {
-                Text(page.eyebrow)
-                    .displayFont(24, .heavy, relativeTo: .title2)
-                    .foregroundStyle(theme.accentInk)
-                    .accessibilityAddTraits(.isHeader)
-                    .padding(.top, 12)
-                    .entrance(shown, delay: 0, reduceMotion: reduceMotion)
                 Spacer(minLength: 12)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(IntroName.first(of: name).isEmpty ? "Hi" : "Hi,")
@@ -415,7 +435,6 @@ private struct WelcomePage: View {
                             .foregroundStyle(.clear)
                             .tint(theme.accent)
                             .focused($focused)
-                            .textContentType(.givenName)
                             .textInputAutocapitalization(.words)
                             .autocorrectionDisabled()
                             .submitLabel(.next)
@@ -436,7 +455,16 @@ private struct WelcomePage: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { focused = true }
-                .entrance(shown, delay: 0.07, reduceMotion: reduceMotion)
+                .entrance(shown, delay: 0, reduceMotion: reduceMotion)
+                // Slides up into the space above the keyboard (moved, not relaid out).
+                .offset(y: -keyboardLift / 2)
+                Text(page.eyebrow)
+                    .displayFont(24, .heavy, relativeTo: .title2)
+                    .foregroundStyle(theme.accentInk)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.top, 22)
+                    .entrance(shown, delay: 0.07, reduceMotion: reduceMotion)
+                    .offset(y: -keyboardLift / 2)
                 Spacer(minLength: 12)
             }
             .padding(.horizontal, 28)

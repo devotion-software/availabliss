@@ -22,8 +22,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -86,6 +87,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -214,7 +216,9 @@ fun IntroScreen(initialName: String = "", onFinish: (String) -> Unit) {
                 .pointerInput(Unit) { detectTapGestures { dismissKeyboard() } },
         ) {
             IntroOrbs(pager, pages)
-            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+            // Not resized for the keyboard (that relaid out every page and its scene): the buttons and the
+            // welcome's greeting slide up with it instead.
+            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Row(
                     Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(start = 24.dp, end = 14.dp, top = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -244,13 +248,18 @@ fun IntroScreen(initialName: String = "", onFinish: (String) -> Unit) {
                         IntroPageContent(pages[index], index, pager, reduceMotion, if (isWelcome) name else "", { name = it.take(60) }, ::next)
                     }
                 }
+                val keyboardLift = rememberKeyboardLift()
                 Column(
-                    Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp)
+                        .graphicsLayer { translationY = -keyboardLift(this) },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(22.dp),
                 ) {
-                    // Out of the way while typing your name.
-                    if (!imeVisible) PageDots(pages.size, pager.currentPage)
+                    // Out of the way while typing your name (faded, so the layout stays put).
+                    val dotsAlpha by animateFloatAsState(if (imeVisible) 0f else 1f, tween(200), label = "dots")
+                    Box(Modifier.graphicsLayer { alpha = dotsAlpha }) { PageDots(pages.size, pager.currentPage) }
                     PrimaryButton(
                         text = if (isLast) "Get started" else "Next",
                         onClick = ::next,
@@ -511,7 +520,7 @@ private fun IntroPageContent(
 }
 
 /**
- * The welcome: "Welcome to Availabliss" at the top, then a big "Hi" you type your name straight into. The
+ * The welcome: a big "Hi" you type your name straight into, with "Welcome to Availabliss" under it. The
  * field's own text is invisible: the travelling name is drawn over it (in the space left here), so the
  * name you type is the very one that moves on through the intro. Long names shrink to fit.
  */
@@ -531,6 +540,7 @@ private fun WelcomePage(
     val density = LocalDensity.current
     val focusRequester = remember { FocusRequester() }
     var focused by remember { mutableStateOf(false) }
+    val keyboardLift = rememberKeyboardLift()
     val base = AvailablissTheme.type.bodyMedium
     fun sized(size: Float) = base.copy(fontSize = size.sp, lineHeight = base.lineHeight * (size / 15f))
 
@@ -540,25 +550,13 @@ private fun WelcomePage(
         val nameSize = if (natural > maxWidth) maxOf(24f, WELCOME_SIZE * (maxWidth / natural)) else WELCOME_SIZE
         val nameStyle = sized(nameSize)
         Column(Modifier.fillMaxSize()) {
-            Text(
-                page.eyebrow,
-                style = AvailablissTheme.type.displaySmall.copy(fontSize = 24.sp),
-                color = colors.accentInk,
-                modifier = Modifier
-                    .padding(top = 12.dp)
-                    .graphicsLayer {
-                        val o = offset()
-                        translationX = -o * 24.dp.toPx()
-                        alpha = 1f - abs(o).coerceAtMost(1f) * 0.8f
-                    }
-                    .semantics { heading() }
-                    .entrance(shown, 0, reduceMotion),
-            )
             Spacer(Modifier.weight(1f))
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .entrance(shown, 70, reduceMotion)
+                    .entrance(shown, 0, reduceMotion)
+                    // Slides up into the space above the keyboard (moved, not relaid out).
+                    .graphicsLayer { translationY = -keyboardLift(this) / 2 }
                     .pointerInput(Unit) { detectTapGestures { focusRequester.requestFocus() } },
             ) {
                 Text(
@@ -606,12 +604,35 @@ private fun WelcomePage(
                         .background(colors.accent.copy(alpha = line)),
                 )
             }
+            Text(
+                page.eyebrow,
+                style = AvailablissTheme.type.displaySmall.copy(fontSize = 24.sp),
+                color = colors.accentInk,
+                modifier = Modifier
+                    .padding(top = 22.dp)
+                    .graphicsLayer {
+                        val o = offset()
+                        translationX = -o * 24.dp.toPx()
+                        translationY = -keyboardLift(this) / 2
+                        alpha = 1f - abs(o).coerceAtMost(1f) * 0.8f
+                    }
+                    .semantics { heading() }
+                    .entrance(shown, 70, reduceMotion),
+            )
             Spacer(Modifier.weight(1f))
         }
     }
 }
 
 private const val WELCOME_SIZE = 56f
+
+/** How far the keyboard reaches above the navigation bar, in pixels: read while drawing, so it moves things without recomposing. */
+@Composable
+private fun rememberKeyboardLift(): Density.() -> Float {
+    val ime = WindowInsets.ime
+    val navigation = WindowInsets.navigationBars
+    return remember(ime, navigation) { { (ime.getBottom(this) - navigation.getBottom(this)).coerceAtLeast(0).toFloat() } }
+}
 
 /** Rises and fades in once [shown], after [delayMs]. */
 @Composable
