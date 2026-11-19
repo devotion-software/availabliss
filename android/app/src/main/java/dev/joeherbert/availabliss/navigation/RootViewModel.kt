@@ -27,6 +27,8 @@ import javax.inject.Inject
 
 /** What the root shows. */
 sealed interface RootState {
+    /** Signed out on a first launch: the intro, before sign-in. */
+    data object Intro : RootState
     data object SignedOut : RootState
     /** Signed in, waiting for the first `/me`. [failed] = couldn't load and nothing cached. */
     data class Loading(val failed: Boolean = false) : RootState
@@ -38,7 +40,7 @@ sealed interface RootState {
 class RootViewModel @Inject constructor(
     private val session: SessionManager,
     private val users: UserRepository,
-    prefs: AppPreferences,
+    private val prefs: AppPreferences,
     private val deepLinkBus: DeepLinkBus,
     notifications: NotificationsRepository,
     liveEvents: LiveEvents,
@@ -50,9 +52,9 @@ class RootViewModel @Inject constructor(
     val appearance: StateFlow<Appearance> = prefs.appearance
         .stateIn(viewModelScope, SharingStarted.Eagerly, Appearance())
 
-    val state: StateFlow<RootState> = combine(session.authState, users.user, loadFailed) { auth, user, failed ->
+    val state: StateFlow<RootState> = combine(session.authState, users.user, loadFailed, prefs.hasSeenIntro) { auth, user, failed, seenIntro ->
         when {
-            auth == AuthState.SignedOut -> RootState.SignedOut
+            auth == AuthState.SignedOut -> if (seenIntro) RootState.SignedOut else RootState.Intro
             auth == AuthState.Loading -> RootState.Loading()
             user == null -> RootState.Loading(failed)
             !user.onboarded -> RootState.Onboarding
@@ -73,7 +75,13 @@ class RootViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             users.restore()
-            session.authState.collect { if (it == AuthState.SignedIn && users.user.value == null) retryLoad() }
+            session.authState.collect {
+                if (it == AuthState.SignedIn) {
+                    // Signed in on this phone: the intro never shows again, even after signing out.
+                    prefs.setHasSeenIntro()
+                    if (users.user.value == null) retryLoad()
+                }
+            }
         }
     }
 
@@ -82,6 +90,11 @@ class RootViewModel @Inject constructor(
             loadFailed.value = false
             loadFailed.value = users.refresh() !is ApiResult.Success && users.user.value == null
         }
+    }
+
+    /** Skip or Get started on the intro: on to sign in, and never shown again. */
+    fun finishIntro() {
+        viewModelScope.launch { prefs.setHasSeenIntro() }
     }
 
     fun consume(link: DeepLink) = deepLinkBus.consume(link)

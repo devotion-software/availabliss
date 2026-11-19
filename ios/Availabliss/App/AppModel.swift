@@ -20,6 +20,12 @@ final class AppModel {
     let groupDetails = GroupDetailStore()
 
     private(set) var unreadNotifications = 0
+    /// The first-launch intro has been seen (or skipped), or someone has signed in on this device:
+    /// it isn't shown again.
+    var hasSeenIntro = UserDefaults.standard.bool(forKey: AppModel.hasSeenIntroKey) {
+        didSet { UserDefaults.standard.set(hasSeenIntro, forKey: Self.hasSeenIntroKey) }
+    }
+    private static let hasSeenIntroKey = "hasSeenIntro"
     /// Activity items known to be unread, so an update to one doesn't count it twice.
     @ObservationIgnored private var unreadIDs: Set<String> = []
     /// Bumped when another account is merged into this one, so screens showing account data reload.
@@ -169,6 +175,7 @@ final class AppModel {
     // MARK: - Private
 
     private func didSignIn() async {
+        if !hasSeenIntro { hasSeenIntro = true }
         if let user = session.user { appearance.adopt(user) }
         live.start()
         startLiveHandling()

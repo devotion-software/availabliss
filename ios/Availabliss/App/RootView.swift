@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Chooses between splash, sign-in, onboarding and the main app, and applies the theme.
+/// Chooses between splash, the first-launch intro, sign-in, onboarding and the main app, and applies the theme.
 struct RootView: View {
     @Environment(AppModel.self) private var app
 
@@ -14,13 +14,13 @@ struct RootView: View {
         .onChange(of: app.session.state) { _, _ in app.sessionStateChanged() }
     }
 
-    private enum Phase: Equatable { case splash, failed, signIn, onboarding, main }
+    private enum Phase: Equatable { case splash, failed, intro, signIn, onboarding, main }
 
     private var phase: Phase {
         switch app.session.state {
         case .restoring: .splash
         case .failed: .failed
-        case .signedOut: .signIn
+        case .signedOut: app.hasSeenIntro ? .signIn : .intro
         case .signedIn: app.session.user?.onboarded == true ? .main : .onboarding
         }
     }
@@ -32,6 +32,9 @@ struct RootView: View {
             SplashView()
         case .failed:
             SplashView(error: failureMessage) { Task { await app.launch() } }
+        case .intro:
+            IntroView { app.hasSeenIntro = true }
+                .transition(.opacity)
         case .signIn:
             SignInView(auth: app.auth)
                 .transition(.opacity)

@@ -20,16 +20,18 @@ import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.VennLogo
 import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.feature.common.LocalShowsAddToCalendar
+import dev.joeherbert.availabliss.feature.intro.IntroScreen
 import dev.joeherbert.availabliss.feature.onboarding.OnboardingScreen
 import dev.joeherbert.availabliss.feature.signin.SignInScreen
 
-/** Switches between sign in, onboarding and the main app based on [RootState]. */
+/** Switches between the first-launch intro, sign in, onboarding and the main app based on [RootState]. */
 @Composable
 fun AppRoot(root: RootViewModel) {
     val state by root.state.collectAsStateWithLifecycle()
     val showsAddToCalendar by root.showsAddToCalendar.collectAsStateWithLifecycle()
     Crossfade(targetState = state::class, label = "root") { key ->
         when (key) {
+            RootState.Intro::class -> IntroScreen(onFinish = root::finishIntro)
             RootState.SignedOut::class -> SignInScreen()
             RootState.Onboarding::class -> OnboardingScreen()
             RootState.Main::class -> CompositionLocalProvider(LocalShowsAddToCalendar provides showsAddToCalendar) { MainNavHost(root) }

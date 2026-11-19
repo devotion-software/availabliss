@@ -7,6 +7,8 @@ struct IntroView: View {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var page: Int? = 0
+    /// Pages whose text has risen in (kept here: the pages' own state goes when they scroll away).
+    @State private var seen: Set<Int> = [0]
 
     private var current: Int { page ?? 0 }
     private var isLast: Bool { current == IntroPage.all.count - 1 }
@@ -17,7 +19,7 @@ struct IntroView: View {
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 0) {
                     ForEach(IntroPage.all) { item in
-                        IntroPageView(page: item, isActive: item.id == current)
+                        IntroPageView(page: item, isActive: item.id == current, shown: seen.contains(item.id))
                             .containerRelativeFrame(.horizontal)
                             .id(item.id)
                     }
@@ -37,6 +39,7 @@ struct IntroView: View {
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.9), value: current)
         }
         .sensoryFeedback(.selection, trigger: current)
+        .onChange(of: current) { _, new in seen.insert(new) }
     }
 
     private var topBar: some View {
@@ -70,11 +73,7 @@ struct IntroView: View {
                 ZStack {
                     // Both labels are laid out so the button never changes size; they cross-fade.
                     Text("Next").opacity(isLast ? 0 : 1)
-                    HStack(spacing: 8) {
-                        Text("Get started")
-                        Image(systemName: "arrow.right").fontWeight(.semibold)
-                    }
-                    .opacity(isLast ? 1 : 0)
+                    Text("Get started").opacity(isLast ? 1 : 0)
                 }
                 .animation(.easeInOut(duration: 0.25), value: isLast)
             }
@@ -111,10 +110,10 @@ private struct PageDots: View {
 private struct IntroPageView: View {
     let page: IntroPage
     let isActive: Bool
+    /// The text rises in the first time the page shows.
+    let shown: Bool
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The text rises in the first time the page shows.
-    @State private var shown = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -165,8 +164,6 @@ private struct IntroPageView: View {
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .accessibilityElement(children: .contain)
-        .onAppear { if isActive { shown = true } }
-        .onChange(of: isActive) { _, active in if active { shown = true } }
     }
 
     @ViewBuilder private var illustration: some View {

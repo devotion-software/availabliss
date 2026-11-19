@@ -96,6 +96,12 @@ for permission in ("POST_NOTIFICATIONS", "ACCESS_LOCAL_NETWORK"):  # the latter 
 adb("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
 time.sleep(4)
 
+# A fresh install opens on the intro: look, then skip it.
+if find("Skip", 20) is not None:
+    snapshot("00-intro")
+    tap("Skip")
+    time.sleep(1)
+
 if find("Email me a code", 20) is None:
     raise SystemExit("Sign-in screen didn't appear")
 snapshot("01-sign-in")

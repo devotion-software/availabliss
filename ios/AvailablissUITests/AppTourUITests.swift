@@ -13,6 +13,13 @@ final class AppTourUITests: XCTestCase {
         let email = try XCTUnwrap(ProcessInfo.processInfo.environment["AV_EMAIL"], "Set TEST_RUNNER_AV_EMAIL to a seeded user's email")
         app.launch()
 
+        // The first-launch intro (the test starts from a fresh install): look, then skip it.
+        let skip = app.buttons["Skip"]
+        if skip.waitForExistence(timeout: 20) {
+            snapshot("00-intro")
+            skip.tap()
+        }
+
         // Sign in with an emailed one-time code.
         let emailField = app.textFields["you@example.com"]
         XCTAssertTrue(emailField.waitForExistence(timeout: 20), "Sign-in screen didn't appear")

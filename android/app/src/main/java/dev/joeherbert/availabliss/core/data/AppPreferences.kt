@@ -3,6 +3,7 @@ package dev.joeherbert.availabliss.core.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -132,6 +133,16 @@ class AppPreferences @Inject constructor(
         store.edit { it[KEY_MY_TIME_VIEW] = view }
     }
 
+    /**
+     * The first-launch intro has been seen (or skipped), or someone has signed in on this phone: it
+     * isn't shown again. Kept on sign out.
+     */
+    val hasSeenIntro: Flow<Boolean> = store.data.map { it[KEY_SEEN_INTRO] ?: false }
+
+    suspend fun setHasSeenIntro() {
+        store.edit { it[KEY_SEEN_INTRO] = true }
+    }
+
     suspend fun pushToken(): String? = store.data.first()[KEY_PUSH_TOKEN]
 
     suspend fun setPushToken(token: String?) {
@@ -174,5 +185,6 @@ class AppPreferences @Inject constructor(
         val KEY_MY_TIME_VIEW = stringPreferencesKey("my_time_view")
         val KEY_ADD_TO_CALENDAR = longPreferencesKey("add_to_calendar_id")
         val KEY_ADDED_CALENDAR_EVENTS = stringPreferencesKey("added_calendar_events")
+        val KEY_SEEN_INTRO = booleanPreferencesKey("seen_intro")
     }
 }
