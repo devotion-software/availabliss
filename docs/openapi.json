@@ -7016,6 +7016,98 @@
 				}
 			}
 		},
+		"/api/v1/polls/{id}": {
+			"patch": {
+				"operationId": "patchPollsById",
+				"tags": [
+					"Chat"
+				],
+				"summary": "Edit a poll (its author): question, pick-one / pick-any, a text poll's options",
+				"description": "Signed in.",
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/UpdatePollBody"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Poll"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "validation_error: the body or query is invalid",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "unauthorized: not signed in",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Not the author",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "The poll is closed",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "rate_limited (see Retry-After)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
 		"/api/v1/polls/{id}/close": {
 			"post": {
 				"operationId": "postPollsByIdClose",
@@ -13425,6 +13517,42 @@
 					"username": {
 						"type": "string",
 						"maxLength": 64
+					}
+				}
+			},
+			"UpdatePollBody": {
+				"type": "object",
+				"properties": {
+					"question": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					},
+					"multi": {
+						"type": "boolean"
+					},
+					"options": {
+						"minItems": 2,
+						"maxItems": 10,
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 36
+								},
+								"label": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 100
+								}
+							},
+							"required": [
+								"label"
+							]
+						}
 					}
 				}
 			},

@@ -25,6 +25,8 @@
 		compact?: boolean;
 		onvote: (optionIds: string[]) => void;
 		onclose?: () => void;
+		/** "Edit" beside Close poll (its author, while it's open). */
+		onedit?: () => void;
 		/** For a date poll's "Ana's busy" per option. */
 		groupId?: string;
 		members?: Map<string, Member>;
@@ -40,6 +42,7 @@
 		compact = false,
 		onvote,
 		onclose,
+		onedit,
 		groupId,
 		members = new Map(),
 		onpropose
@@ -137,8 +140,11 @@
 			{/if}
 		{/each}
 	</div>
-	{#if canClose && !poll.closed && onclose}
-		<button type="button" class="close" onclick={onclose}>Close poll</button>
+	{#if canClose && !poll.closed && (onclose || onedit)}
+		<div class="author-actions">
+			{#if onedit}<button type="button" class="close" onclick={onedit}>Edit</button>{/if}
+			{#if onclose}<button type="button" class="close" onclick={onclose}>Close poll</button>{/if}
+		</div>
 	{/if}
 </section>
 
@@ -284,5 +290,9 @@
 		font-size: 13px;
 		font-weight: 600;
 		color: var(--accent-ink);
+	}
+	.author-actions {
+		display: flex;
+		gap: 4px;
 	}
 </style>

@@ -38,6 +38,13 @@ export const getMessageInfo = (messageId: string) => api.get<MessageInfo>(`/mess
 export const getMessageThread = (messageId: string) => api.get<MessageThread>(`/messages/${messageId}/thread`);
 export const votePoll = (pollId: string, optionIds: string[]) => api.post<Poll>(`/polls/${pollId}/vote`, { optionIds });
 export const closePoll = (pollId: string) => api.post<Poll>(`/polls/${pollId}/close`);
+/** Edits a poll (its author): the question, pick-one / pick-any, and a text poll's options ({ id } keeps one and its votes). */
+export interface PollPatch {
+	question?: string;
+	multi?: boolean;
+	options?: { id?: string; label: string }[];
+}
+export const updatePoll = (pollId: string, patch: PollPatch) => api.patch<Poll>(`/polls/${pollId}`, patch);
 export const editMessage = (messageId: string, body: string) => api.patch<Message>(`/messages/${messageId}`, { body });
 export const deleteMessage = (messageId: string) => api.del(`/messages/${messageId}`);
 

@@ -299,6 +299,10 @@ export const endpoints: Endpoint[] = [
 	{ method: 'DELETE', path: '/messages/{id}', tag: 'Chat', auth: 'user', summary: 'Delete your own text message', status: 204 },
 	{ method: 'GET', path: '/messages/{id}/info', tag: 'Chat', auth: 'user', summary: 'Who has seen a message', response: 'MessageInfo' },
 	{ method: 'GET', path: '/messages/{id}/thread', tag: 'Chat', auth: 'user', summary: 'The thread a message is in', response: 'MessageThread' },
+	{
+		method: 'PATCH', path: '/polls/{id}', tag: 'Chat', auth: 'user', summary: "Edit a poll (its author): question, pick-one / pick-any, a text poll's options",
+		body: s.updatePollSchema, response: 'Poll', errors: { 403: 'Not the author', 409: 'The poll is closed' }
+	},
 	{ method: 'POST', path: '/polls/{id}/vote', tag: 'Chat', auth: 'user', summary: 'Vote in a poll (empty removes your vote)', body: s.voteSchema, response: 'Poll', errors: { 409: 'The poll is closed' } },
 	{ method: 'POST', path: '/polls/{id}/close', tag: 'Chat', auth: 'user', summary: "Close a poll (its author)", response: 'Poll', errors: { 403: 'Not the author' } },
 	{

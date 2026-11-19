@@ -11,6 +11,8 @@
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import { replyAuthorName, replySnippet } from '#lib/client/chat-messages';
 	import PollCard from './PollCard.svelte';
+	import PollComposerSheet from './PollComposerSheet.svelte';
+	import type { Poll } from '#lib/types';
 	import ProposalCard from './ProposalCard.svelte';
 	import EventCard from './EventCard.svelte';
 	import ConfirmedBanner from './ConfirmedBanner.svelte';
@@ -230,6 +232,16 @@
 			// The thread already toasted.
 		}
 	}
+
+	// Your poll being edited (from its Edit button).
+	let editingPoll = $state<Poll | null>(null);
+	let editingOpen = $state(false);
+	$effect(() => {
+		if (editingPoll) editingOpen = true;
+	});
+	$effect(() => {
+		if (!editingOpen) editingPoll = null;
+	});
 </script>
 
 <div class="list">
@@ -265,6 +277,7 @@
 								canClose={item.mine}
 								onvote={(ids) => thread.vote(m.poll!.id, ids)}
 								onclose={() => thread.closePoll(m.poll!.id)}
+								onedit={() => (editingPoll = m.poll!)}
 								groupId={group.id}
 								{members}
 								onpropose={item.mine || admin ? (slot) => proposeFromPoll(m, slot) : undefined}
@@ -317,6 +330,8 @@
 		</div>
 	{/if}
 </div>
+
+<PollComposerSheet bind:open={editingOpen} editing={editingPoll} onsave={(patch) => thread.editPoll(editingPoll!.id, patch)} />
 
 <ThreadSheet focusId={threadFor} {group} {meId} onclose={() => (threadFor = null)} onshowinchat={showInChat} />
 

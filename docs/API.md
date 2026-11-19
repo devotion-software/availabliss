@@ -806,6 +806,7 @@ interface MessageInfo {
 | GET 🔒 | `/messages/:id/thread` | | `{ rootId: string; messages: Message[]; truncated: boolean }`: the thread the message is in. `rootId` is the first message of its chain of replies (following `replyTo` up); `messages` is that message and every reply to it, and replies to those, oldest first (deleted ones included), at most 200 (the earliest; `truncated` when there were more). Any member of the group |
 | POST 🔒 | `/polls/:id/vote` | `{ optionIds: string[] }` (empty = remove vote) | `Poll` |
 | POST 🔒 | `/polls/:id/close` | | `Poll` (only the poll's author) |
+| PATCH 🔒 | `/polls/:id` | `{ question?, multi?, options?: { id?, label }[] }` | `Poll` (only its author, while open; publishes `poll.updated`). `options` (text polls only, 2–10, in order): an `id` keeps that option and its votes, no `id` adds one, one left out goes with its votes. Switching to pick-one keeps each person's first pick |
 
 ### Live updates
 

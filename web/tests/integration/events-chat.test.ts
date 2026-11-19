@@ -14,6 +14,7 @@ import {
 	messageInfo,
 	messageThread,
 	sendPoll,
+	updatePoll,
 	sendText,
 	THREAD_LIMIT,
 	vote
@@ -276,6 +277,33 @@ describe('chat', () => {
 		expect(await unreadCount(g, member)).toBe(0);
 		const rows = await db.select().from(messageReceipts).where(eq(messageReceipts.userId, member));
 		expect(rows.filter((r) => r.seenAt).length).toBeGreaterThanOrEqual(621);
+	});
+
+	test('the author can edit a poll: question, options (votes kept on renamed ones) and pick-one', async () => {
+		const msg = await sendPoll(groupId, member, { question: 'Food?', options: ['Pizza', 'Curry', 'Tacos'], multi: true });
+		const poll = msg.poll!;
+		const [pizza, curry, tacos] = poll.options.map((o) => o.id);
+		await vote(poll.id, owner, [pizza, curry]);
+		await vote(poll.id, member, [tacos]);
+		expect((await apiError(updatePoll(poll.id, owner, { question: 'Nope' }))).code).toBe('forbidden');
+
+		const edited = await updatePoll(poll.id, member, {
+			question: 'Dinner?',
+			options: [{ id: curry, label: 'Thai curry' }, { id: pizza, label: 'Pizza' }, { label: 'Sushi' }]
+		});
+		expect(edited.question).toBe('Dinner?');
+		expect(edited.options.map((o) => o.label)).toEqual(['Thai curry', 'Pizza', 'Sushi']);
+		// Renamed and moved options keep their votes; the removed one took its votes with it.
+		expect(edited.options.find((o) => o.id === curry)!.voterIds).toEqual([owner]);
+		expect(edited.options.flatMap((o) => o.voterIds)).not.toContain(member);
+
+		// Pick-one: the owner keeps just their first pick in the poll's order (Thai curry).
+		const single = await updatePoll(poll.id, member, { multi: false });
+		expect(single.multi).toBe(false);
+		expect(single.options.filter((o) => o.voterIds.includes(owner)).map((o) => o.id)).toEqual([curry]);
+
+		await closePoll(poll.id, member);
+		expect((await apiError(updatePoll(poll.id, member, { question: 'Late' }))).code).toBe('conflict');
 	});
 
 	test('polls: single choice, multi choice and closing', async () => {

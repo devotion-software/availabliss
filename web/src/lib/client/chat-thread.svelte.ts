@@ -7,6 +7,8 @@ import type { Message, MessageLocation, Poll } from '#lib/types';
 import { live, receiptUpdates } from './live.svelte';
 import {
 	closePoll,
+	updatePoll,
+	type PollPatch,
 	deleteMessage,
 	editMessage,
 	listMessages,
@@ -246,6 +248,16 @@ export class ChatThread {
 		} catch (err) {
 			this.#replacePoll(before);
 			toasts.error(err);
+		}
+	}
+
+	/** Saves an edit to your poll; failures toast and throw (the sheet stays open). */
+	async editPoll(pollId: string, patch: PollPatch) {
+		try {
+			this.#replacePoll(await updatePoll(pollId, patch));
+		} catch (err) {
+			toasts.error(err);
+			throw err;
 		}
 	}
 

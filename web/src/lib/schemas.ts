@@ -356,6 +356,21 @@ export const editMessageSchema = z.object({ body: z.string().trim().max(4000) })
 
 export const receiptsSchema = z.object({ upTo: z.string().min(1), state: z.enum(['delivered', 'seen']) });
 export const voteSchema = z.object({ optionIds: z.array(z.string().min(1)).max(10) });
+/**
+ * PATCH /polls/:id (its author): the question, pick-one or pick-any, and for a text poll its options
+ * in order. An option with an `id` keeps its votes (renamed if its label changed); one without is
+ * new; one left out goes, with its votes.
+ */
+export const updatePollSchema = z
+	.object({
+		question: trimmed(200),
+		multi: z.boolean(),
+		options: z
+			.array(z.object({ id: z.string().min(1).max(36).optional(), label: trimmed(100) }))
+			.min(2)
+			.max(10)
+	})
+	.partial();
 export const readNotificationsSchema = z.object({ ids: z.array(z.string()).max(500).optional() });
 export const deviceSchema = z.object({
 	platform: z.enum(['ios', 'android']),

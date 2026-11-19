@@ -83,6 +83,68 @@ export async function vote(pollId: string, userId: string, picked: string[]): Pr
 	return updated;
 }
 
+/** Edits a poll (its author, while it's open); see `updatePollSchema`. */
+export async function updatePoll(
+	pollId: string,
+	userId: string,
+	input: { question?: string; multi?: boolean; options?: { id?: string; label: string }[] }
+): Promise<Poll> {
+	const row = await pollGroup(pollId);
+	await requireMember(row.groupId, userId);
+	if (row.createdBy !== userId) throw forbidden('Only the person who made the poll can edit it');
+	if (row.closedAt) throw conflict('This poll is closed');
+	const current = await getPoll(pollId);
+	const dated = current.options.some((o) => o.slot);
+	if (input.options && dated) throw badRequest("A date poll's times can't be changed");
+	if (input.options) {
+		const known = new Set(current.options.map((o) => o.id));
+		if (input.options.some((o) => o.id && !known.has(o.id))) throw badRequest('Unknown option');
+		const labels = input.options.map((o) => o.label.toLowerCase());
+		if (new Set(labels).size !== labels.length) throw badRequest('Each option needs to be different');
+	}
+
+	await db.transaction(async (tx) => {
+		if (input.question !== undefined || input.multi !== undefined) {
+			await tx
+				.update(polls)
+				.set({ ...(input.question !== undefined && { question: input.question }), ...(input.multi !== undefined && { multi: input.multi }) })
+				.where(eq(polls.id, pollId));
+		}
+		if (input.options) {
+			const keep = new Set(input.options.flatMap((o) => (o.id ? [o.id] : [])));
+			const gone = current.options.filter((o) => !keep.has(o.id)).map((o) => o.id);
+			if (gone.length) await tx.delete(pollOptions).where(inArray(pollOptions.id, gone));
+			for (const [position, option] of input.options.entries()) {
+				if (option.id) await tx.update(pollOptions).set({ label: option.label, position }).where(eq(pollOptions.id, option.id));
+				else await tx.insert(pollOptions).values({ id: newId(), pollId, label: option.label, position });
+			}
+		}
+		// Now pick-one: anyone with several picks keeps just their first (in the poll's order).
+		if (input.multi === false && current.multi) {
+			const order = await tx.select({ id: pollOptions.id, position: pollOptions.position }).from(pollOptions).where(eq(pollOptions.pollId, pollId));
+			const position = new Map(order.map((o) => [o.id, o.position]));
+			const votes = await tx.select().from(pollVotes).where(eq(pollVotes.pollId, pollId));
+			const byUser = Map.groupBy(votes, (v) => v.userId);
+			for (const [voter, picks] of byUser) {
+				if (picks.length < 2) continue;
+				const [, ...rest] = picks.sort((a, b) => (position.get(a.optionId) ?? 0) - (position.get(b.optionId) ?? 0));
+				await tx.delete(pollVotes).where(
+					and(
+						eq(pollVotes.userId, voter),
+						inArray(
+							pollVotes.optionId,
+							rest.map((r) => r.optionId)
+						)
+					)
+				);
+			}
+		}
+	});
+	const updated = await getPoll(pollId);
+	await publishToGroup(row.groupId, 'poll.updated', updated);
+	return updated;
+}
+
 export async function closePoll(pollId: string, userId: string): Promise<Poll> {
 	const row = await pollGroup(pollId);
 	await requireMember(row.groupId, userId);
