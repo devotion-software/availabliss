@@ -12,7 +12,9 @@ struct OnboardingView: View {
     @State private var createdGroup: Group?
 
     private var joiningFromInvite: Bool { app.router.pendingInvite != nil }
-    private var stepCount: Int { joiningFromInvite ? 2 : 4 }
+    /// Two steps when joining from an invite. One opened once you're past calendars (making your own
+    /// group) doesn't shorten it: you finish your group, then the invite opens.
+    private var stepCount: Int { joiningFromInvite && step < 2 ? 2 : 4 }
 
     var body: some View {
         ZStack {

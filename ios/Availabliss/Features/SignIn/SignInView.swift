@@ -10,6 +10,8 @@ struct SignInView: View {
     @State private var formFrame: CGRect = .zero
     /// The screen's height before any keyboard showed.
     @State private var restingHeight: CGFloat = 0
+    /// Opened from an invite: who it's from and for which group, said above the card.
+    @State private var invite: InvitePreview?
     private let auth: AuthService
 
     init(auth: AuthService) {
@@ -25,6 +27,9 @@ struct SignInView: View {
                     Spacer(minLength: 20).frame(maxHeight: 64)
                     hero(HeroSize.current)
                     Spacer(minLength: 20)
+                    if let invite {
+                        inviteNote(invite).padding(.bottom, 12)
+                    }
                     if let model {
                         SignInForm(model: model)
                             .onGeometryChange(for: CGRect.self) {
@@ -56,14 +61,33 @@ struct SignInView: View {
             }
         }
         .errorAlert(Binding(get: { model?.error }, set: { model?.error = $0 }))
-        // Opened from an emailed invite: start with the address it was sent to.
+        // Opened from an invite: say so, and for an emailed one start with the address it was sent to.
         .task(id: app.router.pendingInvite?.token) {
             guard let token = app.router.pendingInvite?.token,
-                let invited = try? await app.api.send(API.Invites.preview(token: token)).email,
-                let model, model.email.isEmpty, model.step == .email
+                let preview = try? await app.api.send(API.Invites.preview(token: token))
             else { return }
+            withAnimation { invite = preview }
+            guard let invited = preview.email, let model, model.email.isEmpty, model.step == .email else { return }
             model.email = invited
         }
+    }
+
+    /// "Sam invited you to Lake District crew. Sign in or create an account to join."
+    private func inviteNote(_ invite: InvitePreview) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "person.badge.plus")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(theme.accentInk)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(theme.accentSoft))
+            Text("\(Text("\(invite.inviterName) invited you to \(invite.groupName).").fontWeight(.semibold)) Sign in or create an account to join.")
+                .bodyFont(14, relativeTo: .subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(cornerRadius: 18)
+        .accessibilityElement(children: .combine)
     }
 
     private var brand: some View {

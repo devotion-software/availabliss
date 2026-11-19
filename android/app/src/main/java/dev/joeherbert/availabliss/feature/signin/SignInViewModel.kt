@@ -33,6 +33,8 @@ data class SignInUiState(
     val googleAvailable: Boolean = true,
     /** Apple's authorize URL, to be opened in a Custom Tab by the UI. */
     val appleUrl: String? = null,
+    /** Opened from an invite: "Sam invited you to Lake District crew." */
+    val invitedTo: String? = null,
 ) {
     val canSendCode: Boolean get() = EMAIL_REGEX.matches(email.trim()) && busy == null
 
@@ -64,11 +66,16 @@ class SignInViewModel @Inject constructor(
                     deepLinks.consume(link)
                     run(SignInBusy.Apple) { auth.completeWebSignIn(link.code, link.error) }
                 }
-                // Opened from an emailed invite: start with the address it was sent to. (The link stays
-                // pending; it opens once they've signed in.)
-                if (link is DeepLink.Invite && _state.value.email.isBlank()) {
-                    groups.invite(link.token).getOrNull()?.email?.let { invited ->
-                        _state.update { if (it.email.isBlank()) it.copy(email = invited) else it }
+                // Opened from an invite: say so, and for an emailed one start with the address it was
+                // sent to. (The link stays pending; it opens once they've signed in.)
+                if (link is DeepLink.Invite) {
+                    groups.invite(link.token).getOrNull()?.let { preview ->
+                        _state.update {
+                            it.copy(
+                                invitedTo = "${preview.inviterName} invited you to ${preview.groupName}.",
+                                email = if (it.email.isBlank()) preview.email.orEmpty() else it.email,
+                            )
+                        }
                     }
                 }
             }

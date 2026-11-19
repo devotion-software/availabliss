@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,9 +59,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -175,6 +179,7 @@ fun SignInContent(
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    state.invitedTo?.let { InviteNote(it) }
                     AnimatedContent(
                         targetState = state.step,
                         transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -266,6 +271,25 @@ private fun CodeStep(state: SignInUiState, onCodeChange: (String) -> Unit, onUse
             TextAction("Use a different email", onUseDifferentEmail, enabled = state.busy == null)
             TextAction("Send again", onSendAgain, enabled = state.busy == null)
         }
+    }
+}
+
+/** "Sam invited you to Lake District crew. Sign in or create an account to join." */
+@Composable
+private fun InviteNote(invitedTo: String) {
+    val colors = AvailablissTheme.colors
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.size(32.dp).clip(CircleShape).background(colors.accentSoft), contentAlignment = Alignment.Center) {
+            Icon(AvIcons.Groups, null, tint = colors.accentInk, modifier = Modifier.size(17.dp))
+        }
+        Text(
+            buildAnnotatedString {
+                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(invitedTo) }
+                append(" Sign in or create an account to join.")
+            },
+            style = AvailablissTheme.type.labelRegular.copy(fontWeight = FontWeight.Normal),
+            color = colors.ink,
+        )
     }
 }
 
