@@ -127,7 +127,7 @@
 		align-items: center;
 		gap: 10px;
 		margin: calc(-1 * max(20px, env(safe-area-inset-top))) calc(-1 * var(--gutter)) 4px;
-		padding: max(12px, env(safe-area-inset-top)) var(--gutter) 18px;
+		padding: max(12px, env(safe-area-inset-top)) var(--gutter) 30px;
 	}
 	/* A light wash of the page colour over a strong blur, fading out at the bottom so the
 	   calendar scrolls away under the name without a hard edge. On a pseudo-element so the
@@ -138,11 +138,11 @@
 		inset: 0;
 		z-index: -1;
 		pointer-events: none;
-		background: color-mix(in srgb, var(--bg) 45%, transparent);
-		-webkit-backdrop-filter: blur(24px) saturate(160%);
-		backdrop-filter: blur(24px) saturate(160%);
-		-webkit-mask-image: linear-gradient(#000 calc(100% - 14px), transparent);
-		mask-image: linear-gradient(#000 calc(100% - 14px), transparent);
+		background: color-mix(in srgb, var(--bg) 15%, transparent);
+		-webkit-backdrop-filter: blur(40px) saturate(140%);
+		backdrop-filter: blur(40px) saturate(140%);
+		-webkit-mask-image: linear-gradient(#000 calc(100% - 22px), transparent);
+		mask-image: linear-gradient(#000 calc(100% - 22px), transparent);
 	}
 	.titles {
 		flex: 1;

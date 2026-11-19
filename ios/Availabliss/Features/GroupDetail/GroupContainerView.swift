@@ -131,17 +131,19 @@ private struct GroupTopBar: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
-        .padding(.bottom, 18)
+        .padding(.bottom, 30)
         .background {
-            // A light wash of the page colour over a strong blur, fading out at the bottom (as on
-            // Android and web) so the calendar scrolls away under the name without a hard edge.
+            // Mostly see-through: the thinnest material twice over (a stronger blur without the
+            // thicker materials' milky tint) and only a hint of the page colour, fading out at the
+            // bottom so the calendar scrolls away under the name without a hard edge.
             ZStack {
                 Rectangle().fill(.ultraThinMaterial)
-                theme.bg.opacity(0.45)
+                Rectangle().fill(.ultraThinMaterial)
+                theme.bg.opacity(0.1)
             }
             .mask(
                 LinearGradient(
-                    stops: [.init(color: .black, location: 0.8), .init(color: .clear, location: 1)],
+                    stops: [.init(color: .black, location: 0.72), .init(color: .clear, location: 1)],
                     startPoint: .top, endPoint: .bottom)
             )
             .ignoresSafeArea(edges: .top)
