@@ -124,7 +124,7 @@ struct MyPlansView: View {
             Text("Coming up").displayFont(19, .semibold).accessibilityAddTraits(.isHeader)
             Spacer()
             // Gone once every plan coming up is in your calendar (as on Android).
-            if !notAdded.isEmpty || isAdding {
+            if app.session.user?.showsAddToCalendar ?? true, !notAdded.isEmpty || isAdding {
                 Button(action: startAddAll) {
                     if isAdding {
                         ProgressView().controlSize(.small)

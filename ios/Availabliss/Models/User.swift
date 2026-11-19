@@ -79,6 +79,11 @@ struct User: Codable, Sendable, Identifiable, Equatable {
     /// Pushes before confirmed plans you're going to. Optional so an older server's `User` still decodes
     /// (treat nil as `.both`, the server's default).
     var eventReminders: EventReminders? = nil
+    /// "Add to calendar" on plans; nil (an older server) counts as on.
+    var showAddToCalendar: Bool? = nil
+
+    /// Whether plans show "Add to calendar" (turned off in You for people who subscribe instead).
+    var showsAddToCalendar: Bool { showAddToCalendar ?? true }
 
     var firstName: String {
         name.split(separator: " ").first.map(String.init) ?? name
@@ -107,6 +112,7 @@ struct UserPatch: Encodable, Sendable {
     var onboarded: Bool?
     var busyBufferMinutes: Int?
     var eventReminders: EventReminders?
+    var showAddToCalendar: Bool?
     /// Sends nil region fields as `null`. Omitting them would keep the old values, so moving from
     /// GB-ENG to Ireland would leave the subdivision (and its holidays) behind.
     private var replacesRegion = false
@@ -122,7 +128,8 @@ struct UserPatch: Encodable, Sendable {
         timezone: String? = nil,
         onboarded: Bool? = nil,
         busyBufferMinutes: Int? = nil,
-        eventReminders: EventReminders? = nil
+        eventReminders: EventReminders? = nil,
+        showAddToCalendar: Bool? = nil
     ) {
         self.name = name
         self.username = username
@@ -135,6 +142,7 @@ struct UserPatch: Encodable, Sendable {
         self.onboarded = onboarded
         self.busyBufferMinutes = busyBufferMinutes
         self.eventReminders = eventReminders
+        self.showAddToCalendar = showAddToCalendar
     }
 
     /// Replaces the whole region: a nil subdivision or school authority clears it on the server.
@@ -163,10 +171,12 @@ struct UserPatch: Encodable, Sendable {
         try container.encodeIfPresent(onboarded, forKey: .onboarded)
         try container.encodeIfPresent(busyBufferMinutes, forKey: .busyBufferMinutes)
         try container.encodeIfPresent(eventReminders, forKey: .eventReminders)
+        try container.encodeIfPresent(showAddToCalendar, forKey: .showAddToCalendar)
     }
 
     private enum CodingKeys: String, CodingKey {
         case name, username, themeMode, colorTheme, country, subdivision, schoolAuthority, timezone, onboarded, busyBufferMinutes, eventReminders
+        case showAddToCalendar
     }
 }
 

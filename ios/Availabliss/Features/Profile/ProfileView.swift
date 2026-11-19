@@ -20,6 +20,7 @@ struct ProfileView: View {
                 account
                 settingsList
                 PlanRemindersCard(error: $error)
+                AddToCalendarSettingCard(error: $error)
                 NotificationsCard(error: $error)
                 PlanSection(toast: $toast)
                 SignInMethodsSection(toast: $toast, error: $error)
@@ -229,6 +230,49 @@ private struct PlanRemindersCard: View {
                     _ = try await app.session.update(UserPatch(eventReminders: new))
                 } catch {
                     selection = old
+                    self.error = error.userMessage
+                }
+            }
+        }
+    }
+}
+
+/// "Add to calendar buttons": on plans, in chats, on Home and My plans. Off suits people who subscribe
+/// to their plans instead. Saved to the account, so every device follows.
+private struct AddToCalendarSettingCard: View {
+    @Binding var error: String?
+    @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
+    @State private var isOn = true
+    @State private var loaded = false
+
+    private var saved: Bool { app.session.user?.showsAddToCalendar ?? true }
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Add to calendar buttons").bodyFont(14, .semibold)
+                Text("On plans, in chats and on My plans. Turn them off if you subscribe to your plans instead.")
+                    .bodyFont(12, relativeTo: .caption)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .tint(theme.accent)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(cornerRadius: 24)
+        .onAppear {
+            isOn = saved
+            loaded = true
+        }
+        .onChange(of: isOn) { old, new in
+            guard loaded, new != saved else { return }
+            Task {
+                do {
+                    _ = try await app.session.update(UserPatch(showAddToCalendar: new))
+                } catch {
+                    isOn = old
                     self.error = error.userMessage
                 }
             }

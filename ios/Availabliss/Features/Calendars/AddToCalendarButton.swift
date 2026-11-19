@@ -29,8 +29,13 @@ struct AddToCalendarButton: View {
     }
 
     var body: some View {
+        // Turned off in You (e.g. subscribed to their plans instead): nothing at all.
+        if app.session.user?.showsAddToCalendar ?? true { content }
+    }
+
+    private var content: some View {
         let state = app.deviceCalendar.addedState(event.id)
-        VStack(spacing: 8) {
+        return VStack(spacing: 8) {
             switch state {
             case .notAdded:
                 addButton
