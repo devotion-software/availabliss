@@ -27,6 +27,8 @@ struct ChatView: View {
     /// The list has been put at the latest message after the first load. Until then older messages
     /// aren't fetched: the lazy list can briefly show its top (or nothing) while it measures.
     @State private var hasLandedAtBottom = false
+    /// You've dragged the list yourself: the opening re-checks of the bottom stop.
+    @State private var hasDragged = false
     /// A message to scroll to and flash ("Show in chat" from a thread).
     @State private var showRequest: String?
     /// A message's photos open full screen, at the one tapped.
@@ -177,6 +179,10 @@ struct ChatView: View {
                 viewportHeight = $0
             }
             .defaultScrollAnchor(.bottom)
+            // Photos, maps, passes and polls settle their heights after the first layout; keep the
+            // bottom where it is while they do, so the list never ends up past its content (blank).
+            .modifier(KeepsBottomOnResize(isActive: !isScrolledBack))
+            .simultaneousGesture(DragGesture(minimumDistance: 6).onChanged { _ in hasDragged = true })
             .modifier(BottomEdgeEffectWhenScrolledBack(isScrolledBack: isScrolledBack))
             .scrollDismissesKeyboard(.interactively)
             .overlay(alignment: .bottomTrailing) {
@@ -209,8 +215,10 @@ struct ChatView: View {
         }
     }
 
-    /// Once, after the first messages load: shows the latest without animation. Twice over a frame,
-    /// since the first pass can land short while rows above it are still being measured.
+    /// Once, after the first messages load: shows the latest without animation. Again over the next
+    /// second while photos, maps and passes settle their heights (the list could otherwise be left
+    /// past the end of its shrunken content, showing nothing until you scrolled), stopping as soon
+    /// as you drag the list yourself.
     private func landAtBottom(proxy: ScrollViewProxy) {
         guard !hasLandedAtBottom else { return }
         Task { @MainActor in
@@ -219,6 +227,11 @@ struct ChatView: View {
             try? await Task.sleep(for: .milliseconds(60))
             if let last = model.messages.last?.id { proxy.scrollTo(last, anchor: .bottom) }
             hasLandedAtBottom = true
+            for delay in [150, 300, 500] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                guard !hasDragged, let last = model.messages.last?.id else { return }
+                proxy.scrollTo(last, anchor: .bottom)
+            }
         }
     }
 
@@ -547,6 +560,20 @@ struct Composer: View {
 
 /// iOS 26 fades a scroll view's bottom edge, which drew a faint line above the composer even at the
 /// latest message, with nothing underneath it. It's only shown once you've scrolled back.
+/// Keeps the bottom of the chat in place when its content changes size (iOS 18+), while you're at
+/// the bottom; scrolled back to read, what you're looking at stays put instead.
+private struct KeepsBottomOnResize: ViewModifier {
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.defaultScrollAnchor(isActive ? .bottom : nil, for: .sizeChanges)
+        } else {
+            content
+        }
+    }
+}
+
 private struct BottomEdgeEffectWhenScrolledBack: ViewModifier {
     let isScrolledBack: Bool
 
