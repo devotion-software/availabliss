@@ -75,15 +75,31 @@
 	const JUMP_THRESHOLD = 200;
 	let scrolledBack = $state(false);
 	let unseen = $state(0);
+	/** When the list last scrolled: still gliding after a flick if it's very recent. */
+	let lastScrollAt = 0;
 	function onscroll() {
+		lastScrollAt = performance.now();
 		if (!scroller) return;
 		scrolledBack = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight > JUMP_THRESHOLD;
 		if (!scrolledBack) unseen = 0;
 	}
 	function jumpToLatest() {
 		unseen = 0;
+		const el = scroller;
+		if (!el) return;
+		// Still gliding from a flick: a smooth scroll would be ignored (iOS Safari) or fight the glide,
+		// so stop the glide (briefly no scrolling) and jump straight there.
+		if (performance.now() - lastScrollAt < 150) {
+			el.style.overflowY = 'hidden';
+			el.scrollTop = el.scrollHeight;
+			requestAnimationFrame(() => {
+				el.style.overflowY = '';
+				el.scrollTop = el.scrollHeight;
+			});
+			return;
+		}
 		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-		scroller?.scrollTo({ top: scroller.scrollHeight, behavior: reduce ? 'auto' : 'smooth' });
+		el.scrollTo({ top: el.scrollHeight, behavior: reduce ? 'auto' : 'smooth' });
 	}
 
 	const RUN_GAP_MS = 5 * 60_000;

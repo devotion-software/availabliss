@@ -19,6 +19,8 @@ struct ChatView: View {
     /// Where the bottom of the messages sits in the list's frame, and the list's height: together,
     /// how far you've scrolled back from the latest message.
     @State private var contentBottom: CGFloat = 0
+    /// When the list last moved (a drag, or still gliding after a flick).
+    @State private var lastMovedAt = Date.distantPast
     @State private var viewportHeight: CGFloat = 0
     /// Messages from others that arrived while you were scrolled back, shown on the jump button.
     @State private var unseenCount = 0
@@ -164,6 +166,7 @@ struct ChatView: View {
                     $0.frame(in: .named(Self.scrollSpace)).maxY
                 } action: {
                     contentBottom = $0
+                    lastMovedAt = .now
                 }
             }
             .coordinateSpace(name: Self.scrollSpace)
@@ -219,10 +222,24 @@ struct ChatView: View {
         }
     }
 
+    /// The jump button. While the list is still gliding from a flick, an animated scroll loses to
+    /// the glide, so it jumps straight there (which stops the glide), and again a moment later in
+    /// case the glide carried on.
     private func scrollToLatest(proxy: ScrollViewProxy) {
         guard let last = model.messages.last?.id else { return }
-        withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo(last, anchor: .bottom) }
         unseenCount = 0
+        guard Date.now.timeIntervalSince(lastMovedAt) < 0.15 else {
+            withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo(last, anchor: .bottom) }
+            return
+        }
+        proxy.scrollTo(last, anchor: .bottom)
+        Task { @MainActor in
+            for delay in [50, 150] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                guard isScrolledBack, let newest = model.messages.last?.id else { return }
+                proxy.scrollTo(newest, anchor: .bottom)
+            }
+        }
     }
 
     /// A new newest message: counted on the jump button while you're scrolled back (no jump),
