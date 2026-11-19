@@ -64,7 +64,8 @@ struct AddToCalendarButton: View {
                     title: "Add to calendar",
                     message: "Which calendar should \(event.title) go in?",
                     groups: app.deviceCalendar.writableCalendarsBySource,
-                    selectedId: app.deviceCalendar.preferredCalendar?.calendarIdentifier
+                    selectedId: app.deviceCalendar.preferredCalendar?.calendarIdentifier,
+                    selectedIsLastUsed: true
                 ) { calendar in
                     Task { await add(to: calendar) }
                 }

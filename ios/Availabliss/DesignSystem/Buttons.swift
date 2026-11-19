@@ -22,6 +22,7 @@ struct FilledButtonStyle: ButtonStyle {
     var cornerRadius: CGFloat = 16
     var fontSize: CGFloat = 16
     var fullWidth = true
+    var horizontalPadding: CGFloat = 16
     @Environment(\.theme) private var theme
     @Environment(\.isEnabled) private var isEnabled
 
@@ -33,7 +34,7 @@ struct FilledButtonStyle: ButtonStyle {
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .foregroundStyle(colors.foreground)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, horizontalPadding)
             .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
             .background(shape.fill(colors.background))
             .overlay {
@@ -105,8 +106,11 @@ extension ButtonStyle where Self == FilledButtonStyle {
     static var primary: FilledButtonStyle { FilledButtonStyle(kind: .primary) }
     static var accent: FilledButtonStyle { FilledButtonStyle(kind: .accent) }
     static var secondary: FilledButtonStyle { FilledButtonStyle(kind: .secondary) }
-    static func filled(_ kind: FilledButtonKind, height: CGFloat = 50, cornerRadius: CGFloat = 16, fontSize: CGFloat = 16, fullWidth: Bool = true) -> FilledButtonStyle {
-        FilledButtonStyle(kind: kind, height: height, cornerRadius: cornerRadius, fontSize: fontSize, fullWidth: fullWidth)
+    static func filled(
+        _ kind: FilledButtonKind, height: CGFloat = 50, cornerRadius: CGFloat = 16, fontSize: CGFloat = 16, fullWidth: Bool = true,
+        horizontalPadding: CGFloat = 16
+    ) -> FilledButtonStyle {
+        FilledButtonStyle(kind: kind, height: height, cornerRadius: cornerRadius, fontSize: fontSize, fullWidth: fullWidth, horizontalPadding: horizontalPadding)
     }
 }
 

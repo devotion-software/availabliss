@@ -174,6 +174,7 @@ struct ChatView: View {
                 viewportHeight = $0
             }
             .defaultScrollAnchor(.bottom)
+            .modifier(BottomEdgeEffectWhenScrolledBack(isScrolledBack: isScrolledBack))
             .scrollDismissesKeyboard(.interactively)
             .overlay(alignment: .bottomTrailing) {
                 if isScrolledBack {
@@ -524,5 +525,19 @@ struct Composer: View {
         .padding(.horizontal, 12)
         .padding(.top, 10)
         .padding(.bottom, 10)
+    }
+}
+
+/// iOS 26 fades a scroll view's bottom edge, which drew a faint line above the composer even at the
+/// latest message, with nothing underneath it. It's only shown once you've scrolled back.
+private struct BottomEdgeEffectWhenScrolledBack: ViewModifier {
+    let isScrolledBack: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectHidden(!isScrolledBack, for: .bottom)
+        } else {
+            content
+        }
     }
 }

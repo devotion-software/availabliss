@@ -198,29 +198,11 @@ private struct PendingProposalView: View {
             Text(replyPrompt(mine))
                 .bodyFont(13, .semibold, relativeTo: .subheadline)
                 .padding(.leading, 4)
-            HStack(spacing: 8) {
-                Button {
-                    Task { await model.respond(.declined) }
-                } label: {
-                    LoadingLabel(title: "Can't make it", isLoading: model.sending == .declined)
-                }
-                .buttonStyle(.secondary)
-                .disabled(mine == .declined || model.isResponding)
-                Button {
-                    Task { await model.respond(.maybe) }
-                } label: {
-                    LoadingLabel(title: "Maybe", systemImage: mine == .maybe ? "checkmark" : nil, isLoading: model.sending == .maybe)
-                }
-                .buttonStyle(.secondary)
-                .disabled(mine == .maybe || model.isResponding)
-                Button {
-                    Task { await model.respond(.accepted) }
-                } label: {
-                    LoadingLabel(
-                        title: mine == .accepted ? "Accepted" : "Accept", systemImage: mine == .accepted ? "checkmark" : nil, isLoading: model.sending == .accepted)
-                }
-                .buttonStyle(.primary)
-                .disabled(mine == .accepted || model.isResponding)
+            // Three across with tighter padding so "Can't make it" and "✓ Accepted" fit whole;
+            // stacked when even that's too narrow (large text sizes).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { replyButtons(mine, padding: 8) }
+                VStack(spacing: 8) { replyButtons(mine, padding: 16) }
             }
         }
         .padding(12)
@@ -228,6 +210,32 @@ private struct PendingProposalView: View {
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
         .sensoryFeedback(.success, trigger: mine)
+    }
+
+    @ViewBuilder
+    private func replyButtons(_ mine: ResponseKind?, padding: CGFloat) -> some View {
+        Button {
+            Task { await model.respond(.declined) }
+        } label: {
+            LoadingLabel(title: "Can\u{2019}t make it", isLoading: model.sending == .declined)
+        }
+        .buttonStyle(.filled(.secondary, horizontalPadding: padding))
+        .disabled(mine == .declined || model.isResponding)
+        Button {
+            Task { await model.respond(.maybe) }
+        } label: {
+            LoadingLabel(title: "Maybe", systemImage: mine == .maybe ? "checkmark" : nil, isLoading: model.sending == .maybe)
+        }
+        .buttonStyle(.filled(.secondary, horizontalPadding: padding))
+        .disabled(mine == .maybe || model.isResponding)
+        Button {
+            Task { await model.respond(.accepted) }
+        } label: {
+            LoadingLabel(
+                title: mine == .accepted ? "Accepted" : "Accept", systemImage: mine == .accepted ? "checkmark" : nil, isLoading: model.sending == .accepted)
+        }
+        .buttonStyle(.filled(.primary, horizontalPadding: padding))
+        .disabled(mine == .accepted || model.isResponding)
     }
 
     private func replyPrompt(_ mine: ResponseKind?) -> String {

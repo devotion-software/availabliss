@@ -302,6 +302,7 @@ fun AddToCalendarEffect(
             message = "Which calendar should ${choice.draft.title} go in?",
             calendars = state.calendars,
             selectedId = state.selectedCalendarId,
+            selectedIsLastUsed = true,
             onChoose = onChoose,
             onDismiss = onCancelChoice,
         )
@@ -310,6 +311,7 @@ fun AddToCalendarEffect(
             message = "Which calendar should your ${choice.drafts.size} plans go in?",
             calendars = state.calendars,
             selectedId = state.selectedCalendarId,
+            selectedIsLastUsed = true,
             onChoose = onChoose,
             onDismiss = onCancelChoice,
         )
@@ -327,7 +329,10 @@ fun AddToCalendarEffect(
 
 /**
  * Chooses which of the phone's calendars a plan goes in: writable calendars grouped by account,
- * each with its colour, the current choice ticked. Picking one calls [onChoose].
+ * each with its colour. Picking one calls [onChoose].
+ * [selectedId] is ticked when it's where the plan is now (moving it). When adding, nothing has been
+ * chosen yet, so the last calendar used is only labelled "Last used" ([selectedIsLastUsed]): a tick
+ * there read as already chosen, with no button to confirm it.
  */
 @Composable
 fun CalendarChoiceSheet(
@@ -335,6 +340,7 @@ fun CalendarChoiceSheet(
     message: String?,
     calendars: List<DeviceCalendarInfo>,
     selectedId: Long?,
+    selectedIsLastUsed: Boolean = false,
     onChoose: (Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -349,7 +355,8 @@ fun CalendarChoiceSheet(
                 SurfacePanel(Modifier.fillMaxWidth()) {
                     list.forEachIndexed { index, cal ->
                         if (index > 0) RowDivider()
-                        val selected = cal.id == selectedId
+                        val marked = cal.id == selectedId
+                        val selected = marked && !selectedIsLastUsed
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -367,7 +374,11 @@ fun CalendarChoiceSheet(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f),
                             )
-                            if (selected) Icon(AvIcons.Check, null, tint = colors.accentInk, modifier = Modifier.size(18.dp))
+                            if (selected) {
+                                Icon(AvIcons.Check, null, tint = colors.accentInk, modifier = Modifier.size(18.dp))
+                            } else if (marked) {
+                                Text("Last used", style = AvailablissTheme.type.caption, color = colors.muted)
+                            }
                         }
                     }
                 }

@@ -81,7 +81,8 @@ struct MyPlansView: View {
                 title: "Add all to calendar",
                 message: "Which calendar should \(count == 1 ? "this plan" : "these \(count) plans") go in?",
                 groups: app.deviceCalendar.writableCalendarsBySource,
-                selectedId: app.deviceCalendar.preferredCalendar?.calendarIdentifier
+                selectedId: app.deviceCalendar.preferredCalendar?.calendarIdentifier,
+                selectedIsLastUsed: true
             ) { calendar in
                 Task { await addAll(to: calendar) }
             }

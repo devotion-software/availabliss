@@ -103,7 +103,9 @@ struct ChatMediaSheet: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(item.attachment.kind == .gif ? "GIF" : item.attachment.kind == .video ? "Video" : "Photo") from \(author(item)), \(Formatting.chatDay(item.createdAt))")
+                .accessibilityLabel(
+                    "\(item.attachment.kind == .gif ? "GIF" : item.attachment.kind == .video ? "Video" : "Photo") from \(author(item)), \(Formatting.chatDay(item.createdAt))"
+                )
                 .onAppear { loadMore(after: item) }
             }
         }

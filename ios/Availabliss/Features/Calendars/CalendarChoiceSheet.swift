@@ -2,12 +2,16 @@ import EventKit
 import SwiftUI
 
 /// Chooses which of the phone's calendars a plan goes in: writable calendars grouped by account,
-/// each with its colour, the current choice ticked. Picking one closes the sheet and runs `onChoose`.
+/// each with its colour. Picking one closes the sheet and runs `onChoose`.
+/// `selectedId` is ticked when it's where the plan is now (moving it). When adding, nothing has been
+/// chosen yet, so the last calendar used is only labelled "Last used" (`selectedIsLastUsed`): a tick
+/// there read as already chosen, with no button to confirm it.
 struct CalendarChoiceSheet: View {
     let title: String
     var message: String?
     let groups: [(source: String, calendars: [EKCalendar])]
     let selectedId: String?
+    var selectedIsLastUsed = false
     let onChoose: (EKCalendar) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
@@ -29,7 +33,8 @@ struct CalendarChoiceSheet: View {
     }
 
     private func row(_ calendar: EKCalendar) -> some View {
-        let isSelected = calendar.calendarIdentifier == selectedId
+        let isMarked = calendar.calendarIdentifier == selectedId
+        let isSelected = isMarked && !selectedIsLastUsed
         return Button {
             dismiss()
             onChoose(calendar)
@@ -40,6 +45,8 @@ struct CalendarChoiceSheet: View {
                 Spacer(minLength: 8)
                 if isSelected {
                     Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(theme.accentInk)
+                } else if isMarked {
+                    Text("Last used").bodyFont(13, relativeTo: .subheadline).foregroundStyle(theme.muted)
                 }
             }
             .foregroundStyle(theme.ink)
@@ -47,7 +54,7 @@ struct CalendarChoiceSheet: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(calendar.title), \(calendar.source.title)")
+        .accessibilityLabel("\(calendar.title), \(calendar.source.title)\(isMarked && selectedIsLastUsed ? ", last used" : "")")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

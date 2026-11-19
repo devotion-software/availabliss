@@ -494,6 +494,10 @@ struct AttachmentViewer: View {
     @State private var shareURL: URL?
     @State private var isPreparingShare = false
     @State private var error: String?
+    /// The Close / Share bar's height (its 44pt buttons).
+    private static let topBarHeight: CGFloat = 44
+
+    private var isShowingVideo: Bool { attachments.first { $0.id == selection }?.kind == .video }
 
     var body: some View {
         ZStack {
@@ -502,30 +506,24 @@ struct AttachmentViewer: View {
                 ForEach(attachments) { attachment in
                     SwiftUI.Group {
                         if attachment.kind == .video, let url = URL(string: attachment.url) {
+                            // Kept inside the safe area, so the player's own AirPlay button sits at the top
+                            // left, level with the bar (which keeps its buttons on the right).
                             VideoPage(url: url, isShowing: selection == attachment.id)
                         } else {
                             ZoomableImage(attachment: attachment)
+                                .ignoresSafeArea()
                         }
                     }
                     .tag(attachment.id)
-                    .ignoresSafeArea()
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: attachments.count > 1 ? .automatic : .never))
             .ignoresSafeArea()
         }
         .overlay(alignment: .top) {
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark").font(.system(size: 16, weight: .bold)).frame(width: 44, height: 44)
-                }
-                .accessibilityLabel("Close")
-                Spacer()
-                if attachments.count > 1, let index = attachments.firstIndex(where: { $0.id == selection }) {
-                    Text("\(index + 1) of \(attachments.count)").font(.system(size: 15, weight: .semibold))
-                }
+            // Everything on the right, Close at the far right, leaving the top left free for a
+            // video's AirPlay button.
+            HStack(spacing: 0) {
                 Spacer()
                 if let onShowInChat {
                     Button {
@@ -546,9 +544,22 @@ struct AttachmentViewer: View {
                     }
                 }
                 .accessibilityLabel("Share or save")
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 16, weight: .bold)).frame(width: Self.topBarHeight, height: Self.topBarHeight)
+                }
+                .accessibilityLabel("Close")
+            }
+            .overlay {
+                if attachments.count > 1, let index = attachments.firstIndex(where: { $0.id == selection }) {
+                    Text("\(index + 1) of \(attachments.count)").font(.system(size: 15, weight: .semibold))
+                }
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 8)
+            // Level with the player's AirPlay button, whose centre sits a little lower.
+            .padding(.top, isShowingVideo ? 5 : 0)
             .background(LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
         }
         .sheet(item: Binding(get: { shareURL.map(ShareItem.init) }, set: { if $0 == nil { shareURL = nil } })) { item in
@@ -676,7 +687,6 @@ enum AttachmentFiles {
         return file
     }
 }
-
 
 /// A video in the full-screen viewer: plays with the system controls while it's the one showing.
 private struct VideoPage: View {

@@ -65,7 +65,8 @@ struct ChatComposerArea: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: state.editing?.id)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showsMenu)
         .photosPicker(
-            isPresented: $pickingPhotos, selection: $photoSelection, maxSelectionCount: AttachmentFormat.maxPerMessage, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current
+            isPresented: $pickingPhotos, selection: $photoSelection, maxSelectionCount: AttachmentFormat.maxPerMessage, matching: .any(of: [.images, .videos]),
+            preferredItemEncoding: .current
         )
         .onChange(of: photoSelection) { _, items in
             guard !items.isEmpty else { return }
