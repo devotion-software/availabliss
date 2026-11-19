@@ -191,11 +191,9 @@ targets:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
           NSExtensionAttributes:
-            NSExtensionActivationRule:
-              NSExtensionActivationSupportsImageWithMaxCount: 10
-              NSExtensionActivationSupportsFileWithMaxCount: 10
-              NSExtensionActivationSupportsWebURLWithMaxCount: 1
-              NSExtensionActivationSupportsText: true
+            # A predicate rather than the dictionary keys: Apple Wallet shares a pass as com.apple.pkpass
+            # data (not a file), which the keys don't cover, and nor do videos. Up to 10 items.
+            NSExtensionActivationRule: "SUBQUERY (extensionItems, $extensionItem, $extensionItem.attachments.@count <= 10 AND SUBQUERY ($extensionItem.attachments, $attachment, ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO \"public.image\" || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO \"public.movie\" || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO \"public.file-url\" || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO \"com.apple.pkpass\" || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO \"com.apple.pkpasses\" || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO \"public.url\" || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO \"public.plain-text\" || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO \"public.data\").@count >= 1).@count >= 1"
 
   AvailablissTests:
     type: bundle.unit-test
