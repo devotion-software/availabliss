@@ -111,14 +111,14 @@ private extension UIColor {
     }
 }
 
-/// "NEXT PLAN", in the accent colour above the widget's content.
+/// "NEXT PLAN", in the accent ink colour (readable on the dark and clear backgrounds) above the widget's content.
 struct WidgetLabel: View {
     let text: String
 
     var body: some View {
         Text(text.uppercased())
             .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(WidgetPalette.accent)
+            .foregroundStyle(WidgetPalette.accentInk)
             .lineLimit(1)
     }
 }

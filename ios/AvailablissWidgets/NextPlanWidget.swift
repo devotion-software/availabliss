@@ -103,7 +103,7 @@ struct NextPlanView: View {
         HStack(spacing: 6) {
             Text("Then")
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(WidgetPalette.accent)
+                .foregroundStyle(WidgetPalette.accentInk)
             Text("\(plan.title) · \(WidgetSnapshots.whenLabel(plan, now: entry.date))")
                 .font(.system(size: 12))
                 .foregroundStyle(WidgetPalette.muted)

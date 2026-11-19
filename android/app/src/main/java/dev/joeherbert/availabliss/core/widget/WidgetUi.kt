@@ -160,12 +160,12 @@ private fun orbBitmap(theme: ColorTheme, widthDp: Float, heightDp: Float): Bitma
     return bitmap
 }
 
-/** "NEXT PLAN", in the accent colour above the widget's content. */
+/** "NEXT PLAN", in the accent ink colour (readable on dark backgrounds) above the widget's content. */
 @Composable
 internal fun WidgetLabel(text: String) {
     Text(
         text = text.uppercase(),
-        style = TextStyle(color = GlanceTheme.colors.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold),
+        style = TextStyle(color = GlanceTheme.colors.secondary, fontSize = 11.sp, fontWeight = FontWeight.Bold),
         maxLines = 1,
     )
     Spacer(GlanceModifier.height(6.dp))
