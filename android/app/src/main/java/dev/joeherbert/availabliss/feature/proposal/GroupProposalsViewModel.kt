@@ -35,6 +35,10 @@ data class ProposalListItem(
     val card: ProposalCardUi,
     val headline: String = card.title,
     val detail: String = card.status,
+    /** Your reply, when you were asked (members who joined since weren't); changeable from the list. */
+    val myReply: ResponseKind? = null,
+    /** A confirmed plan's event, to show the reply under it in Coming up. */
+    val eventId: String? = null,
 )
 
 data class GroupProposalsUiState(
@@ -43,7 +47,11 @@ data class GroupProposalsUiState(
     val error: String? = null,
     val open: List<ProposalListItem> = emptyList(),
     val confirmed: List<ProposalListItem> = emptyList(),
+    val message: dev.joeherbert.availabliss.core.common.UserMessage? = null,
 ) {
+    /** Confirmed plans by their event's id, for the reply under each event in Coming up. */
+    val confirmedByEvent: Map<String, ProposalListItem> get() = confirmed.mapNotNull { c -> c.eventId?.let { it to c } }.toMap()
+
     /** Up to three for the calendar's Plans card: open proposals first, then confirmed plans coming up. */
     val highlights: List<ProposalListItem> get() = (open + confirmed).take(3)
 }
@@ -53,6 +61,7 @@ private data class ProposalsData(
     val group: Group? = null,
     val loading: Boolean = true,
     val error: String? = null,
+    val message: dev.joeherbert.availabliss.core.common.UserMessage? = null,
 )
 
 @HiltViewModel
@@ -102,6 +111,18 @@ class GroupProposalsViewModel @Inject constructor(
         }
     }
 
+    /** Your reply from the Plans list (on a confirmed plan, a change flags a drop-out as on its page). */
+    fun respond(id: String, response: ResponseKind) {
+        viewModelScope.launch {
+            when (val result = proposals.respond(id, response)) {
+                is ApiResult.Success -> upsert(result.value)
+                is ApiResult.Failure -> data.update { it.copy(message = dev.joeherbert.availabliss.core.common.UserMessage(result.error.message)) }
+            }
+        }
+    }
+
+    fun messageShown() = data.update { it.copy(message = null) }
+
     private fun upsert(proposal: Proposal) = data.update { d ->
         d.copy(proposals = d.proposals.filterNot { it.id == proposal.id } + proposal)
     }
@@ -129,7 +150,14 @@ class GroupProposalsViewModel @Inject constructor(
                 else -> null
             }
             val detail = listOfNotNull(card.title.takeIf { title != null }, status, yours).joinToString(" · ")
-            return ProposalListItem(p.id, card, headline = title ?: card.title, detail = detail)
+            return ProposalListItem(
+                p.id,
+                card,
+                headline = title ?: card.title,
+                detail = detail,
+                myReply = p.responses.firstOrNull { it.userId == meId }?.response,
+                eventId = p.eventId,
+            )
         }
         val upcoming = proposals.filter { p -> endsInFuture(p.end, now) }
         return GroupProposalsUiState(
@@ -138,6 +166,7 @@ class GroupProposalsViewModel @Inject constructor(
             error = error,
             open = upcoming.filter { it.status == ProposalStatus.Open }.sortedBy { it.start }.map(::item),
             confirmed = upcoming.filter { it.status == ProposalStatus.Confirmed }.sortedBy { it.start }.map(::item),
+            message = message,
         )
     }
 }

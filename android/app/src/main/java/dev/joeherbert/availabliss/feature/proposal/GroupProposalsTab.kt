@@ -1,5 +1,6 @@
 package dev.joeherbert.availabliss.feature.proposal
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,12 +26,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.joeherbert.availabliss.core.network.model.ResponseKind
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.EmptyState
@@ -75,6 +80,7 @@ fun GroupProposalsTab(
     val events by eventsViewModel.state.collectAsStateWithLifecycle()
     val snackbar = rememberSnackbarHostState()
     UserMessageEffect(events.message, snackbar, eventsViewModel::onMessageShown)
+    UserMessageEffect(state.message, snackbar) { viewModel.messageShown() }
     AddToCalendarEffect(events.calendar, eventsViewModel::onIntentHandled, eventsViewModel::chooseCalendar, eventsViewModel::cancelCalendarChoice)
     GroupProposalsContent(
         state = state,
@@ -89,6 +95,7 @@ fun GroupProposalsTab(
         },
         onAddToCalendar = eventsViewModel::onAddToCalendar,
         onDeleteEvent = eventsViewModel::onDelete,
+        onRespond = viewModel::respond,
     )
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) { AvSnackbarHost(snackbar, Modifier.navigationBarsPadding()) }
 }
@@ -104,6 +111,7 @@ private fun GroupProposalsContent(
     onRetry: () -> Unit,
     onAddToCalendar: (String) -> Unit,
     onDeleteEvent: (String) -> Unit,
+    onRespond: (proposalId: String, ResponseKind) -> Unit = { _, _ -> },
 ) {
     var confirmDelete by remember { mutableStateOf<EventRowUi?>(null) }
     val loaded = !(state.loading && state.open.isEmpty() && state.confirmed.isEmpty()) &&
@@ -130,7 +138,11 @@ private fun GroupProposalsContent(
                 if (events.upcoming.isNotEmpty()) {
                     item { Heading("Coming up") }
                     items(events.upcoming, key = { "event-" + it.id }) { row ->
-                        EventRow(row, past = false, onOpen = { onOpenEvent(row.id) }, onAddToCalendar = { onAddToCalendar(row.id) }, onDelete = { confirmDelete = row })
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            EventRow(row, past = false, onOpen = { onOpenEvent(row.id) }, onAddToCalendar = { onAddToCalendar(row.id) }, onDelete = { confirmDelete = row })
+                            // A confirmed plan: change your reply here too.
+                            state.confirmedByEvent[row.id]?.let { plan -> plan.myReply?.let { ReplyMenu(it) { kind -> onRespond(plan.id, kind) } } }
+                        }
                     }
                 }
                 // Proposals, with Add event.
@@ -145,7 +157,12 @@ private fun GroupProposalsContent(
                 }
                 when {
                     state.open.isNotEmpty() ->
-                        items(state.open, key = { it.id }) { ProposalCard(it.card, onClick = { onOpenProposal(it.id) }) }
+                        items(state.open, key = { it.id }) { item ->
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                ProposalCard(item.card, onClick = { onOpenProposal(item.id) })
+                                item.myReply?.let { ReplyMenu(it) { kind -> onRespond(item.id, kind) } }
+                            }
+                        }
                     events.upcoming.isEmpty() -> item {
                         EmptyState(
                             title = "Nothing proposed yet",
@@ -211,4 +228,47 @@ private fun GroupProposalsPreview() {
             onAddToCalendar = {}, onDeleteEvent = {},
         )
     }
+}
+
+/** "Your reply: Can make it ⌄", opening the three replies. */
+@Composable
+private fun ReplyMenu(mine: ResponseKind, onChoose: (ResponseKind) -> Unit) {
+    val colors = AvailablissTheme.colors
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier
+                .heightIn(min = 36.dp)
+                .clickable(role = Role.Button, onClickLabel = "Change your reply") { open = true }
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                "Your reply: ${replyLabel(mine)}",
+                style = AvailablissTheme.type.bodySmallStrong,
+                color = if (mine == ResponseKind.Pending) colors.accentInk else colors.muted,
+            )
+            Icon(AvIcons.ChevronDown, null, tint = colors.muted, modifier = Modifier.size(14.dp))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bg) {
+            listOf(ResponseKind.Accepted, ResponseKind.Maybe, ResponseKind.Declined).forEach { kind ->
+                DropdownMenuItem(
+                    text = { Text(replyLabel(kind), style = AvailablissTheme.type.bodySmallStrong, color = if (kind == mine) colors.accentInk else colors.ink) },
+                    trailingIcon = if (kind == mine) ({ Icon(AvIcons.Check, null, tint = colors.accentInk, modifier = Modifier.size(16.dp)) }) else null,
+                    onClick = {
+                        open = false
+                        if (kind != mine) onChoose(kind)
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun replyLabel(kind: ResponseKind): String = when (kind) {
+    ResponseKind.Accepted -> "Can make it"
+    ResponseKind.Maybe -> "Maybe"
+    ResponseKind.Declined -> "Can't make it"
+    ResponseKind.Pending -> "Not replied"
 }

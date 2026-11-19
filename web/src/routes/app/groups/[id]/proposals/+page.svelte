@@ -7,6 +7,7 @@
 	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
 	import ProposalRow from '#lib/components/proposals/ProposalRow.svelte';
 	import EventEditSheet from '#lib/components/events/EventEditSheet.svelte';
+	import ReplySelect from '#lib/components/proposals/ReplySelect.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import { useFormat } from '#lib/client/format';
 	import type { GroupEvent } from '#lib/types';
@@ -28,6 +29,8 @@
 	const fmt = useFormat();
 	const isAdmin = $derived(data.group.role === 'owner' || data.group.role === 'admin');
 	const canEdit = (e: GroupEvent) => e.createdBy === data.user.id || isAdmin;
+	/** The confirmed plan an event came from, to change your reply under it. */
+	const confirmedPlan = (e: GroupEvent) => (e.proposalId ? data.proposals.find((p) => p.id === e.proposalId && p.status === 'confirmed') : undefined);
 
 	$effect(() => {
 		const id = data.group.id;
@@ -77,6 +80,8 @@
 							{/if}
 						</div>
 					</div>
+					{@const plan = confirmedPlan(event)}
+					{#if plan}<ReplySelect proposal={plan} meId={data.user.id} onchanged={() => invalidate('app:proposals')} />{/if}
 				{/each}
 			</div>
 		</section>
@@ -103,7 +108,10 @@
 				<h2 id="sec-{section.title}" class="eyebrow">{section.title}</h2>
 				<div class="list">
 					{#each section.items as proposal (proposal.id)}
-						<ProposalRow {proposal} group={data.group} meId={data.user.id} />
+						<div class="with-reply">
+							<ProposalRow {proposal} group={data.group} meId={data.user.id} />
+							{#if proposal.status === 'open'}<ReplySelect {proposal} meId={data.user.id} onchanged={() => invalidate('app:proposals')} />{/if}
+						</div>
 					{/each}
 				</div>
 			</section>
@@ -183,5 +191,10 @@
 	.meta {
 		font-size: 13px;
 		color: var(--muted);
+	}
+	.with-reply {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
 	}
 </style>

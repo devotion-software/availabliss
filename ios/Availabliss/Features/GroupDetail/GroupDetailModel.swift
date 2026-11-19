@@ -107,6 +107,13 @@ final class GroupDetailModel {
 
     func update(_ group: Group) { self.group = group }
 
+    /// Your reply to a proposal from the Plans list (open, or confirmed: changing it there flags a
+    /// drop-out for the proposer, as on the proposal's page).
+    func respond(to proposalId: String, _ response: ResponseKind) async throws {
+        let updated = try await api.send(API.Proposals.respond(id: proposalId, response))
+        if let index = proposals.firstIndex(where: { $0.id == updated.id }) { proposals[index] = updated }
+    }
+
     /// Applies group, member, proposal, event and message live events, and refetches after a reconnect.
     func apply(_ event: LiveEvent) async {
         switch event.kind {

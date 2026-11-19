@@ -62,12 +62,15 @@ struct GroupPlansView: View {
                 .glass(cornerRadius: 24)
         } else {
             ForEach(open) { proposal in
-                Button {
-                    app.router.push(.proposal(id: proposal.id))
-                } label: {
-                    ProposalCard(proposal: proposal, group: group, me: app.session.user?.id)
+                VStack(alignment: .leading, spacing: 6) {
+                    Button {
+                        app.router.push(.proposal(id: proposal.id))
+                    } label: {
+                        ProposalCard(proposal: proposal, group: group, me: app.session.user?.id)
+                    }
+                    .buttonStyle(.pressable)
+                    replyMenu(for: proposal)
                 }
-                .buttonStyle(.pressable)
             }
         }
     }
@@ -93,10 +96,53 @@ struct GroupPlansView: View {
         if !detail.events.isEmpty {
             Text("Coming up").displayFont(19, .semibold).padding(.top, 6).accessibilityAddTraits(.isHeader)
             ForEach(detail.events) { event in
-                EventRow(event: event, canEdit: event.createdBy == app.session.user?.id || group.role.isAdmin) {
-                    editingEvent = .edit(event)
+                VStack(alignment: .leading, spacing: 6) {
+                    EventRow(event: event, canEdit: event.createdBy == app.session.user?.id || group.role.isAdmin) {
+                        editingEvent = .edit(event)
+                    }
+                    // A confirmed plan: change your reply here too.
+                    if let proposal = detail.proposals.first(where: { $0.id == event.proposalId && $0.status == .confirmed }) {
+                        replyMenu(for: proposal)
+                    }
                 }
             }
+        }
+    }
+
+    /// "Your reply: Can make it ⌄", for proposals you were asked (members who joined later weren't).
+    @ViewBuilder
+    private func replyMenu(for proposal: Proposal) -> some View {
+        if let me = app.session.user?.id, let mine = proposal.responses.first(where: { $0.userId == me })?.response {
+            Menu {
+                ForEach([ResponseKind.accepted, .maybe, .declined], id: \.self) { kind in
+                    Button {
+                        Task {
+                            do { try await detail.respond(to: proposal.id, kind) } catch  where !error.isCancellation { self.error = error.userMessage } catch {}
+                        }
+                    } label: {
+                        if kind == mine { Label(Self.replyLabel(kind), systemImage: "checkmark") } else { Text(Self.replyLabel(kind)) }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Your reply: \(Self.replyLabel(mine))").bodyFont(13, .semibold, relativeTo: .subheadline)
+                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
+                }
+                .foregroundStyle(mine == .pending ? theme.accentInk : theme.muted)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 32)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Your reply: \(Self.replyLabel(mine)). Change it")
+        }
+    }
+
+    static func replyLabel(_ kind: ResponseKind) -> String {
+        switch kind {
+        case .accepted: "Can make it"
+        case .maybe: "Maybe"
+        case .declined: "Can\u{2019}t make it"
+        case .pending: "Not replied"
         }
     }
 
