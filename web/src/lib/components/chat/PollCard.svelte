@@ -28,7 +28,7 @@
 		/** For a date poll's "Ana's busy" per option. */
 		groupId?: string;
 		members?: Map<string, Member>;
-		/** "Propose this" on the leading time (the poll's creator and admins). */
+		/** "Propose this" on each leading time (the poll's creator and admins). */
 		onpropose?: (slot: PollSlot) => void;
 	}
 	let {
@@ -54,10 +54,10 @@
 	const max = $derived(Math.max(0, ...counts));
 	const myVotes = $derived(poll.options.filter((o) => o.voterIds.includes(meId)).map((o) => o.id));
 
-	// The leading time (most votes, the earliest on a tie), for "Propose this".
-	const leadId = $derived.by(() => {
-		if (!max) return null;
-		return poll.options.find((o, i) => counts[i] === max && o.slot && ahead(o.slot))?.id ?? null;
+	// The leading times still to come (most votes, every one of a tie), for "Propose this".
+	const leadIds = $derived.by(() => {
+		if (!max) return new Set<string>();
+		return new Set(poll.options.filter((o, i) => counts[i] === max && o.slot && ahead(o.slot)).map((o) => o.id));
 	});
 
 	// Who's busy at each time still to come (refreshed when anyone's busy time changes). Not for closed polls.
@@ -114,7 +114,7 @@
 				type="button"
 				class="option"
 				class:on
-				class:leading={dated && option.id === leadId}
+				class:leading={dated && leadIds.has(option.id)}
 				aria-pressed={on}
 				disabled={poll.closed}
 				aria-label="{label}, {n} vote{n === 1 ? '' : 's'}{who ? `, ${who}` : ''}"
@@ -130,7 +130,7 @@
 				</span>
 				<span class="count">{n}</span>
 			</button>
-			{#if onpropose && option.slot && option.id === leadId}
+			{#if onpropose && option.slot && leadIds.has(option.id)}
 				<div class="propose">
 					<Button variant="accent" size="sm" icon="calendar-plus" onclick={() => onpropose(option.slot!)}>Propose this</Button>
 				</div>

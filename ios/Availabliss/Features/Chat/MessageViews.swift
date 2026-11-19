@@ -466,7 +466,7 @@ struct PollCard: View {
     /// Who asked: "Your poll" or "Poll by Ana".
     let title: String
     let canClose: Bool
-    /// The poll's creator and admins: "Propose this" on a date poll's leading option.
+    /// The poll's creator and admins: "Propose this" on each of a date poll's leading options (all tied for most votes).
     let canPropose: Bool
     let model: ChatViewModel
     @Environment(\.theme) private var theme
@@ -499,7 +499,7 @@ struct PollCard: View {
                     ) {
                         Task { await model.vote(poll: poll, option: option) }
                     }
-                    if canPropose, option.id == leading?.id, let slot = option.slot {
+                    if canPropose, isLeading(option, leading: leading), let slot = option.slot {
                         Button("Propose this") { proposalDraft = slot.draft }
                             .buttonStyle(.filled(.accent, height: 36, cornerRadius: 12, fontSize: 13))
                             .accessibilityLabel("Propose \(option.label)")
@@ -519,9 +519,9 @@ struct PollCard: View {
     }
 
     /// A date poll has one leader (the earliest of a tie), to propose; a text poll highlights every tied option.
+    /// Has the most votes, tied or not.
     private func isLeading(_ option: Poll.Option, leading: Poll.Option?) -> Bool {
-        if poll.isDatePoll { return option.id == leading?.id }
-        return leading.map { option.voterIds.count == $0.voterIds.count } ?? false
+        leading.map { option.voterIds.count == $0.voterIds.count } ?? false
     }
 
     /// "Everyone's free", "Priya is busy then", or nil while it's still being checked.
