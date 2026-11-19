@@ -19,6 +19,7 @@ export function toPublicUser(u: AuthUser): User {
 		timezone: u.timezone || 'Europe/London',
 		onboarded: !!u.onboarded,
 		busyBufferMinutes: toBusyBuffer(Number(u.busyBufferMinutes ?? 0)),
-		eventReminders: EVENT_REMINDERS.find((r) => r === u.eventReminders) ?? 'both'
+		eventReminders: EVENT_REMINDERS.find((r) => r === u.eventReminders) ?? 'both',
+		showAddToCalendar: u.showAddToCalendar !== false
 	};
 }

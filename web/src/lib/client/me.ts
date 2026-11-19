@@ -14,6 +14,7 @@ export type MePatch = Partial<
 		| 'onboarded'
 		| 'busyBufferMinutes'
 		| 'eventReminders'
+		| 'showAddToCalendar'
 	> & { username: string }
 >;
 

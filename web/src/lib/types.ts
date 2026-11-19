@@ -101,6 +101,8 @@ export interface User {
 	busyBufferMinutes: BusyBufferMinutes;
 	/** Pushes before a confirmed plan you're going to: the day before, an hour before, both or none. */
 	eventReminders: EventReminders;
+	/** Shows "Add to calendar" on plans (off for people who subscribe to their plans instead). */
+	showAddToCalendar: boolean;
 }
 
 /** Kinds of push you can turn off, each covering some notification kinds (see NOTIFICATION_CATEGORY_KINDS). */

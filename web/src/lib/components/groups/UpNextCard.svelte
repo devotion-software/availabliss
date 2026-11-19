@@ -5,6 +5,7 @@
 	import { useFormat } from '#lib/client/format';
 	import StatusPill from '#lib/components/ui/StatusPill.svelte';
 	import AddToCalendar from '#lib/components/events/AddToCalendar.svelte';
+	import { showsAddToCalendar } from '#lib/client/add-to-calendar.svelte';
 
 	/** The next confirmed plan across all groups (Main.dc "Up next"). */
 	interface Props {
@@ -36,7 +37,7 @@
 		<h2>{event.allDay ? fmt.current.when(event.start, event.end, true) : fmt.current.dateTime(event.start)}</h2>
 		<span class="sub">{[event.title, event.location && `At ${event.location}`].filter(Boolean).join(' · ')}</span>
 	</div>
-	<div class="actions"><AddToCalendar eventId={event.id} item={event} /></div>
+	{#if showsAddToCalendar()}<div class="actions"><AddToCalendar eventId={event.id} item={event} /></div>{/if}
 </section>
 
 <style>

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { myPlansIcsUrl } from '#lib/client/plans';
+	import { showsAddToCalendar } from '#lib/client/add-to-calendar.svelte';
 	import { rememberAddedToCalendar, wasAddedToCalendar } from '#lib/client/calendar-links';
 	import { plural } from '#lib/client/format';
 	import PageHeader from '#lib/components/ui/PageHeader.svelte';
@@ -37,7 +38,7 @@
 		<div class="section-head">
 			<h2 class="eyebrow" id="coming-up">Coming up{plans.going.length ? ` · ${plans.going.length}` : ''}</h2>
 			<!-- Gone once every plan coming up has been added from this browser. -->
-			{#if plans.going.some((p) => !added.has(p.id))}
+			{#if showsAddToCalendar() && plans.going.some((p) => !added.has(p.id))}
 				<Button href={myPlansIcsUrl()} download size="sm" variant="secondary" icon="calendar-plus" onclick={addedAll}>Add all to calendar</Button>
 			{/if}
 		</div>

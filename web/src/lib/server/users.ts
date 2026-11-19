@@ -29,7 +29,8 @@ export const toUser = (row: UserRow): User => ({
 	timezone: row.timezone,
 	onboarded: row.onboarded,
 	busyBufferMinutes: toBusyBuffer(row.busyBufferMinutes),
-	eventReminders: oneOf<EventReminders>(EVENT_REMINDERS, row.eventReminders, 'both')
+	eventReminders: oneOf<EventReminders>(EVENT_REMINDERS, row.eventReminders, 'both'),
+	showAddToCalendar: row.showAddToCalendar
 });
 
 export async function getMe(userId: string): Promise<User> {
@@ -52,6 +53,7 @@ export type UserPatch = Partial<
 		| 'onboarded'
 		| 'busyBufferMinutes'
 		| 'eventReminders'
+		| 'showAddToCalendar'
 	> & {
 		username: string;
 	}

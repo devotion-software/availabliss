@@ -129,6 +129,7 @@ export const updateMeSchema = z
 		onboarded: z.boolean(),
 		busyBufferMinutes: z.literal(BUSY_BUFFER_MINUTES),
 		eventReminders: z.enum(EVENT_REMINDERS),
+		showAddToCalendar: z.boolean(),
 		username
 	})
 	.partial();

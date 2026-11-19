@@ -128,6 +128,7 @@ interface User {
   timezone: string;              // IANA, e.g. "Europe/London"
   onboarded: boolean;            // false until the user finishes calendar setup
   eventReminders: 'both' | 'day' | 'hour' | 'off'; // pushes before confirmed plans you're going to (day before / hour before)
+  showAddToCalendar: boolean;                 // "Add to calendar" on plans (off for people who subscribe to their plans instead)
   busyBufferMinutes: 0 | 15 | 30 | 60 | 120; // counted as busy before and after each busy time when finding free slots and clashes (not in /me/busy)
 }
 
@@ -312,7 +313,7 @@ Offer `webcalUrl` to Apple Calendar / Outlook, `https://calendar.google.com/cale
 | Method | Path | Body | Response |
 | ------ | ---- | ---- | -------- |
 | GET 🔒 | `/me` | | `User` |
-| PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'username' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded' \| 'busyBufferMinutes' \| 'eventReminders'>>` | `User` (`409` if the username is taken; changing `busyBufferMinutes` publishes `availability.changed` to the user's groups) |
+| PATCH 🔒 | `/me` | `Partial<Pick<User, 'name' \| 'username' \| 'themeMode' \| 'colorTheme' \| 'country' \| 'subdivision' \| 'schoolAuthority' \| 'timezone' \| 'onboarded' \| 'busyBufferMinutes' \| 'eventReminders' \| 'showAddToCalendar'>>` | `User` (`409` if the username is taken; changing `busyBufferMinutes` publishes `availability.changed` to the user's groups) |
 | GET 🔒 | `/usernames/:username` | | `UsernameCheck`: whether it can be yours, and who has it (to invite them) |
 | GET 🔒 | `/me/busy?from&to` (ISO instants, `to` after `from`, at most 120 days apart) | | `{ intervals: BusyInterval[] }` (own merged busy time; `label` is only ever returned to the owner) |
 | PUT 🔒 | `/me/avatar` | the image bytes (JPEG / PNG / WebP / HEIC, ≤ 10 MB) with its `image/*` content type | `User` (`image` is the new picture, shrunk to fit 512 px) |

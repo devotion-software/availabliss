@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { showsAddToCalendar } from '#lib/client/add-to-calendar.svelte';
 	import { eventIcsUrl } from '#lib/client/events';
 	import { googleCalendarUrl, rememberAddedToCalendar, wasAddedToCalendar, type CalendarItem } from '#lib/client/calendar-links';
 	import { useFormat } from '#lib/client/format';
@@ -52,7 +53,9 @@
 	}
 </script>
 
-{#if remembered && !added}
+{#if !showsAddToCalendar()}
+	<!-- Turned off in Settings (e.g. subscribed to their plans instead). -->
+{:else if remembered && !added}
 	<p class="in-calendar">
 		<span class="chip">
 			<Icon name="check" size={13} strokeWidth={2.6} />

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { showsAddToCalendar } from '#lib/client/add-to-calendar.svelte';
 	import type { Message } from '#lib/types';
 	import type { GroupEvent } from '#lib/types';
 	import { cacheEvent, eventIcsUrl, getEventCached, removeEventImage, setEventImage } from '#lib/client/events';
@@ -88,7 +89,7 @@
 			<span class="title">{event?.title ?? message.body ?? 'An event was added'}</span>
 			{#if when}<span class="meta">{[when, event?.location].filter(Boolean).join(' · ')}</span>{/if}
 		</span>
-		{#if message.eventId}
+		{#if message.eventId && showsAddToCalendar()}
 			<a href={eventIcsUrl(message.eventId)} download aria-label="Add to calendar">
 				<Icon name="calendar-plus" size={18} />
 			</a>

@@ -281,6 +281,13 @@
       "when": 1795083482191,
       "tag": "0039_name_bare_join_notices",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1795086209439,
+      "tag": "0040_show_add_to_calendar",
+      "breakpoints": true
     }
   ]
 }

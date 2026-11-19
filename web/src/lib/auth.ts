@@ -92,7 +92,8 @@ export const auth = betterAuth({
 			timezone: { type: 'string', required: false, defaultValue: 'Europe/London', input: false },
 			onboarded: { type: 'boolean', required: false, defaultValue: false, input: false },
 			busyBufferMinutes: { type: 'number', required: false, defaultValue: 0, input: false },
-			eventReminders: { type: 'string', required: false, defaultValue: 'both', input: false }
+			eventReminders: { type: 'string', required: false, defaultValue: 'both', input: false },
+			showAddToCalendar: { type: 'boolean', required: false, defaultValue: true, input: false }
 		}
 	},
 	plugins: [

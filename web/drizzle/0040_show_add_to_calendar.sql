@@ -1,0 +1,1 @@
+ALTER TABLE `user` ADD `show_add_to_calendar` boolean DEFAULT true NOT NULL;
