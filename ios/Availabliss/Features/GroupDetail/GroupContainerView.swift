@@ -159,11 +159,13 @@ private struct GroupTopBar: View {
             // short band under them. Below that it eases out over 48pt that hang over the content, so the
             // calendar scrolls away under it gradually rather than hitting a hard edge. That fade only
             // shows once the content is scrolled: at the top it would blur the first card, and keeping
-            // it out of the header's own height means no big gap above the content.
+            // it out of the header's own height means no big gap above the content. At the top there's
+            // no blur at all: there's nothing under the header to hide, and blurring the background
+            // behind it alone left a visible edge where the header stops.
             ClearBlur(style: .systemUltraThinMaterial)
                 .mask {
                     VStack(spacing: 0) {
-                        Color.black
+                        Color.black.opacity(Self.blurStrength(scroll))
                         LinearGradient(
                             stops: [
                                 .init(color: .black, location: 0),
@@ -183,6 +185,15 @@ private struct GroupTopBar: View {
                 .ignoresSafeArea(edges: .top)
                 .animation(.easeOut(duration: 0.15), value: scroll.fadeProgress)
         }
+    }
+}
+
+extension GroupTopBar {
+    /// How strong the header's blur is: none at the top, full once scrolled 24pt. iOS 17 can't
+    /// report the scroll position, so there it's always full (the content scrolls under the name).
+    static func blurStrength(_ scroll: TopBarScrollState) -> Double {
+        if #available(iOS 18.0, *) { return scroll.fadeProgress }
+        return 1
     }
 }
 

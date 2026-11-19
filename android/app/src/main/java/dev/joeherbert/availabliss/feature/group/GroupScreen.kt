@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -144,12 +145,18 @@ private fun GroupTopBar(state: GroupShellUiState, scroll: ScrollState, actions: 
     val colors = AvailablissTheme.colors
     val fadeIn = with(LocalDensity.current) { 24.dp.toPx() }
     Column(modifier.fillMaxWidth()) {
-        // Nearly opaque: without a backdrop blur (no library just for that), anything lighter lets the
-        // calendar's text show through under the group's name and makes it hard to read.
+        // Nearly opaque once scrolled: without a backdrop blur (no library just for that), anything
+        // lighter lets the calendar's text show through under the group's name. At the top it's clear,
+        // so the page's background runs on behind the header without an edge where the header stops.
+        // Read in the draw phase so scrolling doesn't recompose the header.
+        val wash = Brush.verticalGradient(0f to colors.bg.copy(alpha = 0.94f), 1f to colors.bg.copy(alpha = 0.88f))
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(0f to colors.bg.copy(alpha = 0.94f), 1f to colors.bg.copy(alpha = 0.88f)))
+                .drawBehind {
+                    val alpha = (scroll.value / fadeIn).coerceIn(0f, 1f)
+                    if (alpha > 0f) drawRect(wash, alpha = alpha)
+                }
                 .statusBarsPadding()
                 .height(GroupTopBarHeight)
                 .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
