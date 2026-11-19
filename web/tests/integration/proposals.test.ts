@@ -1,4 +1,5 @@
 import './setup';
+import { listMessages } from '#lib/server/chat';
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db';
@@ -309,6 +310,15 @@ describe('confirmAnyway', () => {
 		const p = await createProposal(g.groupId, g.owner, slot(20));
 		await respond(p.id, g.admin, 'accepted');
 		expect(await respond(p.id, g.member, 'accepted')).toMatchObject({ status: 'confirmed', confirmedBy: null });
+	});
+
+	test('cancelling an open proposal says so at that point in the chat', async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(23));
+		await cancelProposal(p.id, g.owner);
+		const last = (await listMessages(g.groupId, g.owner, null, 50)).messages.at(-1);
+		expect(last).toMatchObject({ kind: 'system' });
+		expect(last?.body).toMatch(/ cancelled the proposal for /);
 	});
 
 	test('a cancelled proposal cannot be confirmed', async () => {

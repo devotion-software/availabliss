@@ -309,6 +309,10 @@ export async function cancelProposal(proposalId: string, userId: string): Promis
 		.set({ status: 'cancelled' })
 		.where(and(eq(proposals.id, proposalId), eq(proposals.status, 'open')));
 	if (!result.affectedRows) throw conflict(`This proposal is already ${(await getRow(proposalId)).status}`);
+	// Said at this point in the chat too: the proposal's own card further up only changes to "Cancelled".
+	const [group, name] = await Promise.all([getGroupRow(row.groupId), memberName(row.groupId, userId)]);
+	const when = slotLabel({ start: row.start.getTime(), end: row.end.getTime() }, group.requirement);
+	await postMessage(row.groupId, null, { kind: 'system', body: `${name} cancelled the proposal for ${when}` });
 	await publishToGroup(row.groupId, 'proposal.updated', await fetchProposal(proposalId));
 }
 
