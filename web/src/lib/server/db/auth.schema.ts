@@ -29,6 +29,8 @@ export const user = mysqlTable('user', {
 	eventReminders: varchar('event_reminders', { length: 8 }).default('both').notNull(),
 	// "Add to calendar" buttons on plans (off for people who subscribe to their plans instead).
 	showAddToCalendar: boolean('show_add_to_calendar').default(true).notNull(),
+	// Groups you create start with auto-archive on (archived once their latest plan has passed).
+	autoArchiveNewGroups: boolean('auto_archive_new_groups').default(false).notNull(),
 	// Push categories turned off (["chat", …]) and quiet hours ({ from: "22:00", to: "07:00" }).
 	notificationOff: json('notification_off').$type<string[]>(),
 	quietHours: json('quiet_hours').$type<{ from: string; to: string } | null>()

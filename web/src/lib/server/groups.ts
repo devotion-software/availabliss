@@ -155,14 +155,16 @@ export async function createGroup(
 	await db.transaction(async (tx) => {
 		// Locking the user's row queues their parallel creates, so each one counts
 		// the groups the others just made before checking the free-plan limit.
-		await tx.select({ id: user.id }).from(user).where(eq(user.id, userId)).for('update');
+		const [me] = await tx.select({ autoArchive: user.autoArchiveNewGroups }).from(user).where(eq(user.id, userId)).for('update');
 		await requireCanCreateGroup(userId, tx);
 		await tx.insert(groups).values({
 			id,
 			name: input.name,
 			color,
 			requirement: input.requirement ?? defaultRequirement(timeZone),
-			createdBy: userId
+			createdBy: userId,
+			// Your setting for groups you create; each group can still change it.
+			autoArchive: me?.autoArchive ?? false
 		});
 		await tx.insert(groupMembers).values({ groupId: id, userId, role: 'owner' });
 	});

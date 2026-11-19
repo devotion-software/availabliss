@@ -15,6 +15,7 @@ export type MePatch = Partial<
 		| 'busyBufferMinutes'
 		| 'eventReminders'
 		| 'showAddToCalendar'
+		| 'autoArchiveNewGroups'
 	> & { username: string }
 >;
 

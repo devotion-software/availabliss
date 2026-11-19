@@ -1,0 +1,1 @@
+ALTER TABLE `user` ADD `auto_archive_new_groups` boolean DEFAULT false NOT NULL;

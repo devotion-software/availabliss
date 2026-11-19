@@ -20,6 +20,7 @@ struct ProfileView: View {
                 settingsList
                 PlanRemindersCard(error: $error)
                 AddToCalendarSettingCard(error: $error)
+                AutoArchiveSettingCard(error: $error)
                 NotificationsCard(error: $error)
                 PlanSection(toast: $toast)
                 SignInMethodsSection(toast: $toast, error: $error)
@@ -389,6 +390,49 @@ private struct EditNameSheet: View {
             dismiss()
         } catch {
             self.error = error.userMessage
+        }
+    }
+}
+
+/// "Auto-archive groups I create": new groups you make start with auto-archive on (archived once their
+/// last plan has passed); each can still change it in its settings. Saved to the account, like web and Android.
+private struct AutoArchiveSettingCard: View {
+    @Binding var error: String?
+    @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
+    @State private var isOn = false
+    @State private var loaded = false
+
+    private var saved: Bool { app.session.user?.autoArchiveNewGroups ?? false }
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Auto-archive groups I create").bodyFont(14, .semibold)
+                Text("New groups you make archive themselves once their last plan has passed. You can change it for each group in its settings.")
+                    .bodyFont(12, relativeTo: .caption)
+                    .foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .tint(theme.accent)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(cornerRadius: 24)
+        .onAppear {
+            isOn = saved
+            loaded = true
+        }
+        .onChange(of: isOn) { old, new in
+            guard loaded, new != saved else { return }
+            Task {
+                do {
+                    _ = try await app.session.update(UserPatch(autoArchiveNewGroups: new))
+                } catch {
+                    isOn = old
+                    self.error = error.userMessage
+                }
+            }
         }
     }
 }

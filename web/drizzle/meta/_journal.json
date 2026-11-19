@@ -288,6 +288,13 @@
       "when": 1795086209439,
       "tag": "0040_show_add_to_calendar",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1795089835984,
+      "tag": "0041_auto_archive_new_groups",
+      "breakpoints": true
     }
   ]
 }

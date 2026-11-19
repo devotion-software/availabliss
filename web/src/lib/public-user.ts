@@ -20,6 +20,7 @@ export function toPublicUser(u: AuthUser): User {
 		onboarded: !!u.onboarded,
 		busyBufferMinutes: toBusyBuffer(Number(u.busyBufferMinutes ?? 0)),
 		eventReminders: EVENT_REMINDERS.find((r) => r === u.eventReminders) ?? 'both',
-		showAddToCalendar: u.showAddToCalendar !== false
+		showAddToCalendar: u.showAddToCalendar !== false,
+		autoArchiveNewGroups: u.autoArchiveNewGroups === true
 	};
 }

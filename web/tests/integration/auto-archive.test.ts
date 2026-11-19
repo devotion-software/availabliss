@@ -4,6 +4,7 @@ import { autoArchiveGroups } from '#lib/server/auto-archive';
 import { createGroup, getGroup, updateGroup } from '#lib/server/groups';
 import { createEvent } from '#lib/server/events';
 import { cancelProposal, createProposal } from '#lib/server/proposals';
+import { getMe, updateMe } from '#lib/server/users';
 import { apiError, everyDay, fixture } from './fixtures';
 
 const fx = fixture('autoarchive');
@@ -72,5 +73,17 @@ describe('auto-archive', () => {
 		await updateGroup(groupId, owner, { archived: true });
 		await createEvent(groupId, owner, event(12));
 		expect(await archived()).toBe(false);
+	});
+});
+
+describe('auto-archive for groups you create (your setting)', () => {
+	test('off by default; on, your new groups start with it on, and each can still turn it off', async () => {
+		const creator = await fx.user();
+		expect((await createGroup(creator, { name: 'Before', requirement: everyDay() }, 'UTC')).autoArchive).toBe(false);
+		await updateMe(creator, { autoArchiveNewGroups: true });
+		const after = await createGroup(creator, { name: 'After', requirement: everyDay() }, 'UTC');
+		expect(after.autoArchive).toBe(true);
+		expect((await updateGroup(after.id, creator, { autoArchive: false })).autoArchive).toBe(false);
+		expect((await getMe(creator)).autoArchiveNewGroups).toBe(true);
 	});
 });

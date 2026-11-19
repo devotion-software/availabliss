@@ -18,6 +18,7 @@
 	import PlanSection from '#lib/components/settings/PlanSection.svelte';
 	import TemplatesSection from '#lib/components/settings/TemplatesSection.svelte';
 	import AddToCalendarSection from '#lib/components/settings/AddToCalendarSection.svelte';
+	import AutoArchiveSection from '#lib/components/settings/AutoArchiveSection.svelte';
 	import RemindersSection from '#lib/components/settings/RemindersSection.svelte';
 	import NotificationsSection from '#lib/components/settings/NotificationsSection.svelte';
 	import UsernameField from '#lib/components/settings/UsernameField.svelte';
@@ -159,6 +160,7 @@
 			<RemindersSection reminders={data.user.eventReminders} />
 
 			<AddToCalendarSection show={data.user.showAddToCalendar} />
+			<AutoArchiveSection on={data.user.autoArchiveNewGroups} />
 
 			<NotificationsSection />
 

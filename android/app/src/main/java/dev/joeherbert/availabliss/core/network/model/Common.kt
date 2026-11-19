@@ -78,6 +78,8 @@ data class User(
     val eventReminders: EventReminders = EventReminders.Both,
     /** "Add to calendar" on plans (off for people who subscribe to their plans instead). Missing means on. */
     val showAddToCalendar: Boolean = true,
+    /** Groups you create start with auto-archive on. Missing means off. */
+    val autoArchiveNewGroups: Boolean = false,
 ) {
     /** The name other people see (outside a group that has its own name for them): their name, or their email. */
     val accountName: String get() = name.trim().ifEmpty { email }

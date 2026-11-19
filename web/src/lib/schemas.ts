@@ -130,6 +130,7 @@ export const updateMeSchema = z
 		busyBufferMinutes: z.literal(BUSY_BUFFER_MINUTES),
 		eventReminders: z.enum(EVENT_REMINDERS),
 		showAddToCalendar: z.boolean(),
+		autoArchiveNewGroups: z.boolean(),
 		username
 	})
 	.partial();

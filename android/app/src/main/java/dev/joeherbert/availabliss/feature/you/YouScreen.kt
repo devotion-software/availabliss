@@ -94,12 +94,15 @@ fun YouScreen(
     viewModel: YouViewModel = hiltViewModel(),
     remindersViewModel: PlanRemindersViewModel = hiltViewModel(),
     addToCalendarViewModel: AddToCalendarSettingViewModel = hiltViewModel(),
+    autoArchiveViewModel: AutoArchiveSettingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val reminders by remindersViewModel.reminders.collectAsStateWithLifecycle()
     val remindersMessage by remindersViewModel.message.collectAsStateWithLifecycle()
     val showsAddToCalendar by addToCalendarViewModel.show.collectAsStateWithLifecycle()
     val addToCalendarMessage by addToCalendarViewModel.message.collectAsStateWithLifecycle()
+    val autoArchive by autoArchiveViewModel.on.collectAsStateWithLifecycle()
+    val autoArchiveMessage by autoArchiveViewModel.message.collectAsStateWithLifecycle()
     val username by viewModel.username.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // Credential Manager sheets run in this scope so the ViewModel never holds the Activity.
@@ -118,6 +121,7 @@ fun YouScreen(
     UserMessageEffect(state.message, snackbar, viewModel::onMessageShown)
     UserMessageEffect(remindersMessage, snackbar) { remindersViewModel.onMessageShown() }
     UserMessageEffect(addToCalendarMessage, snackbar) { addToCalendarViewModel.onMessageShown() }
+    UserMessageEffect(autoArchiveMessage, snackbar) { autoArchiveViewModel.onMessageShown() }
 
     AvailablissBackground(OrbLayout.Main) {
         YouContent(
@@ -139,6 +143,8 @@ fun YouScreen(
             onSelectReminders = remindersViewModel::select,
             showsAddToCalendar = showsAddToCalendar,
             onShowAddToCalendar = addToCalendarViewModel::set,
+            autoArchive = autoArchive,
+            onAutoArchive = autoArchiveViewModel::set,
             templateActions = TemplateActions(
                 onRename = viewModel::startRenamingTemplate,
                 onNameChange = viewModel::onTemplateNameChange,
@@ -217,6 +223,8 @@ fun YouContent(
     onSelectReminders: (EventReminders) -> Unit = {},
     showsAddToCalendar: Boolean = true,
     onShowAddToCalendar: (Boolean) -> Unit = {},
+    autoArchive: Boolean = false,
+    onAutoArchive: (Boolean) -> Unit = {},
     templateActions: TemplateActions = TemplateActions(),
 ) {
     val colors = AvailablissTheme.colors
@@ -250,6 +258,7 @@ fun YouContent(
         PlanRemindersCard(reminders, onSelectReminders)
 
         AddToCalendarSettingCard(showsAddToCalendar, onShowAddToCalendar)
+        AutoArchiveSettingCard(autoArchive, onAutoArchive)
 
         SignInMethodsPanel(state, onLink)
 

@@ -93,7 +93,8 @@ export const auth = betterAuth({
 			onboarded: { type: 'boolean', required: false, defaultValue: false, input: false },
 			busyBufferMinutes: { type: 'number', required: false, defaultValue: 0, input: false },
 			eventReminders: { type: 'string', required: false, defaultValue: 'both', input: false },
-			showAddToCalendar: { type: 'boolean', required: false, defaultValue: true, input: false }
+			showAddToCalendar: { type: 'boolean', required: false, defaultValue: true, input: false },
+			autoArchiveNewGroups: { type: 'boolean', required: false, defaultValue: false, input: false }
 		}
 	},
 	plugins: [

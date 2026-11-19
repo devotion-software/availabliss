@@ -13760,6 +13760,9 @@
 					"showAddToCalendar": {
 						"type": "boolean"
 					},
+					"autoArchiveNewGroups": {
+						"type": "boolean"
+					},
 					"username": {
 						"type": "string",
 						"maxLength": 64
@@ -14117,6 +14120,10 @@
 					"showAddToCalendar": {
 						"type": "boolean",
 						"description": "Shows \"Add to calendar\" on plans (off for people who subscribe to their plans instead)."
+					},
+					"autoArchiveNewGroups": {
+						"type": "boolean",
+						"description": "Groups you create start with auto-archive on (archived once their latest plan has passed)."
 					}
 				},
 				"required": [
@@ -14134,7 +14141,8 @@
 					"onboarded",
 					"busyBufferMinutes",
 					"eventReminders",
-					"showAddToCalendar"
+					"showAddToCalendar",
+					"autoArchiveNewGroups"
 				]
 			},
 			"UsernameCheck": {

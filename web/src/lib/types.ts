@@ -103,6 +103,8 @@ export interface User {
 	eventReminders: EventReminders;
 	/** Shows "Add to calendar" on plans (off for people who subscribe to their plans instead). */
 	showAddToCalendar: boolean;
+	/** Groups you create start with auto-archive on (archived once their latest plan has passed). */
+	autoArchiveNewGroups: boolean;
 }
 
 /** Kinds of push you can turn off, each covering some notification kinds (see NOTIFICATION_CATEGORY_KINDS). */
