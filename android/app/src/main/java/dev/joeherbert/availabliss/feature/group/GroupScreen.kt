@@ -1,10 +1,12 @@
 package dev.joeherbert.availabliss.feature.group
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -28,7 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.role
@@ -54,8 +59,14 @@ import dev.joeherbert.availabliss.feature.availability.GroupCalendarTab
 import dev.joeherbert.availabliss.feature.proposal.PlansCard
 import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
 
-/** Height of the group's pinned header below the status bar; the calendar leaves this much room. */
-val GroupTopBarHeight = 84.dp
+/**
+ * Height of the group's pinned header below the status bar (its row plus a short band); the calendar
+ * leaves this much room. Its fade hangs a further [GroupTopBarFade] over the calendar, shown only once
+ * the calendar is scrolled, so there's no big gap above the first card at the top.
+ */
+val GroupTopBarHeight = 68.dp
+
+private val GroupTopBarFade = 48.dp
 
 /**
  * A group: its calendar, under a pinned header (back, name, chat, "More"). Chat, Plans, Timing,
@@ -80,15 +91,18 @@ fun GroupScreen(
     val snackbar = rememberSnackbarHostState()
     var choosingMute by rememberSaveable { mutableStateOf(false) }
     UserMessageEffect(message, snackbar, viewModel::onMessageShown)
+    val calendarScroll = rememberScrollState()
     Box(Modifier.fillMaxSize()) {
         GroupCalendarTab(
             onOpenTiming = onOpenTiming,
             onCreateProposal = onCreateProposal,
             plans = { PlansCard(onOpenProposal = onOpenProposal, onSeeAll = onOpenPlans) },
             onOpenChat = onOpenChat,
+            scrollState = calendarScroll,
         )
         GroupTopBar(
             state,
+            calendarScroll,
             GroupTopBarActions(
                 onBack, onOpenChat, onOpenPlans, onOpenTiming, onOpenMembers, onOpenSettings, onNewGroupWithPeople,
                 onMute = { choosingMute = true },
@@ -126,27 +140,54 @@ private class GroupTopBarActions(
 )
 
 @Composable
-private fun GroupTopBar(state: GroupShellUiState, actions: GroupTopBarActions, modifier: Modifier = Modifier) {
+private fun GroupTopBar(state: GroupShellUiState, scroll: ScrollState, actions: GroupTopBarActions, modifier: Modifier = Modifier) {
+    val colors = AvailablissTheme.colors
+    val fadeIn = with(LocalDensity.current) { 24.dp.toPx() }
+    Column(modifier.fillMaxWidth()) {
+        // Nearly opaque: without a backdrop blur (no library just for that), anything lighter lets the
+        // calendar's text show through under the group's name and makes it hard to read.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(0f to colors.bg.copy(alpha = 0.94f), 1f to colors.bg.copy(alpha = 0.88f)))
+                .statusBarsPadding()
+                .height(GroupTopBarHeight)
+                .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            GroupTopBarRow(state, actions)
+        }
+        // The fade over the calendar: hidden at the top (it would dim the first card), easing in over
+        // the first 24dp of scrolling. Read in the layer so scrolling doesn't recompose the header.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(GroupTopBarFade)
+                .graphicsLayer { alpha = (scroll.value / fadeIn).coerceIn(0f, 1f) }
+                .background(
+                    Brush.verticalGradient(
+                        0f to colors.bg.copy(alpha = 0.88f),
+                        0.3f to colors.bg.copy(alpha = 0.62f),
+                        0.6f to colors.bg.copy(alpha = 0.28f),
+                        1f to colors.bg.copy(alpha = 0f),
+                    ),
+                ),
+        )
+    }
+}
+
+@Composable
+private fun RowScope.GroupTopBarRow(state: GroupShellUiState, actions: GroupTopBarActions) {
     val colors = AvailablissTheme.colors
     val type = AvailablissTheme.type
-    Row(
-        modifier
-            .fillMaxWidth()
-            .background(Brush.verticalGradient(0f to colors.bg.copy(alpha = 0.6f), 0.7f to colors.bg.copy(alpha = 0.45f), 1f to colors.bg.copy(alpha = 0f)))
-            .statusBarsPadding()
-            .height(GroupTopBarHeight)
-            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        GlassIconButton(AvIcons.Back, "Back to groups", actions.onBack)
-        Column(Modifier.weight(1f)) {
-            Text(state.groupName, style = type.headlineSmall, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(state.membersLine, style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted, maxLines = 1)
-        }
-        ChatButton(state.unreadCount, actions.onOpenChat)
-        MoreMenu(state.isAdmin, state.hasOthers, state.muted, actions)
+    GlassIconButton(AvIcons.Back, "Back to groups", actions.onBack)
+    Column(Modifier.weight(1f)) {
+        Text(state.groupName, style = type.headlineSmall, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(state.membersLine, style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted, maxLines = 1)
     }
+    ChatButton(state.unreadCount, actions.onOpenChat)
+    MoreMenu(state.isAdmin, state.hasOthers, state.muted, actions)
 }
 
 @Composable
@@ -216,6 +257,7 @@ private fun GroupTopBarPreview() {
     AvailablissPreviewTheme {
         GroupTopBar(
             GroupShellUiState("Lake District crew", unreadCount = 3, isAdmin = true, membersLine = "6 members · you're an admin"),
+            rememberScrollState(),
             GroupTopBarActions({}, {}, {}, {}, {}, {}, {}, {}, {}),
         )
     }

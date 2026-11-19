@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -111,6 +112,8 @@ fun GroupCalendarTab(
     plans: @Composable () -> Unit = {},
     /** Opens the group's chat (after asking the group about shortlisted times). */
     onOpenChat: () -> Unit = {},
+    /** The calendar's scroll; the group's header reads it to fade in its edge once scrolled. */
+    scrollState: ScrollState = rememberScrollState(),
     viewModel: GroupCalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -175,6 +178,7 @@ fun GroupCalendarTab(
         },
         snackbar = { AvSnackbarHost(snackbar) },
         plans = plans,
+        scrollState = scrollState,
     )
 }
 
@@ -205,6 +209,7 @@ fun GroupCalendarContent(
     onToggleShortlist: (Slot) -> Unit = {},
     /** "3 picked · Ask the group": opens the date poll sheet. */
     onAskGroup: () -> Unit = {},
+    scrollState: ScrollState = rememberScrollState(),
 ) {
     AvailablissBackground(OrbLayout.GroupCalendar) {
         Box(Modifier.fillMaxSize()) {
@@ -212,7 +217,7 @@ fun GroupCalendarContent(
                 Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = Spacing.tabBarClearance),
                 verticalArrangement = Arrangement.spacedBy(Spacing.l),
             ) {
