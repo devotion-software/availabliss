@@ -17,11 +17,19 @@ import { newId, newToken } from './ids';
 import { deleteKeys, getObject, putObject } from './media';
 import { requireMember, roleIn } from './groups';
 import { passTitle, readWalletPass } from './wallet-pass';
+import { videoDurationSeconds } from './video-duration';
+import { isPro } from './billing';
 
 type AttachmentRow = typeof messageAttachments.$inferSelect;
 
 export const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
+/** Videos: up to 3 minutes and 100 MB, or with Pro 10 minutes and 300 MB (after the apps shrink them to 720p). */
+export const VIDEO_LIMITS = {
+	free: { seconds: 3 * 60, bytes: 100 * 1024 * 1024 },
+	pro: { seconds: 10 * 60, bytes: 300 * 1024 * 1024 }
+} as const;
+export const MAX_VIDEO_BYTES = VIDEO_LIMITS.pro.bytes;
 /** Most attachments one message can carry. */
 export const MAX_ATTACHMENTS = 10;
 /** Uploads never sent with a message are deleted after this long. */
@@ -71,11 +79,16 @@ export const FILE_TYPES: Record<string, string> = {
 	mp3: 'audio/mpeg',
 	m4a: 'audio/mp4',
 	wav: 'audio/wav',
-	mp4: 'video/mp4',
-	mov: 'video/quicktime',
 	// Apple Wallet passes: shown as a card (kind 'pass') when their pass.json can be read.
 	pkpass: 'application/vnd.apple.pkpass',
 	pkpasses: 'application/vnd.apple.pkpasses'
+};
+
+/** Videos that play in the chat (MP4 / QuickTime, whose length can be read from the header). */
+const VIDEO_TYPES: Record<string, string> = {
+	mp4: 'video/mp4',
+	m4v: 'video/x-m4v',
+	mov: 'video/quicktime'
 };
 
 const PASS_MIMES = new Set(['application/vnd.apple.pkpass', 'application/vnd.apple.pkpasses']);
@@ -125,7 +138,8 @@ function toAttachment(row: AttachmentRow): Attachment {
 		height: row.height,
 		url: signedUrl(row.id, 'file'),
 		thumbnailUrl: row.thumbKey ? signedUrl(row.id, 'thumb') : null,
-		pass: row.kind === 'pass' ? row.pass : null
+		pass: row.kind === 'pass' ? row.pass : null,
+		duration: row.kind === 'video' ? row.duration : null
 	};
 }
 
@@ -147,7 +161,7 @@ export async function attachmentsFor(messageIds: string[]): Promise<Map<string, 
 }
 
 /** What each tab of a chat's media page shows. */
-export const MEDIA_KINDS = { media: ['image', 'gif'], files: ['file', 'pass'] } as const satisfies Record<string, readonly AttachmentKind[]>;
+export const MEDIA_KINDS = { media: ['image', 'gif', 'video'], files: ['file', 'pass'] } as const satisfies Record<string, readonly AttachmentKind[]>;
 
 /**
  * Everything sent in a group's chat, newest first (in message order within a message): its photos
@@ -206,12 +220,15 @@ export function attachmentSummary(list: (Pick<Attachment, 'kind' | 'name'> & { p
 	if (!list.length) return '';
 	const files = list.filter((a) => a.kind === 'file' || a.kind === 'pass');
 	const passes = list.filter((a) => a.kind === 'pass');
+	const videos = list.filter((a) => a.kind === 'video');
 	if (list.length === 1) {
 		const [only] = list;
 		if (only.kind === 'pass') return `🎟️ ${passTitle(only.pass ?? null)}`;
+		if (only.kind === 'video') return '🎥 Video';
 		return only.kind === 'gif' ? 'GIF' : only.kind === 'image' ? '📷 Photo' : `📎 ${only.name}`;
 	}
-	if (!files.length) return `📷 ${list.length} photos`;
+	if (videos.length === list.length) return `🎥 ${list.length} videos`;
+	if (!files.length) return videos.length ? `📷 ${list.length} photos and videos` : `📷 ${list.length} photos`;
 	if (passes.length === list.length) return `🎟️ ${list.length} passes`;
 	return files.length === list.length ? `📎 ${list.length} files` : `📎 ${list.length} attachments`;
 }
@@ -271,6 +288,47 @@ interface Prepared {
 	thumb: Uint8Array | null;
 	ext: string;
 	pass?: WalletPass | null;
+	duration?: number | null;
+}
+
+/**
+ * A video: kept as sent (the apps shrink it to 720p first), as long as its length can be read and is
+ * within the plan's limits. The app's poster (a frame from it) becomes its preview.
+ */
+async function prepareVideo(
+	file: File,
+	name: string,
+	ext: string,
+	poster: File | null,
+	limit: { seconds: number; bytes: number }
+): Promise<Prepared> {
+	const minutes = limit.seconds / 60;
+	const megabytes = limit.bytes / 1024 / 1024;
+	const tooBig = `Videos can be up to ${minutes} minutes and ${megabytes} MB${limit === VIDEO_LIMITS.free ? ` (${VIDEO_LIMITS.pro.seconds / 60} minutes with Pro)` : ''}`;
+	if (file.size > limit.bytes) throw badRequest(tooBig);
+	const bytes = new Uint8Array(await file.arrayBuffer());
+	const seconds = videoDurationSeconds(bytes);
+	if (seconds === null) throw badRequest("That video couldn't be read. Try an MP4 or MOV.");
+	// A second's grace for rounding in the app's own check.
+	if (seconds > limit.seconds + 1) throw badRequest(tooBig);
+	let thumb: Uint8Array | null = null;
+	let width: number | null = null;
+	let height: number | null = null;
+	if (poster && poster.size > 0 && poster.size <= MAX_IMAGE_BYTES) {
+		try {
+			const out = await sharp(Buffer.from(await poster.arrayBuffer()), { limitInputPixels: 100_000_000 })
+				.rotate()
+				.resize(THUMB_SIDE, THUMB_SIDE, { fit: 'inside', withoutEnlargement: true })
+				.jpeg({ quality: 80, mozjpeg: true })
+				.toBuffer({ resolveWithObject: true });
+			thumb = new Uint8Array(out.data);
+			width = out.info.width;
+			height = out.info.height;
+		} catch {
+			// No usable poster: the chat shows a plain video tile.
+		}
+	}
+	return { kind: 'video', name: withExtension(name, ext), mime: VIDEO_TYPES[ext], bytes, width, height, thumb, ext, duration: Math.round(seconds) };
 }
 
 async function prepareImage(input: Buffer, name: string): Promise<Prepared> {
@@ -340,7 +398,7 @@ async function preparePass(file: Prepared): Promise<Prepared> {
  * Stores one upload for the group's chat and returns it (not yet in any message). Photos
  * are resized and stripped of metadata (location included); files must be an allowed type.
  */
-export async function uploadAttachment(groupId: string, userId: string, file: File): Promise<Attachment> {
+export async function uploadAttachment(groupId: string, userId: string, file: File, poster: File | null = null): Promise<Attachment> {
 	await requireMember(groupId, userId);
 	if (file.size === 0) throw badRequest('That file is empty');
 	const declared = (file.type || '').toLowerCase();
@@ -351,7 +409,9 @@ export async function uploadAttachment(groupId: string, userId: string, file: Fi
 	const looksLikeImage = ext in IMAGE_TYPES || Object.values(IMAGE_TYPES).includes(declared);
 
 	let prepared: Prepared;
-	if (looksLikeImage) {
+	if (ext in VIDEO_TYPES) {
+		prepared = await prepareVideo(file, name, ext, poster, (await isPro(userId)) ? VIDEO_LIMITS.pro : VIDEO_LIMITS.free);
+	} else if (looksLikeImage) {
 		if (file.size > MAX_IMAGE_BYTES) throw badRequest('Photos can be up to 15 MB');
 		prepared = await prepareImage(Buffer.from(await file.arrayBuffer()), name);
 	} else {
@@ -382,7 +442,8 @@ export async function uploadAttachment(groupId: string, userId: string, file: Fi
 		height: prepared.height,
 		storageKey,
 		thumbKey,
-		pass: prepared.pass ?? null
+		pass: prepared.pass ?? null,
+		duration: prepared.duration ?? null
 	});
 	return toAttachment((await db.query.messageAttachments.findFirst({ where: eq(messageAttachments.id, id) }))!);
 }

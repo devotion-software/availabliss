@@ -16,7 +16,8 @@ import {
 	passCard,
 	passTitle,
 	pickProblem,
-	pickedKind
+	pickedKind,
+	formatDuration
 } from './attachments';
 
 const att = (over: Partial<Attachment> = {}): Attachment => ({
@@ -219,5 +220,21 @@ describe('Wallet passes', () => {
 			false
 		);
 		expect(opensWallet('Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36')).toBe(false);
+	});
+});
+
+describe('videos', () => {
+	test('picked as videos, labelled with their length', () => {
+		expect(pickedKind({ name: 'clip.MOV', type: 'video/quicktime' })).toBe('video');
+		expect(pickedKind({ name: 'clip.mp4', type: 'video/mp4' })).toBe('video');
+		expect(formatDuration(95)).toBe('1:35');
+		expect(formatDuration(7)).toBe('0:07');
+		expect(attachmentSummary([{ kind: 'video', name: 'a.mp4' }])).toBe('Video');
+		expect(
+			attachmentSummary([
+				{ kind: 'video', name: 'a.mp4' },
+				{ kind: 'image', name: 'b.jpg' }
+			])
+		).toBe('2 photos and videos');
 	});
 });

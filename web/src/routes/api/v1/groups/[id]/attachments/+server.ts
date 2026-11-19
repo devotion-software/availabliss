@@ -1,5 +1,5 @@
 import { authed, badRequest, json, query } from '#lib/server/http';
-import { listGroupMedia, MAX_FILE_BYTES, uploadAttachment } from '#lib/server/attachments';
+import { listGroupMedia, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, uploadAttachment } from '#lib/server/attachments';
 import { groupMediaQuerySchema } from '#lib/schemas';
 
 /** The chat's media page: its photos and GIFs, or files and passes, newest first. */
@@ -14,7 +14,8 @@ export const GET = authed<{ id: string }>(async ({ params, url, userId }) => {
  */
 export const POST = authed<{ id: string }>(async ({ event, params, userId }) => {
 	// Refuse obviously oversized bodies before reading them (multipart adds a little).
-	if (Number(event.request.headers.get('content-length') ?? 0) > MAX_FILE_BYTES + 64 * 1024) throw badRequest('Files can be up to 25 MB');
+	if (Number(event.request.headers.get('content-length') ?? 0) > MAX_VIDEO_BYTES + MAX_IMAGE_BYTES + 64 * 1024)
+		throw badRequest('That upload is too big');
 	let form: FormData;
 	try {
 		form = await event.request.formData();
@@ -23,5 +24,7 @@ export const POST = authed<{ id: string }>(async ({ event, params, userId }) => 
 	}
 	const file = form.get('file');
 	if (!(file instanceof File)) throw badRequest('Expected multipart/form-data with a file');
-	return json(await uploadAttachment(params.id, userId, file), { status: 201 });
+	// A video may come with a poster (a frame from it, made by the app) for its preview.
+	const poster = form.get('poster');
+	return json(await uploadAttachment(params.id, userId, file, poster instanceof File ? poster : null), { status: 201 });
 });

@@ -67,7 +67,7 @@ export const deleteMessage = (messageId: string) => api.del(`/messages/${message
 export function uploadAttachment(
 	groupId: string,
 	file: File,
-	opts: { onprogress?: (fraction: number) => void; signal?: AbortSignal } = {}
+	opts: { onprogress?: (fraction: number) => void; signal?: AbortSignal; poster?: Blob | null } = {}
 ): Promise<Attachment> {
 	return new Promise((resolve, reject) => {
 		const xhr = new XMLHttpRequest();
@@ -93,6 +93,8 @@ export function uploadAttachment(
 		opts.signal?.addEventListener('abort', () => xhr.abort(), { once: true });
 		const form = new FormData();
 		form.append('file', file, file.name);
+		// A video's poster: a frame from it, for its preview.
+		if (opts.poster) form.append('poster', opts.poster, 'poster.jpg');
 		xhr.send(form);
 	});
 }

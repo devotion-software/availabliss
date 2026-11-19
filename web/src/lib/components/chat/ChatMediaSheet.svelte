@@ -2,7 +2,7 @@
 	import { untrack } from 'svelte';
 	import type { Group, GroupMediaItem } from '#lib/types';
 	import { listGroupMedia } from '#lib/client/chat';
-	import { formatBytes, middleTruncate } from '#lib/client/attachments';
+	import { attachmentLabel, bubbleSrc, formatBytes, formatDuration, middleTruncate } from '#lib/client/attachments';
 	import { replyAuthorName } from '#lib/client/chat-messages';
 	import { memberMap } from '#lib/client/members';
 	import { useFormat } from '#lib/client/format';
@@ -116,16 +116,12 @@
 						<button
 							type="button"
 							class="pic"
-							aria-label="{item.attachment.kind === 'gif' ? 'GIF' : 'Photo'} from {author(item)}, {fmt.current.dayDivider(item.createdAt)}"
+							aria-label="{attachmentLabel(item.attachment)} from {author(item)}, {fmt.current.dayDivider(item.createdAt)}"
 							onclick={() => (viewing = i)}
 						>
-							<img
-								src={item.attachment.kind === 'gif' ? item.attachment.url : (item.attachment.thumbnailUrl ?? item.attachment.url)}
-								alt=""
-								loading="lazy"
-								decoding="async"
-							/>
+							{#if bubbleSrc(item.attachment)}<img src={bubbleSrc(item.attachment)} alt="" loading="lazy" decoding="async" />{/if}
 							{#if item.attachment.kind === 'gif'}<span class="badge">GIF</span>{/if}
+							{#if item.attachment.kind === 'video'}<span class="badge">▶ {formatDuration(item.attachment.duration)}</span>{/if}
 						</button>
 					</li>
 				{/each}

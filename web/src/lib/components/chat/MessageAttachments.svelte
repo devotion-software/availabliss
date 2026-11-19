@@ -3,6 +3,7 @@
 	import {
 		attachmentLabel,
 		bubbleSrc,
+		formatDuration,
 		fitImage,
 		formatBytes,
 		gridTiles,
@@ -39,6 +40,13 @@
 	const tiles = $derived(pictures.length > 1 ? gridTiles(pictures.length) : []);
 </script>
 
+{#snippet play(a: Attachment)}
+	<span class="play" aria-hidden="true">
+		<svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor" /></svg>
+	</span>
+	<span class="badge" aria-hidden="true">{formatDuration(a.duration)}</span>
+{/snippet}
+
 {#if single}
 	{@const a = pictures[0]}
 	<button
@@ -49,8 +57,17 @@
 		aria-label="{attachmentLabel(a)}. Open"
 		onclick={() => onopen?.(0)}
 	>
-		<img src={bubbleSrc(a)} alt="" width={single.width} height={single.height} loading="lazy" decoding="async" draggable="false" />
+		{#if bubbleSrc(a)}<img
+				src={bubbleSrc(a)}
+				alt=""
+				width={single.width}
+				height={single.height}
+				loading="lazy"
+				decoding="async"
+				draggable="false"
+			/>{/if}
 		{#if a.kind === 'gif'}<span class="badge" aria-hidden="true">GIF</span>{/if}
+		{#if a.kind === 'video'}{@render play(a)}{/if}
 	</button>
 {:else if tiles.length}
 	<div class="grid" style:width="{maxW}px" style:--gap="{GAP}px">
@@ -63,8 +80,17 @@
 				aria-label="{attachmentLabel(a)} {t.index + 1} of {pictures.length}{t.more ? `, and ${t.more} more` : ''}. Open"
 				onclick={() => onopen?.(t.index)}
 			>
-				<img src={bubbleSrc(a)} alt="" width={t.wide ? maxW : tile} height={tile} loading="lazy" decoding="async" draggable="false" />
+				{#if bubbleSrc(a)}<img
+						src={bubbleSrc(a)}
+						alt=""
+						width={t.wide ? maxW : tile}
+						height={tile}
+						loading="lazy"
+						decoding="async"
+						draggable="false"
+					/>{/if}
 				{#if a.kind === 'gif' && !t.more}<span class="badge" aria-hidden="true">GIF</span>{/if}
+				{#if a.kind === 'video' && !t.more}{@render play(a)}{/if}
 				{#if t.more}<span class="more" aria-hidden="true">+{t.more}</span>{/if}
 			</button>
 		{/each}
@@ -169,6 +195,20 @@
 	.grid .pic.wide {
 		grid-column: span 2;
 		aspect-ratio: 2;
+	}
+	.play {
+		position: absolute;
+		inset: 0;
+		margin: auto;
+		width: 48px;
+		height: 48px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #fff;
+		background: rgba(0, 0, 0, 0.5);
+		backdrop-filter: blur(6px);
 	}
 	.badge {
 		position: absolute;

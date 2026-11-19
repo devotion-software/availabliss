@@ -309,6 +309,13 @@
       "when": 1795091009362,
       "tag": "0043_group_removals",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "5",
+      "when": 1795096609956,
+      "tag": "0044_video_attachments",
+      "breakpoints": true
     }
   ]
 }

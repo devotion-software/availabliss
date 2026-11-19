@@ -216,7 +216,7 @@
 		<div class="menu" class:glass={!compact} class:few={plain} id="composer-menu-{uid}" transition:fly={{ y: 10, duration: 220 }}>
 			<button type="button" onclick={() => choose(() => photoInput?.click())}>
 				<Icon name="image" size={22} />
-				Photos
+				Photos and videos
 			</button>
 			<button type="button" onclick={() => choose(() => fileInput?.click())}>
 				<Icon name="paperclip" size={22} />
@@ -244,7 +244,7 @@
 			{/if}
 		</div>
 	{/if}
-	<input bind:this={photoInput} type="file" accept="image/*" multiple hidden onchange={onpick} />
+	<input bind:this={photoInput} type="file" accept="image/*,video/mp4,video/quicktime,.mp4,.m4v,.mov" multiple hidden onchange={onpick} />
 	<input bind:this={fileInput} type="file" multiple hidden onchange={onpick} />
 
 	{#if hasDraft && !editing}

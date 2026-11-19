@@ -84,6 +84,24 @@ export const init: ServerInit = () => {
 
 const OTP_SEND_PATH = '/api/auth/email-otp/send-verification-otp';
 
+/** Most a request body can be: chat uploads (videos up to 300 MB), pictures, and everything else. */
+const BODY_LIMITS: [RegExp, number][] = [
+	[/^\/api\/v1\/groups\/[^/]+\/attachments$/, Number.POSITIVE_INFINITY], // checked by the route; BODY_SIZE_LIMIT is the ceiling
+	[/^\/api\/v1\/(me\/avatar|groups\/[^/]+\/image|events\/[^/]+\/image)$/, 16 * 1024 * 1024]
+];
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+
+/** 413 for a body over its route's limit, before anything reads it. */
+function refuseLargeBodies(event: RequestEvent): Response | null {
+	const length = Number(event.request.headers.get('content-length') ?? 0);
+	const limit = BODY_LIMITS.find(([path]) => path.test(event.url.pathname))?.[1] ?? MAX_BODY_BYTES;
+	if (length <= limit) return null;
+	return new Response(JSON.stringify({ code: 'payload_too_large', message: 'That request is too big' }), {
+		status: 413,
+		headers: { 'content-type': 'application/json' }
+	});
+}
+
 /**
  * Only sign-in codes can be requested: the other kinds (password reset, email verification) email
  * existing accounts only, so how long they take would say who has an account. Always on, unlike the
@@ -167,6 +185,8 @@ const handleRequest: Handle = async ({ event, resolve }) => {
 	if (ctx) ctx.userId = event.locals.user?.id ?? null;
 	event.locals.session = session?.session ?? null;
 
+	const tooBig = refuseLargeBodies(event);
+	if (tooBig) return tooBig;
 	const refused = await refuseOtherCodes(event);
 	if (refused) return refused;
 	const limited = await rateLimit(event);

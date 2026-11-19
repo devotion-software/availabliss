@@ -8579,6 +8579,13 @@
 							}
 						],
 						"description": "For `kind: 'pass'` (an Apple Wallet .pkpass / .pkpasses): what to show on its card. Null otherwise."
+					},
+					"duration": {
+						"type": [
+							"number",
+							"null"
+						],
+						"description": "For `kind: 'video'`: its length in seconds. `thumbnailUrl` is then its poster (when the app sent one) and `width` / `height` the poster's. Null for everything else."
 					}
 				},
 				"required": [
@@ -8601,7 +8608,8 @@
 					"image",
 					"gif",
 					"file",
-					"pass"
+					"pass",
+					"video"
 				]
 			},
 			"Availability": {

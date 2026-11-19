@@ -6,6 +6,10 @@ export const MAX_ATTACHMENTS = 10;
 /** The server's limits: photos (and GIFs) up to 15 MB, other files up to 25 MB. */
 export const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
+/** Videos up to 300 MB (Pro; 100 MB otherwise, which the server checks along with the length). */
+export const MAX_VIDEO_BYTES = 300 * 1024 * 1024;
+/** Videos that play in the chat. */
+export const VIDEO_EXTENSIONS = ['mp4', 'm4v', 'mov'] as const;
 
 /** File extensions the server accepts as files (anything else is a 400). */
 export const FILE_EXTENSIONS = [
@@ -33,8 +37,6 @@ export const FILE_EXTENSIONS = [
 	'mp3',
 	'm4a',
 	'wav',
-	'mp4',
-	'mov',
 	'pkpass',
 	'pkpasses'
 ] as const;
@@ -89,10 +91,17 @@ export function fileIconKind(name: string, mime = ''): FileIconKind {
 }
 
 /** Images and GIFs (shown as pictures) versus files (shown as cards). */
-export const isVisual = (a: Pick<Attachment, 'kind'>) => a.kind === 'image' || a.kind === 'gif';
+export const isVisual = (a: Pick<Attachment, 'kind'>) => a.kind === 'image' || a.kind === 'gif' || a.kind === 'video';
+
+/** A video's length: "0:07", "1:35", "12:04". */
+export function formatDuration(seconds: number | null | undefined): string {
+	const s = Math.max(0, Math.round(seconds ?? 0));
+	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
 
 /** What a picture in a bubble loads: a GIF's own (animated) file, a photo's preview. */
-export const bubbleSrc = (a: Attachment) => (a.kind === 'gif' ? a.url : (a.thumbnailUrl ?? a.url));
+export const bubbleSrc = (a: Attachment): string | null =>
+	a.kind === 'gif' ? a.url : a.kind === 'video' ? a.thumbnailUrl : (a.thumbnailUrl ?? a.url);
 
 /** A photo or file as a download (photos are served inline otherwise). */
 export const downloadUrl = (url: string) => `${url}${url.includes('?') ? '&' : '?'}download=1`;
@@ -101,6 +110,7 @@ export const downloadUrl = (url: string) => `${url}${url.includes('?') ? '&' : '
 export function attachmentLabel(a: Pick<Attachment, 'kind' | 'name' | 'size'> & { pass?: WalletPass | null }): string {
 	if (a.kind === 'image') return 'Photo';
 	if (a.kind === 'gif') return 'GIF';
+	if (a.kind === 'video') return `Video, ${formatDuration((a as { duration?: number | null }).duration)}`;
 	if (a.kind === 'pass') return `Wallet pass: ${passTitle(a.pass ?? null)}`;
 	return `File: ${a.name}, ${formatBytes(a.size)}`;
 }
@@ -111,11 +121,20 @@ export function attachmentSummary(attachments: (Pick<Attachment, 'kind' | 'name'
 	if (!n) return '';
 	if (n === 1) {
 		const [a] = attachments;
-		return a.kind === 'image' ? 'Photo' : a.kind === 'gif' ? 'GIF' : a.kind === 'pass' ? passTitle(a.pass ?? null) : a.name;
+		return a.kind === 'image'
+			? 'Photo'
+			: a.kind === 'gif'
+				? 'GIF'
+				: a.kind === 'video'
+					? 'Video'
+					: a.kind === 'pass'
+						? passTitle(a.pass ?? null)
+						: a.name;
 	}
+	if (attachments.every((a) => a.kind === 'video')) return `${n} videos`;
 	if (attachments.every((a) => a.kind === 'image')) return `${n} photos`;
 	if (attachments.every((a) => a.kind === 'gif')) return `${n} GIFs`;
-	if (attachments.every(isVisual)) return `${n} photos`;
+	if (attachments.every(isVisual)) return attachments.some((a) => a.kind === 'video') ? `${n} photos and videos` : `${n} photos`;
 	if (attachments.every((a) => a.kind === 'pass')) return `${n} passes`;
 	if (attachments.every((a) => a.kind === 'file' || a.kind === 'pass')) return `${n} files`;
 	return `${n} attachments`;
@@ -212,8 +231,9 @@ export function gridTiles(count: number, maxTiles = 4): GridTile[] {
 }
 
 /** A picked file's kind as the server will see it: GIFs and other images go up as pictures, the rest as files. */
-export function pickedKind(file: { name: string; type: string }): 'image' | 'gif' | 'file' {
+export function pickedKind(file: { name: string; type: string }): 'image' | 'gif' | 'video' | 'file' {
 	if (file.type === 'image/gif' || extensionOf(file.name) === 'gif') return 'gif';
+	if ((VIDEO_EXTENSIONS as readonly string[]).includes(extensionOf(file.name))) return 'video';
 	if (file.type.startsWith('image/') || isHeic(file)) return 'image';
 	return 'file';
 }
@@ -228,6 +248,8 @@ export function pickProblem(file: { name: string; type: string; size: number }):
 	// Photos over the limit are shrunk before uploading (attachment-draft); GIFs go as they are.
 	if (kind === 'gif') return file.size > MAX_IMAGE_BYTES ? `${file.name} is too big. GIFs can be up to 15 MB.` : null;
 	if (kind === 'image') return null;
+	if (kind === 'video') return file.size > MAX_VIDEO_BYTES ? `${file.name} is too big. Videos can be up to 300 MB.` : null;
+	if (file.type.startsWith('video/')) return `${file.name} can’t be sent. Try an MP4 or MOV video.`;
 	if (!(FILE_EXTENSIONS as readonly string[]).includes(extensionOf(file.name)) && !file.type.startsWith('application/vnd.apple.pkpass'))
 		return `${file.name} can’t be sent. Try a PDF, document, spreadsheet, presentation, ZIP, audio, video or Wallet pass.`;
 	return file.size > MAX_FILE_BYTES ? `${file.name} is too big. Files can be up to 25 MB.` : null;

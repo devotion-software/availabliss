@@ -404,7 +404,7 @@ export interface MessageLocation {
 	accuracy: number | null;
 }
 
-export const ATTACHMENT_KINDS = ['image', 'gif', 'file', 'pass'] as const;
+export const ATTACHMENT_KINDS = ['image', 'gif', 'file', 'pass', 'video'] as const;
 export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
 
 /** A photo, GIF or file in a chat message. URLs are signed and expire after about a week: refetch the message for fresh ones. */
@@ -423,6 +423,11 @@ export interface Attachment {
 	thumbnailUrl: string | null;
 	/** For `kind: 'pass'` (an Apple Wallet .pkpass / .pkpasses): what to show on its card. Null otherwise. */
 	pass: WalletPass | null;
+	/**
+	 * For `kind: 'video'`: its length in seconds. `thumbnailUrl` is then its poster (when the app sent
+	 * one) and `width` / `height` the poster's. Null for everything else.
+	 */
+	duration?: number | null;
 }
 
 /** A photo or file on a chat's media page, with the message it was sent in. */

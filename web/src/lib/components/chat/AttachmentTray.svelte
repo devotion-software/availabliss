@@ -20,7 +20,14 @@
 
 <ul class="tray" class:compact aria-label="Attachments to send">
 	{#each draft.items as item (item.key)}
-		{@const label = item.kind === 'file' ? `${item.file.name}, ${formatBytes(item.file.size)}` : item.kind === 'gif' ? 'GIF' : 'Photo'}
+		{@const label =
+			item.kind === 'file'
+				? `${item.file.name}, ${formatBytes(item.file.size)}`
+				: item.kind === 'gif'
+					? 'GIF'
+					: item.kind === 'video'
+						? 'Video'
+						: 'Photo'}
 		{@const state =
 			item.status === 'uploading' ? `uploading, ${Math.round(item.progress * 100)}%` : item.status === 'error' ? `failed: ${item.error}` : 'ready'}
 		<li class="item" class:file={item.kind === 'file'} class:failed={item.status === 'error'} aria-label="{label}, {state}">

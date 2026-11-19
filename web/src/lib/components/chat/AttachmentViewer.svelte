@@ -264,43 +264,54 @@
 			</button>
 		</div>
 
-		<div
-			class="stage"
-			class:zoomed={zoom > 1}
-			bind:this={stage}
-			role="presentation"
-			use:nonPassive
-			{onpointerdown}
-			{onpointermove}
-			{onpointerup}
-			{onpointercancel}
-		>
-			{#key current.id}
-				{#if current.thumbnailUrl && !loaded}
+		{#if current.kind === 'video'}
+			<!-- A video plays with the browser's own controls (no zoom or swipe on top of them). -->
+			<div class="stage">
+				{#key current.id}
+					<!-- svelte-ignore a11y_media_has_caption -->
+					<video class="pic video" src={current.url} poster={current.thumbnailUrl ?? undefined} controls autoplay playsinline preload="metadata"
+					></video>
+				{/key}
+			</div>
+		{:else}
+			<div
+				class="stage"
+				class:zoomed={zoom > 1}
+				bind:this={stage}
+				role="presentation"
+				use:nonPassive
+				{onpointerdown}
+				{onpointermove}
+				{onpointerup}
+				{onpointercancel}
+			>
+				{#key current.id}
+					{#if current.thumbnailUrl && !loaded}
+						<img
+							class="pic preview"
+							src={current.thumbnailUrl}
+							alt=""
+							width={current.width ?? undefined}
+							height={current.height ?? undefined}
+							draggable="false"
+							style:transform="translate({tx}px, {ty}px) scale({zoom})"
+						/>
+					{/if}
 					<img
-						class="pic preview"
-						src={current.thumbnailUrl}
-						alt=""
+						bind:this={picture}
+						class="pic"
+						src={current.url}
+						alt={current.kind === 'gif' ? 'GIF' : 'Photo'}
 						width={current.width ?? undefined}
 						height={current.height ?? undefined}
 						draggable="false"
+						onload={() => (loaded = true)}
 						style:transform="translate({tx}px, {ty}px) scale({zoom})"
+						style:transition={dragging ? 'none' : undefined}
 					/>
-				{/if}
-				<img
-					bind:this={picture}
-					class="pic"
-					src={current.url}
-					alt={current.kind === 'gif' ? 'GIF' : 'Photo'}
-					width={current.width ?? undefined}
-					height={current.height ?? undefined}
-					draggable="false"
-					onload={() => (loaded = true)}
-					style:transform="translate({tx}px, {ty}px) scale({zoom})"
-					style:transition={dragging ? 'none' : undefined}
-				/>
-			{/key}
-		</div>
+				{/key}
+			</div>
+		{/if}
 
 		{#if many}
 			<button type="button" class="nav prev" aria-label="Previous photo" onclick={() => go(-1)}>
@@ -362,6 +373,11 @@
 	.nav:focus-visible {
 		outline: 2px solid #fff;
 		outline-offset: 2px;
+	}
+	.video {
+		max-width: 100%;
+		max-height: 100%;
+		background: #000;
 	}
 	.stage {
 		position: relative;

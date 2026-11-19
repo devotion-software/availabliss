@@ -494,6 +494,8 @@ export const messageAttachments = mysqlTable(
 		thumbKey: varchar('thumb_key', { length: 255 }),
 		// A Wallet pass's card details (kind 'pass'); null otherwise.
 		pass: json('pass').$type<WalletPass>(),
+		// A video's length in seconds (kind 'video'); null otherwise.
+		duration: int('duration'),
 		// Order within its message.
 		position: int('position').default(0).notNull(),
 		createdAt: createdAt()

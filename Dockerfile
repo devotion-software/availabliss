@@ -32,7 +32,8 @@ ENV PROTOCOL_HEADER=x-forwarded-proto
 ENV HOST_HEADER=x-forwarded-host
 ENV ADDRESS_HEADER=x-forwarded-for
 # Chat files can be 25 MB (plus multipart overhead).
-ENV BODY_SIZE_LIMIT=26M
+# Chat videos go up to 300 MB (plus a poster); every other route is capped at 2 MB in hooks.server.ts.
+ENV BODY_SIZE_LIMIT=320M
 
 # Run as the image's unprivileged node user, not root.
 COPY --chown=node:node --from=deps  /app/node_modules ./node_modules

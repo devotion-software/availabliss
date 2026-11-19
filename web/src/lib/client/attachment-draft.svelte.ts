@@ -12,7 +12,9 @@ import { toasts } from './toast.svelte';
 export interface DraftAttachment {
 	key: number;
 	file: File;
-	kind: 'image' | 'gif' | 'file';
+	kind: 'image' | 'gif' | 'video' | 'file';
+	/** A video's first frame (JPEG), sent with it as its preview. */
+	poster?: Blob | null;
 	/** An object URL for a picture's thumbnail in the tray (null for files). */
 	preview: string | null;
 	status: 'uploading' | 'done' | 'error';
@@ -56,7 +58,7 @@ export class AttachmentDraft {
 				key: ++seq,
 				file,
 				kind,
-				preview: kind !== 'file' && !isHeic(file) ? URL.createObjectURL(file) : null,
+				preview: kind !== 'file' && kind !== 'video' && !isHeic(file) ? URL.createObjectURL(file) : null,
 				status: 'uploading',
 				progress: 0,
 				error: null,
@@ -103,8 +105,15 @@ export class AttachmentDraft {
 			const file = isHeic(item.file) || (item.kind === 'image' && item.file.size > MAX_IMAGE_BYTES) ? await toJpeg(item.file) : item.file;
 			// The converted photo can show in the tray now.
 			if (file !== item.file && !item.preview) this.#patch(key, { preview: URL.createObjectURL(file) });
+			// A video goes with a frame from it, which is also its thumbnail in the tray.
+			let poster = item.poster ?? null;
+			if (item.kind === 'video' && poster === null && item.poster === undefined) {
+				poster = await videoPoster(item.file);
+				this.#patch(key, { poster, preview: poster ? URL.createObjectURL(poster) : null });
+			}
 			const attachment = await uploadAttachment(this.groupId, file, {
 				signal: abort.signal,
+				poster,
 				onprogress: (progress) => this.#patch(key, { progress })
 			});
 			if (abort.signal.aborted) return;
@@ -139,5 +148,43 @@ async function toJpeg(file: File): Promise<File> {
 		return new File([blob], file.name.replace(/\.(heic|heif|jpe?g|png|webp|avif|tiff?)$/i, '') + '.jpg', { type: 'image/jpeg' });
 	} catch {
 		return file;
+	}
+}
+
+/** The longest side of a video's poster (the server keeps 720 px). */
+const POSTER_SIDE = 720;
+
+/**
+ * A frame from near the start of a video (JPEG), where the browser can play it; null otherwise (the
+ * video still sends, shown without a preview).
+ */
+export async function videoPoster(file: File): Promise<Blob | null> {
+	const url = URL.createObjectURL(file);
+	try {
+		const video = document.createElement('video');
+		video.muted = true;
+		video.playsInline = true;
+		video.preload = 'auto';
+		video.src = url;
+		await new Promise<void>((resolve, reject) => {
+			video.onloadeddata = () => resolve();
+			video.onerror = () => reject(new Error('unreadable'));
+			setTimeout(() => reject(new Error('timeout')), 10_000);
+		});
+		await new Promise<void>((resolve) => {
+			video.onseeked = () => resolve();
+			video.currentTime = Math.min(0.5, (video.duration || 1) / 2);
+			setTimeout(resolve, 3_000);
+		});
+		const scale = Math.min(1, POSTER_SIDE / Math.max(video.videoWidth, video.videoHeight));
+		const canvas = document.createElement('canvas');
+		canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+		canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+		canvas.getContext('2d')!.drawImage(video, 0, 0, canvas.width, canvas.height);
+		return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+	} catch {
+		return null;
+	} finally {
+		URL.revokeObjectURL(url);
 	}
 }
