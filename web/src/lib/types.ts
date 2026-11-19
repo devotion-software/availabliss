@@ -188,7 +188,7 @@ export interface Group extends Omit<GroupSummary, 'status' | 'unreadCount' | 'me
 	createdAt: string;
 }
 
-export const RHYTHMS = ['week', 'two-weeks', 'month'] as const;
+export const RHYTHMS = ['week', 'two-weeks', 'three-weeks', 'month', 'two-months', 'three-months', 'six-months', 'year'] as const;
 export interface Rhythm {
 	every: (typeof RHYTHMS)[number];
 	/** After each plan, post "Same again?" in the chat with the next free time near the rhythm. */

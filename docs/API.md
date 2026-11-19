@@ -189,7 +189,7 @@ interface Group extends Omit<GroupSummary, 'status' | 'unreadCount' | 'memberPre
   requirement: Requirement;
   members: Member[];
   autoArchive: boolean;     // archive it automatically once its event has passed (see below); off by default
-  rhythm: { every: 'week' | 'two-weeks' | 'month'; prompt: boolean } | null; // how often it meets; see "Rhythm" below
+  rhythm: { every: 'week' | 'two-weeks' | 'three-weeks' | 'month' | 'two-months' | 'three-months' | 'six-months' | 'year'; prompt: boolean } | null; // how often it meets; see "Rhythm" below
   createdAt: string;
 }
 ```

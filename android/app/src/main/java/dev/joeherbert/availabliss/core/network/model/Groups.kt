@@ -92,7 +92,7 @@ data class Group(
 )
 
 /**
- * How often a group meets ([every]: `week`, `two-weeks` or `month`, see [frequency]). With [prompt],
+ * How often a group meets ([every]: `week`, `two-weeks`, `three-weeks`, `month`, `two-months`, `three-months`, `six-months` or `year`, see [frequency]). With [prompt],
  * once a plan has ended and nothing newer is planned, the server suggests the next one in the chat.
  */
 @Serializable
@@ -111,7 +111,12 @@ data class Rhythm(val every: String, val prompt: Boolean = false) {
 enum class RhythmEvery(val wire: String, val label: String) {
     Week("week", "Every week"),
     TwoWeeks("two-weeks", "Every two weeks"),
+    ThreeWeeks("three-weeks", "Every three weeks"),
     Month("month", "Every month"),
+    TwoMonths("two-months", "Every two months"),
+    ThreeMonths("three-months", "Every three months"),
+    SixMonths("six-months", "Every six months"),
+    Year("year", "Every year"),
 }
 
 /** `GET /groups/:id/next`: the free time nearest the group's next meet-up, or null without a rhythm. */

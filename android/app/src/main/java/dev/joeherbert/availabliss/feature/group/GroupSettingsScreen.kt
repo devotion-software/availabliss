@@ -385,7 +385,7 @@ private fun RhythmCard(state: GroupSettingsUiState, actions: GroupSettingsAction
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
-                        every?.label ?: "None",
+                        every?.label ?: "Once",
                         style = if (selected) type.bodySmallStrong else type.body,
                         color = colors.ink,
                         modifier = Modifier.weight(1f),

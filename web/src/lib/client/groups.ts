@@ -47,7 +47,12 @@ export interface NextSuggestion {
 export const RHYTHM_LABELS: Record<Rhythm['every'], string> = {
 	week: 'Every week',
 	'two-weeks': 'Every two weeks',
-	month: 'Every month'
+	'three-weeks': 'Every three weeks',
+	month: 'Every month',
+	'two-months': 'Every two months',
+	'three-months': 'Every three months',
+	'six-months': 'Every six months',
+	year: 'Every year'
 };
 /** Null when the group has no rhythm. */
 export const getNextSuggestion = (id: string, fetch?: Fetch) =>

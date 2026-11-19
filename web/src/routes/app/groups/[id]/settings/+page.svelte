@@ -82,7 +82,7 @@
 	// How often the group meets, and whether to post "Same again?" in the chat after each plan.
 	// Both follow the saved setting (and go back if saving fails).
 	const RHYTHM_OPTIONS = [
-		{ value: 'none', label: 'None' },
+		{ value: 'none', label: 'Once' },
 		...(Object.entries(RHYTHM_LABELS) as [Rhythm['every'], string][]).map(([value, label]) => ({ value, label }))
 	];
 	let every = $state('none');
@@ -92,7 +92,7 @@
 		every = group.rhythm?.every ?? 'none';
 		prompt = group.rhythm?.prompt ?? true;
 	});
-	async function saveRhythm(next: Rhythm | null, done: string) {
+	async function saveRhythm(next: Rhythm | null, done: string | null) {
 		savingRhythm = true;
 		if (!(await save({ rhythm: next }, done))) {
 			every = group.rhythm?.every ?? 'none';
@@ -101,8 +101,8 @@
 		savingRhythm = false;
 	}
 	function setEvery(value: string) {
-		if (value === 'none') saveRhythm(null, 'No regular meet-ups');
-		else saveRhythm({ every: value as Rhythm['every'], prompt }, `Set to ${RHYTHM_LABELS[value as Rhythm['every']].toLowerCase()}`);
+		// The picker already shows what you chose: no toast.
+		saveRhythm(value === 'none' ? null : { every: value as Rhythm['every'], prompt }, null);
 	}
 	function setPrompt(on: boolean) {
 		if (every === 'none') return;
@@ -116,13 +116,14 @@
 
 	async function save(
 		patch: { name?: string; color?: TileColor; archived?: boolean; autoArchive?: boolean; rhythm?: Rhythm | null },
-		done: string
+		/** The toast once it's saved; null for none. */
+		done: string | null
 	): Promise<boolean> {
 		try {
 			await updateGroup(group.id, patch);
 			// The group's own details and the groups list (sidebar and home) both show it.
 			await Promise.all([invalidate('app:group'), invalidate('app:groups')]);
-			toasts.success(done);
+			if (done) toasts.success(done);
 			return true;
 		} catch (err) {
 			toasts.error(err);

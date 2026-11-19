@@ -12,6 +12,13 @@ describe('nextTarget', () => {
 		expect(nextTarget('2032-01-31', 'month')).toBe('2032-02-28');
 		expect(nextTarget('2032-12-03', 'month')).toBe('2033-01-07');
 	});
+	test('three weeks, and every few months or a year (first Friday → first Friday)', () => {
+		expect(nextTarget('2032-03-05', 'three-weeks')).toBe('2032-03-26');
+		expect(nextTarget('2032-03-05', 'two-months')).toBe('2032-05-07');
+		expect(nextTarget('2032-11-05', 'three-months')).toBe('2033-02-04');
+		expect(nextTarget('2032-03-05', 'six-months')).toBe('2032-09-03');
+		expect(nextTarget('2032-03-05', 'year')).toBe('2033-03-04');
+	});
 });
 
 describe('nearest', () => {

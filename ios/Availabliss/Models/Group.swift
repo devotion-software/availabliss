@@ -125,25 +125,36 @@ struct Group: Codable, Sendable, Identifiable, Equatable {
     var rhythm: Rhythm?
     var createdAt: Date
 
-    /// How often a group meets: weekly, fortnightly or monthly (the same weekday in the same week of the
-    /// month). With `prompt`, the server suggests the next one in the chat once a plan has ended.
+    /// How often a group meets: every one to three weeks, or every one, two, three or six months or a
+    /// year (the same weekday in the same week of the month). With `prompt`, the server suggests the
+    /// next one in the chat once a plan has ended.
     struct Rhythm: Codable, Sendable, Hashable {
         enum Every: String, Codable, Sendable, CaseIterable {
             case week
             case twoWeeks = "two-weeks"
+            case threeWeeks = "three-weeks"
             case month
+            case twoMonths = "two-months"
+            case threeMonths = "three-months"
+            case sixMonths = "six-months"
+            case year
 
             /// A value from a newer server reads as weekly rather than failing the whole group.
             init(from decoder: Decoder) throws {
                 self = Every(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .week
             }
 
-            /// "Every week", "Every two weeks", "Every month".
+            /// "Every week", "Every two weeks", "Every month", "Every year".
             var label: String {
                 switch self {
                 case .week: "Every week"
                 case .twoWeeks: "Every two weeks"
+                case .threeWeeks: "Every three weeks"
                 case .month: "Every month"
+                case .twoMonths: "Every two months"
+                case .threeMonths: "Every three months"
+                case .sixMonths: "Every six months"
+                case .year: "Every year"
                 }
             }
         }

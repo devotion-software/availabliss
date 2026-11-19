@@ -14,14 +14,16 @@ import { notify } from './notifications';
 
 /** The date a rhythm points at after `last` (YYYY-MM-DD in the group's zone). */
 export function nextTarget(last: string, every: Rhythm['every']): string {
-	if (every === 'week') return addDays(last, 7);
-	if (every === 'two-weeks') return addDays(last, 14);
-	// Monthly: the same weekday in the same week of next month ("the first Friday").
+	const weeks = { week: 1, 'two-weeks': 2, 'three-weeks': 3 } as const;
+	if (every in weeks) return addDays(last, 7 * weeks[every as keyof typeof weeks]);
+	const months = { month: 1, 'two-months': 2, 'three-months': 3, 'six-months': 6, year: 12 } as const;
+	const step = months[every as keyof typeof months];
+	// Monthly and longer: the same weekday in the same week of the month ("the first Friday").
 	const [y, m, d] = last.split('-').map(Number);
 	const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 	const nth = Math.ceil(d / 7);
-	const ny = m === 12 ? y + 1 : y,
-		nm = m === 12 ? 1 : m + 1;
+	const ny = y + Math.floor((m - 1 + step) / 12),
+		nm = ((m - 1 + step) % 12) + 1;
 	const firstWeekday = new Date(Date.UTC(ny, nm - 1, 1)).getUTCDay();
 	let day = 1 + ((weekday - firstWeekday + 7) % 7) + (nth - 1) * 7;
 	const daysInMonth = new Date(Date.UTC(ny, nm, 0)).getUTCDate();

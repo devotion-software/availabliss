@@ -13312,7 +13312,12 @@
 						"enum": [
 							"week",
 							"two-weeks",
-							"month"
+							"three-weeks",
+							"month",
+							"two-months",
+							"three-months",
+							"six-months",
+							"year"
 						]
 					},
 					"prompt": {
@@ -13889,7 +13894,12 @@
 										"enum": [
 											"week",
 											"two-weeks",
-											"month"
+											"three-weeks",
+											"month",
+											"two-months",
+											"three-months",
+											"six-months",
+											"year"
 										]
 									},
 									"prompt": {

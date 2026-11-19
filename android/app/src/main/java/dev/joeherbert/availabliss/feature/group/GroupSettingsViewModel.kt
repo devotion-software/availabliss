@@ -200,11 +200,11 @@ class GroupSettingsViewModel @Inject constructor(
         }
     }
 
-    /** "How often do you meet?": None (null) or a frequency, keeping the chat suggestion switch as it is. */
+    /** "How often do you meet?": Once (null) or a frequency, keeping the chat suggestion switch as it is. No toast: the list shows the choice. */
     fun setRhythm(every: RhythmEvery?) {
         val s = _state.value
         if (!s.canEdit || s.savingRhythm || every == s.rhythm) return
-        saveRhythm(every, s.rhythmPrompt, if (every == null) "No regular meet-ups" else "Meeting ${every.label.lowercase()}")
+        saveRhythm(every, s.rhythmPrompt, done = null)
     }
 
     /** "Suggest the next one in the chat" (only with a rhythm). */
@@ -216,7 +216,7 @@ class GroupSettingsViewModel @Inject constructor(
     }
 
     /** Saves the rhythm through the group PATCH; the choice shows straight away and goes back on failure. */
-    private fun saveRhythm(every: RhythmEvery?, prompt: Boolean, done: String) {
+    private fun saveRhythm(every: RhythmEvery?, prompt: Boolean, done: String?) {
         val before = _state.value
         _state.update { it.copy(rhythm = every, rhythmPrompt = prompt, savingRhythm = true) }
         viewModelScope.launch {
@@ -224,7 +224,7 @@ class GroupSettingsViewModel @Inject constructor(
             _state.update {
                 when (result) {
                     is ApiResult.Failure -> it.copy(rhythm = before.rhythm, rhythmPrompt = before.rhythmPrompt, savingRhythm = false, message = UserMessage(result.error.message))
-                    else -> it.copy(savingRhythm = false, message = UserMessage(done))
+                    else -> it.copy(savingRhythm = false, message = done?.let(::UserMessage) ?: it.message)
                 }
             }
         }

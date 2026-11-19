@@ -301,7 +301,7 @@ struct GroupSettingsView: View {
 
     // MARK: How often you meet
 
-    /// "How often do you meet?": None / Every week / Every two weeks / Every month, and whether to suggest
+    /// "How often do you meet?": Once / every week … every year, and whether to suggest
     /// the next one in the chat. Admins only; the calendar then shows a "Next one" card.
     private var rhythmCard: some View {
         GlassPanel(cornerRadius: 24) {
@@ -313,7 +313,7 @@ struct GroupSettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], alignment: .leading, spacing: 0) {
-                rhythmChip("None", isOn: group.rhythm == nil) { setRhythm(nil) }
+                rhythmChip("Once", isOn: group.rhythm == nil) { setRhythm(nil) }
                 ForEach(Group.Rhythm.Every.allCases, id: \.self) { every in
                     rhythmChip(every.label, isOn: group.rhythm?.every == every) {
                         setRhythm(Group.Rhythm(every: every, prompt: group.rhythm?.prompt ?? true))
@@ -353,17 +353,13 @@ struct GroupSettingsView: View {
     private func setRhythm(_ rhythm: Group.Rhythm?) {
         let old = group.rhythm
         guard rhythm != old else { return }
-        // "Every two weeks", "Suggestions off" (only the toggle changed), or "No regular meet-up".
-        let message: String
-        if let rhythm {
-            message = rhythm.every == old?.every ? (rhythm.prompt ? "Suggestions on" : "Suggestions off") : rhythm.every.label
-        } else {
-            message = "No regular meet-up"
-        }
+        // Only the suggestions switch gets a toast; the chips already show which one you picked.
+        let message: String? =
+            if let rhythm, rhythm.every == old?.every { rhythm.prompt ? "Suggestions on" : "Suggestions off" } else { nil }
         Task {
             isSavingRhythm = true
             defer { isSavingRhythm = false }
-            if await update(UpdateGroupBody(rhythm: rhythm.map { .set($0) } ?? .clear)) { toast = message }
+            if await update(UpdateGroupBody(rhythm: rhythm.map { .set($0) } ?? .clear)), let message { toast = message }
         }
     }
 
