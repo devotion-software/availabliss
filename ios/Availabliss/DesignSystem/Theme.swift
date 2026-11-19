@@ -29,6 +29,8 @@ struct Theme: Sendable, Equatable {
     let warn: Color
     let warnBg: Color
     let warnInk: Color
+    /// Solid, for the one irreversible action on a screen (Delete group), with white text.
+    let danger: Color
     let tiles: [Color]
     let orbOpacity: Double
 
@@ -72,7 +74,7 @@ struct Theme: Sendable, Equatable {
             solid: ink, onSolid: .white, onAccent: .white,
             busyBg: .white.opacity(0.4), busyLine: Color(hex: 0xB9BCD6),
             ok: Color(hex: 0x0FA37F), okBg: Color(hex: 0xD3F5EA), okInk: Color(hex: 0x0D6B52),
-            warn: Color(hex: 0xFF8A5E), warnBg: Color(hex: 0xFFE0CF), warnInk: Color(hex: 0x8A3410),
+            warn: Color(hex: 0xFF8A5E), warnBg: Color(hex: 0xFFE0CF), warnInk: Color(hex: 0x8A3410), danger: Color(hex: 0xB8321F),
             tiles: [0xFFD3BF, 0xD6DAFF, 0xC8F1E4, 0xF5D6EE, 0xFFE7A3].map { Color(hex: $0) },
             orbOpacity: 0.85,
             accent: palette.accent, accentInk: palette.accentInk, accentSoft: palette.accentSoft, orbs: palette.orbs
@@ -89,7 +91,7 @@ struct Theme: Sendable, Equatable {
             solid: Color(hex: 0xF1F2FA), onSolid: Color(hex: 0x0C0D1D), onAccent: .white,
             busyBg: .black.opacity(0.28), busyLine: Color(hex: 0x4A4D70),
             ok: Color(hex: 0x34D3A0), okBg: Color(hex: 0x34D3A0, alpha: 0.16), okInk: Color(hex: 0x7EE8C6),
-            warn: Color(hex: 0xFF9A73), warnBg: Color(hex: 0xFF8A5E, alpha: 0.18), warnInk: Color(hex: 0xFFBCA2),
+            warn: Color(hex: 0xFF9A73), warnBg: Color(hex: 0xFF8A5E, alpha: 0.18), warnInk: Color(hex: 0xFFBCA2), danger: Color(hex: 0xD8452F),
             tiles: [0x5C3B2E, 0x363B78, 0x1E5045, 0x58304F, 0x5A4A1E].map { Color(hex: $0) },
             orbOpacity: 0.42,
             accent: palette.accent, accentInk: palette.accentInk, accentSoft: palette.accentSoft, orbs: palette.orbs

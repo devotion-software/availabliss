@@ -300,7 +300,7 @@
 					<h2 id="delete-title">Delete group</h2>
 					<p class="small">Deletes it for everyone in it, with its chat, plans and photos.</p>
 				</div>
-				<Button variant="danger" icon="trash" onclick={() => (deleteOpen = true)}>Delete group</Button>
+				<Button variant="destructive" icon="trash" onclick={() => (deleteOpen = true)}>Delete group</Button>
 			</section>
 		{/if}
 	</div>
@@ -321,7 +321,7 @@
 	title="Delete group?"
 	message="{group.name} will be deleted for everyone in it, with its chat, plans and photos. This can't be undone."
 	confirmLabel="Delete group"
-	destructive
+	destructive="solid"
 	onconfirm={destroy}
 />
 

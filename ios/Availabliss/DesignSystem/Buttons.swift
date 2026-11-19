@@ -10,8 +10,10 @@ enum FilledButtonKind {
     case secondary
     /// `ok-bg` / `ok-ink` — a completed state ("Added to your calendar").
     case success
-    /// `warn-bg` / `warn-ink` — e.g. "Nudge".
+    /// `warn-bg` / `warn-ink` — e.g. "Nudge", "Leave group".
     case warning
+    /// `danger` / white — irreversible, e.g. "Delete group".
+    case danger
 }
 
 struct FilledButtonStyle: ButtonStyle {
@@ -50,6 +52,7 @@ struct FilledButtonStyle: ButtonStyle {
         case .secondary: (theme.surface, theme.ink)
         case .success: (theme.okBg, theme.okInk)
         case .warning: (theme.warnBg, theme.warnInk)
+        case .danger: (theme.danger, .white)
         }
     }
 }

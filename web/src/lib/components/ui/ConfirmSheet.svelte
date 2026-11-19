@@ -8,8 +8,8 @@
 		message: string;
 		confirmLabel: string;
 		cancelLabel?: string;
-		/** Styles the confirm button as destructive. */
-		destructive?: boolean;
+		/** Styles the confirm button as destructive: soft red, or solid red for the irreversible ones (Delete group). */
+		destructive?: boolean | 'solid';
 		/** `auto` slides up from the bottom on phones (a centred modal on wider screens). */
 		placement?: 'auto' | 'center';
 		onconfirm: () => Promise<unknown> | unknown;
@@ -42,6 +42,8 @@
 	{#snippet children()}{/snippet}
 	{#snippet footer()}
 		<Button variant="secondary" onclick={() => (open = false)}>{cancelLabel}</Button>
-		<Button variant={destructive ? 'danger' : 'solid'} loading={busy} onclick={confirm}>{confirmLabel}</Button>
+		<Button variant={destructive === 'solid' ? 'destructive' : destructive ? 'danger' : 'solid'} loading={busy} onclick={confirm}>
+			{confirmLabel}
+		</Button>
 	{/snippet}
 </Sheet>

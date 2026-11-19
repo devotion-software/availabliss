@@ -111,7 +111,7 @@
 		<Button variant="secondary" onclick={() => (open = false)}>Cancel</Button>
 		{#if others.length === 0}
 			{#if myRole === 'owner'}
-				<Button variant="danger" icon="trash" onclick={ondeleteinstead}>Delete group</Button>
+				<Button variant="destructive" icon="trash" onclick={ondeleteinstead}>Delete group</Button>
 			{/if}
 		{:else if needsAdmin}
 			<Button variant="accent" icon="shield" loading={busy} disabled={!picked} onclick={makeAdmin}>Make admin</Button>

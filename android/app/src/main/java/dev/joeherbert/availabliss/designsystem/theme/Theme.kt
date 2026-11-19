@@ -100,6 +100,7 @@ private fun animatedColors(target: AvailablissColors): AvailablissColors {
         warn = target.warn.animate("warn"),
         warnBg = target.warnBg.animate("warnBg"),
         warnInk = target.warnInk.animate("warnInk"),
+        danger = target.danger.animate("danger"),
         t1 = target.t1.animate("t1"),
         t2 = target.t2.animate("t2"),
         t3 = target.t3.animate("t3"),

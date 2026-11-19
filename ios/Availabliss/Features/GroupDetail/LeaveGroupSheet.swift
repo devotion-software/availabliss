@@ -38,7 +38,7 @@ struct LeaveGroupSheet: View {
                     } label: {
                         Label("Delete group", systemImage: "trash")
                     }
-                    .buttonStyle(.filled(.warning))
+                    .buttonStyle(.filled(.danger))
                 }
                 Button("Cancel") { dismiss() }.buttonStyle(.filled(.secondary))
             } else if needsAdmin {

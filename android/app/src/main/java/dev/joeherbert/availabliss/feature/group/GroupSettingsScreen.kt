@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -501,7 +502,7 @@ private fun DeleteCard(actions: GroupSettingsActions) {
                 color = colors.muted,
             )
         }
-        WarningButton("Delete group", AvIcons.Trash, onClick = actions.onDelete, height = 44.dp, shape = Shapes.controlSmall, textStyle = type.bodySmallStrong)
+        WarningButton("Delete group", AvIcons.Trash, onClick = actions.onDelete, solid = true, height = 44.dp, shape = Shapes.controlSmall, textStyle = type.bodySmallStrong)
     }
 }
 
@@ -530,7 +531,7 @@ private fun LeaveGroupSheet(
         when {
             others.isEmpty() -> {
                 SheetCaption("Nobody else is in ${state.groupName}, so there's no one to hand it to. Delete the group instead if you're done with it.")
-                if (state.role == GroupRole.Owner) WarningButton("Delete group", AvIcons.Trash, onClick = onDeleteInstead)
+                if (state.role == GroupRole.Owner) WarningButton("Delete group", AvIcons.Trash, onClick = onDeleteInstead, solid = true)
             }
             state.leaveNeedsAdmin -> {
                 SheetCaption("A group needs an admin, and nobody else in ${state.groupName} is one. Choose someone to make an admin, then you can leave.")
@@ -610,12 +611,13 @@ private fun MemberPicker(members: List<Member>, picked: String?, onPick: (String
     }
 }
 
-/** A destructive `warn-bg` / `warn-ink` button, as Delete group's. */
+/** A destructive `warn-bg` / `warn-ink` button, as Leave group's; [solid] is the darker red one for Delete group. */
 @Composable
 private fun WarningButton(
     text: String,
     icon: ImageVector,
     onClick: () -> Unit,
+    solid: Boolean = false,
     height: Dp = 52.dp,
     shape: Shape = Shapes.control,
     textStyle: TextStyle = AvailablissTheme.type.bodyStrong,
@@ -623,22 +625,23 @@ private fun WarningButton(
     loading: Boolean = false,
 ) {
     val colors = AvailablissTheme.colors
+    val ink = if (solid) Color.White else colors.warnInk
     Box(
         Modifier
             .fillMaxWidth()
             .height(height)
             .clip(shape)
-            .background(colors.warnBg)
+            .background(if (solid) colors.danger else colors.warnBg)
             .alpha(if (enabled || loading) 1f else 0.5f)
             .clickable(enabled = enabled && !loading, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (loading) {
-            CircularProgressIndicator(Modifier.size(20.dp), color = colors.warnInk, strokeWidth = 2.dp)
+            CircularProgressIndicator(Modifier.size(20.dp), color = ink, strokeWidth = 2.dp)
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(icon, null, tint = colors.warnInk, modifier = Modifier.size(18.dp))
-                Text(text, style = textStyle, color = colors.warnInk)
+                Icon(icon, null, tint = ink, modifier = Modifier.size(18.dp))
+                Text(text, style = textStyle, color = ink)
             }
         }
     }
@@ -654,7 +657,7 @@ private fun DeleteGroupSheet(groupName: String, deleting: Boolean, onConfirm: ()
             style = AvailablissTheme.type.body,
             color = colors.muted,
         )
-        WarningButton("Delete group", AvIcons.Trash, onClick = onConfirm, loading = deleting)
+        WarningButton("Delete group", AvIcons.Trash, onClick = onConfirm, solid = true, loading = deleting)
         SecondaryButton("Cancel", onClick = onDismiss, height = 52.dp, enabled = !deleting, modifier = Modifier.fillMaxWidth())
     }
 }

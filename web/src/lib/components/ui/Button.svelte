@@ -4,7 +4,7 @@
 	import Icon, { type IconName } from './Icon.svelte';
 	import Spinner from './Spinner.svelte';
 
-	type Variant = 'solid' | 'accent' | 'secondary' | 'ghost' | 'danger' | 'warn' | 'glass';
+	type Variant = 'solid' | 'accent' | 'secondary' | 'ghost' | 'danger' | 'destructive' | 'warn' | 'glass';
 	type Size = 'sm' | 'md' | 'lg';
 
 	type Common = {
@@ -154,5 +154,14 @@
 	.danger:hover:not(:disabled) {
 		color: var(--warn-ink);
 		border-color: var(--warn);
+	}
+	/* Solid red for the one irreversible action on a screen (Delete group); `danger` is the softer one (Leave group). */
+	.destructive {
+		background: var(--danger);
+		color: #fff;
+	}
+	.destructive:hover:not(:disabled) {
+		color: #fff;
+		background: color-mix(in srgb, var(--danger) 88%, black);
 	}
 </style>

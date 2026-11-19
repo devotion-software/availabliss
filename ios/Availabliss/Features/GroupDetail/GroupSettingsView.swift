@@ -483,7 +483,7 @@ struct GroupSettingsView: View {
             } label: {
                 Label("Delete group", systemImage: "trash")
             }
-            .buttonStyle(.filled(.warning, height: 44, cornerRadius: 14, fontSize: 14))
+            .buttonStyle(.filled(.danger, height: 44, cornerRadius: 14, fontSize: 14))
         }
     }
 
@@ -498,7 +498,7 @@ struct GroupSettingsView: View {
             } label: {
                 LoadingLabel(title: "Delete group", systemImage: "trash", isLoading: isDeleting)
             }
-            .buttonStyle(.filled(.warning))
+            .buttonStyle(.filled(.danger))
             .disabled(isDeleting)
             Button("Cancel") { confirmsDelete = false }
                 .buttonStyle(.filled(.secondary))
