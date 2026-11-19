@@ -63,6 +63,7 @@ import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
 import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
+import dev.joeherbert.availabliss.designsystem.component.CoverPhoto
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
 import dev.joeherbert.availabliss.designsystem.component.GlassIconButton
 import dev.joeherbert.availabliss.designsystem.component.GlassPanel
@@ -469,16 +470,18 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
                     )
                 }
             }
-            // The first card, above Who's coming: Add to calendar (or which calendar it's in), and changing your reply.
+            // The first card, above Who's coming: the cover photo (if any) and Add to calendar (or which
+            // calendar it's in). Changing your reply sits apart, below it.
             GlassPanel(
                 Modifier.fillMaxWidth().padding(top = 6.dp),
                 shape = Shapes.panel,
                 contentPadding = PaddingValues(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                state.coverImage?.let { CoverPhoto(it, aspectRatio = 2.4f) }
                 AddToCalendarButton(state.calendarStatus, onClick = actions.onAddToCalendar)
-                if (state.canChangeReply) ChangeReply(state, actions.onRespond)
             }
+            if (state.canChangeReply) ChangeReply(state, actions.onRespond)
             if (state.coming.isNotEmpty()) {
                 PeoplePanel("Who's coming", state.coming.size.toString(), state.coming)
             }

@@ -10,6 +10,7 @@ import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.common.firstName
 import dev.joeherbert.availabliss.core.common.joinNamesSummary
+import dev.joeherbert.availabliss.core.data.EventsRepository
 import dev.joeherbert.availabliss.core.data.GroupsRepository
 import dev.joeherbert.availabliss.core.data.ProposalsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
@@ -110,6 +111,8 @@ data class ProposalUiState(
     val location: String? = null,
     val calendar: AddToCalendarState = AddToCalendarState(),
     val calendarStatus: CalendarStatus = CalendarStatus(),
+    /** The confirmed plan's cover photo, if someone added one. */
+    val coverImage: String? = null,
     /** Cancelled by this user: leave the screen. */
     val closed: Boolean = false,
     val message: UserMessage? = null,
@@ -124,12 +127,17 @@ private data class ProposalData(
     val closed: Boolean = false,
     val findAnotherDate: Boolean = false,
     val message: UserMessage? = null,
+    /** The confirmed plan's cover photo (fetched with its event). */
+    val coverImage: String? = null,
+    /** Whose event [coverImage] came from, so it's fetched once per event. */
+    val coverFor: String? = null,
 )
 
 @HiltViewModel
 class ProposalViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val proposals: ProposalsRepository,
+    private val events: EventsRepository,
     private val groups: GroupsRepository,
     private val users: UserRepository,
     private val addToCalendar: AddToCalendarDelegate,
@@ -268,7 +276,16 @@ class ProposalViewModel @Inject constructor(
     fun onIntentHandled() = addToCalendar.onIntentHandled()
     fun onMessageShown(message: UserMessage) = data.update { if (it.message?.id == message.id) it.copy(message = null) else it }
 
-    private fun setProposal(proposal: Proposal) = data.update { it.copy(proposal = proposal) }
+    private fun setProposal(proposal: Proposal) {
+        data.update { it.copy(proposal = proposal) }
+        val eventId = proposal.eventId ?: return
+        if (data.value.coverFor == eventId) return
+        data.update { it.copy(coverFor = eventId) }
+        viewModelScope.launch {
+            val image = (events.get(eventId) as? ApiResult.Success)?.value?.image
+            data.update { if (it.coverFor == eventId) it.copy(coverImage = image) else it }
+        }
+    }
 
     private suspend fun loadGroup(groupId: String, force: Boolean) {
         val cached = if (force) null else groups.cachedGroup(groupId)
@@ -395,6 +412,7 @@ class ProposalViewModel @Inject constructor(
             location = p.location?.takeIf { it.isNotBlank() },
             calendar = cal,
             calendarStatus = cal.status(key),
+            coverImage = coverImage,
             closed = closed,
             message = message,
         )

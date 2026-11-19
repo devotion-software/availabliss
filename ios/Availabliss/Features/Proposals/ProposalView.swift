@@ -536,10 +536,12 @@ private struct ConfirmedView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// The first card, above Who's coming: Add to calendar, or which calendar it's in (centred, like the page).
+    /// The first card, above Who's coming: the plan's cover photo (if someone added one), then Add to
+    /// calendar or which calendar it's in (centred, like the page).
     @ViewBuilder
     private var calendarCard: some View {
         VStack(spacing: 10) {
+            if let image = model.event?.image { EventCover(imageURL: image, height: 150, cornerRadius: 14) }
             if let event = model.event {
                 AddToCalendarButton(event: event, centersChip: true)
             } else {
