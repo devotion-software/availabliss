@@ -625,6 +625,19 @@
 			opacity: 0;
 		}
 	}
+	/* Touch screens: no pointer to lean towards, so the calendar sits flat and just rises into place. */
+	@media (hover: none), (pointer: coarse) {
+		.tilt {
+			transform: none;
+			animation-name: rise;
+		}
+	}
+	@keyframes rise {
+		from {
+			transform: translateY(30px);
+			opacity: 0;
+		}
+	}
 
 	@media (min-width: 720px) {
 		.nav :global(.nav-cta) {
