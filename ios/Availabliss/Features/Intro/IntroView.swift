@@ -18,6 +18,10 @@ struct IntroView: View {
     @State private var nameSize = CGSize(width: 180, height: 60)
     /// The page dots step aside while the keyboard is up, to leave the name field room.
     @State private var keyboardUp = false
+    /// The name and its size as the other pages show them: caught up when you leave the welcome (or put
+    /// the keyboard away) rather than on every key, so typing only redraws the welcome page.
+    @State private var settledName = IntroName.first(of: IntroName.saved ?? "")
+    @State private var settledSize = CGSize(width: 180, height: 60)
 
     private var current: Int { page ?? 0 }
     private var isLast: Bool { current == IntroPage.all.count - 1 }
@@ -32,13 +36,19 @@ struct IntroView: View {
                 // Not lazy: every page's space for the name chip has to be there to slide between.
                 HStack(spacing: 0) {
                     ForEach(IntroPage.all) { item in
-                        IntroPageView(page: item, isActive: item.id == current, shown: seen.contains(item.id), name: $name, onSubmitName: next)
-                            .containerRelativeFrame(.horizontal)
-                            .id(item.id)
-                            // Added to the page's own name space (a plain preference would replace it).
-                            .transformAnchorPreference(key: IntroAnchors.self, value: .bounds) { value, anchor in
-                                if item.id == 0 { value[IntroAnchors.firstPage] = IntroSlot(anchor: anchor, tone: .ink) }
-                            }
+                        let isWelcome = item.id == 0
+                        IntroPageView(
+                            page: item, isActive: item.id == current, shown: seen.contains(item.id), name: isWelcome ? $name : .constant(""), onSubmitName: next
+                        )
+                        .equatable()
+                        .environment(\.introNameSize, isWelcome ? nameSize : settledSize)
+                        .environment(\.introName, isWelcome ? firstName : settledName)
+                        .containerRelativeFrame(.horizontal)
+                        .id(item.id)
+                        // Added to the page's own name space (a plain preference would replace it).
+                        .transformAnchorPreference(key: IntroAnchors.self, value: .bounds) { value, anchor in
+                            if item.id == 0 { value[IntroAnchors.firstPage] = IntroSlot(anchor: anchor, tone: .ink) }
+                        }
                     }
                 }
                 .scrollTargetLayout()
@@ -51,8 +61,6 @@ struct IntroView: View {
             .scrollDismissesKeyboard(.immediately)
             controls
         }
-        .environment(\.introNameSize, nameSize)
-        .environment(\.introName, firstName)
         .overlayPreferenceValue(IntroAnchors.self) { slots in
             GeometryReader { proxy in
                 let placement = namePlacement(slots, in: proxy)
@@ -74,6 +82,7 @@ struct IntroView: View {
                     CGSize(width: $0.size.width.rounded(.up), height: $0.size.height.rounded(.up))
                 } action: {
                     nameSize = $0
+                    if !keyboardUp { settle() }
                 }
                 .accessibilityHidden(true)
         }
@@ -84,11 +93,18 @@ struct IntroView: View {
         }
         .sensoryFeedback(.selection, trigger: current)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardUp = false
+            settle()
+        }
         .onChange(of: current) { _, new in
             seen.insert(new)
+            settle()
             Self.dismissKeyboard()
         }
+        // Tapping anywhere outside the name field puts the keyboard away.
+        .contentShape(Rectangle())
+        .onTapGesture { if keyboardUp { Self.dismissKeyboard() } }
     }
 
     /// Where the name sits: between the spaces left for it on the two pages either side of the scroll
@@ -110,8 +126,15 @@ struct IntroView: View {
         return (center, nameSize.height > 0 ? height / nameSize.height : 1, blend(.muted), blend(.accent))
     }
 
+    /// Brings the other pages up to date with the name typed on the welcome.
+    private func settle() {
+        if settledName != firstName { settledName = firstName }
+        if settledSize != nameSize { settledSize = nameSize }
+    }
+
     private func next() {
         guard !needsName else { return }
+        settle()
         Self.dismissKeyboard()
         if isLast {
             onFinish(name.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -266,7 +289,8 @@ private struct PageDots: View {
 }
 
 /// One page: its illustration above, title and a line of text (or, on the welcome, the name field) below.
-private struct IntroPageView: View {
+/// Equal when nothing it shows has changed, so typing on the welcome doesn't redraw the other pages.
+private struct IntroPageView: View, Equatable {
     let page: IntroPage
     let isActive: Bool
     /// The text rises in the first time the page shows.
@@ -276,11 +300,32 @@ private struct IntroPageView: View {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        MainActor.assumeIsolated {
+            lhs.page.id == rhs.page.id && lhs.isActive == rhs.isActive && lhs.shown == rhs.shown
+                && (lhs.page.kind != .welcome || lhs.name == rhs.name)
+        }
+    }
+
     var body: some View {
         GeometryReader { proxy in
             // Smaller illustration on shorter phones (and with the keyboard up), so the text always fits.
             let art = min(320, max(page.kind == .welcome ? 120 : 220, proxy.size.height - 210))
             VStack(spacing: 0) {
+                if page.kind == .welcome {
+                    // The welcome leads with its eyebrow as a heading at the top.
+                    Text(page.eyebrow)
+                        .displayFont(24, .heavy, relativeTo: .title2)
+                        .foregroundStyle(theme.accentInk)
+                        .accessibilityAddTraits(.isHeader)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 28)
+                        .padding(.top, 12)
+                        .entrance(shown, delay: 0, reduceMotion: reduceMotion)
+                        .scrollTransition(axis: .horizontal) { content, phase in
+                            content.offset(x: phase.value * 24).opacity(1 - abs(phase.value) * 0.8)
+                        }
+                }
                 Spacer(minLength: 0)
                 // Drawn at 340 × 320 and scaled to fit.
                 illustration
@@ -300,11 +345,13 @@ private struct IntroPageView: View {
                     }
                 Spacer(minLength: 16).frame(maxHeight: 36)
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(page.eyebrow.uppercased())
-                        .bodyFont(12, .bold, relativeTo: .caption)
-                        .tracking(1.2)
-                        .foregroundStyle(theme.accentInk)
-                        .entrance(shown, delay: 0, reduceMotion: reduceMotion)
+                    if page.kind != .welcome {
+                        Text(page.eyebrow.uppercased())
+                            .bodyFont(12, .bold, relativeTo: .caption)
+                            .tracking(1.2)
+                            .foregroundStyle(theme.accentInk)
+                            .entrance(shown, delay: 0, reduceMotion: reduceMotion)
+                    }
                     Text(page.title)
                         .displayFont(30, .heavy, relativeTo: .largeTitle)
                         .fixedSize(horizontal: false, vertical: true)

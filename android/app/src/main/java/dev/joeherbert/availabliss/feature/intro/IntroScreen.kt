@@ -9,6 +9,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -60,6 +61,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
@@ -158,9 +160,24 @@ fun IntroScreen(initialName: String = "", onFinish: (String) -> Unit) {
     // The welcome needs a name before you can go on (Skip still skips the whole intro).
     val needsName = pager.currentPage == 0 && firstName.isEmpty()
     val chip = remember { IntroChipLayout() }
+    // The name as the other pages show it: caught up when you leave the welcome (or put the keyboard
+    // away) rather than on every key, so typing only redraws the welcome page.
+    var settledName by remember { mutableStateOf(firstName) }
+    fun settle() {
+        settledName = firstName
+        chip.settledSize = chip.size
+    }
+    val imeVisible = WindowInsets.isImeVisible
+    LaunchedEffect(imeVisible, chip.size) { if (!imeVisible) settle() }
+
+    fun dismissKeyboard() {
+        keyboard?.hide()
+        focus.clearFocus()
+    }
 
     fun next() {
         if (needsName) return
+        settle()
         keyboard?.hide()
         focus.clearFocus()
         if (isLast) onFinish(name.trim()) else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) }
@@ -172,6 +189,7 @@ fun IntroScreen(initialName: String = "", onFinish: (String) -> Unit) {
     var lastPage by remember { mutableIntStateOf(0) }
     LaunchedEffect(pager.currentPage) {
         if (pager.currentPage != lastPage) {
+            settle()
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             keyboard?.hide()
             focus.clearFocus()
@@ -179,8 +197,15 @@ fun IntroScreen(initialName: String = "", onFinish: (String) -> Unit) {
         lastPage = pager.currentPage
     }
 
-    CompositionLocalProvider(LocalIntroChip provides chip, LocalIntroName provides firstName) {
-        Box(Modifier.fillMaxSize().background(colors.bg).onGloballyPositioned { chip.origin = it.positionInRoot() }) {
+    CompositionLocalProvider(LocalIntroChip provides chip) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(colors.bg)
+                .onGloballyPositioned { chip.origin = it.positionInRoot() }
+                // Tapping anywhere outside the name field puts the keyboard away.
+                .pointerInput(Unit) { detectTapGestures { dismissKeyboard() } },
+        ) {
             IntroOrbs(pager, pages)
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
                 Row(
@@ -207,7 +232,10 @@ fun IntroScreen(initialName: String = "", onFinish: (String) -> Unit) {
                     beyondViewportPageCount = 1,
                     userScrollEnabled = !needsName,
                 ) { index ->
-                    IntroPageContent(pages[index], index, pager, reduceMotion, name, { name = it.take(60) }, ::next)
+                    val isWelcome = index == 0
+                    CompositionLocalProvider(LocalIntroName provides if (isWelcome) firstName else settledName) {
+                        IntroPageContent(pages[index], index, pager, reduceMotion, if (isWelcome) name else "", { name = it.take(60) }, ::next)
+                    }
                 }
                 Column(
                     Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp),
@@ -215,7 +243,7 @@ fun IntroScreen(initialName: String = "", onFinish: (String) -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(22.dp),
                 ) {
                     // Out of the way while typing your name.
-                    if (!WindowInsets.isImeVisible) PageDots(pages.size, pager.currentPage)
+                    if (!imeVisible) PageDots(pages.size, pager.currentPage)
                     PrimaryButton(
                         text = if (isLast) "Get started" else "Next",
                         onClick = ::next,
@@ -245,6 +273,9 @@ private const val NAME_DRAW_SCALE = 3f
 internal class IntroChipLayout {
     val slots = mutableStateMapOf<Int, IntroSlot>()
     var size by mutableStateOf(IntSize(450, 150))
+
+    /** [size] as the pages after the welcome use it, caught up when you leave the welcome. */
+    var settledSize by mutableStateOf(IntSize(450, 150))
     var origin by mutableStateOf(Offset.Zero)
 }
 
@@ -264,7 +295,8 @@ internal fun IntroNameSlot(page: Int, scale: Float = 1f, tone: IntroNameTone = I
     val chip = LocalIntroChip.current
     val density = LocalDensity.current
     val fit = scale / NAME_DRAW_SCALE
-    val size = with(density) { DpSize(chip.size.width.toDp() * fit, chip.size.height.toDp() * fit) }
+    val measured = if (page == 0) chip.size else chip.settledSize
+    val size = with(density) { DpSize(measured.width.toDp() * fit, measured.height.toDp() * fit) }
     DisposableEffect(page) { onDispose { chip.slots.remove(page) } }
     Box(
         modifier.size(size).onGloballyPositioned { coordinates ->
@@ -394,6 +426,24 @@ private fun IntroPageContent(
         val art = (maxHeight - 210.dp).coerceIn(if (page == IntroPage.Welcome) 120.dp else 220.dp, 320.dp)
         val scale = minOf(art / 320.dp, (maxWidth - 24.dp) / 340.dp)
         Column(Modifier.fillMaxSize()) {
+            if (page == IntroPage.Welcome) {
+                // The welcome leads with its eyebrow as a heading at the top.
+                Text(
+                    page.eyebrow,
+                    style = AvailablissTheme.type.displaySmall.copy(fontSize = 24.sp),
+                    color = colors.accentInk,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 28.dp, end = 28.dp, top = 12.dp)
+                        .graphicsLayer {
+                            val o = offset()
+                            translationX = -o * 24.dp.toPx()
+                            alpha = 1f - abs(o).coerceAtMost(1f) * 0.8f
+                        }
+                        .semantics { heading() }
+                        .entrance(shown, 0, reduceMotion),
+                )
+            }
             Spacer(Modifier.weight(1f))
             Box(
                 Modifier
@@ -445,12 +495,14 @@ private fun IntroPageContent(
                     },
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(
-                    page.eyebrow.uppercase(),
-                    style = AvailablissTheme.type.captionStrong.copy(fontSize = 12.sp, letterSpacing = 1.2.sp),
-                    color = colors.accentInk,
-                    modifier = Modifier.entrance(shown, 0, reduceMotion),
-                )
+                if (page != IntroPage.Welcome) {
+                    Text(
+                        page.eyebrow.uppercase(),
+                        style = AvailablissTheme.type.captionStrong.copy(fontSize = 12.sp, letterSpacing = 1.2.sp),
+                        color = colors.accentInk,
+                        modifier = Modifier.entrance(shown, 0, reduceMotion),
+                    )
+                }
                 Text(
                     page.title,
                     style = AvailablissTheme.type.displaySmall,
