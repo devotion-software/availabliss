@@ -11,6 +11,7 @@ import {
 	replyPreview,
 	replySnippet,
 	replyingTo,
+	searchSnippet,
 	threadReplyTarget,
 	withThreadMessage
 } from './chat-messages';
@@ -190,5 +191,42 @@ describe('replyPreview with attachments', () => {
 	test('what is attached when there is no caption', () => {
 		expect(replyPreview(msg({ body: '📷 Photo', caption: null, attachments: [photo] })).text).toBe('Photo');
 		expect(replyPreview(msg({ body: '📎 Plan.pdf', attachments: [{ ...photo, kind: 'file', name: 'Plan.pdf' }] })).text).toBe('Plan.pdf');
+	});
+});
+
+describe('searchSnippet', () => {
+	const file = {
+		id: 'a1',
+		kind: 'file' as const,
+		name: 'Crown menu.pdf',
+		mime: 'application/pdf',
+		size: 1,
+		width: null,
+		height: null,
+		url: 'u',
+		thumbnailUrl: null,
+		pass: null
+	};
+	test('picks out the match, keeping its case', () => {
+		expect(searchSnippet(msg({ body: 'Shall we try the Crown?' }), 'crown')).toEqual({ before: 'Shall we try the ', match: 'Crown', after: '?' });
+	});
+	test('a long message is cut at a word before the match', () => {
+		const s = searchSnippet(msg({ body: 'We could go somewhere near the station after work on Friday, maybe the Crown' }), 'crown');
+		expect(s.before).toBe('…work on Friday, maybe the ');
+		expect(s.match).toBe('Crown');
+	});
+	test('poll options, places and file names', () => {
+		const poll = { id: 'p', question: 'Which pub?', multi: false, closed: false, options: [{ id: 'o', label: 'Red Lion', voterIds: [] }] };
+		expect(searchSnippet(msg({ kind: 'poll', body: null, poll }), 'lion')).toEqual({ before: 'Which pub? · Red ', match: 'Lion', after: '' });
+		const place = { lat: 1, lng: 2, name: 'The Crown', address: '1 High St', accuracy: null };
+		expect(searchSnippet(msg({ body: '📍 The Crown\nhttps://maps', location: place }), 'high').match).toBe('High');
+		expect(searchSnippet(msg({ body: '📎 Crown menu.pdf', attachments: [file] }), 'menu')).toEqual({
+			before: 'Crown ',
+			match: 'menu',
+			after: '.pdf'
+		});
+	});
+	test('no match: the text from the start', () => {
+		expect(searchSnippet(msg({ body: 'hello there' }), 'zzz')).toEqual({ before: 'hello there', match: '', after: '' });
 	});
 });

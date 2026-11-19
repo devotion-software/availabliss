@@ -282,6 +282,10 @@ export const endpoints: Endpoint[] = [
 	// Chat
 	{ method: 'GET', path: '/groups/{id}/messages', tag: 'Chat', auth: 'user', summary: 'A page of messages (newest last)', query: s.messagesQuerySchema, response: 'MessagePage' },
 	{
+		method: 'GET', path: '/groups/{id}/messages/search', tag: 'Chat', auth: 'user', summary: 'Search the chat (newest first)',
+		query: s.messageSearchQuerySchema, response: 'MessageSearch'
+	},
+	{
 		method: 'POST', path: '/groups/{id}/messages', tag: 'Chat', auth: 'user', summary: 'Send a message, photos / files, a place, or a poll',
 		body: s.createMessageSchema, status: 201, response: 'Message', errors: { 409: 'Replying to a deleted message' }, rateLimit: '30 / minute'
 	},

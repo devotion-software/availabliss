@@ -14,6 +14,8 @@ final class GroupDetailModel {
     var unreadCount = 0
     /// Whether the chat is on screen, so new messages there don't count as unread.
     @ObservationIgnored var isChatVisible = false
+    /// Search in the chat's header was tapped: the chat shows its search sheet.
+    var showsChatSearch = false
     @ObservationIgnored private var unreadLoaded = false
 
     /// Proposals (by date) and upcoming events, for the calendar's Plans card and the Plans screen.

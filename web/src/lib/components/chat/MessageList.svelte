@@ -169,8 +169,8 @@
 	const repliedTo = $derived(new Set(thread.messages.flatMap((m) => (m.replyTo ? [m.replyTo.id] : []))));
 	const inThread = (m: Message) => !m.id.startsWith('temp-') && (!!m.replyTo || repliedTo.has(m.id));
 
-	/** Closes the thread and goes to a message in the chat, loading earlier pages until it's there. */
-	async function showInChat(id: string) {
+	/** Closes the thread and goes to a message in the chat, loading earlier pages until it's there (also from search). */
+	export async function showInChat(id: string) {
 		threadFor = null;
 		for (let pages = 0; !thread.messages.some((m) => m.id === id) && thread.hasMore && pages < 20; pages++) {
 			const before = thread.messages.length;

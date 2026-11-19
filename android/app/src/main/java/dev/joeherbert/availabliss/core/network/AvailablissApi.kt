@@ -427,6 +427,14 @@ interface AvailablissApi {
         @Query("limit") limit: Int = 50,
     ): MessagesResponse
 
+    /** Messages containing [query] (2–100 characters, any case), newest first. */
+    @GET("api/v1/groups/{id}/messages/search")
+    suspend fun searchMessages(
+        @Path("id") groupId: String,
+        @Query("q") query: String,
+        @Query("limit") limit: Int = 50,
+    ): MessagesResponse
+
     @POST("api/v1/groups/{id}/messages")
     suspend fun sendText(@Path("id") groupId: String, @Body body: SendTextRequest): Message
 

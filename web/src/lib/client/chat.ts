@@ -14,6 +14,9 @@ export interface PollInput {
 
 export const listMessages = (groupId: string, opts: { before?: string; limit?: number } = {}, fetch?: Fetch) =>
 	api.get<MessagePage>(`/groups/${groupId}/messages`, { fetch, query: { before: opts.before, limit: opts.limit ?? 50 } });
+/** Messages containing `q` (2–100 characters, any case), newest first. */
+export const searchMessages = (groupId: string, q: string, opts: { limit?: number; signal?: AbortSignal } = {}) =>
+	api.get<MessagePage>(`/groups/${groupId}/messages/search`, { query: { q, limit: opts.limit ?? 50 }, signal: opts.signal });
 /** A text message, or (with `attachmentIds`) uploaded attachments with `body` as their optional caption. */
 export const sendMessage = (groupId: string, body: string, replyToId?: string | null, attachmentIds: string[] = []) =>
 	api.post<Message>(`/groups/${groupId}/messages`, {

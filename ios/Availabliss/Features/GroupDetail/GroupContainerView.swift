@@ -113,6 +113,13 @@ private struct GroupTopBar: View {
         AnyView(GroupTile(monogram: group.monogram, colorToken: group.color, imageURL: group.image, size: 40, cornerRadius: 14))
     }
 
+    /// Search, in the chat's header.
+    @ViewBuilder private var chatActions: some View {
+        if section == .chat {
+            IconButton(systemImage: "magnifyingglass", label: "Search chat") { detail.showsChatSearch = true }
+        }
+    }
+
     /// "Lake District crew Plans" on Plans; the group's name on its other sections.
     private var sectionTitle: String { section == .plans ? "\(group.name) Plans" : group.name }
 
@@ -125,7 +132,8 @@ private struct GroupTopBar: View {
             } else if let section, app.router.isOverGroup(group.id) {
                 ScreenHeader(
                     title: sectionTitle, titleSize: 22, backLabel: "Back to calendar", onBack: { app.router.back() },
-                    leading: section == .chat ? tile : nil)
+                    leading: section == .chat ? tile : nil
+                ) { chatActions }
             } else if section != nil {
                 // Opened from elsewhere (Activity): back returns there; the name opens the group.
                 ScreenHeader(
@@ -133,7 +141,8 @@ private struct GroupTopBar: View {
                     onTitle: {
                         app.router.pop(); app.open(.group(id: group.id))
                     },
-                    leading: section == .chat ? tile : nil)
+                    leading: section == .chat ? tile : nil
+                ) { chatActions }
             } else {
                 GroupHeader(detail: detail, group: group, unreadCount: unreadCount, onNewGroup: onNewGroup, toast: $toast, error: $error)
             }

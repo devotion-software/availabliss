@@ -48,8 +48,11 @@ struct ChatView: View {
         case info(Message)
         /// The thread a message is part of (by the message's id).
         case thread(String)
+        /// Search in the chat, from the header.
+        case search
         var id: String {
             switch self {
+            case .search: "search"
             case .thread(let id): "thread-\(id)"
             case .info(let message): "info-\(message.id)"
             }
@@ -91,6 +94,13 @@ struct ChatView: View {
         .onAppear { app.router.visibleChatGroupId = group.id }
         .onDisappear { if app.router.visibleChatGroupId == group.id { app.router.visibleChatGroupId = nil } }
         .sheet(item: $sheet) { sheet in sheetContent(sheet) }
+        // Search in the header (GroupTopBar) asks through the shared model.
+        .onChange(of: detail.showsChatSearch) { _, shows in
+            guard shows else { return }
+            detail.showsChatSearch = false
+            showsMenu = false
+            sheet = .search
+        }
         .errorAlert($model.error)
     }
 
@@ -278,6 +288,11 @@ struct ChatView: View {
             MessageInfoSheet(message: message, group: group, me: app.session.user?.id, model: model)
         case .thread(let id):
             ThreadSheet(focusId: id, group: group, me: me, model: model, api: detail.api) { target in
+                self.sheet = nil
+                showRequest = target
+            }
+        case .search:
+            ChatSearchSheet(group: group, me: me, api: detail.api) { target in
                 self.sheet = nil
                 showRequest = target
             }

@@ -4289,6 +4289,89 @@
 				}
 			}
 		},
+		"/api/v1/groups/{id}/messages/search": {
+			"get": {
+				"operationId": "getGroupsByIdMessagesSearch",
+				"tags": [
+					"Chat"
+				],
+				"summary": "Search the chat (newest first)",
+				"description": "Signed in.",
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "q",
+						"in": "query",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"minLength": 2,
+							"maxLength": 100
+						}
+					},
+					{
+						"name": "limit",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"default": 50,
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/MessageSearch"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "validation_error: the body or query is invalid",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "unauthorized: not signed in",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "rate_limited (see Retry-After)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
 		"/api/v1/groups/{id}/mute": {
 			"put": {
 				"operationId": "putGroupsByIdMute",
@@ -11339,6 +11422,27 @@
 					"deleted"
 				],
 				"description": "The quoted message shown above a reply, as it is now (edits and deletion included)."
+			},
+			"MessageSearch": {
+				"type": "object",
+				"properties": {
+					"messages": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/Message"
+						},
+						"description": "Newest first."
+					},
+					"hasMore": {
+						"type": "boolean",
+						"description": "More matched than `limit`: search for something more specific."
+					}
+				},
+				"required": [
+					"messages",
+					"hasMore"
+				],
+				"description": "GET /groups/:id/messages/search"
 			},
 			"MessageThread": {
 				"type": "object",

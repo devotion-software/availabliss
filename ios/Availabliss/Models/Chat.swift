@@ -284,3 +284,48 @@ struct ReceiptBody: Encodable, Sendable {
 }
 
 struct VoteBody: Encodable, Sendable { let optionIds: [String] }
+
+// MARK: Search
+
+extension Message {
+    /// A search result's line with the match picked out (see `searchSnippet(for:)`).
+    struct SearchSnippet: Equatable {
+        let before: String
+        let match: String
+        let after: String
+    }
+
+    /// Words kept either side of a match before the line is cut with "…".
+    private static let searchContext = 32
+
+    /// The first of the text (or caption), poll question and options, place and file names that contains
+    /// `query` (any case), cut down around the match. With no match there, the text from the start.
+    /// Same as web's `searchSnippet` and Android's `searchSnippet`.
+    func searchSnippet(for query: String) -> SearchSnippet {
+        func tidy(_ s: String?) -> String? {
+            let t = s?.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            return t?.isEmpty == false ? t : nil
+        }
+        var candidates: [String?] = []
+        if kind == .poll, let poll {
+            candidates.append(poll.question)
+            candidates += poll.options.map { "\(poll.question) · \($0.label)" }
+        }
+        candidates.append(files.isEmpty ? (place == nil ? body : nil) : caption)
+        candidates += [place?.name, place?.address]
+        candidates += files.map(\.name)
+        let texts = candidates.compactMap(tidy)
+        let needle = query.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        for text in texts where !needle.isEmpty {
+            guard let found = text.range(of: needle, options: [.caseInsensitive]) else { continue }
+            let start = text.index(found.lowerBound, offsetBy: -Self.searchContext, limitedBy: text.startIndex) ?? text.startIndex
+            var before = String(text[start..<found.lowerBound])
+            if start > text.startIndex {
+                if let space = before.firstIndex(of: " ") { before = String(before[before.index(after: space)...]) }
+                before = "…" + before
+            }
+            return SearchSnippet(before: before, match: String(text[found]), after: String(text[found.upperBound...]))
+        }
+        return SearchSnippet(before: texts.first ?? body ?? "", match: "", after: "")
+    }
+}

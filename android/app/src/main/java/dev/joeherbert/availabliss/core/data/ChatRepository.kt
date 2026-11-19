@@ -36,6 +36,10 @@ class ChatRepository @Inject constructor(
     suspend fun page(groupId: String, before: String? = null, limit: Int = PAGE_SIZE): ApiResult<MessagesResponse> =
         call { api.getMessages(groupId, before, limit) }
 
+    /** Messages containing [query] (2–100 characters, any case), newest first. */
+    suspend fun search(groupId: String, query: String): ApiResult<MessagesResponse> =
+        call { api.searchMessages(groupId, query) }
+
     suspend fun sendText(groupId: String, body: String, replyToId: String? = null): ApiResult<Message> =
         call { api.sendText(groupId, SendTextRequest(body.trim(), replyToId)) }
 

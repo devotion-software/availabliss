@@ -100,3 +100,38 @@ export function threadReplyTarget(thread: Message[], pickedId: string | null, me
 
 /** A message as it reads once deleted: no text, flagged deleted. */
 export const deletedCopy = (m: Message): Message => ({ ...m, body: null, deleted: true, location: null });
+
+/** Words either side of a search match in a result, before it's cut with "…". */
+const SEARCH_CONTEXT_CHARS = 32;
+
+/**
+ * A search result's line, with the match picked out: the first of the message's text (or caption),
+ * poll question and options, place and file names that contains `query` (any case), cut down around
+ * the match. With no match there (the server found it some other way), the text from the start.
+ */
+export function searchSnippet(m: Message, query: string): { before: string; match: string; after: string } {
+	const tidy = (s: string | null | undefined) => s?.replace(/\s+/g, ' ').trim() || null;
+	const poll = m.poll ? [m.poll.question, ...m.poll.options.map((o) => `${m.poll!.question} · ${o.label}`)] : [];
+	const candidates = [
+		...(m.kind === 'poll' ? poll : []),
+		m.attachments?.length ? m.caption : m.location ? null : m.body,
+		m.location?.name,
+		m.location?.address,
+		...(m.attachments ?? []).map((a) => a.name)
+	]
+		.map(tidy)
+		.filter((s): s is string => !!s);
+	const needle = query.trim().replace(/\s+/g, ' ').toLowerCase();
+	for (const text of candidates) {
+		const at = needle ? text.toLowerCase().indexOf(needle) : -1;
+		if (at < 0) continue;
+		const start = Math.max(0, at - SEARCH_CONTEXT_CHARS);
+		const before = text.slice(start, at);
+		return {
+			before: start > 0 ? `…${before.replace(/^\S*\s/, '')}` : before,
+			match: text.slice(at, at + needle.length),
+			after: text.slice(at + needle.length)
+		};
+	}
+	return { before: candidates[0] ?? replySnippet(replyPreview(m)), match: '', after: '' };
+}

@@ -152,6 +152,8 @@ data class ChatActions(
     val onLocation: () -> Unit = {},
     /** Tapped a shared place: ask which maps app to open it in. */
     val onOpenLocation: (MessageLocation) -> Unit = {},
+    /** Search in the header. */
+    val onSearch: () -> Unit = {},
 )
 
 /** The group's chat (full screen; back returns to the calendar tab). */
@@ -197,6 +199,7 @@ fun GroupChatTab(
     val actions = remember(viewModel) {
         ChatActions(
             onBack = { currentOnBack() },
+            onSearch = viewModel::openSearch,
             onRetry = viewModel::load,
             onLoadOlder = viewModel::loadOlder,
             onDraftChange = viewModel::onDraftChange,
@@ -289,6 +292,9 @@ fun GroupChatTab(
             onDismiss = viewModel::closeLocationSheet,
         )
     }
+    state.search?.let { search ->
+        ChatSearchSheet(search, onQuery = viewModel::onSearchQuery, onPick = viewModel::pickSearchResult, onDismiss = viewModel::closeSearch)
+    }
     openingLocation?.let { location -> OpenLocationSheet(location, onDismiss = { openingLocation = null }) }
     state.viewer?.let { viewer ->
         AttachmentViewer(
@@ -324,7 +330,7 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
     val listState = rememberLazyListState()
     AvailablissBackground(OrbLayout.Chat) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-            ChatHeader(state, actions.onBack, actions.onOpenGroup)
+            ChatHeader(state, actions.onBack, actions.onSearch, actions.onOpenGroup)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     state.loading && state.items.isEmpty() -> LoadingIndicator(Modifier.align(Alignment.Center))
@@ -367,7 +373,7 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
 }
 
 @Composable
-private fun ChatHeader(state: ChatUiState, onBack: () -> Unit, onOpenGroup: (() -> Unit)? = null) {
+private fun ChatHeader(state: ChatUiState, onBack: () -> Unit, onSearch: () -> Unit, onOpenGroup: (() -> Unit)? = null) {
     val colors = AvailablissTheme.colors
     Row(
         Modifier
@@ -398,6 +404,7 @@ private fun ChatHeader(state: ChatUiState, onBack: () -> Unit, onOpenGroup: (() 
                 Icon(AvIcons.Forward, contentDescription = null, tint = colors.muted, modifier = Modifier.size(18.dp))
             }
         }
+        PlainIconButton(AvIcons.Search, "Search chat", onSearch)
     }
 }
 

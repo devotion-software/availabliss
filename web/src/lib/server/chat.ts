@@ -2,7 +2,7 @@
 import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import type { Attachment, Message, MessageInfo, MessageKind, MessageLocation, MessageReply, MessageThread, Poll } from '#lib/types';
 import { db } from './db';
-import { groupMembers, groups, messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
+import { groupMembers, groups, messageAttachments, messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
 import { badRequest, conflict, forbidden, notFound } from './http';
 import { alias } from 'drizzle-orm/mysql-core';
 import { newId } from './ids';
@@ -393,6 +393,38 @@ export async function listMessages(groupId: string, userId: string, before: stri
 		.limit(limit + 1);
 	const hasMore = rows.length > limit;
 	const page = rows.slice(0, limit).reverse();
+	return { messages: await toMessages(page, userId, (await memberIds(groupId)).length), hasMore };
+}
+
+/** `%` and `_` match literally in a search (backslash is MariaDB's LIKE escape). */
+const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+
+/**
+ * Messages in a group's chat containing `text` (case-insensitive): in a message or caption, a poll's
+ * question or options, a file's name, or a shared place's name or address. Newest first; deleted
+ * messages and group updates aren't searched.
+ */
+export async function searchMessages(groupId: string, userId: string, text: string, limit: number) {
+	await requireMember(groupId, userId);
+	const like = likePattern(text);
+	const matches = or(
+		sql`${messages.body} LIKE ${like}`,
+		sql`${polls.question} LIKE ${like}`,
+		sql`EXISTS (SELECT 1 FROM ${pollOptions} WHERE ${pollOptions.pollId} = ${messages.pollId} AND ${pollOptions.label} LIKE ${like})`,
+		sql`EXISTS (SELECT 1 FROM ${messageAttachments} WHERE ${messageAttachments.messageId} = ${messages.id} AND ${messageAttachments.name} LIKE ${like})`,
+		// JSON values compare case-sensitively, so these are lowered on both sides.
+		sql`LOWER(JSON_VALUE(${messages.location}, '$.name')) LIKE LOWER(${like})`,
+		sql`LOWER(JSON_VALUE(${messages.location}, '$.address')) LIKE LOWER(${like})`
+	);
+	const rows = await db
+		.select({ message: messages })
+		.from(messages)
+		.leftJoin(polls, eq(polls.id, messages.pollId))
+		.where(and(eq(messages.groupId, groupId), isNull(messages.deletedAt), inArray(messages.kind, ['text', 'poll']), matches))
+		.orderBy(desc(messages.seq))
+		.limit(limit + 1);
+	const hasMore = rows.length > limit;
+	const page = rows.slice(0, limit).map((r) => r.message);
 	return { messages: await toMessages(page, userId, (await memberIds(groupId)).length), hasMore };
 }
 

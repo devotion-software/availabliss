@@ -426,6 +426,11 @@ export const messagesQuerySchema = z.object({
 	before: z.string().min(1).optional(),
 	limit: z.coerce.number().int().min(1).max(100).default(50)
 });
+/** GET /groups/:id/messages/search?q */
+export const messageSearchQuerySchema = z.object({
+	q: z.string().trim().min(2, 'Search for at least 2 characters').max(100),
+	limit: z.coerce.number().int().min(1).max(100).default(50)
+});
 /** GET /groups/:id/availability/day?date */
 export const dayQuerySchema = z.object({ date: dateString });
 

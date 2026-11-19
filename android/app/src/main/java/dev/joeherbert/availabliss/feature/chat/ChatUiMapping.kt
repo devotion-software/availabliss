@@ -58,6 +58,7 @@ internal fun ChatData.toUi(items: List<ChatItem>, me: String?, cal: AddToCalenda
         downloads = downloads,
         viewer = viewer,
         locationSheet = locationSheet,
+        search = search?.toUi(MemberDirectory(g?.members.orEmpty(), me)),
     )
 }
 

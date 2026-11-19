@@ -7,7 +7,7 @@ import type { previewInvite } from './server/groups';
 import type { myPlans, upcomingFor } from './server/events';
 import type { getCalendarFeed } from './server/calendar-feeds';
 import type { nextSuggestion } from './server/rhythm';
-import type { listMessages } from './server/chat';
+import type { listMessages, searchMessages } from './server/chat';
 import type { listNotifications } from './server/notifications';
 import type { previewRequirement } from './server/availability/service';
 import type { draftProposal } from './server/planner';
@@ -28,6 +28,7 @@ export type ApiTypeChecks = [
 	Assert<Same<Returns<typeof getCalendarFeed>, A.CalendarFeed>>,
 	Assert<Same<Returns<typeof nextSuggestion>, A.NextSuggestion | null>>,
 	Assert<Same<Returns<typeof listMessages>, A.MessagePage>>,
+	Assert<Same<Returns<typeof searchMessages>, A.MessageSearch>>,
 	Assert<Same<Returns<typeof listNotifications>, A.NotificationList>>,
 	// The route adds `summary` to what previewRequirement works out.
 	Assert<Same<Returns<typeof previewRequirement> & { summary: string }, A.RequirementPreview>>,

@@ -113,6 +113,8 @@ data class ChatUiState(
     val viewer: ViewerUi? = null,
     /** Non-null while the Share a location sheet is open. */
     val locationSheet: LocationSheetUi? = null,
+    /** Non-null while the Search chat sheet is open. */
+    val search: ChatSearchUi? = null,
 )
 
 /** The Share a location sheet: a place search and what it found, or the place picked from it. */

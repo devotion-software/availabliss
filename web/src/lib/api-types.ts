@@ -97,6 +97,14 @@ export interface MessagePage {
 	hasMore: boolean;
 }
 
+/** GET /groups/:id/messages/search */
+export interface MessageSearch {
+	/** Newest first. */
+	messages: Message[];
+	/** More matched than `limit`: search for something more specific. */
+	hasMore: boolean;
+}
+
 /** GET /notifications */
 export interface NotificationList {
 	notifications: AppNotification[];

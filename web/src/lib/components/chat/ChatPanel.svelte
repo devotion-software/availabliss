@@ -8,6 +8,8 @@
 	import Composer from './Composer.svelte';
 	import PollComposerSheet from './PollComposerSheet.svelte';
 	import LocationSheet from './LocationSheet.svelte';
+	import ChatSearchSheet from './ChatSearchSheet.svelte';
+	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import { dropFiles } from './drop-files';
 
 	/** Compact chat beside the desktop group calendar (Web.dc.html). */
@@ -20,6 +22,8 @@
 
 	let pollOpen = $state(false);
 	let locationOpen = $state(false);
+	let searchOpen = $state(false);
+	let list: ReturnType<typeof MessageList> | undefined = $state();
 	let composer: ReturnType<typeof Composer> | undefined = $state();
 
 	// One thread per group; recreated if you switch groups.
@@ -45,10 +49,11 @@
 	<header>
 		<h2 id="chat-panel-{group.id}">Chat</h2>
 		{#if thread.unseen}<span class="new">{thread.unseen} new</span>{/if}
+		<IconButton icon="search" label="Search chat" variant="plain" size={36} onclick={() => (searchOpen = true)} />
 		<a href="/app/groups/{group.id}/chat">Open<span class="sr-only"> full chat</span></a>
 	</header>
 	<div class="messages">
-		<MessageList {thread} {group} meId={me.id} compact />
+		<MessageList bind:this={list} {thread} {group} meId={me.id} compact />
 	</div>
 	<Composer
 		bind:this={composer}
@@ -68,6 +73,7 @@
 
 <PollComposerSheet bind:open={pollOpen} onsubmit={(poll) => thread.sendPoll(poll)} />
 <LocationSheet bind:open={locationOpen} onsend={(location) => thread.sendLocation(location)} />
+<ChatSearchSheet bind:open={searchOpen} {group} meId={me.id} onpick={(id) => list?.showInChat(id)} />
 
 <style>
 	.panel {

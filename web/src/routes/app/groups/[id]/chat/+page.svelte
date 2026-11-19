@@ -12,6 +12,7 @@
 	import Composer from '#lib/components/chat/Composer.svelte';
 	import PollComposerSheet from '#lib/components/chat/PollComposerSheet.svelte';
 	import LocationSheet from '#lib/components/chat/LocationSheet.svelte';
+	import ChatSearchSheet from '#lib/components/chat/ChatSearchSheet.svelte';
 	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
 	import { dropFiles } from '#lib/components/chat/drop-files';
 
@@ -20,6 +21,8 @@
 	let pollOpen = $state(false);
 	let proposeOpen = $state(false);
 	let locationOpen = $state(false);
+	let searchOpen = $state(false);
+	let list: ReturnType<typeof MessageList> | undefined = $state();
 	let composer: ReturnType<typeof Composer> | undefined = $state();
 
 	const group = $derived(data.group);
@@ -79,10 +82,11 @@
 				<span>{others.length ? listNames(others) : 'Just you so far'}</span>
 			</div>
 		{/if}
+		<IconButton icon="search" label="Search chat" variant="plain" onclick={() => (searchOpen = true)} />
 		<span class="cal-link"><IconButton href={calendarHref} icon="calendar" label="Group calendar" variant="plain" /></span>
 	</header>
 
-	<MessageList {thread} {group} meId={data.user.id} />
+	<MessageList bind:this={list} {thread} {group} meId={data.user.id} />
 
 	<div class="composer">
 		<Composer
@@ -103,6 +107,7 @@
 
 <PollComposerSheet bind:open={pollOpen} onsubmit={(poll) => thread.sendPoll(poll)} />
 <LocationSheet bind:open={locationOpen} onsend={(location) => thread.sendLocation(location)} />
+<ChatSearchSheet bind:open={searchOpen} {group} meId={data.user.id} onpick={(id) => list?.showInChat(id)} />
 <ProposeSheet bind:open={proposeOpen} {group} meId={data.user.id} initial={null} />
 
 <style>
