@@ -76,6 +76,10 @@
 		z-index: 2;
 		pointer-events: none;
 	}
+	/* Nothing to show once it's in your calendar: no gap for it either. */
+	.actions:not(:has(*)) {
+		display: none;
+	}
 	.actions :global(a),
 	.actions :global(button) {
 		pointer-events: auto;

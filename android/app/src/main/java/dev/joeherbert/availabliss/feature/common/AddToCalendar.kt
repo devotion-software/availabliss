@@ -413,6 +413,8 @@ fun AddToCalendarButton(
         delay(CONFIRMATION_MILLIS)
         confirmed = true
     }
+    // Without the chip, an added plan shows nothing at all (not even the modifier's padding).
+    if (!showAddedChip && status.inCalendar && !(status.justAdded && !confirmed)) return
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         AnimatedVisibility(visible = !status.inCalendar || (status.justAdded && !confirmed), enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             PrimaryButton(

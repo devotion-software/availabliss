@@ -210,10 +210,17 @@ private struct UpNextPager: View {
                 .scrollIndicators(.hidden)
                 .modifier(TracksPagerPosition(spacing: Self.spacing, position: $position))
                 .frame(height: height, alignment: .top)
-                // Lets the cards' shadows show and the next card slide in from the screen's edge,
-                // but a taller neighbour stops just below this card instead of covering the dots.
+                // Lets the cards' shadows show and the next card slide in from the screen's edge.
+                // Below the card the mask fades out (no hard edge across the shadow), so a taller
+                // neighbour sliding in doesn't spill over the dots either.
                 .scrollClipDisabled()
-                .mask { Rectangle().padding(.horizontal, -40).padding(.top, -24).padding(.bottom, -12) }
+                .mask {
+                    VStack(spacing: 0) {
+                        Rectangle()
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 48)
+                    }
+                    .padding(.horizontal, -40).padding(.top, -24).padding(.bottom, -48)
+                }
                 PageDots(count: events.count, current: currentIndex) { index in
                     withAnimation(.snappy) { page = events[index].id }
                 }

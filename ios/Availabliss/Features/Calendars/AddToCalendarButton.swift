@@ -32,7 +32,14 @@ struct AddToCalendarButton: View {
 
     var body: some View {
         // Turned off in You (e.g. subscribed to their plans instead): nothing at all.
-        if app.session.user?.showsAddToCalendar ?? true { content }
+        if app.session.user?.showsAddToCalendar ?? true, !hiddenOnceAdded { content }
+    }
+
+    /// Without the chip, an added plan shows nothing at all (and takes no space in its stack).
+    private var hiddenOnceAdded: Bool {
+        guard !showsAddedChip, !justAdded, !isSaving, choice == nil else { return false }
+        if case .added = app.deviceCalendar.addedState(event.id) { return true }
+        return false
     }
 
     private var content: some View {

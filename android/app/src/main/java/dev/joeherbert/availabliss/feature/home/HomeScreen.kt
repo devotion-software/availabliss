@@ -36,8 +36,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -222,7 +229,10 @@ private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAdd
     val density = LocalDensity.current
     // Each card's natural height, by plan.
     val heights = remember(plans.map { it.key }) { mutableStateMapOf<String, Int>() }
-    val shadow = 14.dp
+    // Room under the cards for their whole shadow (it reaches ~30dp), fading out at the bottom so
+    // there's no hard edge; only [gap] of it counts towards the layout, so the dots stay close.
+    val overhang = 44.dp
+    val gap = 14.dp
     // The cards' heights blended by how far the swipe has got (natural size until all are measured).
     val measured = plans.mapNotNull { heights[it.key] }
     val height: Dp? = if (measured.size != plans.size) {
@@ -232,7 +242,7 @@ private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAdd
         val index = position.toInt()
         val next = minOf(index + 1, plans.size - 1)
         val px = measured[index] + (measured[next] - measured[index]) * (position - index)
-        with(density) { px.toDp() } + shadow
+        with(density) { px.toDp() } + overhang
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         HorizontalPager(
@@ -245,9 +255,21 @@ private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAdd
                     val extra = (Spacing.screen * 2).roundToPx()
                     val width = constraints.maxWidth + extra
                     val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
-                    layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+                    val hidden = (overhang - gap).roundToPx()
+                    layout(constraints.maxWidth, (placeable.height - hidden).coerceAtLeast(0)) { placeable.place(-extra / 2, 0) }
+                }
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val fade = overhang.toPx()
+                    drawRect(
+                        Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height),
+                        topLeft = Offset(0f, size.height - fade),
+                        size = Size(size.width, fade),
+                        blendMode = BlendMode.DstIn,
+                    )
                 },
-            contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, bottom = shadow),
+            contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, bottom = overhang),
             pageSpacing = Spacing.screen,
             beyondViewportPageCount = plans.size,
             verticalAlignment = Alignment.Top,
