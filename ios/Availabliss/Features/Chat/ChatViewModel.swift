@@ -377,6 +377,17 @@ final class ChatViewModel {
         }
     }
 
+    /// Saves an edit to your poll. False if it couldn't be saved (the error shows).
+    func editPoll(_ poll: Poll, _ body: UpdatePollBody) async -> Bool {
+        do {
+            update(poll: try await api.send(API.Chat.updatePoll(pollId: poll.id, body)))
+            return true
+        } catch {
+            self.error = error.userMessage
+            return false
+        }
+    }
+
     func closePoll(_ poll: Poll) async {
         do { update(poll: try await api.send(API.Chat.closePoll(pollId: poll.id))) } catch { self.error = error.userMessage }
     }

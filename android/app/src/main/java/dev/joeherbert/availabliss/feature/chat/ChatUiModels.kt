@@ -57,9 +57,15 @@ data class PollDraft(
     val options: List<String> = listOf("", ""),
     val multi: Boolean = false,
     val sending: Boolean = false,
+    /** Editing your poll rather than making one. */
+    val editingPollId: String? = null,
+    /** Each option's id when editing (null for one added now), alongside [options], so votes stay. */
+    val optionIds: List<String?> = listOf(null, null),
+    /** A date poll being edited: its times stay, so only the question and pick-one / pick-any change. */
+    val dated: Boolean = false,
 ) {
     val canAddOption: Boolean get() = options.size < MAX_OPTIONS
-    val canSubmit: Boolean get() = question.isNotBlank() && options.count { it.isNotBlank() } >= 2 && !sending
+    val canSubmit: Boolean get() = question.isNotBlank() && (dated || options.count { it.isNotBlank() } >= 2) && !sending
 
     companion object {
         const val MAX_OPTIONS = 10

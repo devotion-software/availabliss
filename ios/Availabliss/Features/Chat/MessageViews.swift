@@ -471,6 +471,7 @@ struct PollCard: View {
     let model: ChatViewModel
     @Environment(\.theme) private var theme
     @State private var proposalDraft: ProposalDraft?
+    @State private var isEditing = false
 
     var body: some View {
         let leading = poll.leadingOption
@@ -482,6 +483,7 @@ struct PollCard: View {
                 Spacer()
                 if canClose && !poll.closed {
                     Menu {
+                        Button("Edit poll", systemImage: "pencil") { isEditing = true }
                         Button("Close poll") { Task { await model.closePoll(poll) } }
                     } label: {
                         Image(systemName: "ellipsis").frame(width: 32, height: 32)
@@ -510,6 +512,9 @@ struct PollCard: View {
         .padding(14)
         .frame(maxWidth: 300)
         .glass(cornerRadius: 22)
+        .sheet(isPresented: $isEditing) {
+            EditPollSheet(poll: poll) { body in await model.editPoll(poll, body) }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Poll: \(poll.question)")
         .task(id: poll.options.map(\.id)) { if poll.isDatePoll { await model.loadBusy(for: poll) } }

@@ -124,6 +124,7 @@ data class ChatActions(
     val onOpenEvent: (String) -> Unit = {},
     val onVote: (messageId: String, optionId: String) -> Unit = { _, _ -> },
     val onClosePoll: (messageId: String) -> Unit = {},
+    val onEditPoll: (messageId: String) -> Unit = {},
     /** "Propose this" on a date poll's option: the propose form, prefilled with its time. */
     val onProposeOption: ((messageId: String, optionId: String) -> Unit)? = null,
     val onOpenInfo: (messageId: String) -> Unit = {},
@@ -214,6 +215,7 @@ fun GroupChatTab(
             onOpenEvent = { currentOnOpenEvent(it) },
             onVote = viewModel::onVote,
             onClosePoll = viewModel::onClosePoll,
+            onEditPoll = viewModel::onEditPoll,
             onProposeOption = { messageId, optionId -> viewModel.proposalFor(messageId, optionId)?.let { currentOnProposeSlot(it) } },
             onOpenInfo = viewModel::openInfo,
             onEditMessage = viewModel::startEdit,
@@ -620,6 +622,7 @@ internal fun ChatRow(
                     poll = item.poll,
                     onToggle = { optionId -> actions.onVote(item.id, optionId) },
                     onClose = { actions.onClosePoll(item.id) },
+                    onEdit = { actions.onEditPoll(item.id) },
                     onPropose = actions.onProposeOption?.let { propose -> { optionId -> propose(item.id, optionId) } },
                     modifier = Modifier.widthIn(max = 300.dp).fillMaxWidth(),
                 )

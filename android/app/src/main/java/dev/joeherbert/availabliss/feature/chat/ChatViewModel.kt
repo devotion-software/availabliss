@@ -250,6 +250,7 @@ class ChatViewModel @Inject constructor(
     fun proposalFor(messageId: String, optionId: String): ProposalPrefill? = polls.proposalFor(messageId, optionId)
 
     fun onClosePoll(messageId: String) = polls.onClosePoll(messageId)
+    fun onEditPoll(messageId: String) = polls.openEditPoll(messageId)
     // endregion
 
     // region Message info

@@ -133,3 +133,76 @@ struct NewPollSheet: View {
         }
     }
 }
+
+/// Edit your poll: the question and pick-one / pick-any, and a text poll's options. Renamed options keep
+/// their votes; a removed one takes its votes with it. A date poll's times stay as they are.
+struct EditPollSheet: View {
+    let poll: Poll
+    let save: (UpdatePollBody) async -> Bool
+    @Environment(\.dismiss) private var dismiss
+    @State private var question: String
+    @State private var options: [UpdatePollBody.Option]
+    @State private var multi: Bool
+    @State private var isSaving = false
+
+    init(poll: Poll, save: @escaping (UpdatePollBody) async -> Bool) {
+        self.poll = poll
+        self.save = save
+        _question = State(initialValue: poll.question)
+        _options = State(initialValue: poll.options.map { UpdatePollBody.Option(id: $0.id, label: $0.label) })
+        _multi = State(initialValue: poll.multi)
+    }
+
+    private var cleanOptions: [UpdatePollBody.Option] {
+        options.map { UpdatePollBody.Option(id: $0.id, label: $0.label.trimmingCharacters(in: .whitespaces)) }.filter { !$0.label.isEmpty }
+    }
+
+    var body: some View {
+        BottomSheet(title: "Edit poll") {
+            InputField(placeholder: "Ask a question", text: $question)
+            if !poll.isDatePoll {
+                Text("Options").sectionLabelStyle()
+                ForEach(options.indices, id: \.self) { index in
+                    HStack(spacing: 8) {
+                        InputField(placeholder: "Option \(index + 1)", text: $options[index].labelBinding, height: 46, cornerRadius: 14)
+                        if options.count > 2 {
+                            IconButton(systemImage: "minus", label: "Remove option \(index + 1)", size: 36, glass: false) {
+                                options.remove(at: index)
+                            }
+                        }
+                    }
+                }
+                if options.count < 10 {
+                    Button("+ Add option") { options.append(.init(id: nil, label: "")) }.buttonStyle(.textAction)
+                }
+                Text("Votes stay on options you rename. Removing an option removes its votes.")
+                    .bodyFont(12, relativeTo: .caption)
+                    .foregroundStyle(.secondary)
+            }
+            Toggle("Allow more than one choice", isOn: $multi)
+                .toggleStyle(.glassSwitch)
+                .bodyFont(15, .medium)
+            Button {
+                Task {
+                    isSaving = true
+                    defer { isSaving = false }
+                    let body = UpdatePollBody(
+                        question: question.trimmingCharacters(in: .whitespaces), multi: multi, options: poll.isDatePoll ? nil : cleanOptions)
+                    if await save(body) { dismiss() }
+                }
+            } label: {
+                LoadingLabel(title: "Save", isLoading: isSaving)
+            }
+            .buttonStyle(.accent)
+            .disabled(question.trimmingCharacters(in: .whitespaces).isEmpty || (!poll.isDatePoll && cleanOptions.count < 2) || isSaving)
+        }
+    }
+}
+
+extension UpdatePollBody.Option {
+    /// The label as a text field binding (the option is otherwise immutable).
+    fileprivate var labelBinding: String {
+        get { label }
+        set { self = .init(id: id, label: newValue) }
+    }
+}

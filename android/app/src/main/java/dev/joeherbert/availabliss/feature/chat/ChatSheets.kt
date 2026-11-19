@@ -123,7 +123,8 @@ data class PollSheetActions(
 /** "New poll": question, 2–10 options, allow multiple answers. */
 @Composable
 fun PollComposerSheet(draft: PollDraft, actions: PollSheetActions) {
-    AvBottomSheet(title = "New poll", onDismissRequest = actions.onDismiss) {
+    val editing = draft.editingPollId != null
+    AvBottomSheet(title = if (editing) "Edit poll" else "New poll", onDismissRequest = actions.onDismiss) {
         AvTextField(
             value = draft.question,
             onValueChange = actions.onQuestion,
@@ -131,7 +132,8 @@ fun PollComposerSheet(draft: PollDraft, actions: PollSheetActions) {
             placeholder = "e.g. Where should we stay?",
             imeAction = ImeAction.Next,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // A date poll's times stay as they are when editing.
+        if (!draft.dated) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionLabel("Options")
             draft.options.forEachIndexed { index, option ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -149,10 +151,17 @@ fun PollComposerSheet(draft: PollDraft, actions: PollSheetActions) {
                 }
             }
             if (draft.canAddOption) DashedChip("+ Add option", actions.onAddOption)
+            if (editing) {
+                Text(
+                    "Votes stay on options you rename. Removing an option removes its votes.",
+                    style = AvailablissTheme.type.caption,
+                    color = AvailablissTheme.colors.muted,
+                )
+            }
         }
         ToggleRow(title = "Allow more than one answer", checked = draft.multi, onCheckedChange = actions.onMulti)
         PrimaryButton(
-            text = "Post poll",
+            text = if (editing) "Save" else "Post poll",
             onClick = actions.onSubmit,
             style = ButtonStyle.Accent,
             height = 52.dp,

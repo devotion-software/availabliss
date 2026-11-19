@@ -71,6 +71,7 @@ import dev.joeherbert.availabliss.core.network.model.SendTextRequest
 import dev.joeherbert.availabliss.core.network.model.SubdivisionsResponse
 import dev.joeherbert.availabliss.core.network.model.TemplatesResponse
 import dev.joeherbert.availabliss.core.network.model.UpdateGroupRequest
+import dev.joeherbert.availabliss.core.network.model.UpdatePollRequest
 import dev.joeherbert.availabliss.core.network.model.User
 import dev.joeherbert.availabliss.core.network.model.VoteRequest
 import kotlinx.serialization.json.JsonObject
@@ -470,6 +471,10 @@ interface AvailablissApi {
 
     @POST("api/v1/polls/{id}/close")
     suspend fun closePoll(@Path("id") pollId: String): Poll
+
+    /** Edits your poll: question, pick-one / pick-any, and a text poll's options (an id keeps one and its votes). */
+    @PATCH("api/v1/polls/{id}")
+    suspend fun updatePoll(@Path("id") pollId: String, @Body body: UpdatePollRequest): Poll
     // endregion
 
     // region Notifications & devices

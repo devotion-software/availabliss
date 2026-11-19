@@ -19,6 +19,7 @@ import dev.joeherbert.availabliss.core.network.model.SendDatePollRequest
 import dev.joeherbert.availabliss.core.network.model.SendLocationRequest
 import dev.joeherbert.availabliss.core.network.model.SendPollRequest
 import dev.joeherbert.availabliss.core.network.model.SendTextRequest
+import dev.joeherbert.availabliss.core.network.model.UpdatePollRequest
 import dev.joeherbert.availabliss.core.network.model.VoteRequest
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -77,6 +78,8 @@ class ChatRepository @Inject constructor(
         call { api.vote(pollId, VoteRequest(optionIds)) }
 
     suspend fun closePoll(pollId: String): ApiResult<Poll> = call { api.closePoll(pollId) }
+
+    suspend fun updatePoll(pollId: String, body: UpdatePollRequest): ApiResult<Poll> = call { api.updatePoll(pollId, body) }
 
     companion object {
         const val PAGE_SIZE = 50

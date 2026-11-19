@@ -2,6 +2,8 @@ package dev.joeherbert.availabliss.feature.chat
 
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.network.ApiResult
+import dev.joeherbert.availabliss.core.network.model.PollOptionEdit
+import dev.joeherbert.availabliss.core.network.model.UpdatePollRequest
 import dev.joeherbert.availabliss.feature.proposal.ProposalPrefill
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -16,9 +18,27 @@ internal class ChatPolls(private val session: ChatSession) {
     fun onPollOption(index: Int, value: String) = updatePoll { p ->
         p.copy(options = p.options.mapIndexed { i, o -> if (i == index) value.take(100) else o })
     }
-    fun onAddPollOption() = updatePoll { if (it.canAddOption) it.copy(options = it.options + "") else it }
+    fun onAddPollOption() = updatePoll { if (it.canAddOption) it.copy(options = it.options + "", optionIds = it.optionIds + null) else it }
     fun onRemovePollOption(index: Int) = updatePoll { p ->
-        if (p.options.size <= 2) p else p.copy(options = p.options.filterIndexed { i, _ -> i != index })
+        if (p.options.size <= 2) p else p.copy(options = p.options.filterIndexed { i, _ -> i != index }, optionIds = p.optionIds.filterIndexed { i, _ -> i != index })
+    }
+
+    /** "Edit" on your poll: the sheet starts from it. */
+    fun openEditPoll(messageId: String) {
+        val poll = data.value.allMessages.firstOrNull { it.id == messageId }?.poll ?: return
+        data.update {
+            it.copy(
+                pollDraft = PollDraft(
+                    question = poll.question,
+                    options = poll.options.map { o -> o.label },
+                    multi = poll.multi,
+                    editingPollId = poll.id,
+                    optionIds = poll.options.map { o -> o.id },
+                    dated = poll.options.any { o -> o.slot != null },
+                ),
+                menuOpen = false,
+            )
+        }
     }
     fun onPollMulti(value: Boolean) = updatePoll { it.copy(multi = value) }
 
@@ -26,6 +46,23 @@ internal class ChatPolls(private val session: ChatSession) {
         val draft = data.value.pollDraft ?: return
         if (!draft.canSubmit) return
         updatePoll { it.copy(sending = true) }
+        draft.editingPollId?.let { pollId ->
+            session.scope.launch {
+                val options = draft.options.mapIndexed { i, label -> PollOptionEdit(draft.optionIds.getOrNull(i), label.trim()) }.filter { it.label.isNotEmpty() }
+                val body = UpdatePollRequest(draft.question.trim(), draft.multi, options.takeUnless { draft.dated })
+                when (val result = session.chat.updatePoll(pollId, body)) {
+                    is ApiResult.Success -> {
+                        session.replacePoll(result.value)
+                        data.update { it.copy(pollDraft = null) }
+                    }
+                    is ApiResult.Failure -> {
+                        updatePoll { it.copy(sending = false) }
+                        data.update { it.copy(message = UserMessage(result.error.message)) }
+                    }
+                }
+            }
+            return
+        }
         session.scope.launch {
             val options = draft.options.map { it.trim() }.filter { it.isNotEmpty() }
             when (val result = session.chat.sendPoll(session.groupId, draft.question, options, draft.multi)) {

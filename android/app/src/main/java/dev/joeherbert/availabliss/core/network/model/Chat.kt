@@ -303,3 +303,11 @@ data class ReceiptsRequest(val upTo: String, val state: ReceiptState)
 
 @Serializable
 data class VoteRequest(val optionIds: List<String>)
+
+/** `PATCH /polls/:id`. [options] is left out for a date poll (its times can't change). */
+@Serializable
+data class UpdatePollRequest(val question: String, val multi: Boolean, val options: List<PollOptionEdit>? = null)
+
+/** An option when editing a poll: an [id] keeps that option and its votes; none adds one. */
+@Serializable
+data class PollOptionEdit(val id: String? = null, val label: String)

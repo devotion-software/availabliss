@@ -76,6 +76,8 @@ fun PollCard(
     onToggle: (optionId: String) -> Unit,
     modifier: Modifier = Modifier,
     onClose: (() -> Unit)? = null,
+    /** "Edit" beside Close poll (its author, while it's open). */
+    onEdit: (() -> Unit)? = null,
     /** "Propose this" on a date poll's leading option (shown when [PollUi.canPropose]). */
     onPropose: ((optionId: String) -> Unit)? = null,
 ) {
@@ -109,8 +111,11 @@ fun PollCard(
                 )
             }
         }
-        if (poll.canClose && !poll.closed && onClose != null) {
-            TextAction("Close poll", onClose, color = colors.muted, style = AvailablissTheme.type.label, modifier = Modifier.align(Alignment.End))
+        if (poll.canClose && !poll.closed && (onClose != null || onEdit != null)) {
+            Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                onEdit?.let { TextAction("Edit", it, color = colors.muted, style = AvailablissTheme.type.label) }
+                onClose?.let { TextAction("Close poll", it, color = colors.muted, style = AvailablissTheme.type.label) }
+            }
         }
     }
 }
