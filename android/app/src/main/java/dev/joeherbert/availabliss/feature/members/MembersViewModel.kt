@@ -37,8 +37,31 @@ data class MemberUi(
     val canPromote: Boolean,
     val canDemote: Boolean,
     val canRemove: Boolean,
+    /** The name they chose for this group ([name] then shows it), or null for their account name. */
+    val nameInGroup: String? = null,
+    /** Change the name they go by in this group: your own, or as an admin anyone's. */
+    val canRename: Boolean = false,
 ) {
-    val hasActions: Boolean get() = canPromote || canDemote || canRemove
+    val hasActions: Boolean get() = canRename || canPromote || canDemote || canRemove
+}
+
+/** "Change name in group" for one member: [draft] starts as the name they go by now. */
+data class NameEditorUi(
+    val member: MemberUi,
+    val draft: String,
+    /** Your own account name (when it's you), so typing it goes back to it; unknown for others. */
+    val accountName: String? = null,
+    val saving: Boolean = false,
+) {
+    /** What Save sends: the trimmed name, or null (their account name) when blank or your account name. */
+    val toSave: String? get() = draft.trim().takeIf { it.isNotEmpty() && it != accountName }
+
+    val canSave: Boolean get() = !saving && draft.trim() != member.name && toSave != member.nameInGroup
+
+    companion object {
+        /** The server's limit on a name in a group. */
+        const val MAX_LENGTH = 80
+    }
 }
 
 /** Destructive actions waiting for confirmation. */
@@ -75,6 +98,8 @@ data class MembersUiState(
     val pendingShareUrl: String? = null,
     val confirm: ConfirmAction? = null,
     val working: Boolean = false,
+    /** The "Change name in group" sheet, when open. */
+    val nameEditor: NameEditorUi? = null,
     /** True once the user is no longer in the group (removed, or left from Group settings): navigate away. */
     val left: Boolean = false,
     val message: UserMessage? = null,
@@ -233,6 +258,41 @@ class MembersViewModel @Inject constructor(
         }
     }
 
+    fun openNameEditor(member: MemberUi) = _state.update {
+        it.copy(nameEditor = NameEditorUi(member, draft = member.name, accountName = if (member.isMe) users.user.value?.accountName else null))
+    }
+
+    fun onNameDraftChange(text: String) = _state.update { s ->
+        s.copy(nameEditor = s.nameEditor?.copy(draft = text.take(NameEditorUi.MAX_LENGTH)))
+    }
+
+    fun closeNameEditor() = _state.update { it.copy(nameEditor = null) }
+
+    /** Saves the sheet's name, or with [useAccountName] clears it so they go by their account name. */
+    fun saveName(useAccountName: Boolean = false) {
+        val editor = _state.value.nameEditor ?: return
+        if (editor.saving) return
+        val name = if (useAccountName) null else editor.toSave
+        if (!useAccountName && !editor.canSave) return
+        _state.update { it.copy(nameEditor = editor.copy(saving = true)) }
+        viewModelScope.launch {
+            when (val result = groups.setMemberName(groupId, editor.member.userId, name)) {
+                is ApiResult.Success -> _state.update { s ->
+                    val updated = result.value
+                    val who = if (editor.member.isMe) "your" else "their"
+                    s.copy(
+                        nameEditor = null,
+                        members = s.members.map { m -> if (m.userId == updated.userId) m.copy(name = updated.name, nameInGroup = updated.nameInGroup) else m },
+                        message = UserMessage(if (updated.nameInGroup == null) "Back to $who account name" else "Name updated"),
+                    )
+                }
+                is ApiResult.Failure -> _state.update { s ->
+                    s.copy(nameEditor = s.nameEditor?.copy(saving = false), message = UserMessage(result.error.message))
+                }
+            }
+        }
+    }
+
     fun requestRemove(member: MemberUi) = _state.update { it.copy(confirm = ConfirmAction.Remove(member)) }
 
     fun dismissConfirm() = _state.update { it.copy(confirm = null) }
@@ -278,6 +338,8 @@ class MembersViewModel @Inject constructor(
                     canPromote = manageable && m.role == Role.Member,
                     canDemote = manageable && m.role == Role.Admin,
                     canRemove = manageable,
+                    nameInGroup = m.nameInGroup,
+                    canRename = isMe || myRole.isAdmin,
                 )
             }
         return copy(

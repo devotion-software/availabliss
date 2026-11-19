@@ -29,21 +29,28 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.network.model.Role
+import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
 import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
+import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
 import dev.joeherbert.availabliss.designsystem.component.ConfirmOption
 import dev.joeherbert.availabliss.designsystem.component.ConfirmSheet
 import dev.joeherbert.availabliss.designsystem.component.ErrorBanner
@@ -105,10 +112,22 @@ fun MembersScreen(onBack: () -> Unit, onLeftGroup: () -> Unit, viewModel: Member
             onPromote = { viewModel.setRole(it, Role.Admin) },
             onDemote = { viewModel.setRole(it, Role.Member) },
             onRemove = viewModel::requestRemove,
+            onRename = viewModel::openNameEditor,
             onRetry = viewModel::refresh,
         )
     }
     MembersContent(state = state, snackbar = snackbar, actions = actions)
+
+    state.nameEditor?.let { editor ->
+        NameInGroupSheet(
+            editor = editor,
+            groupName = state.groupName,
+            onDraftChange = viewModel::onNameDraftChange,
+            onSave = { viewModel.saveName() },
+            onUseAccountName = { viewModel.saveName(useAccountName = true) },
+            onDismiss = viewModel::closeNameEditor,
+        )
+    }
 
     state.confirm?.let { action ->
         ConfirmDialog(
@@ -133,6 +152,7 @@ data class MembersActions(
     val onPromote: (MemberUi) -> Unit = {},
     val onDemote: (MemberUi) -> Unit = {},
     val onRemove: (MemberUi) -> Unit = {},
+    val onRename: (MemberUi) -> Unit = {},
     val onRetry: () -> Unit = {},
 )
 
@@ -202,9 +222,15 @@ private fun MemberRow(member: MemberUi, actions: MembersActions) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                if (member.synced) "Synced" else "Not synced yet",
+                buildAnnotatedString {
+                    if (member.nameInGroup != null) withStyle(SpanStyle(color = colors.muted)) { append("Name in this group · ") }
+                    withStyle(SpanStyle(color = if (member.synced) colors.muted else colors.warnInk)) {
+                        append(if (member.synced) "Synced" else "Not synced yet")
+                    }
+                },
                 style = type.caption.copy(fontWeight = FontWeight.Normal),
-                color = if (member.synced) colors.muted else colors.warnInk,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         StatusPill(member.role.label(), member.role.tone())
@@ -212,6 +238,12 @@ private fun MemberRow(member: MemberUi, actions: MembersActions) {
             Box {
                 PlainIconButton(AvIcons.More, "Manage ${member.name}", { menuOpen = true }, size = 40.dp, iconSize = 18.dp, tint = colors.muted)
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = colors.bg) {
+                    if (member.canRename) {
+                        DropdownMenuItem(text = { Text("Change name in group", style = type.bodySmallStrong) }, onClick = {
+                            menuOpen = false
+                            actions.onRename(member)
+                        })
+                    }
                     if (member.canPromote) {
                         DropdownMenuItem(text = { Text("Make admin", style = type.bodySmallStrong) }, onClick = {
                             menuOpen = false
@@ -252,6 +284,62 @@ private fun ConfirmDialog(action: ConfirmAction, groupName: String, working: Boo
     )
 }
 
+/** The name [NameEditorUi.member] goes by in this group: a text field starting at their current name, Save, and (when they've set one) back to their account name. */
+@Composable
+private fun NameInGroupSheet(
+    editor: NameEditorUi,
+    groupName: String,
+    onDraftChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onUseAccountName: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = AvailablissTheme.colors
+    val type = AvailablissTheme.type
+    val member = editor.member
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    AvBottomSheet(title = "Change name in group", onDismissRequest = onDismiss) {
+        Text(
+            if (member.isMe) {
+                "The name ${groupName.ifBlank { "this group" }} sees you as. Everywhere else you go by your account name."
+            } else {
+                "The name ${member.name} goes by in ${groupName.ifBlank { "this group" }}. Everywhere else they go by their account name."
+            },
+            style = type.caption.copy(fontWeight = FontWeight.Normal),
+            color = colors.muted,
+        )
+        AvTextField(
+            value = editor.draft,
+            onValueChange = onDraftChange,
+            label = "Name in this group",
+            placeholder = if (member.isMe) editor.accountName.orEmpty() else member.name,
+            capitalization = KeyboardCapitalization.Words,
+            imeAction = ImeAction.Done,
+            onImeAction = onSave,
+            focusRequester = focus,
+        )
+        PrimaryButton(
+            text = "Save",
+            onClick = onSave,
+            style = ButtonStyle.Accent,
+            height = 48.dp,
+            shape = Shapes.control,
+            enabled = editor.canSave,
+            loading = editor.saving,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (member.nameInGroup != null) {
+            TextAction(
+                if (member.isMe) "Use my account name" else "Use their account name",
+                onUseAccountName,
+                enabled = !editor.saving,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+        }
+    }
+}
+
 private fun Role.label() = when (this) {
     Role.Owner -> "Owner"
     Role.Admin -> "Admin"
@@ -275,7 +363,7 @@ private fun MembersPreview() {
                 groupName = "Lake District crew",
                 members = listOf(
                     m("1", "Sam", Role.Owner, true, me = true),
-                    m("2", "Ana", Role.Admin, true),
+                    m("2", "Ana", Role.Admin, true).copy(nameInGroup = "Ana"),
                     m("3", "Priya", Role.Member, true),
                     m("4", "Leo", Role.Member, false),
                 ),

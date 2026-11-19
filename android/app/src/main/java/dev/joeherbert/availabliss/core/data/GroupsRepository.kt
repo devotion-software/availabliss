@@ -2,6 +2,7 @@ package dev.joeherbert.availabliss.core.data
 
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.AvailablissApi
+import dev.joeherbert.availabliss.core.network.jsonPatch
 import dev.joeherbert.availabliss.core.network.map
 import dev.joeherbert.availabliss.core.network.model.Availability
 import dev.joeherbert.availabliss.core.network.model.CreateGroupRequest
@@ -107,6 +108,15 @@ class GroupsRepository @Inject constructor(
     /** Sets (or with null, clears) the name you go by in the group. */
     suspend fun setMyName(groupId: String, name: String?): ApiResult<Member> =
         call { api.setMyName(groupId, MemberNameRequest(name)) }.onSuccess { member ->
+            details.update { map ->
+                val group = map[groupId] ?: return@update map
+                map + (groupId to group.copy(members = group.members.map { if (it.userId == member.userId) member else it }))
+            }
+        }
+
+    /** Sets (or with null, clears) the name [userId] goes by in the group: yourself, or as an admin anyone. */
+    suspend fun setMemberName(groupId: String, userId: String, name: String?): ApiResult<Member> =
+        call { api.setMemberName(groupId, userId, jsonPatch { set("displayName", name) }) }.onSuccess { member ->
             details.update { map ->
                 val group = map[groupId] ?: return@update map
                 map + (groupId to group.copy(members = group.members.map { if (it.userId == member.userId) member else it }))

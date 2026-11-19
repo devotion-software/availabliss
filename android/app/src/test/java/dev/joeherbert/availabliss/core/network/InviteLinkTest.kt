@@ -2,6 +2,9 @@ package dev.joeherbert.availabliss.core.network
 
 import dev.joeherbert.availabliss.core.network.model.CreateInviteRequest
 import dev.joeherbert.availabliss.core.network.model.GroupInvite
+import dev.joeherbert.availabliss.core.network.model.MAX_LINK_USES
+import dev.joeherbert.availabliss.core.network.model.linkLimitFrom
+import dev.joeherbert.availabliss.core.network.model.linkLimitInput
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
@@ -28,5 +31,25 @@ class InviteLinkTest {
         assertEquals("Anyone with this link can join.", link(null, 4).linkSummary)
         assertEquals("Unlimited · 4 joined", link(null, 4).linkUsage)
         assertEquals("Unlimited", link(null, 0).linkUsage)
+    }
+
+    @Test
+    fun `a link's typed limit is a whole number from 1 to 1000, one when empty`() {
+        assertEquals(1, linkLimitFrom(""))
+        assertEquals(1, linkLimitFrom("0"))
+        assertEquals(1, linkLimitFrom("000"))
+        assertEquals(7, linkLimitFrom("7"))
+        assertEquals(12, linkLimitFrom("012"))
+        assertEquals(1000, linkLimitFrom("1000"))
+        assertEquals(MAX_LINK_USES, linkLimitFrom("9999"))
+        assertEquals(MAX_LINK_USES, linkLimitFrom("99999999999999999999"))
+        assertEquals(25, linkLimitFrom(" 2-5 "))
+    }
+
+    @Test
+    fun `the limit field keeps only digits, four at most`() {
+        assertEquals("12", linkLimitInput("1a2"))
+        assertEquals("1234", linkLimitInput("123456"))
+        assertEquals("", linkLimitInput("-."))
     }
 }

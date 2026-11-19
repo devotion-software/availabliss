@@ -245,6 +245,17 @@ interface AvailablissApi {
         @Body body: MemberRoleRequest,
     ): Member
 
+    /**
+     * Sets (or with `displayName: null`, clears) the name someone goes by in the group: yourself,
+     * or as an admin anyone. The body is a [kotlinx.serialization.json.JsonObject] so null is sent.
+     */
+    @PATCH("api/v1/groups/{id}/members/{userId}")
+    suspend fun setMemberName(
+        @Path("id") groupId: String,
+        @Path("userId") userId: String,
+        @Body body: kotlinx.serialization.json.JsonObject,
+    ): Member
+
     /** Sets (or with null, clears) the name you go by in the group. */
     @PATCH("api/v1/groups/{id}/members/me")
     suspend fun setMyName(@Path("id") groupId: String, @Body body: dev.joeherbert.availabliss.core.network.model.MemberNameRequest): Member

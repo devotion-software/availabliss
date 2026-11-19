@@ -178,10 +178,19 @@ data class CreateInviteRequest(
     val maxUses: JsonElement? = null,
 )
 
-/** How many people can join with an invite link, as offered when making one (null: no limit; one is what links always were). */
-val LinkLimitChoices: List<Int?> = listOf(1, 5, 10, 25, null)
+/** The most people one invite link can be for (short of Unlimited). */
+const val MAX_LINK_USES = 1000
 
-fun linkLimitLabel(limit: Int?): String = limit?.toString() ?: "Unlimited"
+/** Keeps what's typed in the "people" field to digits, at most as many as [MAX_LINK_USES] has. */
+fun linkLimitInput(text: String): String = text.filter(Char::isDigit).take(MAX_LINK_USES.toString().length)
+
+/** How many people a link is for, from what's typed: a whole number clamped to 1–[MAX_LINK_USES]; one when empty. */
+fun linkLimitFrom(text: String): Int {
+    val digits = text.filter(Char::isDigit).trimStart('0')
+    if (digits.isEmpty()) return 1
+    if (digits.length > MAX_LINK_USES.toString().length) return MAX_LINK_USES
+    return digits.toInt().coerceIn(1, MAX_LINK_USES)
+}
 
 @Serializable
 data class InviteLink(
