@@ -97,7 +97,7 @@ struct MyTimeView: View {
                         ) {
                             withAnimation(.easeInOut(duration: 0.2)) { view = view == .month ? .agenda : .month }
                         }
-                        IconButton(icon: .asset("CalendarSync"), label: "Connected calendars") { app.router.push(.calendars) }
+                        IconButton(icon: .system("gearshape"), label: "Calendar settings") { app.router.push(.calendars) }
                     }
                 }
                 Button {

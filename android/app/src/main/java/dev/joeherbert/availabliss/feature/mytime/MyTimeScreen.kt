@@ -219,7 +219,7 @@ private fun ScreenHeader(mode: MyTimeMode, actions: MyTimeActions) {
             Text("What groups see as busy", style = type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
         }
         ViewSwitch(mode, onSwitch = { actions.onSetMode(if (mode == MyTimeMode.Month) MyTimeMode.Agenda else MyTimeMode.Month) })
-        GlassIconButton(AvIcons.CalendarSync, "Connected calendars", actions.onOpenCalendars)
+        GlassIconButton(AvIcons.Settings, "Calendar settings", actions.onOpenCalendars)
     }
 }
 

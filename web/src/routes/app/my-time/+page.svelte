@@ -320,7 +320,7 @@
 					<Icon name={view === 'month' ? 'list' : 'calendar'} size={16} strokeWidth={2.2} />
 					<span>{view === 'month' ? 'Agenda' : 'Month'}</span>
 				</button>
-				<IconButton href="/app/calendars" icon="calendar-sync" label="Connected calendars" />
+				<IconButton href="/app/calendars" icon="settings" label="Calendar settings" />
 			{/snippet}
 		</PageHeader>
 
