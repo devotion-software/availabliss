@@ -36,6 +36,9 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -56,8 +59,13 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -82,7 +90,6 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.joeherbert.availabliss.designsystem.component.AvTextField
 import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
@@ -100,7 +107,7 @@ import kotlin.math.abs
 internal enum class IntroPage(val eyebrow: String, val title: String, val body: String, val orbs: OrbLayout) {
     Welcome(
         "Welcome to Availabliss",
-        "What should we call you?",
+        "",
         "",
         OrbLayout.Appearance,
     ),
@@ -421,29 +428,16 @@ private fun IntroPageContent(
     // How far this page is from the middle (-1 … 1), for the parallax.
     val offset = { (pager.currentPage - index) + pager.currentPageOffsetFraction }
 
+    if (page == IntroPage.Welcome) {
+        WelcomePage(page, index, shown, reduceMotion, offset, name, onNameChange, onSubmitName)
+        return
+    }
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // Smaller on shorter phones (and with the keyboard up), so the text always fits.
-        val art = (maxHeight - 210.dp).coerceIn(if (page == IntroPage.Welcome) 120.dp else 220.dp, 320.dp)
+        // Smaller on shorter phones, so the text always fits.
+        val art = (maxHeight - 210.dp).coerceIn(220.dp, 320.dp)
         val scale = minOf(art / 320.dp, (maxWidth - 24.dp) / 340.dp)
         Column(Modifier.fillMaxSize()) {
-            if (page == IntroPage.Welcome) {
-                // The welcome leads with its eyebrow as a heading at the top.
-                Text(
-                    page.eyebrow,
-                    style = AvailablissTheme.type.displaySmall.copy(fontSize = 24.sp),
-                    color = colors.accentInk,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 28.dp, end = 28.dp, top = 12.dp)
-                        .graphicsLayer {
-                            val o = offset()
-                            translationX = -o * 24.dp.toPx()
-                            alpha = 1f - abs(o).coerceAtMost(1f) * 0.8f
-                        }
-                        .semantics { heading() }
-                        .entrance(shown, 0, reduceMotion),
-                )
-            }
             Spacer(Modifier.weight(1f))
             Box(
                 Modifier
@@ -459,22 +453,19 @@ private fun IntroPageContent(
                         alpha = 1f - abs(o).coerceAtMost(1f) * 0.6f
                     }
                     .clearAndSetSemantics { },
-                // The welcome's "Hi," lines up with the text under it, so it shrinks towards the left.
-                contentAlignment = if (page == IntroPage.Welcome) Alignment.CenterStart else Alignment.Center,
+                contentAlignment = Alignment.Center,
             ) {
                 Box(
                     Modifier
-                        .then(if (page == IntroPage.Welcome) Modifier.padding(start = 24.dp) else Modifier)
                         .requiredSize(340.dp, 320.dp)
                         .graphicsLayer {
-                            if (page == IntroPage.Welcome) transformOrigin = TransformOrigin(0f, 0.5f)
                             scaleX = scale
                             scaleY = scale
                         },
                     contentAlignment = Alignment.Center
                 ) {
                     when (page) {
-                        IntroPage.Welcome -> WelcomeScene(index, reduceMotion)
+                        IntroPage.Welcome -> Unit
                         IntroPage.Group -> GroupScene(index, active, reduceMotion)
                         IntroPage.Calendars -> CalendarScene(index, active, reduceMotion)
                         IntroPage.Grid -> MonthScene(index, active, reduceMotion)
@@ -495,48 +486,132 @@ private fun IntroPageContent(
                     },
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                if (page != IntroPage.Welcome) {
-                    Text(
-                        page.eyebrow.uppercase(),
-                        style = AvailablissTheme.type.captionStrong.copy(fontSize = 12.sp, letterSpacing = 1.2.sp),
-                        color = colors.accentInk,
-                        modifier = Modifier.entrance(shown, 0, reduceMotion),
-                    )
-                }
+                Text(
+                    page.eyebrow.uppercase(),
+                    style = AvailablissTheme.type.captionStrong.copy(fontSize = 12.sp, letterSpacing = 1.2.sp),
+                    color = colors.accentInk,
+                    modifier = Modifier.entrance(shown, 0, reduceMotion),
+                )
                 Text(
                     page.title,
                     style = AvailablissTheme.type.displaySmall,
                     color = colors.ink,
                     modifier = Modifier.semantics { heading() }.entrance(shown, 70, reduceMotion),
                 )
-                if (page == IntroPage.Welcome) {
-                    AvTextField(
-                        value = name,
-                        onValueChange = onNameChange,
-                        placeholder = "First name",
-                        capitalization = KeyboardCapitalization.Words,
-                        imeAction = ImeAction.Next,
-                        onImeAction = onSubmitName,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp)
-                            .semantics { contentDescription = "Your name" }
-                            .entrance(shown, 140, reduceMotion),
-                    )
-                }
-                if (page.body.isNotEmpty()) {
-                    Text(
-                        page.body,
-                        style = AvailablissTheme.type.bodyLarge,
-                        color = colors.muted,
-                        modifier = Modifier.entrance(shown, 140, reduceMotion),
-                    )
-                }
+                Text(
+                    page.body,
+                    style = AvailablissTheme.type.bodyLarge,
+                    color = colors.muted,
+                    modifier = Modifier.entrance(shown, 140, reduceMotion),
+                )
             }
             Spacer(Modifier.weight(1f))
         }
     }
 }
+
+/**
+ * The welcome: "Welcome to Availabliss" at the top, then a big "Hi" you type your name straight into. The
+ * field's own text is invisible: the travelling name is drawn over it (in the space left here), so the
+ * name you type is the very one that moves on through the intro. Long names shrink to fit.
+ */
+@Composable
+private fun WelcomePage(
+    page: IntroPage,
+    index: Int,
+    shown: Boolean,
+    reduceMotion: Boolean,
+    offset: () -> Float,
+    name: String,
+    onNameChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    val colors = AvailablissTheme.colors
+    val chip = LocalIntroChip.current
+    val density = LocalDensity.current
+    val focusRequester = remember { FocusRequester() }
+    var focused by remember { mutableStateOf(false) }
+    val base = AvailablissTheme.type.bodyMedium
+    fun sized(size: Float) = base.copy(fontSize = size.sp, lineHeight = base.lineHeight * (size / 15f))
+
+    BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 28.dp)) {
+        // As big as "Hi", or smaller so a long name still fits on the line (the chip is measured at 15sp × the draw scale).
+        val natural = with(density) { chip.size.width.toDp() } * (WELCOME_SIZE / (15f * NAME_DRAW_SCALE))
+        val nameSize = if (natural > maxWidth) maxOf(24f, WELCOME_SIZE * (maxWidth / natural)) else WELCOME_SIZE
+        val nameStyle = sized(nameSize)
+        Column(Modifier.fillMaxSize()) {
+            Text(
+                page.eyebrow,
+                style = AvailablissTheme.type.displaySmall.copy(fontSize = 24.sp),
+                color = colors.accentInk,
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .graphicsLayer {
+                        val o = offset()
+                        translationX = -o * 24.dp.toPx()
+                        alpha = 1f - abs(o).coerceAtMost(1f) * 0.8f
+                    }
+                    .semantics { heading() }
+                    .entrance(shown, 0, reduceMotion),
+            )
+            Spacer(Modifier.weight(1f))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .entrance(shown, 70, reduceMotion)
+                    .pointerInput(Unit) { detectTapGestures { focusRequester.requestFocus() } },
+            ) {
+                Text(
+                    if (firstNameOf(name).isEmpty()) "Hi" else "Hi,",
+                    style = sized(WELCOME_SIZE),
+                    color = colors.ink,
+                    maxLines = 1,
+                    modifier = Modifier.clearAndSetSemantics { },
+                )
+                Box(contentAlignment = Alignment.CenterStart) {
+                    BasicTextField(
+                        value = name,
+                        // One word (it's the first name that travels) and not too long to fit.
+                        onValueChange = { onNameChange(it.filterNot(Char::isWhitespace).take(30)) },
+                        singleLine = true,
+                        textStyle = nameStyle.copy(color = Color.Transparent),
+                        cursorBrush = SolidColor(colors.accent),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            autoCorrectEnabled = false,
+                            imeAction = ImeAction.Next,
+                        ),
+                        keyboardActions = KeyboardActions(onNext = { onSubmit() }),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester)
+                            .onFocusChanged { focused = it.isFocused }
+                            .semantics { contentDescription = "Your first name" },
+                        decorationBox = { inner ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (name.isEmpty()) Text("Your name", style = nameStyle, color = colors.muted.copy(alpha = 0.55f), maxLines = 1)
+                                inner()
+                            }
+                        },
+                    )
+                    IntroNameSlot(index, scale = nameSize / 15f, tone = IntroNameTone.Accent)
+                }
+                val line by animateFloatAsState(if (focused) 1f else 0.3f, tween(200), label = "underline")
+                Box(
+                    Modifier
+                        .padding(top = 6.dp)
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(CircleShape)
+                        .background(colors.accent.copy(alpha = line)),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+private const val WELCOME_SIZE = 56f
 
 /** Rises and fades in once [shown], after [delayMs]. */
 @Composable

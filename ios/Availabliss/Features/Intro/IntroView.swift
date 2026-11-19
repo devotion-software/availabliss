@@ -288,7 +288,7 @@ private struct PageDots: View {
     }
 }
 
-/// One page: its illustration above, title and a line of text (or, on the welcome, the name field) below.
+/// One page: its illustration above, title and a line of text below (the welcome has its own layout).
 /// Equal when nothing it shows has changed, so typing on the welcome doesn't redraw the other pages.
 private struct IntroPageView: View, Equatable {
     let page: IntroPage
@@ -308,32 +308,24 @@ private struct IntroPageView: View, Equatable {
     }
 
     var body: some View {
+        if page.kind == .welcome {
+            WelcomePage(page: page, shown: shown, name: $name, onSubmit: onSubmitName)
+        } else {
+            scenePage
+        }
+    }
+
+    private var scenePage: some View {
         GeometryReader { proxy in
-            // Smaller illustration on shorter phones (and with the keyboard up), so the text always fits.
-            let art = min(320, max(page.kind == .welcome ? 120 : 220, proxy.size.height - 210))
+            // Smaller illustration on shorter phones, so the text always fits.
+            let art = min(320, max(220, proxy.size.height - 210))
             VStack(spacing: 0) {
-                if page.kind == .welcome {
-                    // The welcome leads with its eyebrow as a heading at the top.
-                    Text(page.eyebrow)
-                        .displayFont(24, .heavy, relativeTo: .title2)
-                        .foregroundStyle(theme.accentInk)
-                        .accessibilityAddTraits(.isHeader)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 28)
-                        .padding(.top, 12)
-                        .entrance(shown, delay: 0, reduceMotion: reduceMotion)
-                        .scrollTransition(axis: .horizontal) { content, phase in
-                            content.offset(x: phase.value * 24).opacity(1 - abs(phase.value) * 0.8)
-                        }
-                }
                 Spacer(minLength: 0)
                 // Drawn at 340 × 320 and scaled to fit.
                 illustration
                     .frame(width: 340, height: 320)
-                    // The welcome's "Hi," lines up with the text under it, so it shrinks towards the left.
-                    .scaleEffect(min(art / 320, (proxy.size.width - 24) / 340), anchor: page.kind == .welcome ? .leading : .center)
-                    .padding(.leading, page.kind == .welcome ? 24 : 0)
-                    .frame(maxWidth: .infinity, alignment: page.kind == .welcome ? .leading : .center)
+                    .scaleEffect(min(art / 320, (proxy.size.width - 24) / 340))
+                    .frame(maxWidth: .infinity)
                     .frame(height: art)
                     .accessibilityHidden(true)
                     // Parallax: the picture travels a little further than the page as you swipe.
@@ -345,37 +337,22 @@ private struct IntroPageView: View, Equatable {
                     }
                 Spacer(minLength: 16).frame(maxHeight: 36)
                 VStack(alignment: .leading, spacing: 10) {
-                    if page.kind != .welcome {
-                        Text(page.eyebrow.uppercased())
-                            .bodyFont(12, .bold, relativeTo: .caption)
-                            .tracking(1.2)
-                            .foregroundStyle(theme.accentInk)
-                            .entrance(shown, delay: 0, reduceMotion: reduceMotion)
-                    }
+                    Text(page.eyebrow.uppercased())
+                        .bodyFont(12, .bold, relativeTo: .caption)
+                        .tracking(1.2)
+                        .foregroundStyle(theme.accentInk)
+                        .entrance(shown, delay: 0, reduceMotion: reduceMotion)
                     Text(page.title)
                         .displayFont(30, .heavy, relativeTo: .largeTitle)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
                         .entrance(shown, delay: 0.07, reduceMotion: reduceMotion)
-                    if page.kind == .welcome {
-                        InputField(placeholder: "First name", text: $name)
-                            .textContentType(.givenName)
-                            .textInputAutocapitalization(.words)
-                            .autocorrectionDisabled()
-                            .submitLabel(.next)
-                            .onSubmit(onSubmitName)
-                            .accessibilityLabel("Your name")
-                            .padding(.top, 4)
-                            .entrance(shown, delay: 0.14, reduceMotion: reduceMotion)
-                    }
-                    if !page.body.isEmpty {
-                        Text(page.body)
-                            .bodyFont(16)
-                            .lineSpacing(2)
-                            .foregroundStyle(theme.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .entrance(shown, delay: 0.14, reduceMotion: reduceMotion)
-                    }
+                    Text(page.body)
+                        .bodyFont(16)
+                        .lineSpacing(2)
+                        .foregroundStyle(theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .entrance(shown, delay: 0.14, reduceMotion: reduceMotion)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 28)
@@ -391,13 +368,88 @@ private struct IntroPageView: View, Equatable {
 
     @ViewBuilder private var illustration: some View {
         switch page.kind {
-        case .welcome: WelcomeIllustration(page: page.id)
+        case .welcome: EmptyView()
         case .group: GroupIllustration(page: page.id, isActive: isActive)
         case .calendars: CalendarIllustration(page: page.id, isActive: isActive)
         case .grid: MonthIllustration(page: page.id, isActive: isActive)
         case .proposal: ProposalIllustration(page: page.id, isActive: isActive)
         case .chat: ChatIllustration(page: page.id, isActive: isActive)
         }
+    }
+}
+
+/// The welcome: "Welcome to Availabliss" at the top, then a big "Hi" you type your name straight into.
+/// The field's own text is invisible: the travelling name is drawn over it (in the space left here), so
+/// the name you type is the very one that moves on through the intro. Long names shrink to fit.
+private struct WelcomePage: View {
+    let page: IntroPage
+    let shown: Bool
+    @Binding var name: String
+    let onSubmit: () -> Void
+    @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.introNameSize) private var nameSize
+    @FocusState private var focused: Bool
+
+    private static let size: CGFloat = 56
+
+    var body: some View {
+        GeometryReader { proxy in
+            let nameFont = fittedSize(width: proxy.size.width - 56)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(page.eyebrow)
+                    .displayFont(24, .heavy, relativeTo: .title2)
+                    .foregroundStyle(theme.accentInk)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.top, 12)
+                    .entrance(shown, delay: 0, reduceMotion: reduceMotion)
+                Spacer(minLength: 12)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(IntroName.first(of: name).isEmpty ? "Hi" : "Hi,")
+                        .bodyFont(Self.size, .semibold)
+                        .lineLimit(1)
+                        .accessibilityHidden(true)
+                    ZStack(alignment: .leading) {
+                        TextField("", text: $name, prompt: Text("Your name").foregroundStyle(theme.muted.opacity(0.55)))
+                            .bodyFont(nameFont, .semibold)
+                            .foregroundStyle(.clear)
+                            .tint(theme.accent)
+                            .focused($focused)
+                            .textContentType(.givenName)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled()
+                            .submitLabel(.next)
+                            .onSubmit(onSubmit)
+                            // One word (it's the first name that travels) and not too long to fit.
+                            .onChange(of: name) { _, new in
+                                let cleaned = String(new.filter { !$0.isWhitespace }.prefix(30))
+                                if cleaned != new { name = cleaned }
+                            }
+                            .accessibilityLabel("Your first name")
+                        IntroNameSlot(page: page.id, scale: nameFont / 15, tone: .accent)
+                            .allowsHitTesting(false)
+                    }
+                    Capsule()
+                        .fill(theme.accent.opacity(focused ? 1 : 0.3))
+                        .frame(height: 3)
+                        .animation(.easeOut(duration: 0.2), value: focused)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { focused = true }
+                .entrance(shown, delay: 0.07, reduceMotion: reduceMotion)
+                Spacer(minLength: 12)
+            }
+            .padding(.horizontal, 28)
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
+        }
+    }
+
+    /// The name's size: as big as "Hi", or smaller so a long name still fits on the line.
+    private func fittedSize(width: CGFloat) -> CGFloat {
+        // `nameSize` is measured at 15 × the draw scale.
+        let natural = nameSize.width * Self.size / (15 * IntroNameSlot.drawScale)
+        guard natural > width, natural > 0 else { return Self.size }
+        return max(24, (Self.size * width / natural).rounded(.down))
     }
 }
 
@@ -424,7 +476,7 @@ struct IntroPage: Identifiable {
     static let all: [IntroPage] = [
         IntroPage(
             id: 0, kind: .welcome, eyebrow: "Welcome to Availabliss",
-            title: "What should we call you?",
+            title: "",
             body: "",
             orbs: OrbLayout.appearance
         ),

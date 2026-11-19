@@ -158,35 +158,6 @@ private fun ScenePill(modifier: Modifier = Modifier, content: @Composable RowSco
 
 // endregion
 
-// region 0. Welcome
-
-/** A big "Hi," with your name under it in the accent, filled in as you type ("Hi" alone until then). */
-@Composable
-internal fun WelcomeScene(page: Int, reduceMotion: Boolean) {
-    val colors = AvailablissTheme.colors
-    val name = LocalIntroName.current
-    val base = AvailablissTheme.type.bodyMedium
-    val style = base.copy(fontSize = WELCOME_SIZE.sp, lineHeight = (WELCOME_SIZE * 1.15f).sp)
-    Column(Modifier.fillMaxWidth().padding(start = 4.dp)) {
-        Text(if (name.isEmpty()) "Hi" else "Hi,", style = style, color = colors.ink, maxLines = 1)
-        AnimatedVisibility(
-            visible = name.isNotEmpty(),
-            enter = if (reduceMotion) fadeIn() else fadeIn() + expandVertically(),
-            exit = if (reduceMotion) fadeOut() else fadeOut() + shrinkVertically(),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IntroNameSlot(page, scale = WELCOME_SIZE / 15f, tone = IntroNameTone.Accent)
-                Text(".", style = style, color = colors.accent, maxLines = 1)
-            }
-        }
-        Box(Modifier.padding(top = 18.dp).size(52.dp, 6.dp).clip(CircleShape).background(colors.t1))
-    }
-}
-
-private const val WELCOME_SIZE = 64f
-
-// endregion
-
 // region 1. Make a group
 
 /** A group card filling up as friends join from the invite link. */

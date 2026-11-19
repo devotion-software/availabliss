@@ -67,41 +67,6 @@ private let friends = [
     Friend(name: "Jo", tile: "t4"), Friend(name: "Tom", tile: "t5"),
 ]
 
-// MARK: - 0. Welcome
-
-/// A big "Hi," with your name under it in the accent, filled in as you type ("Hi" alone until then).
-struct WelcomeIllustration: View {
-    let page: Int
-    @Environment(\.theme) private var theme
-    @Environment(\.introName) private var name
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(name.isEmpty ? "Hi" : "Hi,")
-                .bodyFont(Self.size, .semibold)
-                .contentTransition(.identity)
-            if !name.isEmpty {
-                HStack(spacing: 0) {
-                    IntroNameSlot(page: page, scale: Self.size / 15, tone: .accent)
-                    Text(".").bodyFont(Self.size, .semibold).foregroundStyle(theme.accent)
-                }
-                .transition(.opacity)
-            }
-            Capsule()
-                .fill(theme.tile("t1"))
-                .frame(width: 52, height: 6)
-                .padding(.top, 18)
-        }
-        .lineLimit(1)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, 4)
-        .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.85), value: name.isEmpty)
-    }
-
-    private static let size: CGFloat = 64
-}
-
 // MARK: - 1. Make a group
 
 /// A group card filling up as friends join from the invite link.
