@@ -403,7 +403,7 @@ private struct IntroPageView: View, Equatable {
     }
 }
 
-/// The welcome: a big "Hi" you type your name straight into, with "Welcome to Availabliss" under it.
+/// The welcome: a big "Hi," you type your name straight into, with "Welcome to Availabliss" under it.
 /// The field's own text is invisible: the travelling name is drawn over it (in the space left here), so
 /// the name you type is the very one that moves on through the intro. Long names shrink to fit.
 private struct WelcomePage: View {
@@ -425,12 +425,12 @@ private struct WelcomePage: View {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 12)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(IntroName.first(of: name).isEmpty ? "Hi" : "Hi,")
+                    Text("Hi,")
                         .bodyFont(Self.size, .semibold)
                         .lineLimit(1)
                         .accessibilityHidden(true)
                     ZStack(alignment: .leading) {
-                        TextField("", text: $name, prompt: Text("Your name").foregroundStyle(theme.muted.opacity(0.55)))
+                        TextField("", text: $name, prompt: Text("your name").foregroundStyle(theme.muted.opacity(0.55)))
                             .bodyFont(nameFont, .semibold)
                             .foregroundStyle(.clear)
                             .tint(theme.accent)

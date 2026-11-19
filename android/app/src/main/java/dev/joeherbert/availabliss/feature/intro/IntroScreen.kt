@@ -520,7 +520,7 @@ private fun IntroPageContent(
 }
 
 /**
- * The welcome: a big "Hi" you type your name straight into, with "Welcome to Availabliss" under it. The
+ * The welcome: a big "Hi," you type your name straight into, with "Welcome to Availabliss" under it. The
  * field's own text is invisible: the travelling name is drawn over it (in the space left here), so the
  * name you type is the very one that moves on through the intro. Long names shrink to fit.
  */
@@ -560,7 +560,7 @@ private fun WelcomePage(
                     .pointerInput(Unit) { detectTapGestures { focusRequester.requestFocus() } },
             ) {
                 Text(
-                    if (firstNameOf(name).isEmpty()) "Hi" else "Hi,",
+                    "Hi,",
                     style = sized(WELCOME_SIZE),
                     color = colors.ink,
                     maxLines = 1,
@@ -587,7 +587,7 @@ private fun WelcomePage(
                             .semantics { contentDescription = "Your first name" },
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
-                                if (name.isEmpty()) Text("Your name", style = nameStyle, color = colors.muted.copy(alpha = 0.55f), maxLines = 1)
+                                if (name.isEmpty()) Text("your name", style = nameStyle, color = colors.muted.copy(alpha = 0.55f), maxLines = 1)
                                 inner()
                             }
                         },
