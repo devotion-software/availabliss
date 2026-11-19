@@ -8,15 +8,15 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db } from './db';
 import { events, groupMembers, groups, proposals } from './db/schema';
 import { getGroup, getGroupRow, latestEventEnd } from './groups';
-import { publishToGroup } from './realtime';
+import { publishGroupUpdated } from './realtime';
 
-/** Tells the group's members it changed (as the owner sees it: clients read their own role). */
-async function publishGroupUpdated(groupId: string): Promise<void> {
+/** Tells the group's members it changed (each with their own role). */
+async function announceUpdate(groupId: string): Promise<void> {
 	const owner = await db.query.groupMembers.findFirst({
 		where: and(eq(groupMembers.groupId, groupId), eq(groupMembers.role, 'owner')),
 		columns: { userId: true }
 	});
-	if (owner) await publishToGroup(groupId, 'group.updated', await getGroup(groupId, owner.userId));
+	if (owner) await publishGroupUpdated(await getGroup(groupId, owner.userId));
 }
 
 /** Whether the group has an event still to come (or under way), or an open proposal for a time still ahead. */
@@ -54,7 +54,7 @@ export async function autoArchiveGroups(now = new Date()): Promise<string[]> {
 			.where(and(eq(groups.id, group.id), eq(groups.autoArchive, true), isNull(groups.archivedAt)));
 		if (!res.affectedRows) continue;
 		archived.push(group.id);
-		await publishGroupUpdated(group.id);
+		await announceUpdate(group.id);
 	}
 	return archived;
 }
@@ -64,5 +64,5 @@ export async function unarchiveOnActivity(groupId: string): Promise<void> {
 	const row = await getGroupRow(groupId);
 	if (!row.autoArchive || !row.archivedAt) return;
 	await db.update(groups).set({ archivedAt: null }).where(eq(groups.id, groupId));
-	await publishGroupUpdated(groupId);
+	await announceUpdate(groupId);
 }

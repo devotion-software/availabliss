@@ -116,7 +116,7 @@ final class GroupDetailModel {
             try? await loadPlans()
             await loadMute()
         case .groupUpdated:
-            // The server builds the payload for whoever made the change, so its role is theirs: use ours.
+            // The server now sends each member their own role; reading it from the members list as well keeps an older server safe.
             if var updated = event.payload(as: Group.self) {
                 updated.role = updated.member(me() ?? "")?.role ?? group?.role ?? updated.role
                 group = updated

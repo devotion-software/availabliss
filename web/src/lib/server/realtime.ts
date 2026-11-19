@@ -4,7 +4,7 @@
  * should see them. Events travel over the shared bus (Redis pub/sub when
  * configured), so a change made on one instance reaches connections on all of them.
  */
-import type { LiveEvent } from '#lib/types';
+import type { Group, LiveEvent } from '#lib/types';
 import { bus as sharedBus, type Bus } from './redis';
 import { memberIds } from './groups';
 import { eq } from 'drizzle-orm';
@@ -90,6 +90,17 @@ export async function publishToGroup(groupId: string, type: LiveEvent['type'], p
 	// These change what the groups list's cached slot count would be.
 	if (SLOT_COUNT_EVENTS.has(type)) await clearSlotCounts([groupId]);
 	publishToUsers(await memberIds(groupId), { type, groupId, payload });
+}
+
+/**
+ * `group.updated` to every member, each with their own role: `Group.role` is the viewer's, so
+ * sending the editor's copy to everyone would show members admin-only controls.
+ */
+export async function publishGroupUpdated(group: Group): Promise<void> {
+	await clearSlotCounts([group.id]);
+	for (const member of group.members) {
+		publishToUsers([member.userId], { type: 'group.updated', groupId: group.id, payload: { ...group, role: member.role } });
+	}
 }
 
 /** A user's busy time changed: every group they're in should refresh availability. */

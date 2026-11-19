@@ -828,7 +828,7 @@ Payloads by type: `message.created` → `Message`; `message.updated` → `Messag
 loaded message quoting it, since quotes aren't republished); `poll.updated` → `Poll`;
 `proposal.created` / `proposal.updated` → `Proposal`; `proposal.confirmed` →
 `{ proposal: Proposal, event: GroupEvent }`; `event.changed` → `GroupEvent` (or
-`{ id, deleted: true }`); `group.updated` → `Group`; `member.changed` → `Member`
+`{ id, deleted: true }`); `group.updated` → `Group` (each member gets it with their own `role`); `member.changed` → `Member`
 (or `{ userId, removed: true }`); `availability.changed` → `{ userId }` (refetch
 availability); `notification.created` → `Notification`; `message.receipts` →
 `{ userId, state, receipts: { messageId, delivered, seen, recipients, seenBy }[] }`
