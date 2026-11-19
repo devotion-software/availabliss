@@ -88,7 +88,7 @@ struct ActivityView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeader(title: "Activity", subtitle: "Your chats, and proposals, plans and nudges") {
+                ScreenHeader(title: "Activity", subtitle: "Your chats, proposals, plans and nudges") {
                     IconButton(systemImage: "calendar", label: "My plans") { app.router.push(.myPlans) }
                 }
                 Picker("Show", selection: $tab) {

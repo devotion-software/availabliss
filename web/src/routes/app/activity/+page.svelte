@@ -73,7 +73,7 @@
 <div class="activity">
 	<PageHeader
 		title="Activity"
-		subtitle="Your chats, and proposals, plans and nudges from your groups"
+		subtitle="Your chats, proposals, plans and nudges from your groups"
 		backHref="/app"
 		backLabel="Back to groups"
 		backOnPhoneOnly
