@@ -467,7 +467,7 @@ private fun MonthSection(
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 MonthGrid(state.columnLabels, state.monthRows, onSelectDate)
-                MonthLegend(state.daysNote, showPartial = state.showPartialLegend)
+                MonthLegend(showPartial = state.showPartialLegend)
             }
         }
         if (state.bestOptions.isNotEmpty()) {

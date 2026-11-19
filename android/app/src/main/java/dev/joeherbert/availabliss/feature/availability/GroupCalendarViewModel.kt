@@ -84,7 +84,6 @@ data class GroupCalendarUiState(
     val heading: String = "",
     val columnLabels: List<String> = emptyList(),
     val monthRows: List<List<MonthCellUi?>> = emptyList(),
-    val daysNote: String? = null,
     /** A day on screen works only with someone missing: the legend adds "Most of us free". */
     val showPartialLegend: Boolean = false,
     /** The month's top upcoming times, ranked (fewer missing, then the Pro score). */
@@ -552,7 +551,6 @@ class GroupCalendarViewModel @Inject constructor(
             heading = heading,
             columnLabels = AvailabilityUiMapper.columnLabels(columns),
             monthRows = monthRows,
-            daysNote = AvailabilityUiMapper.daysNote(columns),
             detail = if (YearMonth.from(r.selected) == r.month) AvailabilityUiMapper.detail(r.selected, r.availability, group, meId, today) else null,
             syncBanner = AvailabilityUiMapper.syncBanner(r.availability, group, isAdmin),
             coverageNote = AvailabilityUiMapper.coverageNote(r.availability, group, meId),

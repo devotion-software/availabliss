@@ -53,9 +53,6 @@ struct MonthGrid: View {
             LegendItem(label: "Someone's busy") {
                 theme.busyBg.opacity(0.5).overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(theme.busyLine, lineWidth: 1))
             }
-            if model.columns.count < 7, let first = model.columns.first, let last = model.columns.last {
-                Text("\(Weekday.short(first))–\(Weekday.short(last)) only")
-            }
         }
         .bodyFont(11, relativeTo: .caption2)
         .foregroundStyle(theme.muted)

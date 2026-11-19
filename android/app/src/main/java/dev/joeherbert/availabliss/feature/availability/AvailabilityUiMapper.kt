@@ -81,17 +81,6 @@ object AvailabilityUiMapper {
 
     fun columnLabels(columns: List<Int>): List<String> = columns.map { DateTimes.shortWeekday(it) }
 
-    /** "Fri–Sun only" when some weekdays are dropped. */
-    fun daysNote(columns: List<Int>): String? {
-        if (columns.size == 7) return null
-        val contiguous = columns.zipWithNext().all { (a, b) -> b == a + 1 }
-        return if (contiguous && columns.size > 1) {
-            "${DateTimes.shortWeekday(columns.first())}–${DateTimes.shortWeekday(columns.last())} only"
-        } else {
-            columns.joinToString(", ") { DateTimes.shortWeekday(it) } + " only"
-        }
-    }
-
     /** Week rows of the month, with only the visible columns; dates outside the month are null. */
     fun monthRows(
         month: YearMonth,

@@ -249,13 +249,13 @@ private fun HiddenCell(cell: MonthCellUi, modifier: Modifier = Modifier) {
 
 /**
  * Legend under the month: "Works for everyone", "Most of us free" (when [showPartial]: a day
- * on screen works only with someone missing), "Someone's busy", "Fri–Sun only".
+ * on screen works only with someone missing), "Someone's busy". The calendar's columns already show
+ * which weekdays the group's timing uses, so it doesn't spell them out.
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun MonthLegend(daysNote: String?, modifier: Modifier = Modifier, showPartial: Boolean = false) {
+fun MonthLegend(modifier: Modifier = Modifier, showPartial: Boolean = false) {
     val colors = AvailablissTheme.colors
-    val type = AvailablissTheme.type
     // Wraps: with "Most of us free" as well, it can be wider than a phone.
     androidx.compose.foundation.layout.FlowRow(
         modifier.fillMaxWidth().padding(start = 2.dp, top = 4.dp, end = 2.dp),
@@ -274,7 +274,6 @@ fun MonthLegend(daysNote: String?, modifier: Modifier = Modifier, showPartial: B
         LegendItem("Someone's busy") {
             Box(Modifier.size(10.dp).alpha(0.5f).clip(RoundedCornerShape(3.dp)).background(colors.busyBg).border(1.dp, colors.busyLine, RoundedCornerShape(3.dp)))
         }
-        daysNote?.let { Text(it, style = type.micro.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal), color = colors.muted) }
     }
 }
 
@@ -304,7 +303,7 @@ private fun MonthGridPreview() {
         )
         Column(Modifier.background(AvailablissTheme.colors.bg).padding(20.dp)) {
             MonthGrid(listOf("Fri", "Sat", "Sun"), rows, onSelect = {})
-            MonthLegend("Fri–Sun only", showPartial = true)
+            MonthLegend(showPartial = true)
         }
     }
 }

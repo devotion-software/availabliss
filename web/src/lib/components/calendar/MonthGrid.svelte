@@ -122,7 +122,7 @@
 			{/each}
 		{/each}
 	</div>
-	{#if legend}<CalendarLegend {columns} {compact} partial={anyPartial} />{/if}
+	{#if legend}<CalendarLegend {compact} partial={anyPartial} />{/if}
 </div>
 
 <style>
