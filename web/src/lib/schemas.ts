@@ -75,6 +75,9 @@ export const timeWindowSchema = z
 	.object({ from: timeString, to: timeString })
 	.refine((w) => w.from < w.to, { message: 'Window ends before it starts' });
 
+/** How many weeks after its start a span can end ("Tue → Thu 4 weeks later"). */
+export const MAX_WEEKS_LATER = 4;
+
 export const requirementSchema = z.object({
 	length: z.discriminatedUnion('type', [
 		z.object({
@@ -91,7 +94,8 @@ export const requirementSchema = z.object({
 			startTime: timeString,
 			endDay: weekday,
 			endTime: timeString,
-			weeksLater: z.union([z.literal(0), z.literal(1)])
+			/** Extra weeks between the start and end day: 0 = same week, 1 = the following week, up to 4. */
+			weeksLater: z.int().min(0).max(MAX_WEEKS_LATER)
 		})
 	]),
 	window: timeWindowSchema.nullable(),

@@ -48,7 +48,9 @@ describe('requirementSchema', () => {
 		expect(ok(requirementSchema, requirement({ length: { type: 'days', count: 32 } }))).toBe(false);
 		expect(ok(requirementSchema, requirement({ length: { type: 'weeks', count: 1 } }))).toBe(false);
 		const span = { type: 'span', startDay: 4, startTime: '18:00', endDay: 6, endTime: '23:59', weeksLater: 0 };
-		expect(ok(requirementSchema, requirement({ length: { ...span, weeksLater: 2 } }))).toBe(false);
+		expect(ok(requirementSchema, requirement({ length: { ...span, weeksLater: 4 } }))).toBe(true);
+		expect(ok(requirementSchema, requirement({ length: { ...span, weeksLater: 5 } }))).toBe(false);
+		expect(ok(requirementSchema, requirement({ length: { ...span, weeksLater: 1.5 } }))).toBe(false);
 		expect(ok(requirementSchema, requirement({ length: { ...span, endDay: 7 } }))).toBe(false);
 		expect(ok(requirementSchema, requirement({ length: { ...span, startTime: '24:00' } }))).toBe(false);
 	});

@@ -107,7 +107,7 @@ class OnboardingViewModel @Inject constructor(
 
     fun onDayCount(delta: Int) = _state.update { it.copy(draft = RequirementPresets.changeDayCount(it.draft, delta)) }
 
-    fun onWeeksLater(following: Boolean) = _state.update { it.copy(draft = RequirementPresets.setWeeksLater(it.draft, following)) }
+    fun onWeeksLater(delta: Int) = _state.update { it.copy(draft = RequirementPresets.changeWeeksLater(it.draft, delta)) }
 
     fun createGroup() {
         val s = _state.value

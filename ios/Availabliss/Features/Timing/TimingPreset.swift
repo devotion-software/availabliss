@@ -92,7 +92,9 @@ extension Requirement {
         var parts: [String] = [preset == .custom ? lengthDescription : preset.label]
         switch length {
         case .span(let span):
-            parts.append("\(Weekday.short(span.startDay)) \(span.startTime) → \(span.weeksLater == 1 ? "following " : "")\(Weekday.short(span.endDay))")
+            parts.append(
+                "\(Weekday.short(span.startDay)) \(span.startTime) → \(span.weeksLater == 1 ? "following " : "")\(Weekday.short(span.endDay))"
+                    + (span.weeksLater >= 2 ? " \(span.weeksLater) weeks later" : ""))
         default:
             if let window { parts.append("\(window.from)–\(window.to.isEndOfDay ? "late" : window.to.description)") }
         }
@@ -140,10 +142,24 @@ extension Requirement {
         return Weekday.full(span.startDay) + (midnight ? "" : " \(span.startTime)")
     }
 
-    /// "Sunday night" (the end of the day), "Sunday 17:00", "the following Thursday night".
+    /// "Sunday night" (the end of the day), "Sunday 17:00", "the following Thursday night",
+    /// "Thursday night 3 weeks later".
     static func endPhrase(_ span: RequirementLength.Span) -> String {
         let day = (span.weeksLater == 1 ? "the following " : "") + Weekday.full(span.endDay)
-        return span.endTime.isEndOfDay ? "\(day) night" : "\(day) \(span.endTime)"
+        let end = span.endTime.isEndOfDay ? "\(day) night" : "\(day) \(span.endTime)"
+        return span.weeksLater >= 2 ? "\(end) \(span.weeksLater) weeks later" : end
+    }
+
+    /// How many weeks after its start a span can end (as the server allows).
+    static let maxWeeksLater = 4
+
+    /// "Ends the same week", "Ends the week after", "Ends 3 weeks later".
+    static func weeksLaterLabel(_ weeks: Int) -> String {
+        switch weeks {
+        case 0: "Ends the same week"
+        case 1: "Ends the week after"
+        default: "Ends \(weeks) weeks later"
+        }
     }
 
     /// "any time of day", "between 18:00 and midnight".

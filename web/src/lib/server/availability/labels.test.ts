@@ -48,6 +48,9 @@ describe('requirementSummary', () => {
 		expect(requirementSummary(req({ type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '23:59', weeksLater: 1 }))).toBe(
 			'Over a week · Tue → following Thu · Nov – Jan'
 		);
+		expect(requirementSummary(req({ type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '23:59', weeksLater: 2 }))).toBe(
+			'Over 2 weeks · Tue → Thu 2 weeks later · Nov – Jan'
+		);
 		expect(requirementSummary(req({ type: 'span', startDay: 0, startTime: '09:00', endDay: 2, endTime: '17:00', weeksLater: 0 }))).toBe(
 			'A few days · Mon 09:00 → Wed 17:00 · Nov – Jan'
 		);

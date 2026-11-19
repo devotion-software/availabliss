@@ -104,6 +104,18 @@ describe('weekend span', () => {
 	});
 });
 
+describe('span over several weeks', () => {
+	test('Sat → Sun two weeks later is a 16-day slot', () => {
+		const requirement: Requirement = {
+			...weekend,
+			length: { type: 'span', startDay: 5, startTime: '00:00', endDay: 6, endTime: '23:59', weeksLater: 2 }
+		};
+		const result = computeAvailability(input({ requirement, members: [{ userId: 'sam', synced: true, busy: [] }] }));
+		const first = result.slots[0];
+		expect(first.label).toBe('Sat 7 – Sun 22 Nov');
+	});
+});
+
 describe('duration inside a daily window', () => {
 	const req: Requirement = {
 		...weekend,

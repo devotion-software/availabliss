@@ -31,6 +31,10 @@ struct TimingSentenceTests {
         later.endTime = WallTime(hour: 17, minute: 0)
         later.weeksLater = 1
         #expect(Requirement.endPhrase(later) == "the following Sunday 17:00")
+        var weeksOn = later
+        weeksOn.weeksLater = 3
+        #expect(Requirement.endPhrase(weeksOn) == "Sunday 17:00 3 weeks later")
+        #expect(Requirement.weeksLaterLabel(2) == "Ends 2 weeks later")
     }
 
     @Test func timesAndDays() {

@@ -71,7 +71,9 @@ export function requirementSummary(req: Requirement): string {
 		const isWeekend = l.startDay === 4 && l.endDay === 6 && l.weeksLater === 0;
 		const start = l.startTime === '00:00' ? WEEKDAYS[l.startDay] : `${WEEKDAYS[l.startDay]} ${l.startTime}`;
 		const end = minutesOf(l.endTime, { asEnd: true }) === 24 * 60 ? WEEKDAYS[l.endDay] : `${WEEKDAYS[l.endDay]} ${l.endTime}`;
-		what = `${isWeekend ? 'A weekend' : l.weeksLater ? 'Over a week' : 'A few days'} · ${start} → ${l.weeksLater ? 'following ' : ''}${end}`;
+		const kind = isWeekend ? 'A weekend' : l.weeksLater >= 2 ? `Over ${l.weeksLater} weeks` : l.weeksLater ? 'Over a week' : 'A few days';
+		const later = l.weeksLater === 1 ? `following ${end}` : l.weeksLater >= 2 ? `${end} ${l.weeksLater} weeks later` : end;
+		what = `${kind} · ${start} → ${later}`;
 	} else if (l.type === 'days') {
 		const label = l.count === 7 ? 'A week' : l.count === 1 ? (req.window ? 'An evening' : 'One day') : `${l.count} days`;
 		const window = req.window ? ` from ${req.window.from}` : '';

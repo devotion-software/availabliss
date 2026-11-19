@@ -60,7 +60,8 @@ export type RequirementLength =
 			startTime: string;
 			endDay: Weekday;
 			endTime: string;
-			weeksLater: 0 | 1;
+			/** Extra weeks between the start and end day: 0 = same week, 1 = the following week, up to 4. */
+			weeksLater: number;
 	  };
 
 export interface Requirement {

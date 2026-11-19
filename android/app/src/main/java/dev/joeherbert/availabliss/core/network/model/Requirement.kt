@@ -48,7 +48,7 @@ sealed interface RequirementLength {
     @SerialName("days")
     data class Days(val count: Int) : RequirementLength
 
-    /** e.g. Fri 18:00 → Sun 23:59. `weeksLater` 1 = "Tue → following Thu". */
+    /** e.g. Fri 18:00 → Sun 23:59. `weeksLater` 0–4: 1 = "Tue → following Thu", 3 = "Tue → Thu 3 weeks later". */
     @Serializable
     @SerialName("span")
     data class Span(

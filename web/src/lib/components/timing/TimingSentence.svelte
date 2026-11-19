@@ -10,6 +10,7 @@
 		spanEndPhrase,
 		spanStartPhrase,
 		windowPhrase,
+		WEEKS_LATER_CHOICES,
 		type PresetId
 	} from '#lib/client/requirements';
 	import { formatDayKey, plural } from '#lib/client/format';
@@ -189,9 +190,12 @@
 				<Chip selected={span.endTime === '23:59'} onclick={() => (span.endTime = '23:59')}>End of the day</Chip>
 				<Chip selected={span.endTime === '17:00'} onclick={() => (span.endTime = '17:00')}>Teatime</Chip>
 			</div>
-			<div class="row">
-				<span id="wl-{uid}">The following week</span>
-				<Toggle checked={span.weeksLater === 1} labelledby="wl-{uid}" onchange={(on) => (span.weeksLater = on ? 1 : 0)} />
+			<!-- Which week it ends in, so a span can run for up to a month ("Tue → Thu 3 weeks later"). -->
+			<h3 class="eyebrow" id="wl-{uid}">Ends</h3>
+			<div class="chips" role="group" aria-labelledby="wl-{uid}">
+				{#each WEEKS_LATER_CHOICES as choice (choice.weeks)}
+					<Chip selected={span.weeksLater === choice.weeks} onclick={() => (span!.weeksLater = choice.weeks)}>{choice.label}</Chip>
+				{/each}
 			</div>
 			<Button variant="solid" block onclick={() => (open = null)}>Done</Button>
 		</div>

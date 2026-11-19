@@ -93,6 +93,7 @@ describe('labels', () => {
 		expect(spanLabel({ type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '12:00', weeksLater: 1 })).toBe(
 			'Tue → following Thu 12:00'
 		);
+		expect(spanLabel({ type: 'span', startDay: 1, startTime: '00:00', endDay: 3, endTime: '23:59', weeksLater: 3 })).toBe('Tue → Thu 3 weeks later');
 	});
 
 	test('detailLabel and summarize', () => {
@@ -172,6 +173,7 @@ describe('the timing sentence', () => {
 		expect(spanStartPhrase(span)).toBe('Friday 18:00');
 		expect(spanEndPhrase(span)).toBe('Sunday night');
 		expect(spanEndPhrase({ ...span, endTime: '17:00', weeksLater: 1 })).toBe('the following Sunday 17:00');
+		expect(spanEndPhrase({ ...span, weeksLater: 2 })).toBe('Sunday night 2 weeks later');
 		expect(spanStartPhrase({ ...span, startTime: '00:00' })).toBe('Friday');
 	});
 	test('times and days', () => {

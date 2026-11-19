@@ -537,10 +537,10 @@ struct CustomLengthEditor: View {
                     Text("\(Formatting.plural(model.dayCount, "day")) in a row").bodyFont(15, .semibold)
                 }
             case .span:
-                Toggle(isOn: Binding(get: { model.span.weeksLater == 1 }, set: { model.span.weeksLater = $0 ? 1 : 0 })) {
-                    ToggleLabel(title: "Ends the following week", subtitle: "e.g. Tue \u{2192} following Thu")
+                // Which week it ends in, so a span can run for up to a month ("Tue → Thu 3 weeks later").
+                Stepper(value: $model.span.weeksLater, in: 0...Requirement.maxWeeksLater) {
+                    Text(Requirement.weeksLaterLabel(model.span.weeksLater)).bodyFont(15, .semibold)
                 }
-                .toggleStyle(.glassSwitch)
             }
         }
         .padding(12)
@@ -570,10 +570,9 @@ struct TimingEndsSheet: View {
                 DatePicker("Time", selection: timeBinding, displayedComponents: .hourAndMinute)
                     .bodyFont(15, .medium)
                 if target == .end {
-                    Toggle(isOn: Binding(get: { model.span.weeksLater == 1 }, set: { model.span.weeksLater = $0 ? 1 : 0 })) {
-                        Text("The following week").bodyFont(15, .medium)
+                    Stepper(value: $model.span.weeksLater, in: 0...Requirement.maxWeeksLater) {
+                        Text(Requirement.weeksLaterLabel(model.span.weeksLater)).bodyFont(15, .medium)
                     }
-                    .toggleStyle(.glassSwitch)
                 }
             } else {
                 Toggle(isOn: $model.hasWindow) {

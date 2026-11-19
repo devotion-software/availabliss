@@ -68,10 +68,11 @@ object TimingSentence {
     fun start(span: RequirementLength.Span): String =
         DAY_NAMES[span.startDay] + if (span.startTime == "00:00") "" else " ${span.startTime}"
 
-    /** "Sunday night" (the end of the day), "Sunday 17:00", "the following Thursday night". */
+    /** "Sunday night" (the end of the day), "Sunday 17:00", "the following Thursday night", "Thursday night 3 weeks later". */
     fun end(span: RequirementLength.Span): String {
         val day = (if (span.weeksLater == 1) "the following " else "") + DAY_NAMES[span.endDay]
-        return if (span.endTime == "23:59") "$day night" else "$day ${span.endTime}"
+        val end = if (span.endTime == "23:59") "$day night" else "$day ${span.endTime}"
+        return if (span.weeksLater >= 2) "$end ${span.weeksLater} weeks later" else end
     }
 
     /** "any time of day", "between 18:00 and midnight". */
@@ -197,15 +198,15 @@ internal fun TimingSentenceSection(state: TimingEditorUiState, canEdit: Boolean,
     when (open) {
         SentencePart.None -> Unit
         SentencePart.Kind -> KindSheet(draft, actions, close)
-        SentencePart.Start -> SpanEndSheet("Starting", state.spanStart, following = null, onDone = {
+        SentencePart.Start -> SpanEndSheet("Starting", state.spanStart, weeksLater = null, onDone = {
             actions.onSpanStart(it)
             close()
         }, onDismiss = close)
         SentencePart.End -> SpanEndSheet(
             "Ending",
             state.spanEnd,
-            following = (draft.length as? RequirementLength.Span)?.weeksLater == 1,
-            onFollowing = actions.onWeeksLater,
+            weeksLater = (draft.length as? RequirementLength.Span)?.weeksLater ?: 0,
+            onWeeksLater = actions.onWeeksLater,
             onDone = {
                 actions.onSpanEnd(it)
                 close()
@@ -242,8 +243,9 @@ private fun KindSheet(draft: TimingDraft, actions: TimingActions, close: () -> U
 internal fun SpanEndSheet(
     title: String,
     initial: SpanEnd,
-    following: Boolean?,
-    onFollowing: (Boolean) -> Unit = {},
+    // The end's week (0 = the same week, up to 4 weeks later); null for the start.
+    weeksLater: Int?,
+    onWeeksLater: (Int) -> Unit = {},
     onDone: (SpanEnd) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -256,7 +258,7 @@ internal fun SpanEndSheet(
         }
         FieldTile("Time", DateTimes.time(time), onClick = { pickingTime = true }, modifier = Modifier.fillMaxWidth())
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (following == null) {
+            if (weeksLater == null) {
                 Chip("Start of the day", selected = time == LocalTime.MIDNIGHT, onClick = { time = LocalTime.MIDNIGHT })
                 Chip("Morning", selected = time == LocalTime.of(9, 0), onClick = { time = LocalTime.of(9, 0) })
                 Chip("Evening", selected = time == LocalTime.of(18, 0), onClick = { time = LocalTime.of(18, 0) })
@@ -265,8 +267,8 @@ internal fun SpanEndSheet(
                 Chip("Teatime", selected = time == LocalTime.of(17, 0), onClick = { time = LocalTime.of(17, 0) })
             }
         }
-        if (following != null) {
-            ToggleRow(title = "The following week", checked = following, onCheckedChange = onFollowing)
+        if (weeksLater != null) {
+            Stepper(TimingLabels.weeksLater(weeksLater), "end week", enabled = true, onMinus = { onWeeksLater(-1) }, onPlus = { onWeeksLater(1) })
         }
         PrimaryButton("Done", onClick = { onDone(SpanEnd(day, time)) }, height = 52.dp, shape = Shapes.control, modifier = Modifier.fillMaxWidth())
     }

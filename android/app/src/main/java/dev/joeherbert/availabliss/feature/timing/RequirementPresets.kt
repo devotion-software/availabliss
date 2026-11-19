@@ -157,10 +157,13 @@ object RequirementPresets {
         return withLength(draft, RequirementLength.Days((l.count + delta).coerceIn(1, 31))).copy(preset = TimingPreset.Custom)
     }
 
-    /** A span that ends the following week (Tue → the Thursday after next), or the same week. */
-    fun setWeeksLater(draft: TimingDraft, following: Boolean): TimingDraft {
+    /** How many weeks after its start a span can end (as the server allows). */
+    const val MAX_WEEKS_LATER = 4
+
+    /** Moves a span's end [delta] weeks later or earlier: the same week, the week after, … up to 4 weeks later. */
+    fun changeWeeksLater(draft: TimingDraft, delta: Int): TimingDraft {
         val l = draft.length as? RequirementLength.Span ?: return draft
-        return withLength(draft, l.copy(weeksLater = if (following) 1 else 0), null).copy(preset = TimingPreset.Custom)
+        return withLength(draft, l.copy(weeksLater = (l.weeksLater + delta).coerceIn(0, MAX_WEEKS_LATER)), null).copy(preset = TimingPreset.Custom)
     }
 
     /** Re-detects the chip after an edit (e.g. changing the evening's start makes it Custom). */
@@ -171,7 +174,7 @@ object RequirementPresets {
 
     /** Weekdays a span covers, wrapping past Sunday. */
     fun spanDays(span: RequirementLength.Span): Set<Int> {
-        if (span.weeksLater == 1) return (0..6).toSet()
+        if (span.weeksLater >= 1) return (0..6).toSet()
         val result = mutableSetOf<Int>()
         var d = span.startDay
         while (true) {

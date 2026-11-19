@@ -149,7 +149,7 @@ interface Requirement {
     | { type: 'duration'; minutes: number }                    // e.g. 120 = 2 hours
     | { type: 'days'; count: number }                          // whole consecutive days, 7 = a week
     | { type: 'span'; startDay: number; startTime: string;     // e.g. Fri 18:00 → Sun 23:59
-        endDay: number; endTime: string; weeksLater: 0 | 1 };  // weeksLater 1 = "Tue → following Thu"
+        endDay: number; endTime: string; weeksLater: number };  // 0–4: 1 = "Tue → following Thu", 3 = "Tue → Thu 3 weeks later"
   window: { from: string; to: string } | null;  // daily time window, e.g. evening { "18:00", "23:59" }; null = whole day
   days: number[];                              // allowed weekdays (ignored for span)
   bankHolidays: boolean;                       // bank holidays count as allowed days
@@ -219,6 +219,7 @@ A new proposal or event in an archived group with `autoArchive` on unarchives it
 | A weekend | `{ "type": "span", "startDay": 4, "startTime": "18:00", "endDay": 6, "endTime": "23:59", "weeksLater": 0 }` |
 | Tue → Thu | `{ "type": "span", "startDay": 1, "startTime": "00:00", "endDay": 3, "endTime": "23:59", "weeksLater": 0 }` |
 | Tue → following Thu | as above with `"weeksLater": 1` |
+| Tue → Thu 3 weeks later | as above with `"weeksLater": 3` (up to 4) |
 | A week | `{ "type": "days", "count": 7 }` |
 
 A slot "works" when every **synced** member is free for the whole slot. With a `quorum` (or optional members),

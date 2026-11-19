@@ -127,12 +127,12 @@ export function lengthLabel(req: Requirement): string {
 	return 'A span';
 }
 
-/** "Fri from 18:00 → Sun", "Tue → following Thu" */
+/** "Fri from 18:00 → Sun", "Tue → following Thu", "Tue → Thu 3 weeks later" */
 export function spanLabel(length: Extract<RequirementLength, { type: 'span' }>): string {
 	const start = `${weekdayShort(length.startDay)}${length.startTime === '00:00' ? '' : ` from ${length.startTime}`}`;
-	const endDay = `${length.weeksLater ? 'following ' : ''}${weekdayShort(length.endDay)}`;
+	const endDay = `${length.weeksLater === 1 ? 'following ' : ''}${weekdayShort(length.endDay)}`;
 	const end = length.endTime === '23:59' ? endDay : `${endDay} ${length.endTime}`;
-	return `${start} → ${end}`;
+	return `${start} → ${end}${length.weeksLater >= 2 ? ` ${length.weeksLater} weeks later` : ''}`;
 }
 
 /** Everything after the shape: "Fri from 18:00 → Sun · Nov – Jan". */
@@ -237,11 +237,18 @@ export function kindPhrase(req: Requirement): string {
 export const spanStartPhrase = (length: Extract<RequirementLength, { type: 'span' }>) =>
 	`${WEEKDAY_NAMES[length.startDay]}${length.startTime === '00:00' ? '' : ` ${length.startTime}`}`;
 
-/** "Sunday night" (the end of the day), "Sunday 17:00", "the following Thursday night". */
+/** "Sunday night" (the end of the day), "Sunday 17:00", "the following Thursday night", "Thursday night 3 weeks later". */
 export function spanEndPhrase(length: Extract<RequirementLength, { type: 'span' }>): string {
-	const day = `${length.weeksLater ? 'the following ' : ''}${WEEKDAY_NAMES[length.endDay]}`;
-	return length.endTime === '23:59' ? `${day} night` : `${day} ${length.endTime}`;
+	const day = `${length.weeksLater === 1 ? 'the following ' : ''}${WEEKDAY_NAMES[length.endDay]}`;
+	const end = length.endTime === '23:59' ? `${day} night` : `${day} ${length.endTime}`;
+	return length.weeksLater >= 2 ? `${end} ${length.weeksLater} weeks later` : end;
 }
+
+/** The choices for when a span ends: "The same week", "The week after", "2 weeks later" … */
+export const WEEKS_LATER_CHOICES = [0, 1, 2, 3, 4].map((weeks) => ({
+	weeks,
+	label: weeks === 0 ? 'Same week' : weeks === 1 ? 'Week after' : `${weeks} weeks later`
+}));
 
 /** "any time of day", "between 18:00 and midnight", "between 08:00 and 23:00". */
 export function windowPhrase(window: TimeWindow | null): string {

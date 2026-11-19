@@ -31,7 +31,7 @@ object TimingLabels {
 
     fun ends(draft: TimingDraft): String = when (val l = draft.length) {
         is RequirementLength.Span -> {
-            val day = (if (l.weeksLater == 1) "following " else "") + DateTimes.shortWeekday(l.endDay)
+            val day = (if (l.weeksLater == 1) "following " else if (l.weeksLater >= 2) "${l.weeksLater} weeks on, " else "") + DateTimes.shortWeekday(l.endDay)
             if (l.endTime == END_OF_DAY) "$day, any time" else "$day by ${l.endTime}"
         }
         is RequirementLength.Duration -> "Done by ${(draft.window ?: RequirementPresets.DEFAULT_DURATION_WINDOW).to}"
@@ -52,7 +52,8 @@ object TimingLabels {
             is RequirementLength.Duration -> duration(l.minutes)
             is RequirementLength.Days -> days(l.count)
             is RequirementLength.Span ->
-                "${DateTimes.shortWeekday(l.startDay)} → ${if (l.weeksLater == 1) "following " else ""}${DateTimes.shortWeekday(l.endDay)}"
+                "${DateTimes.shortWeekday(l.startDay)} → ${if (l.weeksLater == 1) "following " else ""}${DateTimes.shortWeekday(l.endDay)}" +
+                    if (l.weeksLater >= 2) " ${l.weeksLater} weeks later" else ""
         }
     }
 
@@ -99,11 +100,19 @@ object TimingLabels {
         return bits.joinToString(" · ")
     }
 
-    /** "Fri from 18:00 → Sun", "Tue → following Thu". */
+    /** "Fri from 18:00 → Sun", "Tue → following Thu", "Tue → Thu 3 weeks later". */
     private fun spanLabel(l: RequirementLength.Span): String {
         val start = DateTimes.shortWeekday(l.startDay) + if (l.startTime == "00:00") "" else " from ${l.startTime}"
         val endDay = (if (l.weeksLater == 1) "following " else "") + DateTimes.shortWeekday(l.endDay)
-        return "$start → " + if (l.endTime == END_OF_DAY) endDay else "$endDay ${l.endTime}"
+        val later = if (l.weeksLater >= 2) " ${l.weeksLater} weeks later" else ""
+        return "$start → " + (if (l.endTime == END_OF_DAY) endDay else "$endDay ${l.endTime}") + later
+    }
+
+    /** "Ends the same week", "Ends the week after", "Ends 3 weeks later". */
+    fun weeksLater(weeks: Int): String = when (weeks) {
+        0 -> "Ends the same week"
+        1 -> "Ends the week after"
+        else -> "Ends $weeks weeks later"
     }
 
     /** "any day", "weekdays", "weekends", "Fri–Sun", "Mon, Wed, Fri". */

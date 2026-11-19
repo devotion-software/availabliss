@@ -102,7 +102,7 @@ class TimingEditor(
 
     fun changeDayCount(delta: Int) = edit { RequirementPresets.changeDayCount(it, delta) }
 
-    fun setWeeksLater(following: Boolean) = edit { RequirementPresets.setWeeksLater(it, following) }
+    fun changeWeeksLater(delta: Int) = edit { RequirementPresets.changeWeeksLater(it, delta) }
 
     fun toggleDay(day: Int) = edit { d ->
         if (d.isSpan) d else d.copy(days = if (day in d.days) d.days - day else d.days + day)
@@ -170,7 +170,7 @@ class TimingEditor(
         onCustomKind = ::selectCustomKind,
         onDuration = ::changeDuration,
         onDayCount = ::changeDayCount,
-        onWeeksLater = ::setWeeksLater,
+        onWeeksLater = ::changeWeeksLater,
         onToggleDay = ::toggleDay,
         onWindow = ::setWindow,
         onDays = ::setDays,

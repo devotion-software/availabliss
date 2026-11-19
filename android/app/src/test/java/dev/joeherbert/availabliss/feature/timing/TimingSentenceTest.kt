@@ -26,6 +26,7 @@ class TimingSentenceTest {
         assertEquals("Friday 18:00", TimingSentence.start(span))
         assertEquals("Sunday night", TimingSentence.end(span))
         assertEquals("the following Sunday 17:00", TimingSentence.end(span.copy(endTime = "17:00", weeksLater = 1)))
+        assertEquals("Sunday 17:00 3 weeks later", TimingSentence.end(span.copy(endTime = "17:00", weeksLater = 3)))
     }
 
     @Test

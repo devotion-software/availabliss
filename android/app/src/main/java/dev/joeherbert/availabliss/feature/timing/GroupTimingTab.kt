@@ -169,7 +169,8 @@ data class TimingActions(
     val onCustomKind: (CustomKind) -> Unit = {},
     val onDuration: (Int) -> Unit = {},
     val onDayCount: (Int) -> Unit = {},
-    val onWeeksLater: (Boolean) -> Unit = {},
+    /** Moves a span's end a week later (+1) or earlier (-1). */
+    val onWeeksLater: (Int) -> Unit = {},
     val onToggleDay: (Int) -> Unit = {},
     val onWindow: (dev.joeherbert.availabliss.core.network.model.TimeWindow?) -> Unit = {},
     val onDays: (Set<Int>) -> Unit = {},
@@ -286,7 +287,7 @@ internal fun CustomLengthEditor(
     onCustomKind: (CustomKind) -> Unit,
     onDuration: (Int) -> Unit,
     onDayCount: (Int) -> Unit,
-    onWeeksLater: (Boolean) -> Unit,
+    onWeeksLater: (Int) -> Unit,
 ) {
     SegmentedControl(
         segments = CustomKind.entries.map { Segment(it, it.label) },
@@ -298,17 +299,13 @@ internal fun CustomLengthEditor(
     when (val l = draft.length) {
         is RequirementLength.Duration -> Stepper(TimingLabels.duration(l.minutes), "duration", enabled, onMinus = { onDuration(-15) }, onPlus = { onDuration(15) })
         is RequirementLength.Days -> Stepper(TimingLabels.days(l.count), "number of days", enabled, onMinus = { onDayCount(-1) }, onPlus = { onDayCount(1) })
-        is RequirementLength.Span -> ToggleRow(
-            title = "Ends the following week",
-            subtitle = "e.g. Tue → the Thursday after next",
-            checked = l.weeksLater == 1,
-            onCheckedChange = { if (enabled) onWeeksLater(it) },
-        )
+        // Which week it ends in, so a span can run for up to a month ("Tue → Thu 3 weeks later").
+        is RequirementLength.Span -> Stepper(TimingLabels.weeksLater(l.weeksLater), "end week", enabled, onMinus = { onWeeksLater(-1) }, onPlus = { onWeeksLater(1) })
     }
 }
 
 @Composable
-private fun Stepper(value: String, what: String, enabled: Boolean, onMinus: () -> Unit, onPlus: () -> Unit) {
+internal fun Stepper(value: String, what: String, enabled: Boolean, onMinus: () -> Unit, onPlus: () -> Unit) {
     val colors = AvailablissTheme.colors
     Row(
         Modifier.fillMaxWidth().clip(Shapes.control).background(colors.surface).border(1.dp, colors.glassBorder, Shapes.control).padding(4.dp),
@@ -449,11 +446,11 @@ private fun TimingPickers(state: TimingEditorUiState, picker: TimingPicker, acti
         TimingPicker.None -> Unit
         TimingPicker.StartTime -> AvTimePickerDialog("Starts", state.startTime, actions.onStartTime, close)
         TimingPicker.EndTime -> AvTimePickerDialog("Ends", state.endTime, actions.onEndTime, close)
-        TimingPicker.SpanStart -> SpanEndSheet("Starts", state.spanStart, following = null, onDone = {
+        TimingPicker.SpanStart -> SpanEndSheet("Starts", state.spanStart, weeksLater = null, onDone = {
             actions.onSpanStart(it)
             close()
         }, onDismiss = close)
-        TimingPicker.SpanEnd -> SpanEndSheet("Ends", state.spanEnd, following = null, onDone = {
+        TimingPicker.SpanEnd -> SpanEndSheet("Ends", state.spanEnd, weeksLater = null, onDone = {
             actions.onSpanEnd(it)
             close()
         }, onDismiss = close)

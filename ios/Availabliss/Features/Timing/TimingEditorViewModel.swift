@@ -140,7 +140,7 @@ final class TimingEditorViewModel {
     var endsLabel: String {
         switch draft.length {
         case .span(let span):
-            "\(span.weeksLater == 1 ? "Next " : "")\(Weekday.short(span.endDay)), \(span.endTime.isEndOfDay ? "any time" : "until \(span.endTime)")"
+            "\(span.weeksLater == 1 ? "Next " : span.weeksLater >= 2 ? "\(span.weeksLater) weeks on, " : "")\(Weekday.short(span.endDay)), \(span.endTime.isEndOfDay ? "any time" : "until \(span.endTime)")"
         default: draft.window.map { $0.to.isEndOfDay ? "Until late" : "Until \($0.to)" } ?? "Any time"
         }
     }
@@ -289,7 +289,7 @@ final class TimingEditorViewModel {
     }
 
     nonisolated static func days(in span: RequirementLength.Span) -> [Int] {
-        if span.weeksLater == 1 { return [] }
+        if span.weeksLater >= 1 { return [] }
         var days: [Int] = []
         var day = span.startDay
         while true {
