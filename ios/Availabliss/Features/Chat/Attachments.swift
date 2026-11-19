@@ -506,8 +506,7 @@ struct AttachmentViewer: View {
                 ForEach(attachments) { attachment in
                     SwiftUI.Group {
                         if attachment.kind == .video, let url = URL(string: attachment.url) {
-                            // Kept inside the safe area, so the player's own AirPlay button sits at the top
-                            // left, level with the bar (which keeps its buttons on the right).
+                            // Our own controls sit along the bottom, so nothing clashes with the bar at the top.
                             VideoPage(url: url, isShowing: selection == attachment.id)
                         } else {
                             ZoomableImage(attachment: attachment)
@@ -521,8 +520,7 @@ struct AttachmentViewer: View {
             .ignoresSafeArea()
         }
         .overlay(alignment: .top) {
-            // Everything on the right, Close at the far right, leaving the top left free for a
-            // video's AirPlay button.
+            // Everything on the right, Close at the far right.
             HStack(spacing: 0) {
                 Spacer()
                 if let onShowInChat {
@@ -688,21 +686,163 @@ enum AttachmentFiles {
     }
 }
 
-/// A video in the full-screen viewer: plays with the system controls while it's the one showing.
+/// A video in the full-screen viewer, playing while it's the one showing. Our own controls along the
+/// bottom (play / pause, scrubber and times, mute, AirPlay) instead of the system player's, which put
+/// buttons in the top corners under the viewer's Share and Close. Tap the video to hide or show them.
 private struct VideoPage: View {
     let url: URL
     let isShowing: Bool
     @State private var player: AVPlayer?
+    @State private var isPlaying = false
+    @State private var isMuted = false
+    @State private var current: Double = 0
+    @State private var duration: Double = 0
+    @State private var isScrubbing = false
+    @State private var showsControls = true
+    @State private var timeObserver: Any?
+    @State private var endObserver: NSObjectProtocol?
 
     var body: some View {
-        VideoPlayer(player: player)
-            .onAppear {
-                if player == nil { player = AVPlayer(url: url) }
-                if isShowing { player?.play() }
+        ZStack(alignment: .bottom) {
+            PlayerLayerView(player: player)
+                .contentShape(Rectangle())
+                .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { showsControls.toggle() } }
+                .accessibilityHidden(true)
+            if showsControls {
+                controls.transition(.opacity)
             }
-            .onChange(of: isShowing) { _, showing in
-                if showing { player?.play() } else { player?.pause() }
-            }
-            .onDisappear { player?.pause() }
+        }
+        .onAppear(perform: setUp)
+        .onChange(of: isShowing) { _, showing in
+            if showing { play() } else { pause() }
+        }
+        .onDisappear(perform: tearDown)
     }
+
+    private var controls: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Text(Self.clock(current)).monospacedDigit()
+                Slider(
+                    value: Binding(get: { current }, set: { current = $0 }),
+                    in: 0...max(duration, 0.1)
+                ) { editing in
+                    isScrubbing = editing
+                    if !editing { player?.seek(to: CMTime(seconds: current, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) }
+                }
+                .tint(.white)
+                .accessibilityLabel("Position")
+                .accessibilityValue("\(Self.clock(current)) of \(Self.clock(duration))")
+                Text(Self.clock(duration)).monospacedDigit()
+            }
+            .font(.system(size: 12, weight: .semibold))
+            HStack(spacing: 0) {
+                Button {
+                    isMuted.toggle()
+                    player?.isMuted = isMuted
+                } label: {
+                    Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill").frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(isMuted ? "Unmute" : "Mute")
+                Spacer()
+                Button {
+                    if isPlaying { pause() } else { play() }
+                } label: {
+                    Image(systemName: isPlaying ? "pause.fill" : "play.fill").font(.system(size: 26)).frame(width: 56, height: 44)
+                }
+                .accessibilityLabel(isPlaying ? "Pause" : "Play")
+                Spacer()
+                RoutePicker().frame(width: 44, height: 44).accessibilityLabel("AirPlay")
+            }
+            .font(.system(size: 18, weight: .semibold))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 16)
+        .padding(.top, 24)
+        .padding(.bottom, 28)
+        .background(LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
+    }
+
+    private func setUp() {
+        if player == nil {
+            let player = AVPlayer(url: url)
+            self.player = player
+            timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) { time in
+                MainActor.assumeIsolated {
+                    if !isScrubbing { current = time.seconds.isFinite ? time.seconds : 0 }
+                    let total = player.currentItem?.duration.seconds ?? 0
+                    if total.isFinite, total > 0 { duration = total }
+                }
+            }
+            endObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
+                MainActor.assumeIsolated {
+                    // Back to the start, paused, ready to play again.
+                    player.seek(to: .zero)
+                    isPlaying = false
+                    showsControls = true
+                }
+            }
+        }
+        if isShowing { play() }
+    }
+
+    private func tearDown() {
+        pause()
+        if let timeObserver { player?.removeTimeObserver(timeObserver) }
+        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        timeObserver = nil
+        endObserver = nil
+        player = nil
+    }
+
+    private func play() {
+        player?.play()
+        isPlaying = true
+    }
+
+    private func pause() {
+        player?.pause()
+        isPlaying = false
+    }
+
+    /// "0:07", "1:05:02".
+    static func clock(_ seconds: Double) -> String {
+        let total = Int(max(0, seconds.isFinite ? seconds : 0).rounded())
+        let h = total / 3600, m = (total % 3600) / 60, s = total % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+    }
+}
+
+/// The video itself (aspect-fit), without any of the system player's controls.
+private struct PlayerLayerView: UIViewRepresentable {
+    let player: AVPlayer?
+
+    final class LayerView: UIView {
+        override static var layerClass: AnyClass { AVPlayerLayer.self }
+        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }  // swiftlint:disable:this force_cast
+    }
+
+    func makeUIView(context: Context) -> LayerView {
+        let view = LayerView()
+        view.playerLayer.videoGravity = .resizeAspect
+        view.backgroundColor = .black
+        return view
+    }
+
+    func updateUIView(_ view: LayerView, context: Context) {
+        if view.playerLayer.player !== player { view.playerLayer.player = player }
+    }
+}
+
+/// AirPlay / output picker, in white.
+private struct RoutePicker: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let view = AVRoutePickerView()
+        view.tintColor = .white
+        view.activeTintColor = .white
+        view.prioritizesVideoDevices = true
+        return view
+    }
+
+    func updateUIView(_ view: AVRoutePickerView, context: Context) {}
 }
