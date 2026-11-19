@@ -77,20 +77,24 @@
 		}
 	}
 
-	const PERKS = [
+	// AI planning is listed only where the server has it switched on (as on iOS and Android).
+	const perks = $derived([
 		{
-			icon: 'groups',
+			icon: 'groups' as const,
 			title: 'Unlimited groups',
 			text: `Free accounts can create ${FREE_GROUP_LIMIT}. Joining other people's groups is always free.`
 		},
-		{ icon: 'sparkle', title: 'Supports Availabliss', text: 'Everything else stays free for everyone in your groups.' }
-	] as const;
+		...(plan?.aiPlanner.available
+			? [{ icon: 'sparkle' as const, title: 'AI planning', text: 'Picks the best time, suggests things to do and drafts the plan.' }]
+			: []),
+		{ icon: 'heart' as const, title: 'Supports Availabliss', text: 'Everything else stays free for everyone in your groups.' }
+	]);
 </script>
 
 <Sheet bind:open title="Availabliss Pro" description={reason ?? 'Plan with as many groups as you like.'}>
 	<div class="body">
 		<ul class="perks">
-			{#each PERKS as perk (perk.title)}
+			{#each perks as perk (perk.title)}
 				<li>
 					<span class="perk-icon"><Icon name={perk.icon} size={18} /></span>
 					<span class="perk-text"><strong>{perk.title}</strong><span>{perk.text}</span></span>
