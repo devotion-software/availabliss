@@ -56,7 +56,8 @@
 			text = n ? `${busyNames(day.busyMemberIds, members)} ${n === 1 ? 'is' : 'are'} busy` : 'Someone is busy';
 		} else if (day.status === 'free') text = "Everyone's free, but not for the whole timing";
 		else if (day.status === 'hidden') text = "Outside this group's timing";
-		return day.holiday ? `${text} · ${day.holiday}` : text;
+		// A bank holiday has its own line below; school holidays are named here.
+		return day.holiday && !day.bankHoliday ? `${text} · ${day.holiday}` : text;
 	});
 </script>
 
@@ -70,6 +71,9 @@
 			{partial ? 'Most free' : works ? 'Works' : past ? 'Past' : 'Doesn’t fit'}
 		</StatusPill>
 	</div>
+	{#if day?.bankHoliday}
+		<p class="bank"><Icon name="flag" size={13} />{day.holiday ? `${day.holiday} · Bank holiday` : 'Bank holiday'}</p>
+	{/if}
 	{#if !past && works && day?.preferredBy?.length}
 		<p class="pref">
 			<Icon name="heart" size={13} />
@@ -145,6 +149,15 @@
 	.sub {
 		font-size: 12px;
 		color: var(--muted);
+	}
+	.bank {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: 0;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--ink);
 	}
 	.pref {
 		display: flex;

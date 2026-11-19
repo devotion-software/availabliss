@@ -27,6 +27,15 @@ struct DayDetailCard: View {
                 StatusPill(
                     text: works ? (slot?.missingCount ?? 0 > 0 ? "Most of us" : "Works") : (isPast ? "Past" : "Doesn\u{2019}t fit"), tone: works ? .mint : .neutral)
             }
+            if let info = model.day(day), info.isBankHoliday {
+                Label {
+                    Text("\(info.holiday ?? "Bank holiday")\(info.holiday == nil ? "" : " \u{00B7} Bank holiday")")
+                } icon: {
+                    Image(systemName: "flag.fill")
+                }
+                .bodyFont(13, .semibold, relativeTo: .subheadline)
+                .foregroundStyle(theme.ink)
+            }
             if works, let who = model.day(day)?.preferredBy, !who.isEmpty {
                 Label {
                     Text(
@@ -98,8 +107,10 @@ struct DayDetailCard: View {
         case .busy:
             let names = info.busyMemberIds.map { $0 == me ? "You" : (group.member($0)?.firstName ?? "Someone") }
             return "\(Formatting.list(names)) \(names == ["You"] || names.count > 1 ? "are" : "is") busy"
-        case .hidden: return info.holiday.map { "\($0) · outside the group's timing" } ?? "Outside the group's timing"
-        default: return info.holiday ?? "Free, but no full slot fits here"
+        // A bank holiday has its own line above; school holidays are named here.
+        case .hidden:
+            return info.isBankHoliday ? "Outside the group's timing" : info.holiday.map { "\($0) · outside the group's timing" } ?? "Outside the group's timing"
+        default: return (info.isBankHoliday ? nil : info.holiday) ?? "Free, but no full slot fits here"
         }
     }
 }

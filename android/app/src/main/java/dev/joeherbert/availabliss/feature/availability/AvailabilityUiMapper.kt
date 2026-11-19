@@ -54,6 +54,8 @@ data class DayDetailUi(
     val preferredBy: String? = null,
     /** A time that works for most of the group: "Ana can't make it". */
     val missing: String? = null,
+    /** "Christmas Day · Bank holiday", on a bank holiday (shown with a flag). */
+    val bankHoliday: String? = null,
 )
 
 /**
@@ -191,7 +193,9 @@ object AvailabilityUiMapper {
         val day = availability?.days?.firstOrNull { it.date == date.toString() }
         val local = availability?.let(::localSlots)?.firstOrNull { it.covers(date) }
         val dayTitle = if (date == today) "Today · ${DateTimes.shortDay(date)}" else DateTimes.shortDay(date)
-        val holiday = day?.holiday?.let { " · $it" }.orEmpty()
+        // A bank holiday has its own line; school holidays are named in the subtitle.
+        val holiday = day?.holiday?.takeIf { !day.bankHoliday }?.let { " · $it" }.orEmpty()
+        val bankHoliday = day?.takeIf { it.bankHoliday }?.let { d -> d.holiday?.let { "$it · Bank holiday" } ?: "Bank holiday" }
         if (local != null && !date.isBefore(today)) {
             val from = if (local.start.toLocalTime() == LocalTime.MIDNIGHT) DateTimes.shortDay(local.start.toLocalDate())
             else "${DateTimes.shortWeekday(DateTimes.apiWeekday(local.start.toLocalDate()))} ${DateTimes.time(local.start)}"
@@ -211,10 +215,13 @@ object AvailabilityUiMapper {
                 slot = local.slot,
                 preferredBy = day?.preferredBy.orEmpty().map { name(group, it, meId) }.takeIf { it.isNotEmpty() }
                     ?.let { "${it.joinNames()} ${if (it.size == 1 && it.first() != "You") "prefers" else "prefer"} this" },
+                bankHoliday = bankHoliday,
             )
         }
         val busy = day?.busyMemberIds.orEmpty().map { name(group, it, meId) }
-        if (date.isBefore(today)) return DayDetailUi(date, dayTitle, "This day is in the past", works = false, proposeLabel = null, slot = null, past = true)
+        if (date.isBefore(today)) {
+            return DayDetailUi(date, dayTitle, "This day is in the past", works = false, proposeLabel = null, slot = null, past = true, bankHoliday = bankHoliday)
+        }
         val subtitle = when {
             day == null -> "No availability for this day yet"
             day.status == DayStatus.Hidden -> "Outside the group's timing"
@@ -224,7 +231,7 @@ object AvailabilityUiMapper {
             else -> "Everyone's free, but not for the whole timing"
         }
         val anyway = (day?.status == DayStatus.Busy || day?.status == DayStatus.Free) && !date.isBefore(today)
-        return DayDetailUi(date, dayTitle, subtitle + holiday, works = false, proposeLabel = null, slot = null, canProposeAnyway = anyway)
+        return DayDetailUi(date, dayTitle, subtitle + holiday, works = false, proposeLabel = null, slot = null, canProposeAnyway = anyway, bankHoliday = bankHoliday)
     }
 
     fun syncBanner(availability: Availability?, group: Group?, isAdmin: Boolean): SyncBannerUi? {

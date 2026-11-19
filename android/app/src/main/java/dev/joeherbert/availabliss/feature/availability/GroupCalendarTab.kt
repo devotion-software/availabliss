@@ -722,6 +722,12 @@ private fun DetailCard(
             }
             StatusPill(if (detail.works) "Works" else if (detail.past) "Past" else "Doesn’t fit", if (detail.works) PillTone.Mint else PillTone.Neutral)
         }
+        detail.bankHoliday?.let {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(AvIcons.Flag, null, tint = colors.ink, modifier = Modifier.size(14.dp))
+                Text(it, style = AvailablissTheme.type.bodySmallStrong, color = colors.ink)
+            }
+        }
         if (detail.past) return@Column
         detail.preferredBy?.let {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
