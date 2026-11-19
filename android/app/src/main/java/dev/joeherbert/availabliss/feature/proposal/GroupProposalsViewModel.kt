@@ -44,8 +44,8 @@ data class GroupProposalsUiState(
     val open: List<ProposalListItem> = emptyList(),
     val confirmed: List<ProposalListItem> = emptyList(),
 ) {
-    /** Up to two for the calendar's Plans card: open proposals first, then the next confirmed plan. */
-    val highlights: List<ProposalListItem> get() = (open + confirmed.take(1)).take(2)
+    /** Up to three for the calendar's Plans card: open proposals first, then confirmed plans coming up. */
+    val highlights: List<ProposalListItem> get() = (open + confirmed).take(3)
 }
 
 private data class ProposalsData(

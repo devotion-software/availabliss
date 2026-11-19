@@ -109,7 +109,7 @@ struct GroupPlansView: View {
     }
 }
 
-/// "Plans" on the group's calendar: open proposals first, then the next event (two at most), and See all.
+/// "Plans" on the group's calendar: open proposals first, then events coming up (three at most), and See all.
 /// Shows nothing when there's nothing planned.
 struct GroupPlansCard: View {
     let detail: GroupDetailModel
@@ -129,8 +129,8 @@ struct GroupPlansCard: View {
 
     private var items: [Item] {
         let open = detail.proposals.filter { $0.status == .open }.map(Item.proposal)
-        let next = detail.events.prefix(1).map(Item.event)
-        return Array((open + next).prefix(2))
+        let upcoming = detail.events.map(Item.event)
+        return Array((open + upcoming).prefix(3))
     }
 
     var body: some View {

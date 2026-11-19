@@ -35,7 +35,7 @@ import dev.joeherbert.availabliss.designsystem.theme.AvailablissTheme
 import dev.joeherbert.availabliss.designsystem.theme.Shapes
 
 /**
- * The calendar's compact "Plans" card: up to two open proposals / the next confirmed plan, and
+ * The calendar's compact "Plans" card: up to three open proposals, then confirmed plans coming up, and
  * "See all" for the Plans screen. Renders nothing when there's nothing coming up.
  */
 @Composable

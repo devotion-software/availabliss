@@ -5,8 +5,8 @@
 	import ProposalRow from './ProposalRow.svelte';
 
 	/**
-	 * The calendar's "Plans" card (phones): open proposals first, then the next confirmed
-	 * plan, two at most. Renders nothing when there's neither.
+	 * The calendar's "Plans" card (phones): open proposals first, then confirmed plans coming up,
+	 * three at most. Renders nothing when there's neither.
 	 */
 	interface Props {
 		group: Group;
@@ -21,8 +21,8 @@
 		const now = Date.now();
 		const ahead = proposals.filter((p) => new Date(p.end).getTime() > now).sort(byStart);
 		const open = ahead.filter((p) => p.status === 'open');
-		const next = ahead.find((p) => p.status === 'confirmed');
-		return [...open, ...(next ? [next] : [])].slice(0, 2);
+		const confirmed = ahead.filter((p) => p.status === 'confirmed');
+		return [...open, ...confirmed].slice(0, 3);
 	});
 
 	// Loaded here rather than in the calendar's load: refreshing it there would rerun that
