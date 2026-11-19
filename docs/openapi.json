@@ -7164,6 +7164,138 @@
 				}
 			}
 		},
+		"/api/v1/messages/{id}/reaction": {
+			"put": {
+				"operationId": "putMessagesByIdReaction",
+				"tags": [
+					"Chat"
+				],
+				"summary": "React to a message with an emoji",
+				"description": "One reaction per person per message: reacting again replaces it. Not for group updates or deleted messages. The author gets a push (not for their own messages).\n\nSigned in.",
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ReactionBody"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/MessageReactions"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "validation_error: the body or query is invalid",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "unauthorized: not signed in",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "The message was deleted",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "rate_limited (see Retry-After)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteMessagesByIdReaction",
+				"tags": [
+					"Chat"
+				],
+				"summary": "Take back your reaction to a message",
+				"description": "Signed in.",
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/MessageReactions"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "unauthorized: not signed in",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "rate_limited (see Retry-After)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
 		"/api/v1/messages/{id}/thread": {
 			"get": {
 				"operationId": "getMessagesByIdThread",
@@ -11298,6 +11430,7 @@
 					"message.created",
 					"message.updated",
 					"message.receipts",
+					"message.reactions",
 					"poll.updated",
 					"proposal.created",
 					"proposal.updated",
@@ -11621,6 +11754,13 @@
 							}
 						],
 						"description": "A place shared in the chat (a one-off pin). `body` is then a fallback for older apps; null once deleted."
+					},
+					"reactions": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/MessageReaction"
+						},
+						"description": "Emoji reactions, one per person, grouped by emoji in the order each was first used (empty once deleted)."
 					}
 				},
 				"required": [
@@ -11639,7 +11779,8 @@
 					"replyTo",
 					"attachments",
 					"caption",
-					"location"
+					"location",
+					"reactions"
 				]
 			},
 			"MessageInfo": {
@@ -11770,6 +11911,44 @@
 					"hasMore"
 				],
 				"description": "GET /groups/:id/messages"
+			},
+			"MessageReaction": {
+				"type": "object",
+				"properties": {
+					"emoji": {
+						"type": "string"
+					},
+					"userIds": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					}
+				},
+				"required": [
+					"emoji",
+					"userIds"
+				],
+				"description": "One emoji on a message and who reacted with it (in the order they did)."
+			},
+			"MessageReactions": {
+				"type": "object",
+				"properties": {
+					"messageId": {
+						"type": "string"
+					},
+					"reactions": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/MessageReaction"
+						}
+					}
+				},
+				"required": [
+					"messageId",
+					"reactions"
+				],
+				"description": "A message's reactions after one changed (`PUT`/`DELETE /messages/:id/reaction`, live `message.reactions`)."
 			},
 			"MessageReply": {
 				"type": "object",
@@ -12779,6 +12958,19 @@
 					"setBy",
 					"updatedAt",
 					"droppedOut"
+				]
+			},
+			"ReactionBody": {
+				"type": "object",
+				"properties": {
+					"emoji": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					}
+				},
+				"required": [
+					"emoji"
 				]
 			},
 			"ReadNotificationsBody": {

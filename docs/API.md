@@ -732,7 +732,10 @@ interface Message {
   attachments: Attachment[];            // photos, GIFs and files sent with it, in order ([] for most messages and once deleted)
   caption: string | null;               // with attachments: the caption, or null. Null for messages without attachments
   location: MessageLocation | null;     // a place shared in the chat (kind 'text'); null otherwise and once deleted
+  reactions: MessageReaction[];         // one per person, grouped by emoji in the order each was first used; empty once deleted (older apps: treat a missing field as [])
 }
+
+interface MessageReaction { emoji: string; userIds: string[] }  // userIds in the order they reacted
 // A shared place is a one-off pin (not live tracking). Its `body` is a fallback for older apps:
 // "📍 Dishoom Shoreditch" (or "📍 Location" without a name), the address if any, and a Google Maps link,
 // one per line. Apps that know `location` show a card instead. It can't be edited, only deleted.
@@ -809,6 +812,8 @@ interface MessageInfo {
 | PATCH 🔒 | `/messages/:id` | `{ body }` | `Message` (the sender's own text messages only; a location can't be edited: `400`). With attachments `body` is the caption and may be `""` to remove it |
 | DELETE 🔒 | `/messages/:id` | | `204` (the sender's own text messages only; it stays in the chat as deleted, and its attachments are deleted for good) |
 | GET | `/attachments/:id?e=…&s=…`, `/attachments/:id/thumb?e=…&s=…` | | The file (or a photo's preview). These are the signed `url` / `thumbnailUrl` links from `Attachment`: no session needed, valid for 7–8 days and unchanged within a day (cacheable); refetch the message for fresh ones. Without a valid signature, only a signed-in member of the group gets it (else `404`). Photos, GIFs and Wallet passes are served `inline` (a pass as `application/vnd.apple.pkpass`, so Safari offers to add it to Wallet); files as a download (`Content-Disposition: attachment` with the name); add `&download=1` to download a photo. Not rate limited. Deleting the group deletes every attachment sent in it |
+| PUT 🔒 | `/messages/:id/reaction` | `{ emoji }` | `{ messageId, reactions: MessageReaction[] }`: react with one emoji (any member; not group updates, `400`, or deleted messages, `409`). One reaction per person per message: reacting again replaces it. The author gets a push ("Sam reacted ❤️ to “…”"), not for their own messages; there's no Activity item |
+| DELETE 🔒 | `/messages/:id/reaction` | | `{ messageId, reactions }`: take back your reaction (no change if you hadn't reacted) |
 | GET 🔒 | `/messages/:id/info` | | `MessageInfo` (any member of the group) |
 | GET 🔒 | `/messages/:id/thread` | | `{ rootId: string; messages: Message[]; truncated: boolean }`: the thread the message is in. `rootId` is the first message of its chain of replies (following `replyTo` up); `messages` is that message and every reply to it, and replies to those, oldest first (deleted ones included), at most 200 (the earliest; `truncated` when there were more). Any member of the group |
 | POST 🔒 | `/polls/:id/vote` | `{ optionIds: string[] }` (empty = remove vote) | `Poll` |
@@ -823,7 +828,7 @@ belongs to. Each event is `data: <json>\n\n` with:
 ```ts
 interface LiveEvent {
   type:
-    | 'message.created' | 'message.updated' | 'message.receipts' | 'poll.updated'
+    | 'message.created' | 'message.updated' | 'message.receipts' | 'message.reactions' | 'poll.updated'
     | 'proposal.created' | 'proposal.updated' | 'proposal.confirmed'
     | 'event.changed' | 'group.updated' | 'member.changed' | 'availability.changed'
     | 'notification.created';
@@ -841,7 +846,8 @@ loaded message quoting it, since quotes aren't republished); `poll.updated` → 
 (or `{ userId, removed: true }`); `availability.changed` → `{ userId }` (refetch
 availability); `notification.created` → `Notification`; `message.receipts` →
 `{ userId, state, receipts: { messageId, delivered, seen, recipients, seenBy }[] }`
-(the newest 500 changed messages; all of them are marked).
+(the newest 500 changed messages; all of them are marked); `message.reactions` →
+`{ messageId, reactions: MessageReaction[] }` (a message's reactions after someone reacted or took it back).
 
 When a group is deleted, each member gets `member.changed` with their own
 `{ userId, removed: true }`, as if they'd been removed. Deleting an account sends

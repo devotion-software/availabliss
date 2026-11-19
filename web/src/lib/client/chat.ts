@@ -1,5 +1,15 @@
 import { api, apiUrl, ApiError, type Fetch } from './api';
-import type { ApiErrorBody, Attachment, GroupMediaItem, Message, MessageInfo, MessageLocation, MessageThread, Poll } from '#lib/types';
+import type {
+	ApiErrorBody,
+	Attachment,
+	GroupMediaItem,
+	Message,
+	MessageInfo,
+	MessageLocation,
+	MessageThread,
+	Poll,
+	MessageReactions
+} from '#lib/types';
 
 export interface GroupMediaPage {
 	items: GroupMediaItem[];
@@ -60,6 +70,9 @@ export interface PollPatch {
 export const updatePoll = (pollId: string, patch: PollPatch) => api.patch<Poll>(`/polls/${pollId}`, patch);
 export const editMessage = (messageId: string, body: string) => api.patch<Message>(`/messages/${messageId}`, { body });
 export const deleteMessage = (messageId: string) => api.del(`/messages/${messageId}`);
+/** Reacts with [emoji] (replacing your earlier reaction), or takes your reaction back with null. */
+export const reactToMessage = (messageId: string, emoji: string | null) =>
+	emoji ? api.put<MessageReactions>(`/messages/${messageId}/reaction`, { emoji }) : api.del<MessageReactions>(`/messages/${messageId}/reaction`);
 
 /**
  * Uploads one photo, GIF or file for the group's chat (not yet sent: pass its id to `sendMessage`).

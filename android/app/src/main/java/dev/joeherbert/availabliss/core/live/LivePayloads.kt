@@ -6,6 +6,7 @@ import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.core.network.model.LiveEvent
 import dev.joeherbert.availabliss.core.network.model.Member
 import dev.joeherbert.availabliss.core.network.model.Message
+import dev.joeherbert.availabliss.core.network.model.MessageReactions
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ReceiptState
@@ -43,6 +44,7 @@ sealed interface LivePayload {
     /** Edited or deleted; its `receipt` is null, so keep the one you have. */
     data class MessageUpdated(val message: Message) : LivePayload
     data class MessageReceipts(val payload: ReceiptsPayload) : LivePayload
+    data class MessageReactionsChanged(val payload: MessageReactions) : LivePayload
     data class PollUpdated(val poll: Poll) : LivePayload
     data class ProposalChanged(val proposal: Proposal, val created: Boolean) : LivePayload
     data class ProposalConfirmed(val proposal: Proposal, val event: GroupEvent) : LivePayload
@@ -64,6 +66,7 @@ fun LiveEvent.decode(json: Json): LivePayload = runCatching {
         LiveEvent.MESSAGE_CREATED -> LivePayload.MessageCreated(json.decodeFromJsonElement(Message.serializer(), payload))
         LiveEvent.MESSAGE_UPDATED -> LivePayload.MessageUpdated(json.decodeFromJsonElement(Message.serializer(), payload))
         LiveEvent.MESSAGE_RECEIPTS -> LivePayload.MessageReceipts(json.decodeFromJsonElement(ReceiptsPayload.serializer(), payload))
+        LiveEvent.MESSAGE_REACTIONS -> LivePayload.MessageReactionsChanged(json.decodeFromJsonElement(MessageReactions.serializer(), payload))
         LiveEvent.POLL_UPDATED -> LivePayload.PollUpdated(json.decodeFromJsonElement(Poll.serializer(), payload))
         LiveEvent.PROPOSAL_CREATED, LiveEvent.PROPOSAL_UPDATED -> LivePayload.ProposalChanged(
             json.decodeFromJsonElement(Proposal.serializer(), payload),

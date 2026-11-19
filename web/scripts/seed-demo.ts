@@ -1,7 +1,7 @@
 /**
  * Seeds a realistic demo dataset through the API (needs `make dev` + `make db-up`):
  * five friends, three groups, busy time that leaves one working weekend, an open
- * proposal, chat with a poll and read receipts, and a confirmed book club evening.
+ * proposal, chat with a poll, reactions and read receipts, and a confirmed book club evening.
  * Dates are relative to today, so it works whenever it's run.
  *
  *   bun scripts/seed-demo.ts     # prints the main user's email; state in .demo.json
@@ -68,11 +68,15 @@ const proposal = slot
 if (proposal)
 	for (const person of [priya, leo]) await call(person.token, 'POST', `/api/v1/proposals/${proposal.id}/respond`, { response: 'accepted' });
 
-// Chat with a poll and read receipts.
+// Chat with a poll, reactions and read receipts.
 const say = (person: SignedIn, body: string) => call(person.token, 'POST', `/api/v1/groups/${lakes.id}/messages`, { body });
 await say(priya, 'Has everyone put their calendar in yet? Leo…');
-await say(tom, "Saturday's fine. Just checking I can get off early on the Friday");
-await say(sam, "I'll book somewhere to stay. Vote below");
+const saturday = (await say(tom, "Saturday's fine. Just checking I can get off early on the Friday")).data;
+const booking = (await say(sam, "I'll book somewhere to stay. Vote below")).data;
+const react = (person: SignedIn, messageId: string, emoji: string) => call(person.token, 'PUT', `/api/v1/messages/${messageId}/reaction`, { emoji });
+await react(priya, saturday.id, '👍');
+await react(ana, saturday.id, '👍');
+for (const person of [priya, ana, tom]) await react(person, booking.id, '❤️');
 const poll = (
 	await call(sam.token, 'POST', `/api/v1/groups/${lakes.id}/messages`, {
 		poll: { question: 'Where should we stay?', options: ['Keswick cottage', 'Ambleside YHA', 'Camping at Wasdale'] }
@@ -84,7 +88,9 @@ const votes: [SignedIn, number][] = [
 	[tom, 1]
 ];
 for (const [person, option] of votes) await call(person.token, 'POST', `/api/v1/polls/${poll.id}/vote`, { optionIds: [poll.options[option].id] });
-await say(ana, 'Cottage. It has a wood burner, case closed');
+const cottage = (await say(ana, 'Cottage. It has a wood burner, case closed')).data;
+await react(sam, cottage.id, '🔥');
+await react(priya, cottage.id, '😂');
 // An event added directly (no proposal): shows as an event card in chat.
 const quizNight = addDays(nextTuesday, 7);
 await call(tom.token, 'POST', `/api/v1/groups/${lakes.id}/events`, {

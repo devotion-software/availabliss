@@ -23,7 +23,7 @@
 	 * A text message, with any photos, GIFs and files above its text (the caption); a picture opens full screen.
 	 * Others' are glass with an avatar; yours are the theme accent. A tap opens message info.
 	 * A menu (Reply / Info, plus Edit / Delete on yours) opens on long-press, right-click or the ⋯ button;
-	 * hovering also shows a Reply button. A reply shows the message it quotes above its text: tapping that opens the thread.
+	 * hovering also shows a Reply button. A double tap (or double click) on the text reacts with ❤️ (or takes it back). A reply shows the message it quotes above its text: tapping that opens the thread.
 	 * Deleted messages are a dashed outline with no actions.
 	 */
 	interface Props {
@@ -41,6 +41,10 @@
 		canModify?: boolean;
 		/** Can be replied to (sent and not deleted). */
 		canReply?: boolean;
+		/** Can be reacted to (sent and not deleted). */
+		canReact?: boolean;
+		/** A double tap on the text: react with ❤️. */
+		onheart?: (message: Message) => void;
 		/** The message this one replies to. */
 		quote?: BubbleQuote | null;
 		oninfo?: (message: Message) => void;
@@ -60,6 +64,8 @@
 		showEdited = true,
 		canModify = false,
 		canReply = false,
+		canReact = false,
+		onheart,
 		quote = null,
 		oninfo,
 		onmenu,
@@ -71,7 +77,7 @@
 	const pending = $derived(message.id.startsWith('temp-'));
 	const name = $derived(author?.name ?? 'Someone');
 	const edited = $derived(!!message.editedAt && !message.deleted && showEdited);
-	const hasMenu = $derived(canModify || canReply);
+	const hasMenu = $derived(canModify || canReply || canReact);
 	const quoteLabel = $derived(quote ? `, replying to ${quote.name}: ${quote.snippet}` : '');
 	const attachments = $derived(message.deleted ? [] : (message.attachments ?? []));
 	const pictures = $derived(attachments.filter(isVisual));
@@ -131,12 +137,23 @@
 			openMenu({ x: r.right, y: r.bottom, keyboard: true });
 		} else openMenu({ x: e.clientX, y: e.clientY });
 	}
-	function onclick() {
+	// A double tap reacts with ❤️, so a single tap waits a moment before opening info.
+	const DOUBLE_TAP_MS = 260;
+	let tapTimer: ReturnType<typeof setTimeout> | undefined;
+	function onclick(e: MouseEvent) {
 		if (suppressClick) {
 			suppressClick = false;
 			return;
 		}
-		oninfo?.(message);
+		clearTimeout(tapTimer);
+		const heart = canReact && !pending ? onheart : undefined;
+		// detail 0 is Enter or Space: straight to info.
+		if (!heart || e.detail === 0) return oninfo?.(message);
+		if (e.detail >= 2) {
+			navigator.vibrate?.(10);
+			return heart(message);
+		}
+		tapTimer = setTimeout(() => oninfo?.(message), DOUBLE_TAP_MS);
 	}
 	function openPicture(index: number) {
 		if (suppressClick) {
@@ -388,6 +405,8 @@
 			transform 0.15s ease;
 	}
 	.pressable .body {
+		/* No double-tap zoom: a double tap reacts. */
+		touch-action: manipulation;
 		-webkit-touch-callout: none;
 		-webkit-user-select: none;
 		user-select: none;

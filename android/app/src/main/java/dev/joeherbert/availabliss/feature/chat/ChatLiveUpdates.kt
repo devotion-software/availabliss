@@ -38,6 +38,7 @@ internal class ChatLiveUpdates(
                     d.copy(messages = d.messages.map { m -> updates[m.id]?.let { m.copy(receipt = it.toReceipt()) } ?: m })
                 }
             }
+            is LivePayload.MessageReactionsChanged -> session.setReactions(payload.payload.messageId, payload.payload.reactions)
             is LivePayload.PollUpdated -> {
                 session.replacePoll(payload.poll)
                 session.references.resolveConflicts(data.value.messages)

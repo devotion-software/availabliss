@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,6 +46,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.joeherbert.availabliss.core.network.model.MessageLocation
+import dev.joeherbert.availabliss.core.network.model.Reactions
 import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.dashedBorder
@@ -66,7 +69,8 @@ data class BubbleAction(val label: String, val destructive: Boolean = false, val
  * when [showAvatar] is false, for consecutive messages); own messages align right.
  *
  * [menuActions] (your own messages): a long-press opens a small menu with "Info"
- * (when [onClick] is set) followed by these. [edited] adds a muted "Edited" under the
+ * (when [onClick] is set) followed by these. With [onReact], the menu starts with a row of
+ * reactions (+ for any emoji), a double tap reacts with ❤️, and [reactions] show under the bubble. [edited] adds a muted "Edited" under the
  * bubble. [deleted] draws an unfilled, dashed, non-tappable bubble with [text] in italics.
  */
 @Composable
@@ -94,10 +98,26 @@ fun MessageBubble(
     /** A shared place, drawn as a map card instead of [text]; tapping it calls [onOpenLocation]. */
     location: MessageLocation? = null,
     onOpenLocation: () -> Unit = {},
+    /** Reactions under the bubble. */
+    reactions: List<ReactionUi> = emptyList(),
+    /** Your reaction, highlighted in the menu's row. */
+    myReaction: String? = null,
+    /** Reacting (picking yours again takes it back); null when it can't be reacted to. */
+    onReact: ((String) -> Unit)? = null,
 ) {
     val colors = AvailablissTheme.colors
     var menuOpen by remember { mutableStateOf(false) }
+    var pickingReaction by remember { mutableStateOf(false) }
+    var hearts by remember { mutableIntStateOf(0) }
     val actions = if (deleted) emptyList() else menuActions
+    val react = if (deleted) null else onReact
+    val hasMenu = actions.isNotEmpty() || react != null
+    val onDoubleClick: (() -> Unit)? = react?.let { r ->
+        {
+            if (myReaction != Reactions.HEART) hearts++
+            r(Reactions.HEART)
+        }
+    }
     val shape = if (own) OwnBubbleShape else IncomingBubbleShape
     val surface = when {
         deleted -> Modifier.dashedBorder(colors.muted.copy(alpha = 0.6f), shape, width = 1.dp)
@@ -108,10 +128,23 @@ fun MessageBubble(
         Box {
             val interaction = surface.then(
                 if (deleted) Modifier.semantics { contentDescription = accessibilityLabel ?: "Message deleted" }
-                else interactions(onClick, accessibilityLabel, actions, onLongClick = { menuOpen = true }),
+                else interactions(
+                    onClick,
+                    accessibilityLabel,
+                    actions,
+                    hasMenu = hasMenu,
+                    onLongClick = { menuOpen = true },
+                    onDoubleClick = onDoubleClick,
+                    reactActions = react?.let { r ->
+                        listOf(
+                            BubbleAction(if (myReaction == Reactions.HEART) "Remove heart" else "React with a heart") { r(Reactions.HEART) },
+                            BubbleAction("React") { pickingReaction = true },
+                        )
+                    }.orEmpty(),
+                ),
             )
             if ((attachments.isNotEmpty() || location != null) && !deleted) {
-                val longPress: (() -> Unit)? = if (actions.isNotEmpty()) ({ menuOpen = true }) else null
+                val longPress: (() -> Unit)? = if (hasMenu) ({ menuOpen = true }) else null
                 Column(
                     interaction.width(IntrinsicSize.Max).padding(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -145,8 +178,23 @@ fun MessageBubble(
                     deleted = deleted,
                 )
             }
-            if (actions.isNotEmpty()) {
+            HeartBurst(hearts, Modifier.align(Alignment.Center))
+            if (hasMenu) {
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = colors.bg) {
+                    if (react != null) {
+                        QuickReactionRow(
+                            current = myReaction,
+                            onPick = { emoji ->
+                                menuOpen = false
+                                react(emoji)
+                            },
+                            onMore = {
+                                menuOpen = false
+                                pickingReaction = true
+                            },
+                        )
+                        HorizontalDivider(Modifier.padding(vertical = 4.dp), color = colors.line)
+                    }
                     if (onClick != null) MenuItem("Info", destructive = false) {
                         menuOpen = false
                         onClick()
@@ -161,9 +209,20 @@ fun MessageBubble(
             }
         }
     }
+    if (pickingReaction && react != null) {
+        ReactionPickerSheet(
+            current = myReaction,
+            onPick = { emoji ->
+                pickingReaction = false
+                react(emoji)
+            },
+            onDismiss = { pickingReaction = false },
+        )
+    }
     if (own) {
         Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
             Box(Modifier.widthIn(max = 270.dp)) { bubble() }
+            if (!deleted) ReactionPills(reactions, own = true, onReact = react, modifier = Modifier.widthIn(max = 290.dp).padding(top = 4.dp))
             if (edited) EditedLabel(Modifier.padding(top = 3.dp, end = 4.dp))
         }
     } else Column(modifier) {
@@ -187,6 +246,7 @@ fun MessageBubble(
             }
         }
         // Outside the row so the avatar stays level with the bubble. 28dp avatar + 8dp gap + 4dp.
+        if (!deleted) ReactionPills(reactions, own = false, onReact = react, modifier = Modifier.widthIn(max = 290.dp).padding(start = 30.dp, top = 4.dp))
         if (edited) EditedLabel(Modifier.padding(start = 40.dp, top = 3.dp))
     }
 }
@@ -274,26 +334,36 @@ private fun interactions(
     onClick: (() -> Unit)?,
     label: String?,
     actions: List<BubbleAction>,
+    hasMenu: Boolean,
     onLongClick: () -> Unit,
+    onDoubleClick: (() -> Unit)? = null,
+    reactActions: List<BubbleAction> = emptyList(),
 ): Modifier {
-    if (onClick == null && actions.isEmpty()) return Modifier
+    if (onClick == null && !hasMenu) return Modifier
     val haptics = LocalHapticFeedback.current
+    val spoken = reactActions + actions
     return Modifier
         .combinedClickable(
             role = Role.Button,
             onClickLabel = if (onClick != null) "Message info" else null,
-            onLongClickLabel = if (actions.isNotEmpty()) "Message options" else null,
-            onLongClick = if (actions.isNotEmpty()) (
+            onLongClickLabel = if (hasMenu) "Message options" else null,
+            onLongClick = if (hasMenu) (
                 {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     onLongClick()
                 }
                 ) else null,
+            onDoubleClick = onDoubleClick?.let { heart ->
+                {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    heart()
+                }
+            },
             onClick = onClick ?: onLongClick,
         )
         .semantics {
             if (label != null) contentDescription = label
-            if (actions.isNotEmpty()) customActions = actions.map { a ->
+            if (spoken.isNotEmpty()) customActions = spoken.map { a ->
                 CustomAccessibilityAction(a.label) {
                     a.onClick()
                     true

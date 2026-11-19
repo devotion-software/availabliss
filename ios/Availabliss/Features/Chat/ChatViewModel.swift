@@ -492,6 +492,37 @@ final class ChatViewModel {
         }
     }
 
+    // MARK: Reactions
+
+    /// Your reaction to a message (as loaded now, in the chat or the thread).
+    func myReaction(to message: Message) -> String? {
+        Reactions.mine(in: current(message).shownReactions, me: me)
+    }
+
+    private func current(_ message: Message) -> Message {
+        messages.first { $0.id == message.id } ?? thread.first { $0.id == message.id } ?? message
+    }
+
+    /// Reacts with `emoji`, or takes it back if it's already yours. Shown straight away; put back if it fails.
+    func react(to message: Message, with emoji: String) async {
+        guard message.canReact, let me else { return }
+        let before = current(message).shownReactions
+        let next = Reactions.toggled(before, me: me, emoji: emoji)
+        setReactions(Reactions.setting(before, me: me, to: next), for: message.id)
+        do {
+            let result = try await api.send(next.map { API.Chat.react(messageId: message.id, emoji: $0) } ?? API.Chat.unreact(messageId: message.id))
+            setReactions(result.reactions, for: result.messageId)
+        } catch  where !error.isCancellation {
+            setReactions(before, for: message.id)
+            self.error = error.userMessage
+        } catch {}
+    }
+
+    private func setReactions(_ reactions: [MessageReaction], for messageId: String) {
+        if let index = messages.firstIndex(where: { $0.id == messageId }), messages[index].reactions ?? [] != reactions { messages[index].reactions = reactions }
+        if let index = thread.firstIndex(where: { $0.id == messageId }), thread[index].reactions ?? [] != reactions { thread[index].reactions = reactions }
+    }
+
     func info(for messageId: String) async -> MessageInfo? {
         do { return try await api.send(API.Chat.info(messageId: messageId)) } catch {
             self.error = error.userMessage
@@ -514,6 +545,8 @@ final class ChatViewModel {
             if message.isDeleted { stopEditingOrReplying(to: message.id) }
         case .pollUpdated:
             if let poll = event.payload(as: Poll.self) { update(poll: poll) }
+        case .messageReactions:
+            if let payload = event.payload(as: MessageReactions.self) { setReactions(payload.reactions, for: payload.messageId) }
         case .messageReceipts:
             guard let payload = event.payload(as: MessageReceiptsPayload.self) else { return }
             for entry in payload.receipts {

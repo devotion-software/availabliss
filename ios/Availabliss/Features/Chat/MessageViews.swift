@@ -32,6 +32,10 @@ struct MessageRow: View {
     var tapHint = "Shows message info"
     var quoteHint = "Shows the thread"
     @Environment(\.theme) private var theme
+    /// "More reactions" is open.
+    @State private var isPickingReaction = false
+    /// Bumped on each double-tap heart, for the burst and the tap.
+    @State private var hearts = 0
 
     private var isMine: Bool { message.authorId != nil && message.authorId == me }
     private var author: Member? { message.authorId.flatMap(group.member) }
@@ -40,9 +44,49 @@ struct MessageRow: View {
         message.replyTo.map { MessageQuote(preview: $0, name: ReplyNames.name(of: $0.authorId, fallback: $0.authorName, group: group, me: me)) }
     }
 
+    private func react(_ emoji: String) {
+        Task { await model.react(to: message, with: emoji) }
+    }
+
+    /// A double tap on a bubble: ❤️ (or takes it back if that's yours).
+    private func heart() {
+        guard message.canReact else { return }
+        if model.myReaction(to: message) != Reactions.heart { hearts += 1 }
+        react(Reactions.heart)
+    }
+
+    /// Your reaction, for the menu's row; picking one reacts (picking yours again takes it back).
+    private var reactionSelection: Binding<String?> {
+        Binding(get: { model.myReaction(to: message) }, set: { emoji in react(emoji ?? model.myReaction(to: message) ?? Reactions.heart) })
+    }
+
     /// The long-press menu on texts and polls.
     @ViewBuilder private var menu: some View {
+        if message.canReact {
+            Picker("React", selection: reactionSelection) {
+                ForEach(Reactions.quick, id: \.self) { emoji in
+                    Text(emoji).tag(Optional(emoji)).accessibilityLabel("React with \(emoji)")
+                }
+            }
+            .pickerStyle(.palette)
+            .paletteSelectionEffect(.custom)
+            // Close the menu once you've picked, like its other actions.
+            .menuActionDismissBehavior(.enabled)
+            Button {
+                isPickingReaction = true
+            } label: {
+                Label("More reactions", systemImage: "face.smiling")
+            }
+        }
         Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
+        // A double tap reacts, so the text isn't selectable in the bubble: copy it from here.
+        if message.kind == .text, let text = message.text, !text.isEmpty {
+            Button {
+                UIPasteboard.general.string = text
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+        }
         if let onOpenThread { Button(action: onOpenThread) { Label("View thread", systemImage: "bubble.left.and.bubble.right") } }
         if let onShowInChat { Button(action: onShowInChat) { Label("Show in chat", systemImage: "text.bubble") } }
         if showsInfo, message.kind == .text { Button(action: openInfo) { Label("Info", systemImage: "info.circle") } }
@@ -61,6 +105,24 @@ struct MessageRow: View {
     }
 
     var body: some View {
+        content
+            .sheet(isPresented: $isPickingReaction) {
+                ReactionPickerSheet(current: model.myReaction(to: message), pick: react)
+            }
+            .sensoryFeedback(.impact(weight: .light), trigger: hearts)
+    }
+
+    /// Reactions under a message (for others' texts, past the avatar).
+    @ViewBuilder private func reactions(indent: Bool = false) -> some View {
+        let reactions = message.shownReactions
+        if !reactions.isEmpty {
+            ReactionPills(reactions: reactions, me: me, group: group, isMine: isMine, react: react)
+                .padding(.leading, indent ? 36 : 0)
+                .padding(.top, -2)
+        }
+    }
+
+    @ViewBuilder private var content: some View {
         switch message.kind {
         case .system:
             // A confirmed proposal ("Everyone's in for …", or "It's on for …" when confirmed anyway)
@@ -91,12 +153,15 @@ struct MessageRow: View {
                         text: message.text ?? "", isMine: true, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files,
                         location: message.place, openImage: openImage, openFile: openFile, openingFileId: openingFileId
                     )
+                    .overlay { HeartBurst(trigger: hearts) }
+                    .onTapGesture(count: 2, perform: heart)
                     .onTapGesture(perform: openInfo)
                     .contextMenu { menu }
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint(tapHint)
                     .accessibilityAction(named: "Reply", onReply)
                     .accessibilityActions { extraActions }
+                    reactions()
                     if message.isEdited { EditedLabel() }
                     if isLatestOwn, let receipt = message.receipt {
                         ReadReceipt(receipt: receipt, group: group, action: openInfo)
@@ -104,21 +169,26 @@ struct MessageRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
-                IncomingRow(author: author, showsName: startsRun) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        MessageBubble(
-                            text: message.text ?? "", isMine: false, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files,
-                            location: message.place, openImage: openImage, openFile: openFile, openingFileId: openingFileId
-                        )
-                        .onTapGesture(perform: openInfo)
-                        .contextMenu { menu }
-                        if message.isEdited { EditedLabel() }
+                VStack(alignment: .leading, spacing: 4) {
+                    IncomingRow(author: author, showsName: startsRun) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            MessageBubble(
+                                text: message.text ?? "", isMine: false, quote: quote, quoteHint: quoteHint, openQuote: openQuote, attachments: message.files,
+                                location: message.place, openImage: openImage, openFile: openFile, openingFileId: openingFileId
+                            )
+                            .overlay { HeartBurst(trigger: hearts) }
+                            .onTapGesture(count: 2, perform: heart)
+                            .onTapGesture(perform: openInfo)
+                            .contextMenu { menu }
+                            if message.isEdited { EditedLabel() }
+                        }
                     }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint(tapHint)
+                    .accessibilityAction(named: "Reply", onReply)
+                    .accessibilityActions { extraActions }
+                    reactions(indent: true)
                 }
-                .accessibilityAddTraits(.isButton)
-                .accessibilityHint(tapHint)
-                .accessibilityAction(named: "Reply", onReply)
-                .accessibilityActions { extraActions }
             }
         case .poll:
             if let poll = message.poll {
@@ -130,6 +200,7 @@ struct MessageRow: View {
                     .contextMenu { menu }
                     .accessibilityAction(named: "Reply", onReply)
                     .accessibilityActions { extraActions }
+                    reactions()
                     if isMine, isLatestOwn, let receipt = message.receipt {
                         ReadReceipt(receipt: receipt, group: group, action: openInfo)
                     }
@@ -138,22 +209,28 @@ struct MessageRow: View {
             }
         case .proposal:
             if let id = message.proposalId {
-                Button {
-                    openProposal(id)
-                } label: {
-                    if let proposal = model.proposals[id] {
-                        ProposalCard(proposal: proposal, group: group, me: me)
-                    } else {
-                        ProgressView().frame(maxWidth: .infinity, minHeight: 74).glass(cornerRadius: 20)
+                VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
+                    Button {
+                        openProposal(id)
+                    } label: {
+                        if let proposal = model.proposals[id] {
+                            ProposalCard(proposal: proposal, group: group, me: me)
+                        } else {
+                            ProgressView().frame(maxWidth: .infinity, minHeight: 74).glass(cornerRadius: 20)
+                        }
                     }
+                    .buttonStyle(.pressable)
+                    reactions()
                 }
-                .buttonStyle(.pressable)
             }
         case .event:
-            if let id = message.eventId, let event = model.events[id] {
-                EventMessageCard(event: event, author: isMine ? "You" : (author?.firstName ?? "Someone"))
-            } else if let body = message.body {
-                Text(body).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
+            VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
+                if let id = message.eventId, let event = model.events[id] {
+                    EventMessageCard(event: event, author: isMine ? "You" : (author?.firstName ?? "Someone"))
+                } else if let body = message.body {
+                    Text(body).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
+                }
+                reactions()
             }
         }
     }
@@ -162,6 +239,10 @@ struct MessageRow: View {
 extension MessageRow {
     /// VoiceOver actions beyond Reply, matching the menu.
     @ViewBuilder fileprivate var extraActions: some View {
+        if message.canReact {
+            Button(model.myReaction(to: message) == Reactions.heart ? "Remove heart" : "React with a heart", action: { react(Reactions.heart) })
+            Button("React", action: { isPickingReaction = true })
+        }
         if let onOpenThread { Button("View thread", action: onOpenThread) }
         if let onShowInChat { Button("Show in chat", action: onShowInChat) }
         if isMine, message.kind == .text {
@@ -409,7 +490,6 @@ struct MessageBubble: View {
                     .bodyFont(14)
                     .lineSpacing(2)
                     .foregroundStyle(isMine ? theme.onAccent : theme.ink)
-                    .textSelection(.enabled)
             }
         }
         .padding(.horizontal, 12)

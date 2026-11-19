@@ -16,6 +16,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,8 +58,14 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,6 +76,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.joeherbert.availabliss.core.network.model.MessageLocation
+import dev.joeherbert.availabliss.core.network.model.Reactions
 import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.designsystem.component.AvSnackbarHost
 import dev.joeherbert.availabliss.designsystem.component.AvailablissBackground
@@ -89,6 +97,8 @@ import dev.joeherbert.availabliss.designsystem.component.chat.MessageBubble
 import dev.joeherbert.availabliss.designsystem.component.chat.PollCard
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCard
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardUi
+import dev.joeherbert.availabliss.designsystem.component.chat.ReactionPickerSheet
+import dev.joeherbert.availabliss.designsystem.component.chat.ReactionPills
 import dev.joeherbert.availabliss.designsystem.component.chat.ReadReceipt
 import dev.joeherbert.availabliss.designsystem.component.chat.SwipeToReply
 import dev.joeherbert.availabliss.designsystem.component.glass
@@ -155,6 +165,8 @@ data class ChatActions(
     /** Search, and Photos and files, in the header. */
     val onSearch: () -> Unit = {},
     val onMedia: () -> Unit = {},
+    /** Reacting to a message with an emoji (picking yours again takes it back). */
+    val onReact: (messageId: String, emoji: String) -> Unit = { _, _ -> },
 )
 
 /** The group's chat (full screen; back returns to the calendar tab). */
@@ -245,6 +257,7 @@ fun GroupChatTab(
             onRetryAttachment = viewModel::retryAttachment,
             onLocation = viewModel::openLocationSheet,
             onOpenLocation = { openingLocation = it },
+            onReact = viewModel::react,
         )
     }
     // The same rows inside the thread sheet, where tapping one offers Reply / Show in chat.
@@ -612,6 +625,9 @@ internal fun ChatRow(
                 downloads = if (item.attachments.isEmpty()) emptyMap() else downloads,
                 location = item.location,
                 onOpenLocation = { item.location?.let(actions.onOpenLocation) },
+                reactions = item.reactions,
+                myReaction = item.myReaction,
+                onReact = if (item.canReact) remember(item.id, actions) { { emoji: String -> actions.onReact(item.id, emoji) } } else null,
             )
         }
         is ChatItem.ProposalCard -> ProposalCard(
@@ -641,14 +657,56 @@ internal fun ChatRow(
             )
         }
         is ChatItem.PollItem -> SwipeToReply(enabled = item.canReply, onReply = { actions.onReply(item.id) }) {
-            Box(Modifier.fillMaxWidth(), contentAlignment = if (item.own) Alignment.CenterEnd else Alignment.CenterStart) {
+            var picking by remember { mutableStateOf(false) }
+            val haptics = LocalHapticFeedback.current
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = if (item.own) Alignment.End else Alignment.Start) {
                 PollCard(
                     poll = item.poll,
                     onToggle = { optionId -> actions.onVote(item.id, optionId) },
                     onClose = { actions.onClosePoll(item.id) },
                     onEdit = { actions.onEditPoll(item.id) },
                     onPropose = actions.onProposeOption?.let { propose -> { optionId -> propose(item.id, optionId) } },
-                    modifier = Modifier.widthIn(max = 300.dp).fillMaxWidth(),
+                    modifier = Modifier
+                        .widthIn(max = 300.dp)
+                        .fillMaxWidth()
+                        // A long press on the poll (not an option) reacts to it; a double tap is ❤️.
+                        .then(
+                            if (item.canReact) Modifier
+                                .pointerInput(item.id) {
+                                    detectTapGestures(
+                                        onLongPress = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            picking = true
+                                        },
+                                        onDoubleTap = { actions.onReact(item.id, Reactions.HEART) },
+                                    )
+                                }
+                                .semantics {
+                                    customActions = listOf(
+                                        CustomAccessibilityAction("React") {
+                                            picking = true
+                                            true
+                                        },
+                                    )
+                                }
+                            else Modifier,
+                        ),
+                )
+                ReactionPills(
+                    item.reactions,
+                    own = item.own,
+                    onReact = if (item.canReact) ({ emoji -> actions.onReact(item.id, emoji) }) else null,
+                    modifier = Modifier.widthIn(max = 300.dp).padding(top = 4.dp),
+                )
+            }
+            if (picking) {
+                ReactionPickerSheet(
+                    current = item.myReaction,
+                    onPick = { emoji ->
+                        picking = false
+                        actions.onReact(item.id, emoji)
+                    },
+                    onDismiss = { picking = false },
                 )
             }
         }

@@ -282,6 +282,12 @@ enum API {
             .init(.patch, "/messages/\(messageId.pathEncoded)", body: EditMessageBody(body: body))
         }
         static func delete(messageId: String) -> Endpoint<EmptyResponse> { .init(.delete, "/messages/\(messageId.pathEncoded)") }
+        /// Reacts with `emoji` (replacing your earlier reaction).
+        static func react(messageId: String, emoji: String) -> Endpoint<MessageReactions> {
+            .init(.put, "/messages/\(messageId.pathEncoded)/reaction", body: ReactionBody(emoji: emoji))
+        }
+        /// Takes back your reaction.
+        static func unreact(messageId: String) -> Endpoint<MessageReactions> { .init(.delete, "/messages/\(messageId.pathEncoded)/reaction") }
         static func vote(pollId: String, optionIds: [String]) -> Endpoint<Poll> {
             .init(.post, "/polls/\(pollId.pathEncoded)/vote", body: VoteBody(optionIds: optionIds))
         }

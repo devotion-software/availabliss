@@ -8,12 +8,14 @@ import dev.joeherbert.availabliss.core.network.model.GroupMediaPage
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
 import dev.joeherbert.availabliss.core.network.model.MessageLocation
+import dev.joeherbert.availabliss.core.network.model.MessageReactions
 import dev.joeherbert.availabliss.core.network.model.MessageThread
 import dev.joeherbert.availabliss.core.network.model.MessagesResponse
 import dev.joeherbert.availabliss.core.network.model.NewDatePoll
 import dev.joeherbert.availabliss.core.network.model.NewPoll
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.PollSlot
+import dev.joeherbert.availabliss.core.network.model.ReactionRequest
 import dev.joeherbert.availabliss.core.network.model.ReceiptState
 import dev.joeherbert.availabliss.core.network.model.ReceiptsRequest
 import dev.joeherbert.availabliss.core.network.model.SendAttachmentsRequest
@@ -88,6 +90,10 @@ class ChatRepository @Inject constructor(
 
     /** Deletes your own text message (it stays in the chat, shown as deleted). */
     suspend fun delete(messageId: String): ApiResult<Unit> = call { api.deleteMessage(messageId) }
+
+    /** Reacts with [emoji] (replacing your earlier reaction), or takes yours back with null. */
+    suspend fun react(messageId: String, emoji: String?): ApiResult<MessageReactions> =
+        call { if (emoji != null) api.react(messageId, ReactionRequest(emoji)) else api.unreact(messageId) }
 
     suspend fun info(messageId: String): ApiResult<MessageInfo> = call { api.getMessageInfo(messageId) }
 

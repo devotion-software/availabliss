@@ -3,7 +3,7 @@
  * subscribe by event type and get a typed payload; the stream opens on the
  * first subscription and closes when the last one goes away.
  */
-import type { AppNotification, Group, GroupEvent, LiveEvent, LiveEventType, Member, Message, Poll, Proposal } from '#lib/types';
+import type { AppNotification, Group, GroupEvent, LiveEvent, LiveEventType, Member, Message, MessageReactions, Poll, Proposal } from '#lib/types';
 import { API_BASE } from './api';
 
 /** What each live event carries (docs/API.md "Live updates"). */
@@ -17,6 +17,7 @@ export interface LivePayloads {
 	'message.created': Message;
 	'message.updated': Message;
 	'message.receipts': ReceiptsPayload;
+	'message.reactions': MessageReactions;
 	'poll.updated': Poll;
 	'proposal.created': Proposal;
 	'proposal.updated': Proposal;

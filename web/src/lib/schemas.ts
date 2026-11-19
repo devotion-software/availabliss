@@ -359,6 +359,13 @@ export const createMessageSchema = z.union([
 // Empty only for a message with attachments (removes its caption).
 export const editMessageSchema = z.object({ body: z.string().trim().max(4000) });
 
+/** A single emoji (one grapheme: flags, skin tones and joined sequences included). */
+export const isSingleEmoji = (text: string) => {
+	const graphemes = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)];
+	return graphemes.length === 1 && /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(text);
+};
+export const reactionSchema = z.object({ emoji: z.string().trim().min(1).max(64).refine(isSingleEmoji, 'React with one emoji') });
+
 export const receiptsSchema = z.object({ upTo: z.string().min(1), state: z.enum(['delivered', 'seen']) });
 export const voteSchema = z.object({ optionIds: z.array(z.string().min(1)).max(10) });
 /**

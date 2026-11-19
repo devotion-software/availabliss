@@ -8,6 +8,8 @@ import { live } from './live.svelte';
 import { getMessageThread, sendMessage, votePoll } from './chat';
 import { applyMessageUpdate, threadReplyTarget, withThreadMessage } from './chat-messages';
 import { toasts } from './toast.svelte';
+import { reactIn } from './chat-thread.svelte';
+import { applyReactions } from './reactions';
 
 export class ReplyThread {
 	messages = $state<Message[]>([]);
@@ -76,6 +78,11 @@ export class ReplyThread {
 		}
 	}
 
+	/** Reacts with [emoji], or takes it back if it's already yours. */
+	async react(message: Message, emoji: string) {
+		await reactIn(this, message, emoji);
+	}
+
 	/** Subscribes to live updates for the thread; returns the unsubscribe function. */
 	listen(): () => void {
 		const offs = [
@@ -84,6 +91,9 @@ export class ReplyThread {
 			}),
 			live.on('message.updated', ({ groupId, payload }) => {
 				if ((groupId ?? payload.groupId) === this.groupId) this.messages = applyMessageUpdate(this.messages, payload);
+			}),
+			live.on('message.reactions', ({ groupId, payload }) => {
+				if (groupId === null || groupId === this.groupId) this.messages = applyReactions(this.messages, payload);
 			}),
 			live.on('poll.updated', ({ groupId, payload }) => {
 				if (groupId === null || groupId === this.groupId) this.#replacePoll(payload);

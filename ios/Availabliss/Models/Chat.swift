@@ -34,6 +34,8 @@ struct Message: Codable, Sendable, Identifiable, Equatable {
     var caption: String?
     /// A shared place (missing from older servers). `body` then holds a fallback for older apps.
     var location: MessageLocation?
+    /// Emoji reactions, one per person, grouped by emoji (missing from older servers).
+    var reactions: [MessageReaction]?
 
     var isDeleted: Bool { deleted == true }
     var files: [Attachment] { isDeleted ? [] : attachments ?? [] }
@@ -42,6 +44,10 @@ struct Message: Codable, Sendable, Identifiable, Equatable {
     /// The place it shares, unless deleted.
     var place: MessageLocation? { isDeleted ? nil : location }
     var isEdited: Bool { editedAt != nil && !isDeleted }
+    /// Its reactions as shown: none on deleted messages or group updates.
+    var shownReactions: [MessageReaction] { isDeleted || kind == .system ? [] : reactions ?? [] }
+    /// Anything but group updates and deleted messages can be reacted to.
+    var canReact: Bool { kind != .system && !isDeleted }
 
     /// A quoted message above a reply: who sent it and one line of it.
     struct ReplyPreview: Codable, Sendable, Equatable {
@@ -192,6 +198,86 @@ struct WalletPass: Codable, Sendable, Equatable, Hashable {
 
 struct EditMessageBody: Encodable, Sendable {
     let body: String
+}
+
+/// One emoji on a message and who reacted with it, in the order they did.
+struct MessageReaction: Codable, Sendable, Equatable, Hashable {
+    let emoji: String
+    var userIds: [String]
+}
+
+/// A message's reactions after one changed (`PUT`/`DELETE /messages/:id/reaction`, live `message.reactions`).
+struct MessageReactions: Codable, Sendable, Equatable {
+    let messageId: String
+    let reactions: [MessageReaction]
+}
+
+struct ReactionBody: Encodable, Sendable {
+    let emoji: String
+}
+
+/// Reactions: one per person per message, picked from the menu (or any emoji), ❤️ on a double tap.
+enum Reactions {
+    static let heart = "❤️"
+    /// The row in the message menu.
+    static let quick = ["❤️", "👍", "😂", "😮", "😢", "🙏"]
+    /// More to pick from, besides any emoji from the keyboard.
+    static let more = [
+        "🔥", "🎉", "👏", "🙌", "💯", "✅", "👀", "🤔",
+        "😍", "🥰", "😘", "😊", "😁", "🤣", "😅", "😎",
+        "🥳", "🤩", "😴", "🙃", "😬", "😱", "😭", "😡",
+        "👎", "👌", "🤞", "💪", "🫶", "🤝", "🍻", "🥂",
+        "☕", "🍕", "🌮", "🎂", "⚽", "🏃", "✈️", "🏖️",
+        "🌞", "🌧️", "❄️", "⭐", "💔", "💀", "🙈", "🤷",
+    ]
+
+    /// Your reaction, or nil.
+    static func mine(in reactions: [MessageReaction], me: String?) -> String? {
+        guard let me else { return nil }
+        return reactions.first { $0.userIds.contains(me) }?.emoji
+    }
+
+    /// What picking `emoji` does: reacts with it, or takes yours back if it's already yours.
+    static func toggled(_ reactions: [MessageReaction], me: String?, emoji: String) -> String? {
+        mine(in: reactions, me: me) == emoji ? nil : emoji
+    }
+
+    /// The reactions with your one reaction set to `emoji` (removed for nil), as the server orders them.
+    static func setting(_ reactions: [MessageReaction], me: String, to emoji: String?) -> [MessageReaction] {
+        var next = reactions.compactMap { reaction -> MessageReaction? in
+            var r = reaction
+            r.userIds.removeAll { $0 == me }
+            return r.userIds.isEmpty ? nil : r
+        }
+        guard let emoji else { return next }
+        if let index = next.firstIndex(where: { $0.emoji == emoji }) {
+            next[index].userIds.append(me)
+        } else {
+            next.append(MessageReaction(emoji: emoji, userIds: [me]))
+        }
+        return next
+    }
+
+    /// One emoji (a single character: flags, skin tones and joined sequences included), else nil.
+    static func single(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count == 1, let character = trimmed.first else { return nil }
+        let scalars = character.unicodeScalars
+        let isEmoji = scalars.contains { $0.properties.isEmojiPresentation || ($0.properties.isEmoji && $0.value > 0xFF) || $0.value == 0x20E3 }
+        return isEmoji ? trimmed : nil
+    }
+
+    /// "You, Ana and Sam" / "Ana, Sam and 2 others" for who reacted with one emoji.
+    static func names(_ userIds: [String], me: String?, name: (String) -> String) -> String {
+        let ordered = userIds.filter { $0 == me } + userIds.filter { $0 != me }
+        let names = ordered.map { $0 == me ? "You" : name($0) }
+        switch names.count {
+        case 0: return ""
+        case 1: return names[0]
+        case 2, 3: return names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+        default: return "\(names[0]), \(names[1]) and \(names.count - 2) others"
+        }
+    }
 }
 
 struct Poll: Codable, Sendable, Identifiable, Equatable {

@@ -22,6 +22,7 @@ const msg = (over: Partial<Message> = {}): Message => ({
 	caption: null,
 	replyTo: null,
 	location: null,
+	reactions: [],
 	...over
 });
 

@@ -306,6 +306,12 @@ export const endpoints: Endpoint[] = [
 	{ method: 'POST', path: '/groups/{id}/messages/receipts', tag: 'Chat', auth: 'user', summary: 'Mark messages delivered or seen', body: s.receiptsSchema, status: 204 },
 	{ method: 'PATCH', path: '/messages/{id}', tag: 'Chat', auth: 'user', summary: 'Edit your own text message', body: s.editMessageSchema, response: 'Message' },
 	{ method: 'DELETE', path: '/messages/{id}', tag: 'Chat', auth: 'user', summary: 'Delete your own text message', status: 204 },
+	{
+		method: 'PUT', path: '/messages/{id}/reaction', tag: 'Chat', auth: 'user', summary: 'React to a message with an emoji',
+		description: 'One reaction per person per message: reacting again replaces it. Not for group updates or deleted messages. The author gets a push (not for their own messages).',
+		body: s.reactionSchema, response: 'MessageReactions', errors: { 409: 'The message was deleted' }
+	},
+	{ method: 'DELETE', path: '/messages/{id}/reaction', tag: 'Chat', auth: 'user', summary: 'Take back your reaction to a message', response: 'MessageReactions' },
 	{ method: 'GET', path: '/messages/{id}/info', tag: 'Chat', auth: 'user', summary: 'Who has seen a message', response: 'MessageInfo' },
 	{ method: 'GET', path: '/messages/{id}/thread', tag: 'Chat', auth: 'user', summary: 'The thread a message is in', response: 'MessageThread' },
 	{

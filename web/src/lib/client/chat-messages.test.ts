@@ -33,6 +33,7 @@ const msg = (over: Partial<Message> = {}): Message => ({
 	attachments: [],
 	caption: null,
 	location: null,
+	reactions: [],
 	...over
 });
 

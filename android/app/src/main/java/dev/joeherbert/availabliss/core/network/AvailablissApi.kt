@@ -39,6 +39,7 @@ import dev.joeherbert.availabliss.core.network.model.Member
 import dev.joeherbert.availabliss.core.network.model.MemberRoleRequest
 import dev.joeherbert.availabliss.core.network.model.Message
 import dev.joeherbert.availabliss.core.network.model.MessageInfo
+import dev.joeherbert.availabliss.core.network.model.MessageReactions
 import dev.joeherbert.availabliss.core.network.model.MessageThread
 import dev.joeherbert.availabliss.core.network.model.MessagesResponse
 import dev.joeherbert.availabliss.core.network.model.MuteGroupRequest
@@ -57,6 +58,7 @@ import dev.joeherbert.availabliss.core.network.model.Proposal
 import dev.joeherbert.availabliss.core.network.model.ProposalDraft
 import dev.joeherbert.availabliss.core.network.model.ProposalDraftRequest
 import dev.joeherbert.availabliss.core.network.model.ProposalsResponse
+import dev.joeherbert.availabliss.core.network.model.ReactionRequest
 import dev.joeherbert.availabliss.core.network.model.ReadNotificationsRequest
 import dev.joeherbert.availabliss.core.network.model.ReceiptsRequest
 import dev.joeherbert.availabliss.core.network.model.RegisterDeviceRequest
@@ -494,6 +496,14 @@ interface AvailablissApi {
     /** Your own text messages only; it stays in the chat as deleted. */
     @DELETE("api/v1/messages/{id}")
     suspend fun deleteMessage(@Path("id") messageId: String)
+
+    /** Reacts with an emoji, replacing your earlier reaction. */
+    @PUT("api/v1/messages/{id}/reaction")
+    suspend fun react(@Path("id") messageId: String, @Body body: ReactionRequest): MessageReactions
+
+    /** Takes back your reaction. */
+    @DELETE("api/v1/messages/{id}/reaction")
+    suspend fun unreact(@Path("id") messageId: String): MessageReactions
 
     @GET("api/v1/messages/{id}/info")
     suspend fun getMessageInfo(@Path("id") messageId: String): MessageInfo

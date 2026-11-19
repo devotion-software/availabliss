@@ -1,8 +1,30 @@
 /** Group chat: messages, polls and per-recipient delivery / read receipts. */
 import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
-import type { Attachment, Message, MessageInfo, MessageKind, MessageLocation, MessageReply, MessageThread, Poll } from '#lib/types';
+import type {
+	Attachment,
+	Message,
+	MessageInfo,
+	MessageKind,
+	MessageLocation,
+	MessageReaction,
+	MessageReactions,
+	MessageReply,
+	MessageThread,
+	Poll
+} from '#lib/types';
 import { db } from './db';
-import { groupMembers, groups, messageAttachments, messageReceipts, messages, pollOptions, polls, pollVotes, user } from './db/schema';
+import {
+	groupMembers,
+	groups,
+	messageAttachments,
+	messageReactions,
+	messageReceipts,
+	messages,
+	pollOptions,
+	polls,
+	pollVotes,
+	user
+} from './db/schema';
 import { badRequest, conflict, forbidden, notFound } from './http';
 import { alias } from 'drizzle-orm/mysql-core';
 import { newId } from './ids';
@@ -274,6 +296,87 @@ export async function messageInfo(messageId: string, userId: string): Promise<Me
 	};
 }
 
+// ─── Reactions ────────────────────────────────────────────────────────────
+
+/** Each message's reactions grouped by emoji, in the order each emoji (and each person) came. */
+async function loadReactions(messageIds: string[]): Promise<Map<string, MessageReaction[]>> {
+	const result = new Map<string, MessageReaction[]>();
+	if (!messageIds.length) return result;
+	const rows = await db
+		.select({ messageId: messageReactions.messageId, userId: messageReactions.userId, emoji: messageReactions.emoji })
+		.from(messageReactions)
+		.where(inArray(messageReactions.messageId, messageIds))
+		.orderBy(asc(messageReactions.createdAt), asc(messageReactions.userId));
+	for (const r of rows) {
+		let list = result.get(r.messageId);
+		if (!list) result.set(r.messageId, (list = []));
+		const same = list.find((x) => x.emoji === r.emoji);
+		if (same) same.userIds.push(r.userId);
+		else list.push({ emoji: r.emoji, userIds: [r.userId] });
+	}
+	return result;
+}
+
+/** A message that can be reacted to: anything in the chat but group updates and deleted messages. */
+async function reactable(messageId: string, userId: string) {
+	const row = await db.query.messages.findFirst({ where: eq(messages.id, messageId) });
+	if (!row) throw notFound('Message not found');
+	await requireMember(row.groupId, userId);
+	if (row.kind === 'system') throw badRequest("Group updates can't be reacted to");
+	if (row.deletedAt) throw conflict('That message was deleted');
+	return row;
+}
+
+async function publishReactions(groupId: string, messageId: string): Promise<MessageReactions> {
+	const reactions = (await loadReactions([messageId])).get(messageId) ?? [];
+	const payload = { messageId, reactions };
+	await publishToGroup(groupId, 'message.reactions', payload);
+	return payload;
+}
+
+/** Reacts to a message with an emoji, replacing your earlier reaction; the author is told (not for their own). */
+export async function setReaction(messageId: string, userId: string, emoji: string): Promise<MessageReactions> {
+	const row = await reactable(messageId, userId);
+	const previous = await db.query.messageReactions.findFirst({
+		where: and(eq(messageReactions.messageId, messageId), eq(messageReactions.userId, userId))
+	});
+	if (previous?.emoji === emoji) return { messageId, reactions: (await loadReactions([messageId])).get(messageId) ?? [] };
+	await db
+		.insert(messageReactions)
+		.values({ messageId, userId, emoji })
+		.onDuplicateKeyUpdate({ set: { emoji, createdAt: new Date() } });
+	const result = await publishReactions(row.groupId, messageId);
+
+	if (row.authorId && row.authorId !== userId) {
+		const [who, group, quoted] = await Promise.all([
+			memberName(row.groupId, userId),
+			db.query.groups.findFirst({ where: eq(groups.id, row.groupId), columns: { name: true } }),
+			loadReplies([messageId])
+		]);
+		const text = quoted.get(messageId)?.text;
+		// A push only, like the message itself would have been: Activity keeps one row per chat.
+		await notify([row.authorId], {
+			kind: 'message',
+			groupId: row.groupId,
+			title: group?.name ?? 'New reaction',
+			body: pushPreview(text ? `${who} reacted ${emoji} to “${text}”` : `${who} reacted ${emoji} to your message`),
+			data: { messageId, reaction: emoji },
+			record: false
+		});
+	}
+	return result;
+}
+
+/** Takes back your reaction to a message. */
+export async function removeReaction(messageId: string, userId: string): Promise<MessageReactions> {
+	const row = await db.query.messages.findFirst({ where: eq(messages.id, messageId) });
+	if (!row) throw notFound('Message not found');
+	await requireMember(row.groupId, userId);
+	const removed = await db.delete(messageReactions).where(and(eq(messageReactions.messageId, messageId), eq(messageReactions.userId, userId)));
+	if (!removed[0].affectedRows) return { messageId, reactions: (await loadReactions([messageId])).get(messageId) ?? [] };
+	return publishReactions(row.groupId, messageId);
+}
+
 // ─── Locations ────────────────────────────────────────────────────────────
 
 /** Coordinates as sent in links: 6 decimal places is about 10 cm. */
@@ -350,10 +453,11 @@ export async function loadReplies(ids: string[]): Promise<Map<string, MessageRep
 // ─── Messages ─────────────────────────────────────────────────────────────
 
 async function toMessages(rows: MessageRow[], viewerId: string, groupSize: number): Promise<Message[]> {
-	const [pollMap, replies, attachments] = await Promise.all([
+	const [pollMap, replies, attachments, reactions] = await Promise.all([
 		loadPolls(rows.flatMap((r) => (r.pollId ? [r.pollId] : []))),
 		loadReplies(rows.flatMap((r) => (r.replyToId ? [r.replyToId] : []))),
-		attachmentsFor(rows.filter((r) => !r.deletedAt && r.kind === 'text').map((r) => r.id))
+		attachmentsFor(rows.filter((r) => !r.deletedAt && r.kind === 'text').map((r) => r.id)),
+		loadReactions(rows.filter((r) => !r.deletedAt && r.kind !== 'system').map((r) => r.id))
 	]);
 	const own = rows.filter((r) => r.authorId === viewerId);
 	const receipts = await receiptSummaries(own, groupSize);
@@ -379,7 +483,8 @@ async function toMessages(rows: MessageRow[], viewerId: string, groupSize: numbe
 			replyTo: r.replyToId ? (replies.get(r.replyToId) ?? null) : null,
 			attachments: files,
 			caption: files.length ? r.body || null : null,
-			location
+			location,
+			reactions: reactions.get(r.id) ?? []
 		};
 	});
 }
@@ -613,7 +718,7 @@ export async function editMessage(messageId: string, userId: string, body: strin
 export async function deleteMessage(messageId: string, userId: string): Promise<void> {
 	await ownText(messageId, userId);
 	await db.update(messages).set({ body: null, deletedAt: new Date() }).where(eq(messages.id, messageId));
-	await deleteMessageAttachments(messageId);
+	await Promise.all([deleteMessageAttachments(messageId), db.delete(messageReactions).where(eq(messageReactions.messageId, messageId))]);
 	await publishUpdated(messageId, userId);
 }
 

@@ -57,6 +57,7 @@ struct LiveEvent: Sendable {
         case messageCreated = "message.created"
         case messageUpdated = "message.updated"
         case messageReceipts = "message.receipts"
+        case messageReactions = "message.reactions"
         case pollUpdated = "poll.updated"
         case proposalCreated = "proposal.created"
         case proposalUpdated = "proposal.updated"

@@ -18,6 +18,8 @@
 	import ConfirmedBanner from './ConfirmedBanner.svelte';
 	import { isConfirmationMessage } from '#lib/client/confirmation';
 	import ReadReceipt from './ReadReceipt.svelte';
+	import Reactions from './Reactions.svelte';
+	import { HEART, myReaction } from '#lib/client/reactions';
 	import MessageInfoSheet from './MessageInfoSheet.svelte';
 	import MessageMenu, { type MessageMenuAnchor } from './MessageMenu.svelte';
 	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
@@ -262,6 +264,15 @@
 		infoOpen = true;
 	}
 
+	/** The menu's message as it is now (its reactions change while the menu is open). */
+	const menuCurrent = $derived(menuMessage ? (thread.messages.find((m) => m.id === menuMessage!.id) ?? menuMessage) : null);
+
+	/** A poll's react button: the menu with its reactions (and Reply). */
+	function openPollMenu(m: Message, e: MouseEvent) {
+		const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		openMenu(m, { x: r.right, y: r.bottom, keyboard: e.detail === 0 });
+	}
+
 	function openMenu(message: Message, anchor: MessageMenuAnchor) {
 		menuMessage = message;
 		menuAnchor = anchor;
@@ -330,10 +341,26 @@
 								{members}
 								onpropose={item.mine || admin ? (slot) => proposeFromPoll(m, slot) : undefined}
 							/>
-							{#if thread.canReply(m)}
-								<button type="button" class="poll-reply" aria-label="Reply to the poll" title="Reply" onclick={() => reply(m)}>
-									<Icon name="reply" size={17} strokeWidth={2.2} />
-								</button>
+							{#if thread.canReply(m) || thread.canReact(m)}
+								<span class="poll-actions">
+									{#if thread.canReact(m)}
+										<button
+											type="button"
+											class="poll-act"
+											aria-label="React to the poll"
+											title="React"
+											aria-haspopup="menu"
+											onclick={(e) => openPollMenu(m, e)}
+										>
+											<Icon name="smile" size={17} strokeWidth={2.2} />
+										</button>
+									{/if}
+									{#if thread.canReply(m)}
+										<button type="button" class="poll-act" aria-label="Reply to the poll" title="Reply" onclick={() => reply(m)}>
+											<Icon name="reply" size={17} strokeWidth={2.2} />
+										</button>
+									{/if}
+								</span>
 							{/if}
 						</div>
 					{:else if m.kind === 'proposal' && m.proposalId}
@@ -351,11 +378,24 @@
 							showEdited={!item.receipt}
 							canModify={thread.canModify(m)}
 							canReply={thread.canReply(m)}
+							canReact={thread.canReact(m)}
+							onheart={(msg) => thread.react(msg, HEART)}
 							quote={item.quote}
 							oninfo={openInfo}
 							onmenu={openMenu}
 							onreply={reply}
 							onquote={() => (threadFor = m.id)}
+						/>
+					{/if}
+					{#if m.reactions?.length && m.kind !== 'system' && !m.deleted}
+						<Reactions
+							reactions={m.reactions}
+							{meId}
+							{members}
+							mine={item.mine}
+							indent={!item.mine && m.kind === 'text'}
+							{compact}
+							onreact={(emoji) => thread.react(m, emoji)}
 						/>
 					{/if}
 					{#if item.receipt}
@@ -394,6 +434,8 @@
 	onthread={menuMessage && inThread(menuMessage) ? () => menuMessage && (threadFor = menuMessage.id) : undefined}
 	onedit={menuMessage && thread.canEdit(menuMessage) ? () => menuMessage && thread.startEdit(menuMessage) : undefined}
 	ondelete={menuMessage && thread.canModify(menuMessage) ? () => menuMessage && confirmDelete(menuMessage) : undefined}
+	onreact={menuCurrent && thread.canReact(menuCurrent) ? (emoji) => menuCurrent && thread.react(menuCurrent, emoji) : undefined}
+	reacted={menuCurrent ? myReaction(menuCurrent.reactions, meId) : null}
 />
 
 <ConfirmSheet
@@ -479,10 +521,15 @@
 		display: flex;
 		flex-direction: column;
 	}
-	.poll-reply {
+	.poll-actions {
 		position: absolute;
 		top: 50%;
 		translate: 0 -50%;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.poll-act {
 		width: 32px;
 		height: 32px;
 		border-radius: 50%;
@@ -496,27 +543,27 @@
 			background-color 0.15s ease;
 	}
 	/* Beside the card: to its right for others' polls, left for yours. */
-	.poll-line:not(.mine) .poll-reply {
+	.poll-line:not(.mine) .poll-actions {
 		left: min(calc(100% + 4px), calc(320px + 4px));
 	}
-	.poll-line.mine .poll-reply {
+	.poll-line.mine .poll-actions {
 		right: min(calc(100% + 4px), calc(320px + 4px));
 	}
-	.poll-reply:hover {
+	.poll-act:hover {
 		color: var(--ink);
 		background: var(--surface);
 	}
-	.poll-reply:focus-visible {
+	.poll-act:focus-visible {
 		opacity: 1;
 	}
 	@media (hover: hover) {
-		.poll-line:hover .poll-reply {
+		.poll-line:hover .poll-act {
 			opacity: 1;
 		}
 	}
 	@media (hover: none) {
-		/* No hover on touch screens: keep it faintly visible. */
-		.poll-reply {
+		/* No hover on touch screens: keep them faintly visible. */
+		.poll-act {
 			opacity: 0.7;
 		}
 	}

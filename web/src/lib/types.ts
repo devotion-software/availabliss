@@ -395,6 +395,20 @@ export interface Message {
 	caption: string | null;
 	/** A place shared in the chat (a one-off pin). `body` is then a fallback for older apps; null once deleted. */
 	location: MessageLocation | null;
+	/** Emoji reactions, one per person, grouped by emoji in the order each was first used (empty once deleted). */
+	reactions: MessageReaction[];
+}
+
+/** One emoji on a message and who reacted with it (in the order they did). */
+export interface MessageReaction {
+	emoji: string;
+	userIds: string[];
+}
+
+/** A message's reactions after one changed (`PUT`/`DELETE /messages/:id/reaction`, live `message.reactions`). */
+export interface MessageReactions {
+	messageId: string;
+	reactions: MessageReaction[];
 }
 
 /** A place shared in a chat message: where it is and, if it's a named place, what it's called. */
@@ -553,6 +567,7 @@ export type LiveEventType =
 	| 'message.created'
 	| 'message.updated'
 	| 'message.receipts'
+	| 'message.reactions'
 	| 'poll.updated'
 	| 'proposal.created'
 	| 'proposal.updated'

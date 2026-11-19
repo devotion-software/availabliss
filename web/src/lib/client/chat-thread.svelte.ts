@@ -11,6 +11,7 @@ import {
 	type PollPatch,
 	deleteMessage,
 	editMessage,
+	reactToMessage,
 	listMessages,
 	sendMessage,
 	sendLocation,
@@ -22,6 +23,7 @@ import {
 } from './chat';
 import { applyMessageUpdate, canEditMessage, canModifyMessage, canReplyTo, deletedCopy, isTempMessage, replyPreview } from './chat-messages';
 import { toasts } from './toast.svelte';
+import { applyReactions, canReact, toggled, withReaction } from './reactions';
 
 const PAGE = 50;
 let tempSeq = 0;
@@ -127,7 +129,8 @@ export class ChatThread {
 			replyTo: replying ? replyPreview(replying) : null,
 			attachments: [],
 			caption: null,
-			location: null
+			location: null,
+			reactions: []
 		};
 		this.messages = [...this.messages, temp];
 		try {
@@ -211,6 +214,15 @@ export class ChatThread {
 	}
 
 	/** Deletes one of your messages; it stays in the chat as deleted. Failures toast and throw. */
+	canReact(message: Message) {
+		return canReact(message);
+	}
+
+	/** Reacts with [emoji], or takes it back if it's already yours (shown straight away). */
+	async react(message: Message, emoji: string) {
+		await reactIn(this, message, emoji);
+	}
+
 	async deleteMessage(message: Message) {
 		try {
 			await deleteMessage(message.id);
@@ -303,6 +315,9 @@ export class ChatThread {
 			}),
 			live.on('poll.updated', ({ groupId, payload }) => {
 				if (groupId === null || groupId === this.groupId) this.#replacePoll(payload);
+			}),
+			live.on('message.reactions', ({ groupId, payload }) => {
+				if (groupId === null || groupId === this.groupId) this.messages = applyReactions(this.messages, payload);
 			}),
 			live.on('message.receipts', ({ groupId, payload }) => {
 				if (groupId !== null && groupId !== this.groupId) return;
@@ -411,5 +426,23 @@ export class ChatThread {
 			if (newer(target, this.#delivered)) this.#delivered = target;
 			sendReceipt(this.groupId, target.id, 'seen').catch(() => {});
 		}, 500);
+	}
+}
+
+/**
+ * Reacts in a chat or thread: shows it straight away, then the server's copy; puts it back and toasts on failure.
+ * Tapping the emoji that's already yours takes it back.
+ */
+export async function reactIn(list: { messages: Message[]; meId: string }, message: Message, emoji: string) {
+	if (!canReact(message)) return;
+	const current = list.messages.find((m) => m.id === message.id) ?? message;
+	const next = toggled(current.reactions, list.meId, emoji);
+	const before = current.reactions ?? [];
+	list.messages = applyReactions(list.messages, { messageId: message.id, reactions: withReaction(before, list.meId, next) });
+	try {
+		list.messages = applyReactions(list.messages, await reactToMessage(message.id, next));
+	} catch (err) {
+		list.messages = applyReactions(list.messages, { messageId: message.id, reactions: before });
+		toasts.error(err);
 	}
 }

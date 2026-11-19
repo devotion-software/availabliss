@@ -11,9 +11,11 @@ import dev.joeherbert.availabliss.core.network.model.MessageReply
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.PollSlot
 import dev.joeherbert.availabliss.core.network.model.Proposal
+import dev.joeherbert.availabliss.core.network.model.Reactions
 import dev.joeherbert.availabliss.core.network.model.WalletPass
 import dev.joeherbert.availabliss.core.network.model.asReply
 import dev.joeherbert.availabliss.core.network.model.attachmentsSummary
+import dev.joeherbert.availabliss.core.network.model.canReact
 import dev.joeherbert.availabliss.core.network.model.canReply
 import dev.joeherbert.availabliss.core.network.model.displayText
 import dev.joeherbert.availabliss.core.network.model.isDatePoll
@@ -26,6 +28,7 @@ import dev.joeherbert.availabliss.designsystem.component.chat.PollOptionUi
 import dev.joeherbert.availabliss.designsystem.component.chat.PollUi
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardTone
 import dev.joeherbert.availabliss.designsystem.component.chat.ProposalCardUi
+import dev.joeherbert.availabliss.designsystem.component.chat.ReactionUi
 import dev.joeherbert.availabliss.designsystem.component.chat.fileIconFor
 import dev.joeherbert.availabliss.designsystem.component.chat.formatFileSize
 import dev.joeherbert.availabliss.designsystem.component.chat.passColor
@@ -68,6 +71,12 @@ sealed interface ChatItem {
         val attachments: List<AttachmentUi> = emptyList(),
         /** A shared place, drawn as a map card ([text] is then empty). */
         val location: MessageLocation? = null,
+        /** Reactions under the bubble. */
+        val reactions: List<ReactionUi> = emptyList(),
+        /** Your reaction, if any (highlighted in the menu). */
+        val myReaction: String? = null,
+        /** Can be reacted to: sent and not deleted. */
+        val canReact: Boolean = false,
     ) : ChatItem {
         override val key get() = id
     }
@@ -105,7 +114,16 @@ sealed interface ChatItem {
         override val key get() = id
     }
 
-    data class PollItem(val id: String, val poll: PollUi, val own: Boolean, val author: AvatarPerson?, val canReply: Boolean = true) : ChatItem {
+    data class PollItem(
+        val id: String,
+        val poll: PollUi,
+        val own: Boolean,
+        val author: AvatarPerson?,
+        val canReply: Boolean = true,
+        val reactions: List<ReactionUi> = emptyList(),
+        val myReaction: String? = null,
+        val canReact: Boolean = false,
+    ) : ChatItem {
         override val key get() = id
     }
 
@@ -163,6 +181,9 @@ fun buildChatItems(
                     m.poll.toUi(directory, canClose = own, title = if (own) "Your poll" else "Poll by $authorName", canPropose = own || isAdmin, conflicts = conflicts),
                     own,
                     m.authorId?.let(directory::avatar),
+                    reactions = reactionsFor(m, directory),
+                    myReaction = myReaction(m, directory),
+                    canReact = m.canReact,
                 )
 
             m.kind == MessageKind.Proposal && m.proposalId != null -> {
@@ -235,6 +256,9 @@ fun buildChatItems(
                         inThread = m.replyTo != null || m.id in repliedTo,
                         attachments = attachments,
                         location = location,
+                        reactions = reactionsFor(m, directory),
+                        myReaction = myReaction(m, directory),
+                        canReact = m.canReact,
                     )
                 }
             }
@@ -244,6 +268,17 @@ fun buildChatItems(
     }
     return items
 }
+
+/** A message's reactions as pills: each emoji, how many, whether you're one, and who ("You and Ana"). */
+internal fun reactionsFor(m: Message, directory: MemberDirectory): List<ReactionUi> =
+    if (!m.canReact) emptyList()
+    else m.reactions.map { r ->
+        val me = r.userIds.firstOrNull(directory::isMe)
+        ReactionUi(r.emoji, r.userIds.size, mine = me != null, who = Reactions.names(r.userIds, me) { directory.displayName(it, youSuffix = false) })
+    }
+
+private fun myReaction(m: Message, directory: MemberDirectory): String? =
+    m.reactions.firstOrNull { r -> r.userIds.any(directory::isMe) }?.emoji
 
 /** A sent attachment as the bubble draws it. */
 fun Attachment.toUi(): AttachmentUi = AttachmentUi(

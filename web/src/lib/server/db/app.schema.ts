@@ -521,6 +521,20 @@ export const messageReceipts = mysqlTable(
 	(t) => [primaryKey({ columns: [t.messageId, t.userId] }), index('message_receipts_user_idx').on(t.userId)]
 );
 
+/** Emoji reactions to chat messages: one per person per message (reacting again replaces it). */
+export const messageReactions = mysqlTable(
+	'message_reactions',
+	{
+		messageId: varchar('message_id', { length: 36 })
+			.notNull()
+			.references(() => messages.id, { onDelete: 'cascade' }),
+		userId: userRef(),
+		emoji: varchar('emoji', { length: 64 }).notNull(),
+		createdAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.messageId, t.userId] })]
+);
+
 // ─── Notifications & push ─────────────────────────────────────────────────
 export const notifications = mysqlTable(
 	'notifications',

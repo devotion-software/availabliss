@@ -11,8 +11,10 @@
 	import { tick } from 'svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import { portal } from '#lib/components/ui/portal';
+	import { MORE_REACTIONS, QUICK_REACTIONS, typedEmoji } from '#lib/client/reactions';
 
 	/**
+	 * A row of reactions (+ for more, or any emoji typed in) above
 	 * Reply / View thread / Info, and Edit / Delete on your own messages (in a thread: Reply / Show in chat):
 	 * opened by long-press, right-click or the bubble's ⋯ button.
 	 * Floats at the pointer (or the button), kept inside the viewport. Same look as the group's More menu.
@@ -27,9 +29,24 @@
 		onshowinchat?: () => void;
 		onedit?: () => void;
 		ondelete?: () => void;
+		/** Reacting: the row of emoji is left out when not given. */
+		onreact?: (emoji: string) => void;
+		/** Your reaction to the message, highlighted (picking it again takes it back). */
+		reacted?: string | null;
 		onclose: () => void;
 	}
-	let { anchor, oninfo, onreply, onthread, onshowinchat, onedit, ondelete, onclose }: Props = $props();
+	let { anchor, oninfo, onreply, onthread, onshowinchat, onedit, ondelete, onreact, reacted = null, onclose }: Props = $props();
+
+	// "+": more emoji and a field for any other.
+	let more = $state(false);
+	let typed = $state('');
+	const typedValid = $derived(typedEmoji(typed));
+	$effect(() => {
+		if (!anchor) {
+			more = false;
+			typed = '';
+		}
+	});
 
 	type Item = { label: string; icon: 'reply' | 'chat' | 'arrow-right' | 'info' | 'pencil' | 'trash'; run: () => void; danger?: boolean };
 	const items = $derived(
@@ -50,6 +67,7 @@
 
 	// Place it beside the anchor (to the left, since your bubbles sit on the right), inside the viewport.
 	$effect(() => {
+		void more;
 		if (!anchor || !el) return;
 		const { width, height } = el.getBoundingClientRect();
 		const pad = 8;
@@ -67,7 +85,7 @@
 		if (!anchor) return;
 		returnFocus = document.activeElement as HTMLElement | null;
 		const keyboard = anchor.keyboard;
-		tick().then(() => (keyboard ? buttons[0] : el)?.focus({ preventScroll: true }));
+		tick().then(() => (keyboard ? (el?.querySelector<HTMLElement>('.react') ?? buttons[0]) : el)?.focus({ preventScroll: true }));
 		const onPointer = (e: PointerEvent) => {
 			if (el && !el.contains(e.target as Node)) onclose();
 		};
@@ -93,7 +111,28 @@
 		action();
 	}
 
+	function react(emoji: string) {
+		const run = onreact;
+		if (run) choose(() => run(emoji));
+	}
+
+	function submitTyped(e: SubmitEvent) {
+		e.preventDefault();
+		if (typedValid) react(typedValid);
+	}
+
+	/** Left / right moves along a row of emoji. */
+	function onrowkeydown(e: KeyboardEvent) {
+		if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+		const row = [...(e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('button')];
+		const i = row.indexOf(document.activeElement as HTMLElement);
+		if (i < 0) return;
+		e.preventDefault();
+		row[(i + (e.key === 'ArrowRight' ? 1 : -1) + row.length) % row.length]?.focus();
+	}
+
 	function onkeydown(e: KeyboardEvent) {
+		if (e.target instanceof HTMLInputElement && e.key !== 'Escape') return;
 		// The menu's items change with the message; drop slots left from a longer one.
 		const live = buttons.slice(0, items.length);
 		const i = live.indexOf(document.activeElement as HTMLElement);
@@ -122,6 +161,69 @@
 		use:portal
 		{onkeydown}
 	>
+		{#if onreact}
+			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+			<div class="reactions" role="group" aria-label="React" onkeydown={onrowkeydown}>
+				{#each QUICK_REACTIONS as emoji (emoji)}
+					<button
+						type="button"
+						class="react"
+						class:on={reacted === emoji}
+						aria-label={reacted === emoji ? `Remove your ${emoji} reaction` : `React with ${emoji}`}
+						aria-pressed={reacted === emoji}
+						onclick={() => react(emoji)}
+					>
+						{emoji}
+					</button>
+				{/each}
+				<button
+					type="button"
+					class="react more"
+					class:on={!!reacted && !QUICK_REACTIONS.includes(reacted as (typeof QUICK_REACTIONS)[number]) && !more}
+					aria-label={more ? 'Fewer reactions' : 'More reactions'}
+					aria-expanded={more}
+					onclick={() => (more = !more)}
+				>
+					{#if reacted && !QUICK_REACTIONS.includes(reacted as (typeof QUICK_REACTIONS)[number]) && !more}{reacted}{:else}<Icon
+							name={more ? 'minus' : 'plus'}
+							size={18}
+							strokeWidth={2.4}
+						/>{/if}
+				</button>
+			</div>
+			{#if more}
+				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+				<div class="grid" role="group" aria-label="More reactions" onkeydown={onrowkeydown}>
+					{#each MORE_REACTIONS as emoji (emoji)}
+						<button
+							type="button"
+							class="react"
+							class:on={reacted === emoji}
+							aria-label={reacted === emoji ? `Remove your ${emoji} reaction` : `React with ${emoji}`}
+							aria-pressed={reacted === emoji}
+							onclick={() => react(emoji)}
+						>
+							{emoji}
+						</button>
+					{/each}
+				</div>
+				<form class="typed" onsubmit={submitTyped}>
+					<input
+						type="text"
+						bind:value={typed}
+						placeholder="Or type any emoji"
+						aria-label="Any emoji"
+						enterkeyhint="send"
+						autocomplete="off"
+						spellcheck="false"
+					/>
+					<button type="submit" class="react" disabled={!typedValid} aria-label={typedValid ? `React with ${typedValid}` : 'React'}>
+						{typedValid ?? '↵'}
+					</button>
+				</form>
+			{/if}
+			{#if items.length}<hr />{/if}
+		{/if}
 		{#each items as item, i (item.label)}
 			<button bind:this={buttons[i]} type="button" role="menuitem" class:danger={item.danger} onclick={() => choose(item.run)}>
 				<Icon name={item.icon} size={18} />{item.label}
@@ -146,6 +248,66 @@
 	}
 	.menu:focus {
 		outline: none;
+	}
+	.reactions {
+		display: flex;
+		gap: 2px;
+		padding: 2px;
+	}
+	.grid {
+		display: grid;
+		grid-template-columns: repeat(8, 1fr);
+		gap: 2px;
+		padding: 4px 2px 2px;
+		max-width: 296px;
+	}
+	.react {
+		min-height: 0;
+		width: 36px;
+		height: 36px;
+		padding: 0;
+		justify-content: center;
+		border-radius: 50%;
+		font-size: 22px;
+		line-height: 1;
+		transition: transform 0.12s var(--ease-out);
+	}
+	.react:hover:not(:disabled) {
+		transform: scale(1.15);
+	}
+	.react.on {
+		background: var(--accent-soft);
+	}
+	.react.more {
+		color: var(--muted);
+		background: var(--surface);
+		font-size: 20px;
+	}
+	.typed {
+		display: flex;
+		gap: 6px;
+		align-items: center;
+		padding: 6px 2px 2px;
+	}
+	.typed input {
+		flex: 1;
+		min-width: 0;
+		height: 36px;
+		padding: 0 12px;
+		border-radius: 18px;
+		border: 1px solid var(--line-2);
+		background: var(--surface);
+		color: var(--ink);
+		font-size: 16px;
+	}
+	.typed .react:disabled {
+		color: var(--muted);
+		font-size: 16px;
+	}
+	hr {
+		border: 0;
+		border-top: 1px solid var(--line);
+		margin: 4px 6px;
 	}
 	button {
 		display: flex;

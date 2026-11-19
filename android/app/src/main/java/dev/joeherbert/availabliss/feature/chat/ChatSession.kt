@@ -9,6 +9,7 @@ import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiResult
 import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.core.network.model.Message
+import dev.joeherbert.availabliss.core.network.model.MessageReaction
 import dev.joeherbert.availabliss.core.network.model.Poll
 import dev.joeherbert.availabliss.core.network.model.Proposal
 import kotlinx.coroutines.CoroutineScope
@@ -49,6 +50,12 @@ internal class ChatSession(
             d.copy(messages = messages, thread = d.thread?.let { t -> t.copy(messages = t.messages.withThreadMessage(message)) })
         }
         references.resolve()
+    }
+
+    /** A message's reactions, in the chat and the open thread. */
+    fun setReactions(messageId: String, reactions: List<MessageReaction>) = data.update { d ->
+        fun List<Message>.withReactions() = map { m -> if (m.id == messageId && m.reactions != reactions) m.copy(reactions = reactions) else m }
+        d.copy(messages = d.messages.withReactions(), thread = d.thread?.let { it.copy(messages = it.messages.withReactions()) })
     }
 
     fun replacePoll(poll: Poll) = data.update { d ->

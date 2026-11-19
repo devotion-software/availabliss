@@ -41,6 +41,8 @@ data class Message(
     val caption: String? = null,
     /** A shared place (a one-off pin); [body] is then a fallback for older apps. Null once deleted. */
     val location: MessageLocation? = null,
+    /** Emoji reactions, one per person, grouped by emoji in the order each was first used (empty once deleted). */
+    val reactions: List<MessageReaction> = emptyList(),
 )
 
 /** A place shared in a chat message: where it is and, for a named place, what it's called. */

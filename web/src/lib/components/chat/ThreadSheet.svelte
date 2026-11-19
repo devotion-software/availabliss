@@ -11,6 +11,8 @@
 	import PollCard from './PollCard.svelte';
 	import Composer from './Composer.svelte';
 	import MessageMenu, { type MessageMenuAnchor } from './MessageMenu.svelte';
+	import Reactions from './Reactions.svelte';
+	import { HEART, canReact, myReaction } from '#lib/client/reactions';
 
 	/**
 	 * A thread: the first message of a chain of replies and every reply under it, oldest first,
@@ -114,6 +116,7 @@
 	}
 
 	const count = $derived(rt?.messages.length ?? 0);
+	const menuCurrent = $derived(menuMessage ? (rt?.messages.find((m) => m.id === menuMessage!.id) ?? menuMessage) : null);
 </script>
 
 <Sheet
@@ -154,12 +157,24 @@
 						first={item.first}
 						last={item.last}
 						canReply={canReplyTo(m)}
+						canReact={canReact(m)}
+						onheart={(msg) => rt?.react(msg, HEART)}
 						quote={item.quote}
 						quoteHint="Show the original message"
 						oninfo={openMenuBy}
 						onmenu={openMenu}
 						onreply={(msg) => rt?.pick(msg)}
 						onquote={(id) => flash(id)}
+					/>
+				{/if}
+				{#if m.reactions?.length && !m.deleted}
+					<Reactions
+						reactions={m.reactions}
+						{meId}
+						{members}
+						mine={item.mine}
+						indent={!item.mine && m.kind === 'text'}
+						onreact={(emoji) => rt?.react(m, emoji)}
 					/>
 				{/if}
 			</div>
@@ -190,6 +205,8 @@
 	onclose={() => (menuAnchor = null)}
 	onreply={menuMessage && canReplyTo(menuMessage) ? () => menuMessage && rt?.pick(menuMessage) : undefined}
 	onshowinchat={() => menuMessage && onshowinchat(menuMessage.id)}
+	onreact={menuCurrent && canReact(menuCurrent) ? (emoji) => menuCurrent && rt?.react(menuCurrent, emoji) : undefined}
+	reacted={menuCurrent ? myReaction(menuCurrent.reactions, meId) : null}
 />
 
 <style>

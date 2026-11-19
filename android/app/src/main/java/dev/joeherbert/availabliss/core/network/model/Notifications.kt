@@ -72,6 +72,7 @@ data class LiveEvent(
         const val MESSAGE_CREATED = "message.created"
         const val MESSAGE_UPDATED = "message.updated"
         const val MESSAGE_RECEIPTS = "message.receipts"
+        const val MESSAGE_REACTIONS = "message.reactions"
         const val POLL_UPDATED = "poll.updated"
         const val PROPOSAL_CREATED = "proposal.created"
         const val PROPOSAL_UPDATED = "proposal.updated"

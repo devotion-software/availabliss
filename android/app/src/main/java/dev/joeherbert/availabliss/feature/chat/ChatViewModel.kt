@@ -67,6 +67,7 @@ class ChatViewModel @Inject constructor(
     private val composer = ChatComposer(session)
     private val attachments = ChatAttachments(session, files)
     private val polls = ChatPolls(session)
+    private val reactions = ChatReactions(session)
     private val threads = ChatThreads(session)
     private val location = ChatLocation(session, places)
     private val search = ChatSearch(session, threads)
@@ -277,6 +278,11 @@ class ChatViewModel @Inject constructor(
 
     fun onClosePoll(messageId: String) = polls.onClosePoll(messageId)
     fun onEditPoll(messageId: String) = polls.openEditPoll(messageId)
+    // endregion
+
+    // region Reactions
+    /** Reacts with [emoji], or takes it back if it's already yours (a double tap is ❤️). */
+    fun react(messageId: String, emoji: String) = reactions.react(messageId, emoji)
     // endregion
 
     // region Message info
