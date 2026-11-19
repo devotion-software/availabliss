@@ -5,6 +5,7 @@
 	import { getEventCached } from '#lib/client/events';
 	import Logo from '#lib/components/ui/Logo.svelte';
 	import AddToCalendar from '#lib/components/events/AddToCalendar.svelte';
+	import { showsAddToCalendar } from '#lib/client/add-to-calendar.svelte';
 	import Avatar from '#lib/components/ui/Avatar.svelte';
 	import Button from '#lib/components/ui/Button.svelte';
 	import Sheet from '#lib/components/ui/Sheet.svelte';
@@ -139,35 +140,36 @@
 		{#if proposal.title}<p class="title">{proposal.title}</p>{/if}
 	</div>
 
-	<!-- The first card, above Who's coming: Add to calendar, and changing your reply. -->
-	<div class="card glass">
-		{#if cover}<img class="cover" src={cover} alt="" onerror={() => (cover = null)} />{/if}
-		{#if proposal.eventId}
-			<AddToCalendar
-				eventId={proposal.eventId}
-				size="lg"
-				item={{
-					title: proposal.title ?? group.name,
-					start: proposal.start,
-					end: proposal.end,
-					allDay: proposal.allDay,
-					location: proposal.location,
-					note: proposal.note
-				}}
-			/>
-		{/if}
-		{#if mine}
-			<button type="button" class="change" disabled={busy !== null} onclick={() => (replyOpen = true)}>
-				{mine === 'accepted'
-					? 'Can’t make it any more?'
-					: mine === 'maybe'
-						? 'Know whether you can make it?'
-						: mine === 'declined'
-							? 'Can make it after all?'
-							: 'Can you make it?'}
-			</button>
-		{/if}
-	</div>
+	<!-- The first card, above Who's coming: the cover photo and Add to calendar (when there's either). -->
+	{#if cover || (proposal.eventId && showsAddToCalendar())}<div class="card glass">
+			{#if cover}<img class="cover" src={cover} alt="" onerror={() => (cover = null)} />{/if}
+			{#if proposal.eventId}
+				<AddToCalendar
+					eventId={proposal.eventId}
+					size="lg"
+					item={{
+						title: proposal.title ?? group.name,
+						start: proposal.start,
+						end: proposal.end,
+						allDay: proposal.allDay,
+						location: proposal.location,
+						note: proposal.note
+					}}
+				/>
+			{/if}
+		</div>{/if}
+	<!-- Apart from the calendar card: changing your reply isn't about the calendar. -->
+	{#if mine}
+		<button type="button" class="change" disabled={busy !== null} onclick={() => (replyOpen = true)}>
+			{mine === 'accepted'
+				? 'Can’t make it any more?'
+				: mine === 'maybe'
+					? 'Know whether you can make it?'
+					: mine === 'declined'
+						? 'Can make it after all?'
+						: 'Can you make it?'}
+		</button>
+	{/if}
 
 	{#if coming.length}
 		<section class="people glass" aria-labelledby="coming-heading">

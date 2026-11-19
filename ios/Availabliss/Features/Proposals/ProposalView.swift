@@ -325,8 +325,11 @@ private struct ConfirmedView: View {
                         .accessibilityAddTraits(.isHeader)
                     when
                         .padding(.horizontal, 10)
-                    calendarCard
-                        .padding(.top, 6)
+                    // Nothing to show when there's no cover and Add to calendar is turned off in You.
+                    if model.event?.image != nil || app.session.user?.showsAddToCalendar ?? true {
+                        calendarCard
+                            .padding(.top, 6)
+                    }
                     if let changeReplyLabel {
                         // Apart from the calendar card: changing your reply isn't about the calendar.
                         Button(changeReplyLabel) { changingReply = true }
