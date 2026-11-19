@@ -172,8 +172,10 @@ struct GroupsHomeView: View {
 }
 
 /// The next confirmed plans, one card each, swiped left and right with page dots under them
-/// (no dots when there's only one). Each card hugs its content and the pager takes the height of
-/// the card you're on, so a short card doesn't leave a gap.
+/// (no dots when there's only one). Each card hugs its content and the pager's height follows the
+/// swipe, blending from one card's height to the next as you drag, so a short card doesn't leave a
+/// gap and nothing jumps. (iOS 17 can't read the scroll position: there every card's slot is as
+/// tall as the tallest.)
 private struct UpNextPager: View {
     let events: [GroupEvent]
     let goingCount: (String) -> Int?
@@ -182,6 +184,9 @@ private struct UpNextPager: View {
     @State private var page: String?
     /// Each card's natural height, by event id.
     @State private var heights: [String: CGFloat] = [:]
+    /// Where the swipe is, in cards: 0 on the first, 1.5 halfway between the second and third.
+    @State private var position: CGFloat = 0
+    private static let spacing: CGFloat = 20
 
     var body: some View {
         if events.count == 1, let event = events.first {
@@ -189,7 +194,7 @@ private struct UpNextPager: View {
         } else {
             VStack(spacing: 12) {
                 ScrollView(.horizontal) {
-                    HStack(alignment: .top, spacing: 20) {
+                    HStack(alignment: .top, spacing: Self.spacing) {
                         ForEach(events) { event in
                             UpNextCard(event: event, group: group(event.groupId), goingCount: goingCount(event.groupId)) { open(event) }
                                 .fixedSize(horizontal: false, vertical: true)
@@ -203,12 +208,12 @@ private struct UpNextPager: View {
                 .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
                 .scrollPosition(id: $page)
                 .scrollIndicators(.hidden)
-                .frame(height: currentHeight, alignment: .top)
+                .modifier(TracksPagerPosition(spacing: Self.spacing, position: $position))
+                .frame(height: height, alignment: .top)
                 // Lets the cards' shadows show and the next card slide in from the screen's edge,
                 // but a taller neighbour stops just below this card instead of covering the dots.
                 .scrollClipDisabled()
                 .mask { Rectangle().padding(.horizontal, -40).padding(.top, -24).padding(.bottom, -12) }
-                .animation(.snappy, value: currentHeight)
                 PageDots(count: events.count, current: currentIndex) { index in
                     withAnimation(.snappy) { page = events[index].id }
                 }
@@ -216,14 +221,39 @@ private struct UpNextPager: View {
         }
     }
 
-    /// The height of the card you're on (the tallest until they're measured).
-    private var currentHeight: CGFloat? {
-        let id = page ?? events.first?.id
-        return id.flatMap { heights[$0] } ?? heights.values.max()
+    /// The cards' heights blended by how far the swipe has got (the tallest until all are measured,
+    /// and on iOS 17).
+    private var height: CGFloat? {
+        let measured = events.compactMap { heights[$0.id] }
+        guard measured.count == events.count, !measured.isEmpty else { return measured.max() }
+        guard #available(iOS 18.0, *) else { return measured.max() }
+        let clamped = min(max(position, 0), CGFloat(measured.count - 1))
+        let index = Int(clamped.rounded(.down))
+        let next = min(index + 1, measured.count - 1)
+        return measured[index] + (measured[next] - measured[index]) * (clamped - CGFloat(index))
     }
 
     private var currentIndex: Int {
         page.flatMap { id in events.firstIndex { $0.id == id } } ?? 0
+    }
+}
+
+/// Reports a paging scroll view's position in cards (offset ÷ (card width + spacing)). Needs iOS 18.
+private struct TracksPagerPosition: ViewModifier {
+    let spacing: CGFloat
+    @Binding var position: CGFloat
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: CGFloat.self) { geometry in
+                let stride = geometry.containerSize.width + spacing
+                return stride > 0 ? geometry.contentOffset.x / stride : 0
+            } action: { _, value in
+                position = value
+            }
+        } else {
+            content
+        }
     }
 }
 

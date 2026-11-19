@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -205,8 +206,9 @@ private fun Header(state: HomeUiState, onOpenProfile: () -> Unit) {
 
 /**
  * The next confirmed plans, one card each, swiped left and right with page dots under them (no
- * dots when there's only one). Each card hugs its content and the pager takes the height of the
- * card you're on, so a short card doesn't leave a gap.
+ * dots when there's only one). Each card hugs its content and the pager's height follows the swipe,
+ * blending from one card's height to the next as you drag, so a short card doesn't leave a gap and
+ * nothing jumps.
  */
 @Composable
 private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAddToCalendar: (String) -> Unit) {
@@ -220,16 +222,25 @@ private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAdd
     val density = LocalDensity.current
     // Each card's natural height, by plan.
     val heights = remember(plans.map { it.key }) { mutableStateMapOf<String, Int>() }
-    val current = heights[plans.getOrNull(pager.currentPage)?.key] ?: heights.values.maxOrNull()
     val shadow = 14.dp
-    val height by animateDpAsState(with(density) { (current ?: 0).toDp() } + shadow, label = "upNextHeight")
+    // The cards' heights blended by how far the swipe has got (natural size until all are measured).
+    val measured = plans.mapNotNull { heights[it.key] }
+    val height: Dp? = if (measured.size != plans.size) {
+        null
+    } else {
+        val position = (pager.currentPage + pager.currentPageOffsetFraction).coerceIn(0f, (plans.size - 1).toFloat())
+        val index = position.toInt()
+        val next = minOf(index + 1, plans.size - 1)
+        val px = measured[index] + (measured[next] - measured[index]) * (position - index)
+        with(density) { px.toDp() } + shadow
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         HorizontalPager(
             state = pager,
             // Spans the screen's full width, so the cards' shadows aren't cut off at the sides and the
             // next card slides in from the screen's edge; the padding puts each card back in line.
             modifier = Modifier
-                .then(if (current != null) Modifier.height(height) else Modifier)
+                .then(if (height != null) Modifier.height(height) else Modifier)
                 .layout { measurable, constraints ->
                     val extra = (Spacing.screen * 2).roundToPx()
                     val width = constraints.maxWidth + extra

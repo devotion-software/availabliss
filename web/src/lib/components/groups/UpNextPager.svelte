@@ -6,7 +6,8 @@
 	/**
 	 * The next confirmed plans, one Up next card each: swipe (or scroll) sideways between them, with
 	 * page dots under them to jump to one (no dots when there's only one). Each card hugs its
-	 * content and the pager takes the height of the card you're on, so a short card leaves no gap.
+	 * content and the pager's height follows the scroll, blending from one card's height to the next,
+	 * so a short card leaves no gap and nothing jumps.
 	 */
 	interface Props {
 		events: UpcomingEvent[];
@@ -20,7 +21,15 @@
 	let current = $state(0);
 	/** Each slide's natural height, by index. */
 	let heights = $state<number[]>([]);
-	const height = $derived(heights[current] ?? Math.max(0, ...heights));
+	/** Where the scroll is, in cards: 0 on the first, 1.5 halfway between the second and third. */
+	let position = $state(0);
+	const height = $derived.by(() => {
+		if (heights.length < events.length || heights.some((h) => !h)) return 0;
+		const p = Math.min(Math.max(position, 0), events.length - 1);
+		const i = Math.floor(p);
+		const next = Math.min(i + 1, events.length - 1);
+		return heights[i] + (heights[next] - heights[i]) * (p - i);
+	});
 
 	/** Distance from one slide to the next (a card plus the gap). */
 	function stride(el: HTMLDivElement): number {
@@ -30,7 +39,8 @@
 
 	function onScroll() {
 		if (!track) return;
-		current = Math.min(events.length - 1, Math.max(0, Math.round(track.scrollLeft / stride(track))));
+		position = track.scrollLeft / stride(track);
+		current = Math.min(events.length - 1, Math.max(0, Math.round(position)));
 	}
 
 	function show(index: number) {
@@ -84,10 +94,9 @@
 		scroll-snap-type: x mandatory;
 		scroll-padding: 0 var(--gutter);
 		scrollbar-width: none;
-		/* Follows the card you're on (height set inline: the card plus the padding). */
+		/* Follows the scroll (height set inline: the cards' blended height plus the padding). */
 		align-items: flex-start;
 		box-sizing: border-box;
-		transition: height 0.25s ease;
 		padding: 4px var(--gutter) 40px;
 		margin: -4px calc(-1 * var(--gutter)) -34px;
 	}
