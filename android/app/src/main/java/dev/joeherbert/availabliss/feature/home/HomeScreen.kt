@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -26,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -203,7 +205,8 @@ private fun Header(state: HomeUiState, onOpenProfile: () -> Unit) {
 
 /**
  * The next confirmed plans, one card each, swiped left and right with page dots under them (no
- * dots when there's only one). Cards grow to match the tallest so the dots don't jump.
+ * dots when there's only one). Each card hugs its content and the pager takes the height of the
+ * card you're on, so a short card doesn't leave a gap.
  */
 @Composable
 private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAddToCalendar: (String) -> Unit) {
@@ -215,20 +218,25 @@ private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAdd
     val pager = rememberPagerState { plans.size }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    // The tallest card so far; every card is at least this tall.
-    var tallest by remember(plans.map { it.key }) { mutableIntStateOf(0) }
+    // Each card's natural height, by plan.
+    val heights = remember(plans.map { it.key }) { mutableStateMapOf<String, Int>() }
+    val current = heights[plans.getOrNull(pager.currentPage)?.key] ?: heights.values.maxOrNull()
+    val shadow = 14.dp
+    val height by animateDpAsState(with(density) { (current ?: 0).toDp() } + shadow, label = "upNextHeight")
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         HorizontalPager(
             state = pager,
             // Spans the screen's full width, so the cards' shadows aren't cut off at the sides and the
             // next card slides in from the screen's edge; the padding puts each card back in line.
-            modifier = Modifier.layout { measurable, constraints ->
-                val extra = (Spacing.screen * 2).roundToPx()
-                val width = constraints.maxWidth + extra
-                val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
-                layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
-            },
-            contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, bottom = 14.dp),
+            modifier = Modifier
+                .then(if (current != null) Modifier.height(height) else Modifier)
+                .layout { measurable, constraints ->
+                    val extra = (Spacing.screen * 2).roundToPx()
+                    val width = constraints.maxWidth + extra
+                    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+                    layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+                },
+            contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, bottom = shadow),
             pageSpacing = Spacing.screen,
             beyondViewportPageCount = plans.size,
             verticalAlignment = Alignment.Top,
@@ -240,8 +248,8 @@ private fun UpNextPager(plans: List<UpNextUi>, onOpen: (UpNextUi) -> Unit, onAdd
                 onOpen = { onOpen(plan) },
                 onAddToCalendar = { onAddToCalendar(plan.key) },
                 modifier = Modifier
-                    .heightIn(min = with(density) { tallest.toDp() })
-                    .onSizeChanged { if (it.height > tallest) tallest = it.height },
+                    .wrapContentHeight(Alignment.Top, unbounded = true)
+                    .onSizeChanged { heights[plan.key] = it.height },
             )
         }
         PageDots(count = plans.size, current = pager.currentPage) { scope.launch { pager.animateScrollToPage(it) } }
@@ -279,7 +287,6 @@ private fun PageDots(count: Int, current: Int, onSelect: (Int) -> Unit) {
 private fun UpNextCard(upNext: UpNextUi, onOpen: () -> Unit, onAddToCalendar: () -> Unit, modifier: Modifier = Modifier) {
     val colors = AvailablissTheme.colors
     // The whole card opens the plan; Add to calendar and Change inside it keep their own taps.
-    // In the pager a shorter card stretches to match the tallest, keeping its button at the foot.
     Column(
         modifier
             .fillMaxWidth()

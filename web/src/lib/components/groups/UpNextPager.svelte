@@ -5,7 +5,8 @@
 
 	/**
 	 * The next confirmed plans, one Up next card each: swipe (or scroll) sideways between them, with
-	 * page dots under them to jump to one (no dots when there's only one). Cards match the tallest.
+	 * page dots under them to jump to one (no dots when there's only one). Each card hugs its
+	 * content and the pager takes the height of the card you're on, so a short card leaves no gap.
 	 */
 	interface Props {
 		events: UpcomingEvent[];
@@ -17,6 +18,9 @@
 
 	let track = $state<HTMLDivElement>();
 	let current = $state(0);
+	/** Each slide's natural height, by index. */
+	let heights = $state<number[]>([]);
+	const height = $derived(heights[current] ?? Math.max(0, ...heights));
 
 	/** Distance from one slide to the next (a card plus the gap). */
 	function stride(el: HTMLDivElement): number {
@@ -40,9 +44,9 @@
 	<UpNextCard event={events[0]} group={groupOf(events[0].groupId)} />
 {:else}
 	<div class="pager" role="region" aria-roledescription="carousel" aria-label="Up next">
-		<div class="track" bind:this={track} onscroll={onScroll}>
+		<div class="track" bind:this={track} onscroll={onScroll} style:height={height ? `${height + 44}px` : undefined}>
 			{#each events as event, i (event.id)}
-				<div class="slide" role="group" aria-roledescription="slide" aria-label="{i + 1} of {events.length}">
+				<div class="slide" role="group" aria-roledescription="slide" aria-label="{i + 1} of {events.length}" bind:clientHeight={heights[i]}>
 					<UpNextCard {event} group={groupOf(event.groupId)} />
 				</div>
 			{/each}
@@ -80,6 +84,10 @@
 		scroll-snap-type: x mandatory;
 		scroll-padding: 0 var(--gutter);
 		scrollbar-width: none;
+		/* Follows the card you're on (height set inline: the card plus the padding). */
+		align-items: flex-start;
+		box-sizing: border-box;
+		transition: height 0.25s ease;
 		padding: 4px var(--gutter) 40px;
 		margin: -4px calc(-1 * var(--gutter)) -34px;
 	}
@@ -88,13 +96,8 @@
 	}
 	.slide {
 		flex: 0 0 100%;
-		display: flex;
-		flex-direction: column;
 		scroll-snap-align: start;
 		scroll-snap-stop: always;
-	}
-	.slide > :global(.next) {
-		flex: 1;
 	}
 	.dots {
 		display: flex;

@@ -172,13 +172,16 @@ struct GroupsHomeView: View {
 }
 
 /// The next confirmed plans, one card each, swiped left and right with page dots under them
-/// (no dots when there's only one). Cards are the same height so the dots don't jump.
+/// (no dots when there's only one). Each card hugs its content and the pager takes the height of
+/// the card you're on, so a short card doesn't leave a gap.
 private struct UpNextPager: View {
     let events: [GroupEvent]
     let goingCount: (String) -> Int?
     let group: (String) -> GroupSummary?
     let open: (GroupEvent) -> Void
     @State private var page: String?
+    /// Each card's natural height, by event id.
+    @State private var heights: [String: CGFloat] = [:]
 
     var body: some View {
         if events.count == 1, let event = events.first {
@@ -189,24 +192,34 @@ private struct UpNextPager: View {
                     HStack(alignment: .top, spacing: 20) {
                         ForEach(events) { event in
                             UpNextCard(event: event, group: group(event.groupId), goingCount: goingCount(event.groupId)) { open(event) }
-                                .frame(maxHeight: .infinity)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .onGeometryChange(for: CGFloat.self, of: \.size.height) { heights[event.id] = $0 }
                                 .containerRelativeFrame(.horizontal)
                                 .id(event.id)
                         }
                     }
-                    .fixedSize(horizontal: false, vertical: true)
                     .scrollTargetLayout()
                 }
                 .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
                 .scrollPosition(id: $page)
                 .scrollIndicators(.hidden)
-                // Lets the cards' shadows show, and the next card slide in from the screen's edge.
+                .frame(height: currentHeight, alignment: .top)
+                // Lets the cards' shadows show and the next card slide in from the screen's edge,
+                // but a taller neighbour stops just below this card instead of covering the dots.
                 .scrollClipDisabled()
+                .mask { Rectangle().padding(.horizontal, -40).padding(.top, -24).padding(.bottom, -12) }
+                .animation(.snappy, value: currentHeight)
                 PageDots(count: events.count, current: currentIndex) { index in
                     withAnimation(.snappy) { page = events[index].id }
                 }
             }
         }
+    }
+
+    /// The height of the card you're on (the tallest until they're measured).
+    private var currentHeight: CGFloat? {
+        let id = page ?? events.first?.id
+        return id.flatMap { heights[$0] } ?? heights.values.max()
     }
 
     private var currentIndex: Int {
@@ -288,13 +301,11 @@ private struct UpNextCard: View {
                     .displayFont(22, .semibold)
                 Text(subtitle).bodyFont(14).foregroundStyle(theme.muted)
             }
-            // In the pager a shorter card stretches to match the tallest, keeping its button at the foot.
-            Spacer(minLength: 0)
             AddToCalendarButton(event: event, height: 48, showsAddedChip: false)
         }
         .foregroundStyle(theme.ink)
         .padding(18)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .glass(cornerRadius: 28)
         .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
