@@ -10,6 +10,8 @@ import SwiftUI
 struct AddToCalendarButton: View {
     let event: GroupEvent
     var height: CGFloat = 54
+    /// Centres the "In Work" chip once it's added (on a centred page); otherwise it sits at the leading edge.
+    var centersChip = false
     @Environment(AppModel.self) private var app
     @State private var justAdded = false
     @State private var isSaving = false
@@ -34,7 +36,7 @@ struct AddToCalendarButton: View {
                 addButton
             case .added(let calendar):
                 if justAdded { addButton }
-                AddedToCalendarRow(calendar: calendar, canChange: app.deviceCalendar.canChooseCalendar) {
+                AddedToCalendarRow(calendar: calendar, canChange: app.deviceCalendar.canChooseCalendar, centered: centersChip) {
                     choice = .move(current: calendar)
                 }
             }
@@ -117,6 +119,7 @@ struct AddToCalendarButton: View {
 private struct AddedToCalendarRow: View {
     let calendar: EKCalendar?
     let canChange: Bool
+    var centered = false
     let change: () -> Void
     @Environment(\.theme) private var theme
 
@@ -124,6 +127,7 @@ private struct AddedToCalendarRow: View {
 
     var body: some View {
         HStack {
+            if centered { Spacer(minLength: 0) }
             Button(action: change) {
                 HStack(spacing: 6) {
                     if let calendar {

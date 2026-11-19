@@ -327,6 +327,12 @@ private struct ConfirmedView: View {
                         .padding(.horizontal, 10)
                     calendarCard
                         .padding(.top, 6)
+                    if let changeReplyLabel {
+                        // Apart from the calendar card: changing your reply isn't about the calendar.
+                        Button(changeReplyLabel) { changingReply = true }
+                            .buttonStyle(.filled(.secondary, height: 44, cornerRadius: 14, fontSize: 14))
+                            .disabled(model.isResponding)
+                    }
                     people
                 }
                 .padding(.top, 12)
@@ -530,21 +536,14 @@ private struct ConfirmedView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// The first card, above Who's coming: Add to calendar (or which calendar it's in), and changing your reply.
+    /// The first card, above Who's coming: Add to calendar, or which calendar it's in (centred, like the page).
     @ViewBuilder
     private var calendarCard: some View {
         VStack(spacing: 10) {
             if let event = model.event {
-                AddToCalendarButton(event: event)
+                AddToCalendarButton(event: event, centersChip: true)
             } else {
                 ProgressView().frame(height: 54)
-            }
-            if let changeReplyLabel {
-                Button(changeReplyLabel) { changingReply = true }
-                    .bodyFont(14, .semibold, relativeTo: .subheadline)
-                    .foregroundStyle(theme.muted)
-                    .frame(minHeight: 36)
-                    .disabled(model.isResponding)
             }
         }
         .padding(14)
