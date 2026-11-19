@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
@@ -76,6 +77,7 @@ import dev.joeherbert.availabliss.designsystem.component.ScreenHeader
 import dev.joeherbert.availabliss.designsystem.component.SecondaryButton
 import dev.joeherbert.availabliss.designsystem.component.StatusPill
 import dev.joeherbert.availabliss.designsystem.component.SyncRing
+import dev.joeherbert.availabliss.designsystem.component.TextAction
 import dev.joeherbert.availabliss.designsystem.component.UserMessageEffect
 import dev.joeherbert.availabliss.designsystem.component.VennLogo
 import dev.joeherbert.availabliss.designsystem.component.rememberSnackbarHostState
@@ -99,6 +101,10 @@ data class ProposalActions(
     val onCancelPlan: () -> Unit = {},
     val onAddToCalendar: () -> Unit = {},
     val onOpenChat: (groupId: String) -> Unit = {},
+    /** "Edit details": the plan's event in the event editor. */
+    val onEditPlan: (groupId: String, eventId: String) -> Unit = { _, _ -> },
+    /** "Cancel plan" (confirmed): calls it off for everyone, then leaves. */
+    val onCancelConfirmedPlan: () -> Unit = {},
 )
 
 @Composable
@@ -106,6 +112,7 @@ fun ProposalScreen(
     onBack: () -> Unit,
     onOpenChat: (groupId: String) -> Unit,
     onOpenGroupCalendar: (groupId: String) -> Unit = {},
+    onEditEvent: (groupId: String, eventId: String) -> Unit = { _, _ -> },
     viewModel: ProposalViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -121,6 +128,7 @@ fun ProposalScreen(
     }
     val currentOnBack by rememberUpdatedState(onBack)
     val currentOnOpenChat by rememberUpdatedState(onOpenChat)
+    val currentOnEditEvent by rememberUpdatedState(onEditEvent)
     // One instance for the screen's lifetime so unchanged parts skip recomposition.
     val actions = remember(viewModel) {
         ProposalActions(
@@ -134,6 +142,8 @@ fun ProposalScreen(
             onCancelPlan = viewModel::cancelPlan,
             onAddToCalendar = viewModel::addToCalendar,
             onOpenChat = { currentOnOpenChat(it) },
+            onEditPlan = { groupId, eventId -> currentOnEditEvent(groupId, eventId) },
+            onCancelConfirmedPlan = viewModel::cancel,
         )
     }
     ProposalContent(state = state, actions = actions)
@@ -405,6 +415,11 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             GlassIconButton(AvIcons.Back, "Back", actions.onBack)
             Spacer(Modifier.weight(1f))
+            val eventId = state.eventId
+            if (state.canManagePlan && eventId != null) {
+                GlassIconButton(AvIcons.Pencil, "Edit details", { actions.onEditPlan(state.groupId, eventId) })
+                Spacer(Modifier.width(8.dp))
+            }
             if (state.groupId.isNotEmpty()) GlassIconButton(AvIcons.Chat, "Go to chat", { actions.onOpenChat(state.groupId) })
         }
         ReviewPrompt(state, actions)
@@ -500,7 +515,28 @@ private fun AllInContent(state: ProposalUiState, actions: ProposalActions) {
             if (state.joinedLater.isNotEmpty()) {
                 PeoplePanel("Joined since", null, state.joinedLater, quiet = true)
             }
+            if (state.canManagePlan) CancelPlanAction(actions.onCancelConfirmedPlan)
         }
+    }
+}
+
+/** "Cancel plan" at the end of the confirmed page, confirmed in a sheet: it comes off everyone's calendar. */
+@Composable
+private fun CancelPlanAction(onCancel: () -> Unit) {
+    var confirming by remember { mutableStateOf(false) }
+    TextAction("Cancel plan", { confirming = true }, modifier = Modifier.fillMaxWidth(), color = AvailablissTheme.colors.warnInk)
+    if (confirming) {
+        ConfirmSheet(
+            title = "Cancel the plan?",
+            message = "It comes off the group's calendar and everyone is told in the chat.",
+            options = listOf(
+                ConfirmOption("Cancel plan", {
+                    confirming = false
+                    onCancel()
+                }, AvIcons.Close, ConfirmOption.Kind.Destructive),
+            ),
+            onDismiss = { confirming = false },
+        )
     }
 }
 

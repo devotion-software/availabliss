@@ -147,7 +147,14 @@ async function syncProposal(proposalId: string, patch: Partial<EventInput>): Pro
 }
 
 export async function deleteEvent(eventId: string, userId: string): Promise<void> {
-	await removeEvent(await requireEditable(eventId, userId));
+	const row = await requireEditable(eventId, userId);
+	// A confirmed plan's event: cancel the plan (which removes the event, says so in the chat and
+	// tells everyone) rather than leave a confirmed proposal with no event.
+	if (row.proposalId) {
+		const { cancelProposal } = await import('./proposals');
+		return cancelProposal(row.proposalId, userId);
+	}
+	await removeEvent(row);
 }
 
 /** Deletes the event (and its cover photo) and tells the group; callers check who may. */

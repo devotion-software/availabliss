@@ -108,6 +108,10 @@ data class ProposalUiState(
     val responding: Boolean = false,
     val status: ProposalStatus = ProposalStatus.Open,
     val canCancel: Boolean = false,
+    /** Confirmed, and you're the proposer or an admin: edit the plan's details or cancel it. */
+    val canManagePlan: Boolean = false,
+    /** The confirmed plan's event, to edit. */
+    val eventId: String? = null,
     val location: String? = null,
     val calendar: AddToCalendarState = AddToCalendarState(),
     val calendarStatus: CalendarStatus = CalendarStatus(),
@@ -409,6 +413,8 @@ class ProposalViewModel @Inject constructor(
             responding = responding,
             status = p.status,
             canCancel = p.status == ProposalStatus.Open && (p.createdBy == meId || isAdmin),
+            canManagePlan = confirmed && p.eventId != null && (p.createdBy == meId || isAdmin),
+            eventId = p.eventId,
             location = p.location?.takeIf { it.isNotBlank() },
             calendar = cal,
             calendarStatus = cal.status(key),

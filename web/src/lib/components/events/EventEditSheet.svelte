@@ -21,8 +21,10 @@
 		onclose: () => void;
 		/** Saved or deleted: the list reloads. */
 		onchanged: () => void;
+		/** Offer Delete (not for a confirmed plan's event, which is cancelled as a plan instead). */
+		canDelete?: boolean;
 	}
-	let { event, onclose, onchanged }: Props = $props();
+	let { event, onclose, onchanged, canDelete = true }: Props = $props();
 
 	const fmt = useFormat();
 	// Made once per event (the parent keys this sheet by event), before the fields mount: the date
@@ -93,7 +95,11 @@
 		<CoverField bind:file={cover} disabled={busy} />
 		<EventFields bind:draft titleRequired {error} />
 		<div class="actions">
-			<Button variant="danger" icon="trash" onclick={() => (confirmsDelete = true)} disabled={busy}>Delete</Button>
+			{#if canDelete}
+				<Button variant="danger" icon="trash" onclick={() => (confirmsDelete = true)} disabled={busy}>Delete</Button>
+			{:else}
+				<span></span>
+			{/if}
 			<Button type="submit" variant="solid" loading={busy}>Save</Button>
 		</div>
 	</form>

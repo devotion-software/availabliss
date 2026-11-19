@@ -208,6 +208,9 @@ final class ProposalViewModel {
         await run { try await self.api.send(API.Proposals.keep(id: self.proposalId)) }
     }
 
+    /// After the plan's event was edited from here.
+    func reloadEvent() async { await loadEventIfConfirmed() }
+
     func cancel() async -> Bool {
         do {
             try await api.send(API.Proposals.cancel(id: proposalId))

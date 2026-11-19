@@ -299,8 +299,13 @@ private struct ConfirmedView: View {
     @State private var reviewing = false
     /// The review sheet opens by itself once per visit; after that, the panel's button opens it.
     @State private var promptedReview = false
+    @State private var editingEvent: EventEditorSheet.Target?
+    @State private var confirmsCancelPlan = false
 
     private var me: String? { app.session.user?.id }
+
+    /// The proposer and admins can change the plan's details or call it off.
+    private var canManage: Bool { model.proposal?.createdBy == me || group.role.isAdmin }
 
     var body: some View {
         ScrollView {
@@ -308,6 +313,16 @@ private struct ConfirmedView: View {
                 HStack {
                     IconButton(systemImage: "chevron.left", label: "Back") { app.router.pop() }
                     Spacer()
+                    if canManage, let event = model.event {
+                        Menu {
+                            Button("Edit details", systemImage: "pencil") { editingEvent = .edit(event) }
+                            Button("Cancel plan", systemImage: "xmark.circle", role: .destructive) { confirmsCancelPlan = true }
+                        } label: {
+                            Image(systemName: "ellipsis").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.ink)
+                                .frame(width: 44, height: 44).glass(in: Circle(), shadow: false)
+                        }
+                        .accessibilityLabel("Plan options")
+                    }
                     IconButton(systemImage: "bubble.left", label: "Go to chat", action: openChat)
                 }
                 .padding(.horizontal, 6)
@@ -370,6 +385,20 @@ private struct ConfirmedView: View {
         }
         .confirmSheet(changeReplyTitle, isPresented: $changingReply, message: changeReplyMessage) {
             changeReplyOptions
+        }
+        .sheet(item: $editingEvent) { target in
+            EventEditorSheet(groupId: group.id, target: target, api: app.api) { _ in Task { await model.reloadEvent() } }
+        }
+        .confirmSheet(
+            "Cancel the plan?",
+            isPresented: $confirmsCancelPlan,
+            message: "It comes off the group\u{2019}s calendar and everyone is told in the chat."
+        ) {
+            [
+                ConfirmOption("Cancel plan", systemImage: "xmark.circle", kind: .destructive) {
+                    Task { if await model.cancel() { app.router.pop() } }
+                }
+            ]
         }
     }
 

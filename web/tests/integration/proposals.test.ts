@@ -1,6 +1,6 @@
 import './setup';
 import { listMessages } from '#lib/server/chat';
-import { updateEvent } from '#lib/server/events';
+import { deleteEvent, updateEvent } from '#lib/server/events';
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db';
@@ -321,6 +321,16 @@ describe('confirmAnyway', () => {
 		const { eventId } = await getProposal(p.id, g.owner);
 		await updateEvent(eventId!, g.owner, { title: 'Birthday drinks', location: 'The Crown' });
 		expect(await getProposal(p.id, g.member)).toMatchObject({ title: 'Birthday drinks', location: 'The Crown' });
+	});
+
+	test("deleting a plan's event cancels the plan", async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(25));
+		await respond(p.id, g.admin, 'accepted');
+		await respond(p.id, g.member, 'accepted');
+		const { eventId } = await getProposal(p.id, g.owner);
+		await deleteEvent(eventId!, g.owner);
+		expect((await getProposal(p.id, g.owner)).status).toBe('cancelled');
 	});
 
 	test('cancelling an open proposal says so at that point in the chat', async () => {

@@ -241,6 +241,7 @@ fun MainNavHost(root: RootViewModel) {
             composable<ProposalRoute> {
                 ProposalScreen(
                     onBack = { nav.popBackStack() },
+                    onEditEvent = { groupId, eventId -> nav.navigate(EventEditorRoute(groupId, eventId = eventId)) },
                     // Opened from that chat, it just goes back to it.
                     onOpenChat = { groupId ->
                         val previous = nav.previousBackStackEntry

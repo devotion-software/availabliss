@@ -113,7 +113,7 @@
 
 <ProposeSheet bind:open={proposing} group={data.group} meId={data.user.id} />
 {#key editing?.id}
-	<EventEditSheet event={editing} onclose={() => (editing = null)} onchanged={() => invalidate('app:proposals')} />
+	<EventEditSheet event={editing} canDelete={!editing?.proposalId} onclose={() => (editing = null)} onchanged={() => invalidate('app:proposals')} />
 {/key}
 
 <style>

@@ -1,8 +1,10 @@
 <script lang="ts">
-	import type { Group, Proposal } from '#lib/types';
+	import type { Group, GroupEvent, Proposal } from '#lib/types';
 	import type { Reply } from '#lib/client/proposals';
 	import { useFormat } from '#lib/client/format';
-	import { getEventCached } from '#lib/client/events';
+	import { cacheEvent, getEvent, getEventCached } from '#lib/client/events';
+	import EventEditSheet from '#lib/components/events/EventEditSheet.svelte';
+	import ConfirmSheet from '#lib/components/ui/ConfirmSheet.svelte';
 	import Logo from '#lib/components/ui/Logo.svelte';
 	import AddToCalendar from '#lib/components/events/AddToCalendar.svelte';
 	import { showsAddToCalendar } from '#lib/client/add-to-calendar.svelte';
@@ -88,15 +90,22 @@
 	}
 	const count = $derived(coming.length || proposal.responses.length || group.members.length);
 
-	// The confirmed event's cover photo, if someone has added one.
+	// The confirmed event (its cover photo, if someone has added one, and for Edit details).
 	let cover = $state<string | null>(null);
+	let event = $state<GroupEvent | null>(null);
+	let editing = $state(false);
+	let confirmsCancel = $state(false);
 	$effect(() => {
 		const id = proposal.eventId;
 		cover = null;
 		if (!id) return;
 		let alive = true;
 		getEventCached(id)
-			.then((e) => alive && (cover = e.image))
+			.then((e) => {
+				if (!alive) return;
+				event = e;
+				cover = e.image;
+			})
 			.catch(() => {});
 		return () => {
 			alive = false;
@@ -107,7 +116,11 @@
 <div class="confirmed">
 	<div class="top">
 		<IconButton href="/app/groups/{group.id}" icon="chevron-left" label="Back to {group.name}" />
-		<IconButton href="/app/groups/{group.id}/chat" icon="chat" label="Go to chat" />
+		<span class="top-actions">
+			<!-- The proposer and admins can change the plan's details (title, time, place, note, cover). -->
+			{#if reviewer && event}<IconButton icon="pencil" label="Edit details" onclick={() => (editing = true)} />{/if}
+			<IconButton href="/app/groups/{group.id}/chat" icon="chat" label="Go to chat" />
+		</span>
 	</div>
 	{#if needsReview}
 		<div class="review">
@@ -217,7 +230,38 @@
 			{/each}
 		</section>
 	{/if}
+	{#if reviewer}
+		<button type="button" class="change cancel-plan" disabled={busy !== null} onclick={() => (confirmsCancel = true)}>Cancel plan</button>
+	{/if}
 </div>
+
+{#key editing}
+	<EventEditSheet
+		event={editing ? event : null}
+		canDelete={false}
+		onclose={() => (editing = false)}
+		onchanged={() => {
+			const id = proposal.eventId;
+			if (id)
+				getEvent(id)
+					.then((e) => {
+						cacheEvent(e);
+						event = e;
+						cover = e.image;
+					})
+					.catch(() => {});
+		}}
+	/>
+{/key}
+
+<ConfirmSheet
+	bind:open={confirmsCancel}
+	title="Cancel the plan?"
+	message="It comes off the group's calendar and everyone is told in the chat."
+	confirmLabel="Cancel plan"
+	destructive="solid"
+	onconfirm={oncancelplan}
+/>
 
 <Sheet
 	bind:open={reviewOpen}
@@ -479,5 +523,12 @@
 		100% {
 			transform: scale(1);
 		}
+	}
+	.top-actions {
+		display: flex;
+		gap: 8px;
+	}
+	.cancel-plan {
+		color: var(--warn-ink);
 	}
 </style>
