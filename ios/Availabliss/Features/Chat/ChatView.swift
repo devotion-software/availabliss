@@ -16,12 +16,11 @@ struct ChatView: View {
     @State private var pendingDelete: Message?
     /// The original of a tapped quote, briefly highlighted after scrolling to it.
     @State private var highlightedId: String?
-    /// Where the bottom of the messages sits in the list's frame, and the list's height: together,
-    /// how far you've scrolled back from the latest message.
-    @State private var contentBottom: CGFloat = 0
-    /// When the list last moved (a drag, or still gliding after a flick).
-    @State private var lastMovedAt = Date.distantPast
-    @State private var viewportHeight: CGFloat = 0
+    /// Scroll measurements, updated every frame while scrolling: kept out of SwiftUI state so a scroll
+    /// doesn't redraw the whole chat. Only crossing the jump threshold (`isScrolledBack`) does.
+    @State private var metrics = ScrollMetrics()
+    /// Scrolled back from the latest message by more than `jumpThreshold`.
+    @State private var isScrolledBack = false
     /// Messages from others that arrived while you were scrolled back, shown on the jump button.
     @State private var unseenCount = 0
     /// The list has been put at the latest message after the first load. Until then older messages
@@ -46,7 +45,11 @@ struct ChatView: View {
     /// Scrolled back further than this, the jump-to-latest button shows.
     private static let jumpThreshold: CGFloat = 200
     private static let scrollSpace = "chat-scroll"
-    private var isScrolledBack: Bool { viewportHeight > 0 && contentBottom - viewportHeight > Self.jumpThreshold }
+    /// Sets `isScrolledBack` only when it actually changes.
+    private func updateScrolledBack() {
+        let back = metrics.viewportHeight > 0 && metrics.contentBottom - metrics.viewportHeight > Self.jumpThreshold
+        if back != isScrolledBack { isScrolledBack = back }
+    }
 
     enum ChatSheet: Identifiable {
         case info(Message)
@@ -122,6 +125,8 @@ struct ChatView: View {
                     }
                     if model.isLoading { StatusView(kind: .loading) }
                     let repliedTo = Set(model.messages.compactMap(\.replyTo?.id))
+                    // Once per pass, not once per row.
+                    let latestOwn = model.latestOwnMessageId
                     ForEach(Array(model.messages.enumerated()), id: \.element.id) { index, message in
                         if index == 0 || !Calendar.current.isDate(model.messages[index - 1].createdAt, inSameDayAs: message.createdAt) {
                             Text(Formatting.chatDay(message.createdAt))
@@ -134,7 +139,7 @@ struct ChatView: View {
                             group: group,
                             me: me,
                             model: model,
-                            isLatestOwn: message.id == model.latestOwnMessageId,
+                            isLatestOwn: message.id == latestOwn,
                             startsRun: startsRun(at: index),
                             openInfo: { sheet = .info(message) },
                             openProposal: { id in app.router.push(.proposal(id: id)) },
@@ -167,8 +172,9 @@ struct ChatView: View {
                 .onGeometryChange(for: CGFloat.self) {
                     $0.frame(in: .named(Self.scrollSpace)).maxY
                 } action: {
-                    contentBottom = $0
-                    lastMovedAt = .now
+                    metrics.contentBottom = $0
+                    metrics.lastMovedAt = .now
+                    updateScrolledBack()
                 }
             }
             .coordinateSpace(name: Self.scrollSpace)
@@ -176,7 +182,8 @@ struct ChatView: View {
             .onGeometryChange(for: CGFloat.self) {
                 $0.size.height
             } action: {
-                viewportHeight = $0
+                metrics.viewportHeight = $0
+                updateScrolledBack()
             }
             .defaultScrollAnchor(.bottom)
             // Photos, maps, passes and polls settle their heights after the first layout; keep the
@@ -241,7 +248,7 @@ struct ChatView: View {
     private func scrollToLatest(proxy: ScrollViewProxy) {
         guard let last = model.messages.last?.id else { return }
         unseenCount = 0
-        guard Date.now.timeIntervalSince(lastMovedAt) < 0.15 else {
+        guard Date.now.timeIntervalSince(metrics.lastMovedAt) < 0.15 else {
             withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo(last, anchor: .bottom) }
             return
         }
@@ -560,6 +567,17 @@ struct Composer: View {
 
 /// iOS 26 fades a scroll view's bottom edge, which drew a faint line above the composer even at the
 /// latest message, with nothing underneath it. It's only shown once you've scrolled back.
+/// The chat list's scroll measurements. A plain class (not observed), so writing them every frame
+/// doesn't redraw anything.
+private final class ScrollMetrics {
+    /// Where the bottom of the messages sits in the list's frame, and the list's height: together,
+    /// how far you've scrolled back from the latest message.
+    var contentBottom: CGFloat = 0
+    var viewportHeight: CGFloat = 0
+    /// When the list last moved (a drag, or still gliding after a flick).
+    var lastMovedAt = Date.distantPast
+}
+
 /// Keeps the bottom of the chat in place when its content changes size (iOS 18+), while you're at
 /// the bottom; scrolled back to read, what you're looking at stays put instead.
 private struct KeepsBottomOnResize: ViewModifier {

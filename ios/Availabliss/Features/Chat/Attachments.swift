@@ -129,9 +129,10 @@ final class AttachmentImages {
 
     /// A still image, or an animated one for a GIF with more than one frame.
     nonisolated static func decode(_ data: Data) -> UIImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return UIImage(data: data) }
+        // Decoded here, off the main thread, rather than lazily the first time it's drawn while scrolling.
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return UIImage(data: data)?.preparingForDisplay() }
         let count = CGImageSourceGetCount(source)
-        guard count > 1 else { return UIImage(data: data) }
+        guard count > 1 else { return UIImage(data: data).map { $0.preparingForDisplay() ?? $0 } }
         var frames: [UIImage] = []
         var duration: Double = 0
         for index in 0..<min(count, 300) {

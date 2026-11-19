@@ -30,8 +30,18 @@ struct GlassBackground<S: InsettableShape>: ViewModifier {
                             lineWidth: 1
                         )
                 }
-                .shadow(color: shadow ? theme.shadow.opacity(0.55) : .clear, radius: 20, x: 0, y: 16)
+                // No shadow pass at all without one (chat bubbles, cards inside cards).
+                .modifier(GlassShadow(isOn: shadow, color: theme.shadow.opacity(0.55)))
             }
+    }
+}
+
+private struct GlassShadow: ViewModifier {
+    let isOn: Bool
+    let color: Color
+
+    func body(content: Content) -> some View {
+        if isOn { content.shadow(color: color, radius: 20, x: 0, y: 16) } else { content }
     }
 }
 
