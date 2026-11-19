@@ -95,6 +95,18 @@ final class GroupAvailabilityViewModel {
 
     /// True when the day works for everyone (and isn't over); unknown days count as working, so
     /// nothing fades while it loads.
+    /// How a day's date looks in the week, as its month cell does.
+    func look(_ date: CalendarDay) -> DayLook {
+        guard date >= .today() else { return .out }
+        guard let info = day(date) else { return .free }
+        switch info.status {
+        case .match: return info.isPartial ? .partial : .match
+        case .busy: return .busy
+        case .free: return .free
+        case .hidden: return .out
+        }
+    }
+
     func works(_ date: CalendarDay) -> Bool {
         if date < .today() { return false }
         guard let status = day(date)?.status else { return true }

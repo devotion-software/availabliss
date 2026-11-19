@@ -16,9 +16,45 @@ struct TimeAxis {
 
 // MARK: - Week
 
-/// How far a week day that doesn't work for everyone fades.
-enum WeekFade {
-    static let opacity = 0.5
+/// How a day's date looks in the week, as its month cell: accent when it works (soft when only most
+/// of the group can), dark when someone's busy, plain when free, dashed when past or outside the timing.
+enum DayLook {
+    case match, partial, busy, free, out
+
+    /// How far the day steps back, as in the month: busy half, past and outside more.
+    var fade: Double {
+        switch self {
+        case .busy: 0.5
+        case .out: 0.35
+        default: 1
+        }
+    }
+}
+
+/// A date drawn on its month-cell look.
+struct DayLookTile: ViewModifier {
+    let look: DayLook
+    var cornerRadius: CGFloat = 12
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        content
+            .foregroundStyle(look == .match ? theme.onAccent : look == .partial ? theme.accentInk : look == .out ? theme.muted : theme.ink)
+            .background {
+                switch look {
+                case .match: shape.fill(theme.accent)
+                case .partial: shape.fill(theme.accentSoft).overlay(shape.strokeBorder(theme.accent, lineWidth: 1.5))
+                case .busy: shape.fill(theme.busyBg).overlay(shape.strokeBorder(theme.glassBorder, lineWidth: 1))
+                case .free: shape.fill(theme.surface).overlay(shape.strokeBorder(theme.glassBorder, lineWidth: 1))
+                case .out: shape.strokeBorder(theme.line, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                }
+            }
+    }
+}
+
+extension View {
+    func dayLook(_ look: DayLook, cornerRadius: CGFloat = 12) -> some View { modifier(DayLookTile(look: look, cornerRadius: cornerRadius)) }
 }
 
 /// Week view: a time grid per visible day with "everyone free" in accent and busy runs faded.
@@ -33,25 +69,27 @@ struct WeekGrid: View {
             HStack(spacing: 6) {
                 Color.clear.frame(width: 28, height: 1)
                 ForEach(model.weekDays, id: \.self) { day in
+                    let look = model.look(day)
                     HStack(spacing: 2) {
                         Text(model.weekDays.count > 4 ? "\(Weekday.short(day.weekday()).prefix(1)) \(day.day)" : "\(Weekday.short(day.weekday())) \(day.day)")
-                            .todayMark(day)
+                            .todayMark(day, onAccent: look == .match)
                         if model.day(day)?.isBankHoliday == true { BankHolidayFlag(size: 8) }
                     }
-                    .frame(maxWidth: .infinity)
-                    .opacity(model.works(day) || day == .today() ? 1 : WeekFade.opacity)
+                    .frame(maxWidth: .infinity, minHeight: 28)
+                    .dayLook(look, cornerRadius: 10)
+                    // Today's date stays at full strength, so it's easy to find.
+                    .opacity(day == .today() ? 1 : look.fade)
                 }
             }
             .bodyFont(11, .semibold, relativeTo: .caption2)
-            .foregroundStyle(theme.muted)
 
             HStack(spacing: 6) {
                 hourLabels
                 ForEach(model.weekDays, id: \.self) { day in
                     let selected = day == model.selection
                     WeekColumn(day: day, detail: model.dayDetails[day], axis: axis, group: group)
-                        // Days that don't work for everyone step back, like the month's plain cells.
-                        .opacity(model.works(day) ? 1 : WeekFade.opacity)
+                        // Days step back like the month's cells: busy half, past and outside more.
+                        .opacity(model.look(day).fade)
                         .overlay {
                             if selected { RoundedRectangle(cornerRadius: 12).strokeBorder(theme.ink, lineWidth: 2) }
                         }
@@ -192,7 +230,7 @@ struct WeekCards: View {
         VStack(spacing: 8) {
             ForEach(model.weekDays, id: \.self) { day in
                 WeekDayCard(
-                    day: day, detail: model.dayDetails[day], status: model.day(day)?.status, works: model.works(day), group: group, isSelected: day == model.selection,
+                    day: day, detail: model.dayDetails[day], status: model.day(day)?.status, look: model.look(day), group: group, isSelected: day == model.selection,
                     bankHoliday: model.day(day)?.isBankHoliday == true
                 )
                 .onTapGesture { withAnimation(.spring(response: 0.3)) { model.pick(day) } }
@@ -206,8 +244,8 @@ private struct WeekDayCard: View {
     let day: CalendarDay
     let detail: DayAvailability?
     let status: AvailabilityDay.Status?
-    /// Works for everyone (or not known yet): days that don't are faded.
-    let works: Bool
+    /// How its date looks (and how far the card steps back), as its month cell.
+    let look: DayLook
     let group: Group
     let isSelected: Bool
     var bankHoliday = false
@@ -220,16 +258,17 @@ private struct WeekDayCard: View {
         HStack(spacing: 12) {
             VStack(spacing: 0) {
                 HStack(spacing: 2) {
-                    Text(Weekday.short(day.weekday())).bodyFont(11, .semibold, relativeTo: .caption2).foregroundStyle(theme.muted)
-                    if bankHoliday { BankHolidayFlag(size: 8).foregroundStyle(theme.muted) }
+                    Text(Weekday.short(day.weekday())).bodyFont(11, .semibold, relativeTo: .caption2).opacity(0.8)
+                    if bankHoliday { BankHolidayFlag(size: 8) }
                 }
                 Text("\(day.day)").displayFont(20, .bold).monospacedDigit()
-                    .todayMark(day)
+                    .todayMark(day, onAccent: look == .match)
                     .padding(.top, day == .today() ? 3 : 0)
             }
-            .frame(width: 40)
+            .frame(width: 48, height: 56)
+            .dayLook(look, cornerRadius: 14)
             // Today's date stays at full strength, so it's easy to find on a faded day.
-            .opacity(works || day == .today() ? 1 : WeekFade.opacity)
+            .opacity(day == .today() ? 1 : look.fade)
             VStack(alignment: .leading, spacing: 6) {
                 Text(summary)
                     .bodyFont(14, .semibold)
@@ -240,7 +279,7 @@ private struct WeekDayCard: View {
                 }
                 strip
             }
-            .opacity(works ? 1 : WeekFade.opacity)
+            .opacity(look.fade)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

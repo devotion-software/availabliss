@@ -209,11 +209,10 @@
 	/** A day's availability from the loaded month (or the current one). */
 	const dayInfo = (date: string) => days.get(date) ?? cache.monthsReady.get(startOfMonth(date))?.days.find((d) => d.date === date);
 
-	/** Whether a day works for everyone (and isn't over); unknown days count as working, so nothing fades while it loads. */
-	function works(date: string): boolean {
-		if (date < todayKey) return false;
-		const status = dayInfo(date)?.status;
-		return status === undefined || status === 'match';
+	/** A day's status from the month, so the week draws each date like its month cell. */
+	function dayStatus(date: string) {
+		const day = dayInfo(date);
+		return day && { status: day.status, partial: day.partial === true };
 	}
 
 	/** A bank holiday's name on that date, for the week's flags. */
@@ -381,7 +380,16 @@
 					{/if}
 				{:else}
 					<!-- Phones get a card per day; the time grid needs a wider screen. -->
-					<WeekGrid dates={week} days={weekDays} {members} selected={picked} onselect={select} cards={!desk && phoneWidth} {works} {bankHoliday} />
+					<WeekGrid
+						dates={week}
+						days={weekDays}
+						{members}
+						selected={picked}
+						onselect={select}
+						cards={!desk && phoneWidth}
+						{bankHoliday}
+						status={dayStatus}
+					/>
 				{/if}
 			</CalendarPager>
 		</section>

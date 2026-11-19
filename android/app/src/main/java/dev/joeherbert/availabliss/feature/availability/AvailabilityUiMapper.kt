@@ -13,6 +13,7 @@ import dev.joeherbert.availabliss.core.network.model.Slot
 import dev.joeherbert.availabliss.core.network.model.SlotPosition
 import dev.joeherbert.availabliss.designsystem.component.availability.BandPosition
 import dev.joeherbert.availabliss.designsystem.component.availability.CellState
+import dev.joeherbert.availabliss.designsystem.component.availability.DayLook
 import dev.joeherbert.availabliss.designsystem.component.availability.EveryoneBandUi
 import dev.joeherbert.availabliss.designsystem.component.availability.MonthCellUi
 import dev.joeherbert.availabliss.designsystem.component.availability.TimelineBarUi
@@ -345,6 +346,7 @@ object AvailabilityUiMapper {
         selected: LocalDate? = null,
         status: (LocalDate) -> DayStatus? = { null },
         bankHoliday: (LocalDate) -> String? = { null },
+        partial: (LocalDate) -> Boolean = { false },
     ): List<WeekColumnUi> = days.mapNotNull { day ->
         val date = DateTimes.parseDate(day.date) ?: return@mapNotNull null
         val free = day.everyoneFree.mapNotNull { clampToDate(it.start, it.end, date) }
@@ -369,7 +371,16 @@ object AvailabilityUiMapper {
             blocks = blocks,
             selected = date == selected,
             today = date == DateTimes.today(),
-            works = !date.isBefore(DateTimes.today()) && status(date).let { it == null || it == DayStatus.Match },
+            look = if (date.isBefore(DateTimes.today())) {
+                DayLook.Out
+            } else {
+                when (status(date)) {
+                    DayStatus.Match -> if (partial(date)) DayLook.Partial else DayLook.Match
+                    DayStatus.Busy -> DayLook.Busy
+                    DayStatus.Hidden -> DayLook.Out
+                    DayStatus.Free, null -> DayLook.Free
+                }
+            },
             bankHoliday = bankHoliday(date) != null,
             accessibilityLabel = (if (date == DateTimes.today()) "Today, " else "") + DateTimes.shortDay(date) +
                 (bankHoliday(date)?.let { " ($it)" } ?: "") + ": " +

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -55,11 +57,53 @@ data class WeekColumnUi(
     val selected: Boolean = false,
     /** Today: its label sits on an accent pill. */
     val today: Boolean = false,
-    /** Works for everyone (or not known yet). Days that don't are faded so the ones that do stand out. */
-    val works: Boolean = true,
+    /** How its date looks, and how far the day steps back, as its month cell. */
+    val look: DayLook = DayLook.Free,
     /** A bank holiday: a small flag after the label. */
     val bankHoliday: Boolean = false,
 )
+
+/**
+ * How a day's date looks in the week, as its month cell: accent when it works (soft when only most
+ * of the group can), dark when someone's busy, plain when free, dashed when past or outside the timing.
+ */
+enum class DayLook(val fade: Float) {
+    Match(1f),
+    Partial(1f),
+    Busy(0.5f),
+    Free(1f),
+    Out(0.35f),
+}
+
+/** A date drawn on its month-cell look (the text colour to use comes from [dayLookInk]). */
+@Composable
+private fun Modifier.dayLook(look: DayLook, shape: RoundedCornerShape): Modifier {
+    val colors = AvailablissTheme.colors
+    return when (look) {
+        DayLook.Match -> clip(shape).background(colors.accent)
+        DayLook.Partial -> clip(shape).background(colors.accentSoft).border(1.5.dp, colors.accent, shape)
+        DayLook.Busy -> clip(shape).background(colors.busyBg).border(1.dp, colors.glassBorder, shape)
+        DayLook.Free -> clip(shape).background(colors.surface).border(1.dp, colors.glassBorder, shape)
+        DayLook.Out -> drawBehind {
+            val stroke = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = 1.dp.toPx(),
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx())),
+            )
+            val radius = 12.dp.toPx()
+            drawRoundRect(colors.line, cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius), style = stroke)
+        }
+    }
+}
+
+@Composable
+private fun dayLookInk(look: DayLook) = AvailablissTheme.colors.let {
+    when (look) {
+        DayLook.Match -> it.onAccent
+        DayLook.Partial -> it.accentInk
+        DayLook.Out -> it.muted
+        else -> it.ink
+    }
+}
 
 /** A small flag after a bank holiday's date. */
 @Composable
@@ -72,11 +116,8 @@ private fun BankHolidayFlag(tint: androidx.compose.ui.graphics.Color) {
     )
 }
 
-/** How far a week day that doesn't work for everyone fades. */
-private const val WEEK_FADE = 0.5f
-
-/** Faded unless the day works; today's date always stays at full strength. */
-private fun WeekColumnUi.dateAlpha() = if (works || today) 1f else WEEK_FADE
+/** Faded as its month cell; today's date always stays at full strength. */
+private fun WeekColumnUi.dateAlpha() = if (today) 1f else look.fade
 
 /** Hour labels on the shared 08–24 axis. */
 val TimelineHours = listOf(8, 12, 16, 20, 24)
@@ -96,15 +137,20 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Spacer(Modifier.width(34.dp))
             columns.forEach {
-                Row(Modifier.weight(1f).alpha(it.dateAlpha()), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                val ink = dayLookInk(it.look)
+                Row(
+                    Modifier.weight(1f).heightIn(min = 28.dp).alpha(it.dateAlpha()).dayLook(it.look, RoundedCornerShape(10.dp)),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         it.label,
                         style = type.micro,
-                        color = if (it.today) colors.onAccent else colors.muted,
+                        color = if (it.today) (if (it.look == DayLook.Match) colors.accent else colors.onAccent) else ink,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.todayPill(it.today, colors.accent),
+                        modifier = Modifier.todayPill(it.today, if (it.look == DayLook.Match) colors.onAccent else colors.accent),
                     )
-                    if (it.bankHoliday) BankHolidayFlag(colors.muted)
+                    if (it.bankHoliday) BankHolidayFlag(ink)
                 }
             }
         }
@@ -129,7 +175,7 @@ fun WeekGrid(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSelec
                         .fillMaxHeight()
                         .then(if (column.selected) Modifier.border(2.dp, colors.ink, RoundedCornerShape(12.dp)) else Modifier)
                         // After the selection border, so only the day fades, not the ring.
-                        .alpha(if (column.works) 1f else WEEK_FADE)
+                        .alpha(column.look.fade)
                         .clip(RoundedCornerShape(12.dp))
                         .then(if (onSelectColumn != null) Modifier.clickable(role = Role.Button, onClickLabel = "Show who's free") { onSelectColumn(index) } else Modifier)
                         .background(colors.line)
@@ -200,16 +246,22 @@ fun WeekCards(columns: List<WeekColumnUi>, modifier: Modifier = Modifier, onSele
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
-                Row(Modifier.width(56.dp).alpha(column.dateAlpha()), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                val ink = dayLookInk(column.look)
+                Row(
+                    Modifier.width(56.dp).heightIn(min = 44.dp).alpha(column.dateAlpha()).dayLook(column.look, RoundedCornerShape(12.dp)),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
                     Text(
                         column.label,
                         style = type.bodySmallStrong,
-                        color = if (column.today) colors.onAccent else colors.ink,
-                        modifier = Modifier.padding(start = if (column.today) 6.dp else 0.dp).todayPill(column.today, colors.accent),
+                        color = if (column.today) (if (column.look == DayLook.Match) colors.accent else colors.onAccent) else ink,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.todayPill(column.today, if (column.look == DayLook.Match) colors.onAccent else colors.accent),
                     )
-                    if (column.bankHoliday) BankHolidayFlag(colors.ink)
+                    if (column.bankHoliday) BankHolidayFlag(ink)
                 }
-                Column(Modifier.weight(1f).alpha(if (column.works) 1f else WEEK_FADE), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(Modifier.weight(1f).alpha(column.look.fade), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         free.firstOrNull()?.label ?: "No time when everyone's free",
                         style = type.bodySmallStrong,

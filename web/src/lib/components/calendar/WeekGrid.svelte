@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { DayAvailability, Member } from '#lib/types';
+	import type { DayAvailability, DayStatus, Member } from '#lib/types';
 	import { formatDayKey, useFormat } from '#lib/client/format';
 	import Spinner from '#lib/components/ui/Spinner.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
@@ -21,12 +21,27 @@
 		selected?: string | null;
 		/** Phones in portrait: a card per day instead of the time grid, which needs the width. */
 		cards?: boolean;
-		/** Whether a day works for everyone (true while unknown). Days that don't are faded. */
-		works?: (date: string) => boolean;
 		/** A bank holiday's name on that date (shown as a flag by the date), or null. */
 		bankHoliday?: (date: string) => string | null;
+		/** The day's status from the month (undefined while unknown): its date is drawn like its month cell. */
+		status?: (date: string) => { status: DayStatus; partial: boolean } | undefined;
 	}
-	let { dates, days, members, onselect, selected, cards = false, works = () => true, bankHoliday = () => null }: Props = $props();
+	let { dates, days, members, onselect, selected, cards = false, bankHoliday = () => null, status = () => undefined }: Props = $props();
+
+	/**
+	 * How a day's date looks, as in the month: accent when it works (soft when only most of the
+	 * group can), dark when someone's busy, plain when free, and dashed for a day that's past or
+	 * outside the timing. Unknown days look free.
+	 */
+	function look(d: string): 'match' | 'partial' | 'busy' | 'free' | 'out' {
+		const s = status(d);
+		if (d < today || s?.status === 'hidden') return 'out';
+		if (!s) return 'free';
+		if (s.status === 'match') return s.partial ? 'partial' : 'match';
+		return s.status;
+	}
+	/** How far the day steps back, as in the month: busy days half, past and outside days more. */
+	const fade = (d: string) => (look(d) === 'out' ? 'far' : look(d) === 'busy' ? 'dim' : '');
 
 	const fmt = useFormat();
 	const today = $derived(fmt.current.today());
@@ -119,15 +134,8 @@
 			{@const most = parts.filter((b) => b.most)}
 			{@const busy = parts.filter((b) => !b.free)}
 			<li>
-				<button
-					type="button"
-					class="card glass"
-					class:on={d === selected}
-					class:faded={!works(d)}
-					aria-pressed={d === selected}
-					onclick={() => onselect?.(d)}
-				>
-					<span class="date" class:keep={d === today}>
+				<button type="button" class="card glass {fade(d)}" class:on={d === selected} aria-pressed={d === selected} onclick={() => onselect?.(d)}>
+					<span class="date tile {look(d)}" class:keep={d === today}>
 						<span class:today={d === today}>{formatDayKey(d).split(' ').slice(0, 2).join(' ')}</span>{#if bankHoliday(d)}<span
 								class="bank"
 								title={bankHoliday(d)}
@@ -158,9 +166,8 @@
 			{#each dates as d (d)}
 				<button
 					type="button"
-					class="head"
+					class="head tile {look(d)} {d === today ? '' : fade(d)}"
 					class:on={d === selected}
-					class:faded={!works(d) && d !== today}
 					aria-pressed={d === selected}
 					onclick={() => onselect?.(d)}
 					aria-label="See who's free on {d === today ? 'today, ' : ''}{formatDayKey(d)}"
@@ -181,7 +188,7 @@
 				{@const day = days.get(d)}
 				<!-- Tapping a column picks the day too; the header button above is the keyboard route. -->
 				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-				<div class="col" class:on={d === selected} class:faded={!works(d)} role="list" aria-label={formatDayKey(d)} onclick={() => onselect?.(d)}>
+				<div class="col {fade(d)}" class:on={d === selected} role="list" aria-label={formatDayKey(d)} onclick={() => onselect?.(d)}>
 					{#if day === undefined}
 						<span class="state"><Spinner size={16} /></span>
 					{:else if day === null}
@@ -224,13 +231,45 @@
 		text-align: left;
 		color: var(--ink);
 	}
-	/* Days that don't work for everyone step back, like the month's plain cells; today's date and
-	   the selection ring stay at full strength. */
-	.card.faded .date:not(.keep),
-	.card.faded .info,
-	.head.faded:not(.on),
-	.col.faded > * {
+	/* Days step back like the month's cells: busy ones half, past and outside ones more. Today's
+	   date and the selection ring stay at full strength. */
+	.card.dim .date:not(.keep),
+	.card.dim .info,
+	.head.dim:not(.on),
+	.col.dim > * {
 		filter: opacity(0.5);
+	}
+	.card.far .date:not(.keep),
+	.card.far .info,
+	.head.far:not(.on),
+	.col.far > * {
+		filter: opacity(0.35);
+	}
+	/* Each day's date drawn like its month cell. */
+	.tile {
+		border-radius: 12px;
+	}
+	.tile.match {
+		background: var(--accent);
+		color: var(--on-accent);
+	}
+	.tile.partial {
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		box-shadow: inset 0 0 0 1.5px var(--accent);
+	}
+	.tile.busy {
+		background: var(--busy-bg);
+		box-shadow: inset 0 0 0 1px var(--glass-border);
+	}
+	.tile.free {
+		background: var(--surface);
+		box-shadow: inset 0 0 0 1px var(--glass-border);
+	}
+	.tile.out {
+		outline: 1px dashed var(--line-2);
+		outline-offset: -1px;
+		color: var(--muted);
 	}
 	.card.on {
 		outline: 2px solid var(--ink);
@@ -245,7 +284,13 @@
 	}
 	.date {
 		width: 56px;
+		min-height: 44px;
 		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 4px;
+		text-align: center;
 		font-size: 14px;
 		font-weight: 650;
 	}

@@ -585,6 +585,7 @@ class GroupCalendarViewModel @Inject constructor(
                 r.selection,
                 status = { date -> dayStatus(r, date) },
                 bankHoliday = { date -> monthDay(r, date)?.takeIf { it.bankHoliday }?.let { it.holiday ?: "Bank holiday" } },
+                partial = { date -> monthDay(r, date)?.partial == true },
             ),
             weekDates = r.week.mapNotNull { DateTimes.parseDate(it.date) },
             dayFree = day?.everyoneFree?.firstOrNull()?.let { it.start to it.end },
