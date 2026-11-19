@@ -201,8 +201,9 @@ private fun HeatGrid(weeks: List<List<MonthDayUi?>>, onSelect: (LocalDate) -> Un
 
 /** A level's fill over the surface (null = plain surface with a border) and its number colour. */
 private fun levelColors(level: Int, colors: AvailablissColors): Pair<Color?, Color> = when (level) {
-    3 -> colors.accent to colors.onAccent
-    2 -> colors.accent.copy(alpha = colors.accent.alpha * 0.5f) to colors.onAccent
+    4 -> colors.accent to colors.onAccent
+    3 -> colors.accent.copy(alpha = colors.accent.alpha * 0.7f) to colors.onAccent
+    2 -> colors.accent.copy(alpha = colors.accent.alpha * 0.45f) to colors.ink
     1 -> colors.accent.copy(alpha = colors.accent.alpha * 0.2f) to colors.ink
     else -> null to colors.muted
 }
@@ -212,7 +213,7 @@ private fun HeatCell(cell: MonthDayUi, onClick: () -> Unit, modifier: Modifier =
     val colors = AvailablissTheme.colors
     val level = if (cell.past) 0 else cell.level
     val (fill, fg) = levelColors(level, colors)
-    val strong = level >= 2
+    val strong = level >= 3
     // The number alone is centred; the dot hangs just below it.
     Box(
         modifier
@@ -266,7 +267,7 @@ private fun HeatLegend(modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
     ) {
         Text("Less free", style = style, color = colors.muted, modifier = Modifier.padding(end = 2.dp))
-        for (level in 0..3) {
+        for (level in 0..4) {
             val (fill, _) = levelColors(level, colors)
             Box(
                 Modifier

@@ -56,11 +56,11 @@ class MyTimeViewsTest {
 
     @Test
     fun freeLevel_thresholds() {
-        assertEquals(3, freeLevel(1080))
-        assertEquals(3, freeLevel(12 * 60))
-        assertEquals(2, freeLevel(12 * 60 - 1))
-        assertEquals(2, freeLevel(6 * 60))
-        assertEquals(1, freeLevel(6 * 60 - 1))
+        assertEquals(4, freeLevel(1080))
+        assertEquals(3, freeLevel(1080 - 60)) // an hour busy
+        assertEquals(2, freeLevel(1080 - 3 * 60)) // exactly 3h busy
+        assertEquals(2, freeLevel(1080 - 6 * 60))
+        assertEquals(1, freeLevel(1080 - 8 * 60)) // exactly 8h busy
         assertEquals(1, freeLevel(30))
         assertEquals(0, freeLevel(29))
         assertEquals(0, freeLevel(0))
@@ -68,14 +68,14 @@ class MyTimeViewsTest {
 
     @Test
     fun dayRow_carriesTheLevel() {
-        // Busy 09:00 – 17:30: 8.5h of 18h busy, 9.5h free → level 2.
+        // Busy 09:00 – 17:30: 8.5h of 18h busy (8h or more), 9.5h free → level 1.
         val workday = row(today, busy("2026-11-17T09:00:00Z", "2026-11-17T17:30:00Z"))
         assertEquals(1080 - 510, workday.freeMinutes)
-        assertEquals(2, workday.level)
+        assertEquals(1, workday.level)
         assertFalse(workday.hasBlock)
         assertTrue(workday.hasCalendarBusy)
         // Time marked not busy doesn't count.
-        assertEquals(3, row(today, busy("2026-11-17T09:00:00Z", "2026-11-17T17:30:00Z", ignored = true)).level)
+        assertEquals(4, row(today, busy("2026-11-17T09:00:00Z", "2026-11-17T17:30:00Z", ignored = true)).level)
         // An all-day block of your own: busy all day, with a block.
         val away = row(today, busy("2026-11-17T00:00:00Z", "2026-11-18T00:00:00Z", BusySource.Manual, "Away", "b1"))
         assertEquals(0, away.level)
@@ -112,7 +112,7 @@ class MyTimeViewsTest {
 
         val t = cells.getValue(today)
         assertTrue(t.today)
-        assertEquals(3, t.level)
+        assertEquals(4, t.level)
         assertEquals("Today, Tuesday 17 November, free all day", t.accessibility)
 
         val b = cells.getValue(busyDay)

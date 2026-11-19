@@ -150,12 +150,12 @@ describe('how free a day is', () => {
 		).toBe(1080 - 240);
 	});
 
-	test('freeLevel thresholds: 12h, 6h, 30m', () => {
-		expect(freeLevel([])).toBe(3);
-		expect(freeLevel([{ from: h(6), to: h(12) }])).toBe(3); // exactly 12h free
-		expect(freeLevel([{ from: h(6), to: h(12, 1) }])).toBe(2);
-		expect(freeLevel([{ from: h(6), to: h(18) }])).toBe(2); // exactly 6h free
-		expect(freeLevel([{ from: h(6), to: h(18, 1) }])).toBe(1);
+	test('freeLevel by time busy: none, under 3h, under 8h, 30m free', () => {
+		expect(freeLevel([])).toBe(4);
+		expect(freeLevel([{ from: h(19), to: h(20) }])).toBe(3); // an hour
+		expect(freeLevel([{ from: h(6), to: h(9) }])).toBe(2); // exactly 3h
+		expect(freeLevel([{ from: h(10), to: h(16) }])).toBe(2); // 6h
+		expect(freeLevel([{ from: h(6), to: h(14) }])).toBe(1); // exactly 8h
 		expect(freeLevel([{ from: h(6), to: h(23, 30) }])).toBe(1); // exactly 30m free
 		expect(freeLevel([{ from: h(6), to: h(23, 31) }])).toBe(0);
 		expect(freeLevel([{ from: 0, to: 1440 }])).toBe(0);

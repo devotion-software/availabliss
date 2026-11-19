@@ -127,10 +127,11 @@ struct DaySummaryTests {
     }
 
     @Test func freeLevelThresholds() {
-        #expect(row().freeLevel == 3)
-        #expect(row(busy("2026-11-17T06:00:00Z", "2026-11-17T12:00:00Z")).freeLevel == 3)
-        #expect(row(busy("2026-11-17T06:00:00Z", "2026-11-17T12:01:00Z")).freeLevel == 2)
-        #expect(row(busy("2026-11-17T06:00:00Z", "2026-11-17T18:00:00Z")).freeLevel == 2)
+        #expect(row().freeLevel == 4)
+        #expect(row(busy("2026-11-17T19:00:00Z", "2026-11-17T20:00:00Z")).freeLevel == 3)  // an hour
+        #expect(row(busy("2026-11-17T06:00:00Z", "2026-11-17T09:00:00Z")).freeLevel == 2)  // exactly 3h
+        #expect(row(busy("2026-11-17T10:00:00Z", "2026-11-17T16:00:00Z")).freeLevel == 2)  // 6h
+        #expect(row(busy("2026-11-17T06:00:00Z", "2026-11-17T14:00:00Z")).freeLevel == 1)  // exactly 8h
         #expect(row(busy("2026-11-17T06:00:00Z", "2026-11-17T23:30:00Z")).freeLevel == 1)
         #expect(row(busy("2026-11-17T06:00:00Z", "2026-11-17T23:31:00Z")).freeLevel == 0)
     }

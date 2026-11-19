@@ -94,12 +94,15 @@ struct DaySummary: Equatable, Sendable {
         return Self.windowEnd - Self.windowStart - busyInWindow
     }
 
-    /// How free the day is, for the month heat map: 3 = 12h or more, 2 = 6h or more, 1 = at least
-    /// half an hour, 0 = busy all day.
+    /// How free the day is, for the month heat map, by time busy between 06:00 and 24:00:
+    /// 4 = nothing, 3 = under 3h, 2 = under 8h, 1 = at least half an hour free, 0 = busy all day.
+    /// Graded by busy time so an hour's plan already shows against a free day.
     var freeLevel: Int {
         let free = freeMinutes
-        if free >= 12 * 60 { return 3 }
-        if free >= 6 * 60 { return 2 }
+        let busy = Self.windowEnd - Self.windowStart - free
+        if busy <= 0 { return 4 }
+        if busy < 3 * 60 { return 3 }
+        if busy < 8 * 60 { return 2 }
         if free >= Self.minimumFree { return 1 }
         return 0
     }

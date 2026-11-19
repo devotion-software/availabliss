@@ -103,7 +103,7 @@
 
 	<div class="legend" aria-hidden="true">
 		<span>Less free</span>
-		<i class="cell l0"></i><i class="cell l1"></i><i class="cell l2"></i><i class="cell l3"></i>
+		<i class="cell l0"></i><i class="cell l1"></i><i class="cell l2"></i><i class="cell l3"></i><i class="cell l4"></i>
 		<span>More free</span>
 	</div>
 </section>
@@ -225,10 +225,14 @@
 		color: var(--ink);
 	}
 	.l2 {
-		background: color-mix(in srgb, var(--accent) 50%, var(--surface));
-		color: var(--on-accent);
+		background: color-mix(in srgb, var(--accent) 45%, var(--surface));
+		color: var(--ink);
 	}
 	.l3 {
+		background: color-mix(in srgb, var(--accent) 70%, var(--surface));
+		color: var(--on-accent);
+	}
+	.l4 {
 		background: var(--accent);
 		color: var(--on-accent);
 	}

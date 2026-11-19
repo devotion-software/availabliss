@@ -123,7 +123,7 @@ struct MyTimeMonth: View {
     private var legend: some View {
         HStack(spacing: 6) {
             Text("Less free")
-            ForEach(0..<4, id: \.self) { level in
+            ForEach(0..<5, id: \.self) { level in
                 HeatFill(level: level, isPast: false).frame(width: 14, height: 14)
             }
             Text("More free")
@@ -161,7 +161,7 @@ private struct HeatCell: View {
 
     var body: some View {
         let isToday = day == .today()
-        let onAccent = level >= 2
+        let onAccent = level >= 3
         Button(action: action) {
             // The number alone is centred; the dot hangs just below it.
             ZStack {
@@ -201,7 +201,7 @@ private struct HeatCell: View {
     }
 }
 
-/// The heat map's fill for a level: 0 plain, 1 a hint of accent, 2 half, 3 solid accent.
+/// The heat map's fill for a level: 0 plain, 1 a hint of accent, 2 and 3 stronger, 4 solid accent.
 private struct HeatFill: View {
     let level: Int
     let isPast: Bool
@@ -210,8 +210,9 @@ private struct HeatFill: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
         switch level {
-        case 3: shape.fill(theme.accent)
-        case 2: shape.fill(theme.accent.opacity(0.55))
+        case 4: shape.fill(theme.accent)
+        case 3: shape.fill(theme.accent.opacity(0.7))
+        case 2: shape.fill(theme.accent.opacity(0.45))
         case 1: shape.fill(theme.accent.opacity(0.2))
         default: shape.fill(theme.surface).overlay(shape.strokeBorder(theme.glassBorder, lineWidth: 1))
         }

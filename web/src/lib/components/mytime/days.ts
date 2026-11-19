@@ -92,13 +92,17 @@ export function freeMinutes(busy: readonly Range[]): number {
 	return STRIP_TO - STRIP_FROM - taken;
 }
 
-export type FreeLevel = 0 | 1 | 2 | 3;
+export type FreeLevel = 0 | 1 | 2 | 3 | 4;
 
 /** How free a day is, for the month's heat map: 3 = 12h+ free, 2 = 6h+, 1 = half an hour+, 0 = busy all day. */
 export function freeLevel(busy: readonly Range[]): FreeLevel {
+	// Graded by time busy (06:00–24:00) so an hour's plan already shows against a free day:
+	// nothing → 4, under 3h → 3, under 8h → 2, 30 min+ still free → 1, otherwise 0.
 	const free = freeMinutes(busy);
-	if (free >= 12 * 60) return 3;
-	if (free >= 6 * 60) return 2;
+	const booked = STRIP_TO - STRIP_FROM - free;
+	if (booked <= 0) return 4;
+	if (booked < 3 * 60) return 3;
+	if (booked < 8 * 60) return 2;
 	if (free >= MIN_FREE_MINUTES) return 1;
 	return 0;
 }

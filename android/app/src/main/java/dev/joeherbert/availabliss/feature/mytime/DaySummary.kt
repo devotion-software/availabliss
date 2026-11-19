@@ -67,7 +67,7 @@ data class DayRowUi(
     /** A connected calendar makes you busy some of this day. */
     val hasCalendarBusy: Boolean get() = calendarSpans.isNotEmpty()
 
-    /** How free the day is, 0 (busy all day) to 3 (12 hours or more free). */
+    /** How free the day is, 0 (busy all day) to 4 (nothing on). */
     val level: Int get() = freeLevel(freeMinutes)
 }
 
@@ -86,12 +86,20 @@ fun freeMinutes(busy: List<BusySpan>): Int {
     return WINDOW_MINUTES - inWindow.sumOf { it.minutes }
 }
 
-/** The month's fill for a day: 12h+ free → 3, 6h+ → 2, 30 min+ → 1, otherwise 0. */
-fun freeLevel(freeMinutes: Int): Int = when {
-    freeMinutes >= 12 * 60 -> 3
-    freeMinutes >= 6 * 60 -> 2
-    freeMinutes >= 30 -> 1
-    else -> 0
+/**
+ * The month's fill for a day, by time busy between 06:00 and 24:00: nothing → 4, under 3h → 3,
+ * under 8h → 2, 30 min+ still free → 1, otherwise 0. Graded by busy time so an hour's plan already
+ * shows against a free day.
+ */
+fun freeLevel(freeMinutes: Int): Int {
+    val busy = WINDOW_MINUTES - freeMinutes
+    return when {
+        busy <= 0 -> 4
+        busy < 3 * 60 -> 3
+        busy < 8 * 60 -> 2
+        freeMinutes >= 30 -> 1
+        else -> 0
+    }
 }
 
 /** Merges overlapping or touching spans; the result is sorted. */
