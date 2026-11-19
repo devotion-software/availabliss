@@ -1,5 +1,6 @@
 import './setup';
 import { listMessages } from '#lib/server/chat';
+import { updateEvent } from '#lib/server/events';
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db';
@@ -310,6 +311,16 @@ describe('confirmAnyway', () => {
 		const p = await createProposal(g.groupId, g.owner, slot(20));
 		await respond(p.id, g.admin, 'accepted');
 		expect(await respond(p.id, g.member, 'accepted')).toMatchObject({ status: 'confirmed', confirmedBy: null });
+	});
+
+	test("renaming a plan's event renames the proposal too, so its chat card follows", async () => {
+		const g = await setup();
+		const p = await createProposal(g.groupId, g.owner, slot(24, { title: 'Drinks' }));
+		await respond(p.id, g.admin, 'accepted');
+		await respond(p.id, g.member, 'accepted');
+		const { eventId } = await getProposal(p.id, g.owner);
+		await updateEvent(eventId!, g.owner, { title: 'Birthday drinks', location: 'The Crown' });
+		expect(await getProposal(p.id, g.member)).toMatchObject({ title: 'Birthday drinks', location: 'The Crown' });
 	});
 
 	test('cancelling an open proposal says so at that point in the chat', async () => {

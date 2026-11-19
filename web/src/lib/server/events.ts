@@ -3,7 +3,7 @@ import { and, asc, eq, gt, gte, inArray, lt } from 'drizzle-orm';
 import { mediaUrl } from './media-urls';
 import type { GroupEvent, ResponseKind } from '#lib/types';
 import { db, type Tx } from './db';
-import { events, groupMembers, groups, proposalResponses } from './db/schema';
+import { events, groupMembers, groups, proposalResponses, proposals } from './db/schema';
 import { badRequest, forbidden, notFound } from './http';
 import { newId } from './ids';
 import { getGroupRow, memberIds, requireMember } from './groups';
@@ -120,7 +120,30 @@ export async function updateEvent(eventId: string, userId: string, patch: Partia
 		.where(eq(events.id, eventId));
 	const event = toGroupEvent(await getEventRow(eventId));
 	await publishToGroup(row.groupId, 'event.changed', event);
+	if (row.proposalId) await syncProposal(row.proposalId, patch);
 	return event;
+}
+
+/**
+ * A plan's event was edited: its proposal follows, so the proposal's card in the chat (and its
+ * page) shows the new name, time and place rather than what was first proposed.
+ */
+async function syncProposal(proposalId: string, patch: Partial<EventInput>): Promise<void> {
+	const { title, start, end, allDay, location, note } = patch;
+	const set = {
+		...(title !== undefined && { title }),
+		...(location !== undefined && { location }),
+		...(note !== undefined && { note }),
+		...(allDay !== undefined && { allDay }),
+		...(start && { start: new Date(start) }),
+		...(end && { end: new Date(end) })
+	};
+	if (!Object.keys(set).length) return;
+	await db.update(proposals).set(set).where(eq(proposals.id, proposalId));
+	// Imported here: proposals.ts imports this module.
+	const { fetchProposal } = await import('./proposals');
+	const proposal = await fetchProposal(proposalId);
+	await publishToGroup(proposal.groupId, 'proposal.updated', proposal);
 }
 
 export async function deleteEvent(eventId: string, userId: string): Promise<void> {

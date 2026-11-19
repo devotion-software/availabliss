@@ -98,7 +98,7 @@ async function getRow(proposalId: string): Promise<ProposalRow> {
 	return row;
 }
 
-async function fetchProposal(proposalId: string): Promise<Proposal> {
+export async function fetchProposal(proposalId: string): Promise<Proposal> {
 	return (await load([await getRow(proposalId)]))[0];
 }
 
