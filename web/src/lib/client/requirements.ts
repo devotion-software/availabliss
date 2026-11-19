@@ -64,12 +64,22 @@ export function presetOf(req: Requirement): PresetId {
 		if (length.minutes === 240) return '4h';
 		return 'custom';
 	}
+	// One day that starts at 16:00 or later is an evening, whatever time it starts or ends.
+	if (isEvening(req)) return 'evening';
 	const match = PRESETS.find((p) => {
 		if (!p.length || !sameJson(p.length, length)) return false;
 		// Duration presets ignore the window; day-shaped ones are defined by it.
 		return p.length.type === 'span' || sameJson(p.window ?? null, window);
 	});
 	return match?.id ?? 'custom';
+}
+
+/** The hour from which a one-day window counts as an evening. */
+export const EVENING_FROM = '16:00';
+
+/** One day with a window starting at 16:00 or later ("An evening from 19:00"). */
+export function isEvening(req: Pick<Requirement, 'length' | 'window'>): boolean {
+	return req.length.type === 'days' && req.length.count === 1 && req.window !== null && req.window.from >= EVENING_FROM;
 }
 
 /** The requirement with a preset applied. "custom" leaves it as it is. */

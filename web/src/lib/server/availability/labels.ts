@@ -75,7 +75,8 @@ export function requirementSummary(req: Requirement): string {
 		const later = l.weeksLater === 1 ? `following ${end}` : l.weeksLater >= 2 ? `${end} ${l.weeksLater} weeks later` : end;
 		what = `${kind} · ${start} → ${later}`;
 	} else if (l.type === 'days') {
-		const label = l.count === 7 ? 'A week' : l.count === 1 ? (req.window ? 'An evening' : 'One day') : `${l.count} days`;
+		const evening = req.window !== null && req.window.from >= '16:00';
+		const label = l.count === 7 ? 'A week' : l.count === 1 ? (evening ? 'An evening' : 'One day') : `${l.count} days`;
 		const window = req.window ? ` from ${req.window.from}` : '';
 		what = `${label}${l.count === 1 && req.window ? window : ''} · ${daysLabel(req.days)}`;
 	} else {

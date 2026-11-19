@@ -66,6 +66,8 @@ object RequirementPresets {
     const val TWO_HOURS = 120
     val DEFAULT_DURATION_WINDOW = TimeWindow("08:00", "23:00")
     val EVENING_WINDOW = TimeWindow("18:00", "23:59")
+    /** From when a one-day window counts as an evening ("HH:MM", so plain string order works). */
+    const val EVENING_FROM = "16:00"
     val WEEKEND = RequirementLength.Span(startDay = 4, startTime = "18:00", endDay = 6, endTime = "23:59", weeksLater = 0)
     /** Default custom span: Tue → Thu. */
     val TUE_TO_THU = RequirementLength.Span(startDay = 1, startTime = "00:00", endDay = 3, endTime = "23:59", weeksLater = 0)
@@ -85,7 +87,8 @@ object RequirementPresets {
     fun detect(length: RequirementLength, window: TimeWindow?): TimingPreset = when (length) {
         is RequirementLength.Duration -> if (length.minutes == TWO_HOURS) TimingPreset.TwoHours else TimingPreset.Custom
         is RequirementLength.Days -> when {
-            length.count == 1 && window == EVENING_WINDOW -> TimingPreset.Evening
+            // One day that starts at 16:00 or later is an evening, whatever time it starts or ends.
+            length.count == 1 && window != null && window.from >= EVENING_FROM -> TimingPreset.Evening
             length.count == 1 && window == null -> TimingPreset.OneDay
             length.count == 7 && window == null -> TimingPreset.Week
             else -> TimingPreset.Custom

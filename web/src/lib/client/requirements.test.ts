@@ -41,6 +41,13 @@ describe('presets', () => {
 		for (const p of PRESETS) if (p.id !== 'custom') expect(presetOf(base(p.id))).toBe(p.id);
 	});
 
+	test('an evening starting later is still an evening', () => {
+		const evening = base('evening');
+		expect(presetOf({ ...evening, window: { from: '19:00', to: '23:59' } })).toBe('evening');
+		expect(kindPhrase({ ...evening, window: { from: '19:00', to: '23:59' } })).toBe('an evening');
+		expect(presetOf({ ...evening, window: { from: '09:00', to: '17:00' } })).toBe('custom');
+	});
+
 	test('default range is three calendar months', () => {
 		expect(base().range).toEqual({ from: '2026-11-02', to: '2027-01-31' });
 	});
@@ -48,7 +55,7 @@ describe('presets', () => {
 	test('odd lengths are custom', () => {
 		expect(presetOf(withLength({ type: 'duration', minutes: 90 }))).toBe('custom');
 		expect(presetOf(withLength({ type: 'days', count: 3 }))).toBe('custom');
-		expect(presetOf(withLength({ type: 'days', count: 1 }, { window: { from: '17:00', to: '23:59' } }))).toBe('custom');
+		expect(presetOf(withLength({ type: 'days', count: 1 }, { window: { from: '10:00', to: '15:00' } }))).toBe('custom');
 	});
 
 	test('duration presets keep a customised window; custom changes nothing', () => {

@@ -19,6 +19,8 @@ enum TimingPreset: String, CaseIterable, Identifiable {
     }
 
     static let eveningWindow = TimeWindow(from: WallTime(hour: 18, minute: 0), to: .endOfDay)
+    /// From when a one-day window counts as an evening.
+    static let eveningFrom = WallTime(hour: 16, minute: 0)
     static let defaultDurationWindow = TimeWindow(from: WallTime(hour: 8, minute: 0), to: WallTime(hour: 23, minute: 0))
     static let weekendSpan = RequirementLength.Span(startDay: 4, startTime: WallTime(hour: 18, minute: 0), endDay: 6, endTime: .endOfDay, weeksLater: 0)
 
@@ -38,7 +40,8 @@ enum TimingPreset: String, CaseIterable, Identifiable {
     static func detect(_ length: RequirementLength, window: TimeWindow?) -> TimingPreset {
         switch length {
         case .duration(120): .twoHours
-        case .days(1) where window == eveningWindow: .evening
+        // One day that starts at 16:00 or later is an evening, whatever time it starts or ends.
+        case .days(1) where window.map { $0.from >= eveningFrom } ?? false: .evening
         case .days(1) where window == nil: .oneDay
         case .days(7) where window == nil: .week
         case .span(let span) where span == weekendSpan: .weekend

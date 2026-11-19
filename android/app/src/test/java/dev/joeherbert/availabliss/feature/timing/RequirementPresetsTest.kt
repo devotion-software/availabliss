@@ -76,11 +76,13 @@ class RequirementPresetsTest {
     }
 
     @Test
-    fun editingEveningStart_becomesCustom() {
+    fun editingEveningStart_staysAnEvening() {
         val evening = RequirementPresets.applyPreset(base, TimingPreset.Evening)
         val edited = RequirementPresets.withLength(evening, evening.length, TimeWindow("19:00", "23:59"))
-        assertEquals(TimingPreset.Custom, edited.preset)
-        assertEquals(CustomKind.Days, edited.customKind)
+        assertEquals(TimingPreset.Evening, edited.preset)
+        val daytime = RequirementPresets.withLength(evening, evening.length, TimeWindow("09:00", "17:00"))
+        assertEquals(TimingPreset.Custom, daytime.preset)
+        assertEquals(CustomKind.Days, daytime.customKind)
     }
 
     @Test

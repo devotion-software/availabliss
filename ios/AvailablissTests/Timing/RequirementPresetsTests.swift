@@ -66,9 +66,10 @@ struct RequirementPresetsTests {
         #expect(TimingPreset.custom.shape == nil)
     }
 
-    @Test func editingTheEveningStartMakesItCustom() {
-        let edited = window("19:00", "23:59")
-        #expect(TimingPreset.detect(.days(count: 1), window: edited) == .custom)
+    @Test func anEveningStartingLaterIsStillAnEvening() {
+        #expect(TimingPreset.detect(.days(count: 1), window: window("19:00", "23:59")) == .evening)
+        #expect(TimingPreset.detect(.days(count: 1), window: window("16:00", "22:00")) == .evening)
+        #expect(TimingPreset.detect(.days(count: 1), window: window("09:00", "17:00")) == .custom)
         #expect(CustomLengthKind(.days(count: 1)) == .days)
         #expect(CustomLengthKind(.duration(minutes: 90)) == .hours)
         let span = RequirementLength.Span(startDay: 1, startTime: .midnight, endDay: 3, endTime: .endOfDay, weeksLater: 1)
