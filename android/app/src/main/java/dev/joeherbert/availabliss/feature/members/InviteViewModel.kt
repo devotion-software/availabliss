@@ -97,7 +97,7 @@ class InviteViewModel @Inject constructor(
                                 groupName = p.groupName,
                                 inviterName = p.inviterName,
                                 memberCount = p.memberCount,
-                                expiry = expires?.let { e -> "Expires ${DateTimes.dayMonth(e.atZone(DateTimes.zone).toLocalDate())}" }.orEmpty(),
+                                expiry = expires?.let { e -> expiryLabel(e.atZone(DateTimes.zone).toLocalDate()) }.orEmpty(),
                             ),
                         )
                     }
@@ -178,5 +178,15 @@ class InviteViewModel @Inject constructor(
                 }
             }
         }
+    }
+}
+
+/** "Expires today" / "Expires tomorrow" / "Expires 14 Nov", as on iOS and web. */
+internal fun expiryLabel(day: java.time.LocalDate, today: java.time.LocalDate = java.time.LocalDate.now(DateTimes.zone)): String {
+    val days = java.time.temporal.ChronoUnit.DAYS.between(today, day)
+    return when {
+        days <= 0 -> "Expires today"
+        days == 1L -> "Expires tomorrow"
+        else -> "Expires ${DateTimes.dayMonth(day)}"
     }
 }

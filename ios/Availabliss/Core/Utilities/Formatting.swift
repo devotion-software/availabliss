@@ -31,6 +31,14 @@ enum Formatting {
         date.formatted(.dateTime.day().month(.abbreviated).year())
     }
 
+    /// "Expires today" / "Expires tomorrow" / "Expires 14 Nov", for an invite.
+    static func expiry(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+        if days <= 0 { return "Expires today" }
+        if days == 1 { return "Expires tomorrow" }
+        return "Expires \(date.formatted(.dateTime.day().month(.abbreviated)))"
+    }
+
     static func dayMonth(_ day: CalendarDay) -> String {
         day.startDate().formatted(.dateTime.day().month(.abbreviated))
     }

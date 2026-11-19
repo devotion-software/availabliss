@@ -73,4 +73,14 @@ struct InvitesTests {
         #expect(try Fixtures.encode(MemberNameBody(displayName: nil)) == #"{"displayName":null}"#)
         #expect(try Fixtures.encode(MemberNameBody(displayName: "Sammy")) == #"{"displayName":"Sammy"}"#)
     }
+
+    @Test func anInviteExpiresTodayTomorrowOrOnADate() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/London")!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 19, hour: 9))!
+        func at(_ day: Int, _ hour: Int = 18) -> Date { calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour))! }
+        #expect(Formatting.expiry(at(19), now: now, calendar: calendar) == "Expires today")
+        #expect(Formatting.expiry(at(20, 1), now: now, calendar: calendar) == "Expires tomorrow")
+        #expect(Formatting.expiry(at(26), now: now, calendar: calendar).hasPrefix("Expires 26"))
+    }
 }

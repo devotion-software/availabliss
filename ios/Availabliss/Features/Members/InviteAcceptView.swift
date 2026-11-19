@@ -49,6 +49,9 @@ struct InviteAcceptView: View {
                         Text("\(preview.inviterName) invited you · \(Formatting.plural(preview.memberCount, "member"))")
                             .bodyFont(13, relativeTo: .subheadline)
                             .foregroundStyle(theme.muted)
+                        Text(Formatting.expiry(preview.expiresAt))
+                            .bodyFont(12, relativeTo: .caption)
+                            .foregroundStyle(theme.muted)
                     }
                 }
                 Label("Your group only ever sees when you're busy, never what you're doing.", systemImage: "shield")
