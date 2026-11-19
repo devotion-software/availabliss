@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.DateTimes
 import dev.joeherbert.availabliss.core.common.UserMessage
 import dev.joeherbert.availabliss.core.data.GroupsRepository
+import dev.joeherbert.availabliss.core.data.RegionsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.deeplink.DeepLink
 import dev.joeherbert.availabliss.core.deeplink.DeepLinkBus
@@ -14,9 +15,9 @@ import dev.joeherbert.availabliss.core.network.model.TileColor
 import dev.joeherbert.availabliss.feature.common.InviteRecipient
 import dev.joeherbert.availabliss.feature.common.InviteRecipients
 import dev.joeherbert.availabliss.feature.common.InviteRecipientsState
-import dev.joeherbert.availabliss.feature.timing.CustomKind
 import dev.joeherbert.availabliss.feature.timing.RequirementPresets
-import dev.joeherbert.availabliss.feature.timing.TimingDraft
+import dev.joeherbert.availabliss.feature.timing.TimingEditor
+import dev.joeherbert.availabliss.feature.timing.TimingEditorUiState
 import dev.joeherbert.availabliss.feature.timing.TimingPreset
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,11 +37,8 @@ data class OnboardingUiState(
     val message: UserMessage? = null,
     // First group
     val groupName: String = "",
-    /** Only the length is chosen here ("More options" opens the custom length); the rest stays default. */
-    val draft: TimingDraft = RequirementPresets.applyPreset(
-        RequirementPresets.defaultDraft(DateTimes.today(), ZoneId.systemDefault().id),
-        TimingPreset.Weekend,
-    ),
+    /** The full timing sentence, as in New group, with its live fit count. */
+    val editor: TimingEditorUiState? = null,
     val color: TileColor = TileColor.entries.random(),
     val creating: Boolean = false,
     val createdGroupId: String? = null,
@@ -65,6 +63,7 @@ class OnboardingViewModel @Inject constructor(
     private val users: UserRepository,
     private val groups: GroupsRepository,
     private val deepLinks: DeepLinkBus,
+    regions: RegionsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(OnboardingUiState(steps = if (deepLinks.pending.value is DeepLink.Invite) 2 else 4))
@@ -75,6 +74,15 @@ class OnboardingViewModel @Inject constructor(
     val inviteRecipients: StateFlow<InviteRecipientsState> = recipients.state
 
     private var markBusyByHand = false
+
+    /** The first group's timing, edited with the same sentence and sheets as New group. */
+    val editor = TimingEditor(viewModelScope, groups, users, regions)
+
+    init {
+        viewModelScope.launch { editor.state.collect { e -> _state.update { it.copy(editor = e) } } }
+        val timezone = users.user.value?.timezone ?: ZoneId.systemDefault().id
+        editor.reset(RequirementPresets.applyPreset(RequirementPresets.defaultDraft(DateTimes.today(), timezone), TimingPreset.Weekend))
+    }
 
     fun goToCalendars() = _state.update { it.copy(step = OnboardingStep.Calendars) }
 
@@ -91,31 +99,15 @@ class OnboardingViewModel @Inject constructor(
     // region First group
     fun onGroupNameChange(value: String) = _state.update { it.copy(groupName = value.take(80)) }
 
-    /** "More options" (Custom) starts at hours, like iOS, rather than a span that looks like the weekend. */
-    fun onPresetChange(preset: TimingPreset) = _state.update {
-        val draft = when {
-            preset != TimingPreset.Custom -> RequirementPresets.applyPreset(it.draft, preset)
-            it.draft.preset == TimingPreset.Custom -> it.draft
-            else -> RequirementPresets.applyCustomKind(it.draft, CustomKind.Hours)
-        }
-        it.copy(draft = draft)
-    }
-
-    fun onCustomKind(kind: CustomKind) = _state.update { it.copy(draft = RequirementPresets.applyCustomKind(it.draft, kind)) }
-
-    fun onDuration(deltaMinutes: Int) = _state.update { it.copy(draft = RequirementPresets.changeDuration(it.draft, deltaMinutes)) }
-
-    fun onDayCount(delta: Int) = _state.update { it.copy(draft = RequirementPresets.changeDayCount(it.draft, delta)) }
-
-    fun onWeeksLater(delta: Int) = _state.update { it.copy(draft = RequirementPresets.changeWeeksLater(it.draft, delta)) }
-
     fun createGroup() {
         val s = _state.value
+        val editing = editor.draft ?: return
         if (s.groupName.isBlank() || s.creating) return
+        TimingEditor.validate(editing)?.let { problem -> return _state.update { it.copy(message = UserMessage(problem)) } }
         _state.update { it.copy(creating = true) }
         viewModelScope.launch {
             val timezone = users.user.value?.timezone ?: ZoneId.systemDefault().id
-            val draft = s.draft.copy(timezone = timezone)
+            val draft = editing.copy(timezone = timezone)
             when (val result = groups.create(s.groupName.trim(), s.color, draft.toRequirement())) {
                 is ApiResult.Success -> _state.update { it.copy(creating = false, createdGroupId = result.value.id, step = OnboardingStep.Invite) }
                 is ApiResult.Failure -> _state.update { it.copy(creating = false, message = UserMessage(result.error.message)) }

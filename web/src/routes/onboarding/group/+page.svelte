@@ -6,47 +6,39 @@
 	import { createGroup } from '#lib/client/groups';
 	import { updateMe } from '#lib/client/me';
 	import { browserTimeZone, todayIn } from '#lib/client/dates';
-	import { applyPreset, defaultRequirement, PRESETS, type PresetId } from '#lib/client/requirements';
+	import { defaultRequirement } from '#lib/client/requirements';
+	import { requirementSchema } from '#lib/schemas';
 	import { toasts } from '#lib/client/toast.svelte';
 	import { monogram } from '#lib/monogram';
 	import Button from '#lib/components/ui/Button.svelte';
-	import Chip from '#lib/components/ui/Chip.svelte';
 	import GroupTile from '#lib/components/ui/GroupTile.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import TextField from '#lib/components/ui/TextField.svelte';
 	import StepDots from '#lib/components/onboarding/StepDots.svelte';
-	import CustomLength from '#lib/components/timing/CustomLength.svelte';
+	import RequirementsEditor from '#lib/components/timing/RequirementsEditor.svelte';
+	import FitPreview from '#lib/components/timing/FitPreview.svelte';
 
 	/** Step 3 of the sign-up wizard: your first group. Skippable. */
 	let { data } = $props();
 
 	let name = $state('');
-	let preset = $state<PresetId>('weekend');
-	/** Only the length is chosen here; the rest of the timing keeps its defaults until later. */
+	/** The full timing sentence, as in New group, with a live count of how many times fit. */
 	const tz = untrack(() => data.user.timezone) || browserTimeZone();
 	let requirement = $state(defaultRequirement(tz, todayIn(tz), 'weekend'));
-	/** "More options": every preset, plus a custom length. */
-	let more = $state(false);
 	const color: TileColor = TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)];
 	let busy = $state<'create' | 'skip' | null>(null);
-	const COMMON: PresetId[] = ['2h', 'evening', 'day', 'weekend', 'week'];
-	const choices = $derived(more ? PRESETS : PRESETS.filter((p) => COMMON.includes(p.id)));
-
-	function pick(id: PresetId) {
-		preset = id;
-		if (id === 'custom') {
-			// Start custom at hours rather than a span that looks like the weekend.
-			if (requirement.length.type === 'span')
-				requirement = { ...requirement, length: { type: 'duration', minutes: 180 }, window: { from: '08:00', to: '23:00' } };
-		} else requirement = applyPreset(requirement, id);
-	}
 
 	async function create(e: SubmitEvent) {
 		e.preventDefault();
 		if (!name.trim()) return;
+		const timing = requirementSchema.safeParse({ ...$state.snapshot(requirement), timezone: requirement.timezone || tz });
+		if (!timing.success) {
+			toasts.error(timing.error.issues[0]?.message ?? 'Check the timing');
+			return;
+		}
 		busy = 'create';
 		try {
-			const group = await createGroup({ name: name.trim(), color, requirement: $state.snapshot(requirement) });
+			const group = await createGroup({ name: name.trim(), color, requirement: timing.data });
 			await goto(`/onboarding/invite?group=${group.id}`);
 		} catch (err) {
 			toasts.error(err);
@@ -85,19 +77,10 @@
 	</div>
 	<fieldset>
 		<legend class="eyebrow">What are you planning?</legend>
-		<div class="chips">
-			{#each choices as c (c.id)}
-				<Chip selected={preset === c.id} onclick={() => pick(c.id)}>{c.label}</Chip>
-			{/each}
-			{#if !more}
-				<Chip selected={false} onclick={() => (more = true)}>More options</Chip>
-			{/if}
-		</div>
-		{#if preset === 'custom'}
-			<div class="custom"><CustomLength bind:requirement /></div>
-		{/if}
+		<RequirementsEditor bind:requirement country={data.user.country} />
 	</fieldset>
 	<span class="spacer"></span>
+	<FitPreview {requirement} timeZone={tz} />
 	<Button type="submit" size="lg" block loading={busy === 'create'} disabled={!name.trim() || !!busy}>Create group</Button>
 	<button type="button" class="skip" disabled={!!busy} onclick={skip}>Skip for now</button>
 </form>
@@ -139,16 +122,6 @@
 	fieldset {
 		border: 0;
 		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-	}
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-	}
-	.custom {
 		display: flex;
 		flex-direction: column;
 		gap: 10px;

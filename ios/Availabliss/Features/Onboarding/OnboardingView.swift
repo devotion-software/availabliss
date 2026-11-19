@@ -89,10 +89,11 @@ private struct FirstGroupStep: View {
     let onCreated: (Group) -> Void
     let onSkip: () -> Void
     let onBack: () -> Void
+    @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @Environment(\.onboardingSteps) private var steps
     @State private var name = ""
-    /// Just the length is chosen here; the rest of the timing keeps its defaults until later.
+    /// The full timing sentence, as in New group, with a live count of how many times fit.
     @State private var timing: TimingEditorViewModel
     @State private var color = ["t1", "t2", "t3", "t4", "t5"].randomElement() ?? "t1"
     @State private var isSaving = false
@@ -130,28 +131,17 @@ private struct FirstGroupStep: View {
                 }
                 VStack(alignment: .leading, spacing: 10) {
                     Text("What are you planning?").sectionLabelStyle()
-                    FlowLayout(spacing: 8) {
-                        ForEach(TimingPreset.allCases) { option in
-                            Chip(
-                                label: option == .custom ? "More options" : option.label,
-                                isOn: timing.preset == option,
-                                height: 40,
-                                fontSize: 14
-                            ) { timing.choose(option) }
-                        }
-                    }
-                    if timing.preset == .custom {
-                        CustomLengthEditor(model: timing)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
+                    TimingForm(model: timing)
                 }
-                .animation(.spring(response: 0.35, dampingFraction: 0.85), value: timing.preset)
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
         }
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 4) {
+                FitSummary(model: timing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 8)
                 Button {
                     Task { await create() }
                 } label: {
@@ -170,6 +160,8 @@ private struct FirstGroupStep: View {
         .screenBackground(OrbLayout.groups)
         .foregroundStyle(theme.ink)
         .errorAlert($error)
+        .task { await timing.loadAuthorities(country: app.session.user?.country) }
+        .task(id: timing.draft) { await timing.refreshPreview() }
     }
 
     private var monogram: String {
@@ -179,10 +171,20 @@ private struct FirstGroupStep: View {
 
     private func create() async {
         guard !trimmed.isEmpty, !isSaving else { return }
+        var requirement = timing.draft
+        if requirement.timezone.isEmpty { requirement.timezone = timezone }
+        if requirement.schoolHolidaysOnly && requirement.schoolAuthority == nil && requirement.customSchoolHolidays.isEmpty {
+            error = "Choose whose school holidays to use."
+            return
+        }
+        if requirement.range.to < requirement.range.from {
+            error = "The search range ends before it starts."
+            return
+        }
         isSaving = true
         defer { isSaving = false }
         do {
-            onCreated(try await api.send(API.Groups.create(CreateGroupBody(name: trimmed, color: color, requirement: timing.draft))))
+            onCreated(try await api.send(API.Groups.create(CreateGroupBody(name: trimmed, color: color, requirement: requirement))))
         } catch {
             self.error = error.userMessage
         }

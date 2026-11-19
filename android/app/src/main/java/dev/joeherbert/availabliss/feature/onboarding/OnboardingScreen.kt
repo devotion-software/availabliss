@@ -63,8 +63,8 @@ import dev.joeherbert.availabliss.feature.calendars.rememberCalendarPermissionRe
 import dev.joeherbert.availabliss.feature.common.InviteLinkSection
 import dev.joeherbert.availabliss.feature.common.InviteRecipientsField
 import dev.joeherbert.availabliss.feature.common.UsernameField
-import dev.joeherbert.availabliss.feature.timing.CustomLengthEditor
-import dev.joeherbert.availabliss.feature.timing.TimingPreset
+import dev.joeherbert.availabliss.feature.timing.FitSummary
+import dev.joeherbert.availabliss.feature.timing.TimingEditorSections
 
 /** The sign-up wizard: about you, calendars, your first group, invite people. */
 @Composable
@@ -186,6 +186,7 @@ fun OnboardingScreen(
                     title = "Start your first group",
                     subtitle = "Name the event you’re planning. You can change everything later.",
                     footer = {
+                        state.editor?.let { FitSummary(it, Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 10.dp)) }
                         PrimaryButton(
                             "Create group",
                             viewModel::createGroup,
@@ -211,29 +212,7 @@ fun OnboardingScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text("What are you planning?", style = AvailablissTheme.type.label, color = AvailablissTheme.colors.muted)
-                    androidx.compose.foundation.layout.FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        TimingPreset.entries.forEach { preset ->
-                            Chip(
-                                if (preset == TimingPreset.Custom) "More options" else preset.label,
-                                selected = state.draft.preset == preset,
-                                onClick = { viewModel.onPresetChange(preset) },
-                                height = 40.dp,
-                            )
-                        }
-                    }
-                    if (state.draft.preset == TimingPreset.Custom) {
-                        CustomLengthEditor(
-                            state.draft,
-                            enabled = true,
-                            onCustomKind = viewModel::onCustomKind,
-                            onDuration = viewModel::onDuration,
-                            onDayCount = viewModel::onDayCount,
-                            onWeeksLater = viewModel::onWeeksLater,
-                        )
-                    }
+                    state.editor?.let { editor -> TimingEditorSections(editor, canEdit = true, actions = viewModel.editor.actions()) }
                 }
                 OnboardingStep.Invite -> OnboardingPage(
                     stepNumber = 4,
