@@ -17,7 +17,7 @@
 		members: Map<string, Member>;
 		onselect?: (date: string) => void;
 		/** The day whose detail shows under the grid. */
-		selected?: string;
+		selected?: string | null;
 		/** Phones in portrait: a card per day instead of the time grid, which needs the width. */
 		cards?: boolean;
 		/** Whether a day works for everyone (true while unknown). Days that don't are faded. */

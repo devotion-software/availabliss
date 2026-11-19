@@ -68,7 +68,7 @@ struct GroupAvailabilityView: View {
         .task(id: group.rhythm) { await loadNext() }
         .refreshable { await model.invalidate() }
         .onChange(of: model.mode) { _, _ in Task { await model.load() } }
-        .onChange(of: model.selectedDay) { _, _ in Task { await model.loadSelectedDay() } }
+        .onChange(of: model.selection) { _, _ in Task { await model.loadSelectedDay() } }
         .onChange(of: group.requirement) { _, requirement in
             model.searchRange = requirement.range
             Task { await model.invalidate() }
@@ -313,8 +313,12 @@ struct GroupAvailabilityView: View {
                 .id(PageID(mode: model.mode, key: model.pageKey))
                 .transition(pageTransition)
             }
-            DayDetailCard(model: model, group: group, me: app.session.user?.id) { draft in
-                proposalDraft = draft
+            // Only once a day's been tapped: nothing is selected to begin with.
+            if let day = model.selection {
+                DayDetailCard(model: model, day: day, group: group, me: app.session.user?.id) { draft in
+                    proposalDraft = draft
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
             if model.mode == .month {
                 BestOptionsCard(

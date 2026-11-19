@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteMap } from 'svelte/reactivity';
 	import { untrack } from 'svelte';
 	import type { DayAvailability, Slot } from '#lib/types';
 	import { addDays, addMonths, endOfMonth, startOfMonth, startOfWeek } from '#lib/client/dates';
@@ -59,7 +60,12 @@
 	// calendar back to this month. Only a rerun of this page's own load reseeds.
 	let month = $state(untrack(() => data.month));
 	let availability = $state(untrack(() => data.availability));
+	// Which week the Week view shows (and where month paging starts): not a selection.
 	let selected = $state(untrack(() => defaultSelection(data.availability, data.month)));
+	// The day tapped, whose detail shows underneath: none until you tap one (and after tapping it again).
+	let picked = $state<string | null>(null);
+	// The day picked on each month or week page (by `pageKey`), restored when you come back to it.
+	const remembered = new SvelteMap<string, string>();
 	let seededFrom = untrack(() => data.availability);
 	$effect.pre(() => {
 		const next = data.availability;
@@ -70,6 +76,8 @@
 			month = data.month;
 			availability = next;
 			selected = defaultSelection(next, data.month);
+			picked = null;
+			remembered.clear();
 			cache.seed(data.month, next);
 			findFreeNeighbours();
 		});
@@ -80,7 +88,7 @@
 
 	const days = $derived(dayMap(availability.days));
 	const columns = $derived(visibleColumns(availability));
-	const selectedSlot = $derived(slotOn(availability.slots, selected, fmt.current.dayKey));
+	const selectedSlot = $derived(picked ? slotOn(availability.slots, picked, fmt.current.dayKey) : null);
 	const week = $derived(weekDates(selected, columns));
 	const heading = $derived(view === 'month' ? monthTitle(month) : formatDayRange(week[0], week[week.length - 1], false));
 
@@ -147,7 +155,11 @@
 	let dayRequest = 0;
 	async function loadDay() {
 		const id = ++dayRequest;
-		const date = selected;
+		const date = picked;
+		if (!date) {
+			dayDetail = null;
+			return;
+		}
 		if (dayDetail?.date !== date) dayDetail = cache.daysReady.get(date) ?? null;
 		try {
 			const detail = await cache.day(date);
@@ -168,6 +180,7 @@
 	$effect(() => {
 		void view;
 		void selected;
+		void picked;
 		void group.id;
 		untrack(() => loadDetails());
 	});
@@ -200,9 +213,26 @@
 		return status === undefined || status === 'match';
 	}
 
-	function select(date: string) {
+	/** A day tapped in the month or week: its detail shows underneath. Tapping it again clears it. */
+	function select(date: string, toggle = true) {
+		if (toggle && picked === date) {
+			picked = null;
+			remembered.delete(pageKey);
+			return;
+		}
 		selected = date;
+		picked = date;
 		if (startOfMonth(date) !== month) loadMonth(startOfMonth(date));
+		remembered.set(pageKey, date);
+	}
+
+	/** Keeps this page's pick before paging away… */
+	function leavePage() {
+		if (picked) remembered.set(pageKey, picked);
+	}
+	/** …and the new page shows its own (or nothing). */
+	function arrive() {
+		picked = remembered.get(pageKey) ?? null;
 	}
 
 	// The month or week on screen doesn't include today, so "Today" is offered.
@@ -212,8 +242,10 @@
 	function jumpToToday() {
 		const today = todayKey;
 		lastStep = today > selected ? 1 : -1;
+		leavePage();
 		if (startOfMonth(today) !== month) loadMonth(startOfMonth(today));
 		selected = today;
+		arrive();
 	}
 
 	// The nearest dates that work for everyone before / after the month or week on screen (the
@@ -248,20 +280,24 @@
 	/** To the month or week holding a free date either side, with it selected. */
 	function jumpTo(date: string) {
 		lastStep = date > selected ? 1 : -1;
-		if (startOfMonth(date) !== month) loadMonth(startOfMonth(date));
-		selected = date;
+		leavePage();
+		select(date, false);
 	}
 
 	let lastStep: 1 | -1 = 1;
 	function step(direction: 1 | -1) {
 		lastStep = direction;
+		leavePage();
 		if (view === 'month') {
 			const m = addMonths(month, direction);
 			loadMonth(m);
 			selected = m;
 		} else {
-			select(addDays(selected, direction * 7));
+			const d = addDays(selected, direction * 7);
+			selected = d;
+			if (startOfMonth(d) !== month) loadMonth(startOfMonth(d));
 		}
+		arrive();
 	}
 
 	// One page per month / week.
@@ -276,7 +312,7 @@
 	const phone = $derived(isDesktop.matches !== true);
 
 	function selectSlot(slot: Slot) {
-		select(fmt.current.dayKey(slot.start));
+		select(fmt.current.dayKey(slot.start), false);
 		view = 'month';
 	}
 </script>
@@ -326,34 +362,35 @@
 				{#if view === 'month'}
 					{#if phone}
 						<span class="phone-only">
-							<MonthGrid {availability} {month} {members} {selected} onselect={select} compact />
+							<MonthGrid {availability} {month} {members} selected={picked} onselect={select} compact />
 						</span>
 					{/if}
 					{#if desk}
 						<span class="desk-only">
-							<MonthGrid {availability} {month} {members} {selected} onselect={select} />
+							<MonthGrid {availability} {month} {members} selected={picked} onselect={select} />
 						</span>
 					{/if}
 				{:else}
 					<!-- Phones get a card per day; the time grid needs a wider screen. -->
-					<WeekGrid dates={week} days={weekDays} {members} {selected} onselect={select} cards={!desk && phoneWidth} {works} />
+					<WeekGrid dates={week} days={weekDays} {members} selected={picked} onselect={select} cards={!desk && phoneWidth} {works} />
 				{/if}
 			</CalendarPager>
 		</section>
 
-		<DayDetailCard
-			date={selected}
-			day={days.get(selected)}
-			detail={dayDetail?.date === selected ? dayDetail : null}
-			slot={selectedSlot}
-			{members}
-			meId={data.user.id}
-			{noun}
-			onpropose={propose}
-			onproposeday={(day) => propose({ day })}
-			shortlisted={selectedSlot ? shortlist.has(selectedSlot) : false}
-			onshortlist={shortlist.toggle}
-		/>
+		<!-- Only once a day's been tapped: nothing is selected to begin with. -->
+		{#if picked}<DayDetailCard
+				date={picked}
+				day={days.get(picked)}
+				detail={dayDetail?.date === picked ? dayDetail : null}
+				slot={selectedSlot}
+				{members}
+				meId={data.user.id}
+				{noun}
+				onpropose={propose}
+				onproposeday={(day) => propose({ day })}
+				shortlisted={selectedSlot ? shortlist.has(selectedSlot) : false}
+				onshortlist={shortlist.toggle}
+			/>{/if}
 	</div>
 
 	<aside class="aside">

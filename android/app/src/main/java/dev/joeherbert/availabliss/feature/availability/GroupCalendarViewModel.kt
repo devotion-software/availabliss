@@ -135,9 +135,12 @@ private data class RawState(
     val view: CalendarView = CalendarView.Month,
     val month: YearMonth = YearMonth.from(DateTimes.today()),
     val availability: Availability? = null,
+    /** Which week the Week view shows (and where month paging starts): not a selection. */
     val selected: LocalDate = DateTimes.today(),
-    /** True once the user taps a day; reloads then keep their choice. */
-    val userPicked: Boolean = false,
+    /** The day tapped, whose detail shows underneath; null until you tap one (and after tapping it again). */
+    val selection: LocalDate? = null,
+    /** The day picked on each month or week page (by [pageKey]), restored when you come back to it. */
+    val remembered: Map<LocalDate, LocalDate> = emptyMap(),
     val week: List<DayAvailability> = emptyList(),
     val weekLoading: Boolean = false,
     val day: DayAvailability? = null,
@@ -235,15 +238,37 @@ class GroupCalendarViewModel @Inject constructor(
 
     // region Intents
     fun selectView(view: CalendarView) {
-        raw.update { it.copy(view = view) }
+        raw.update { s ->
+            val switched = s.copy(view = view)
+            // Same day, other view: kept if it's on the new page, else what was picked there before.
+            val sel = s.selection
+            if (sel == null || pageOf(switched, sel) == pageKey(switched)) switched
+            else switched.copy(remembered = s.remembered + (pageKey(s) to sel)).let { it.copy(selection = it.remembered[pageKey(it)]) }
+        }
         loadForView()
-    }
-
-    /** A day tapped in the month or week grid: its detail loads underneath. */
-    fun selectDate(date: LocalDate) {
-        raw.update { it.copy(selected = date, userPicked = true) }
         loadDay()
     }
+
+    /** A day tapped in the month or week grid: its detail loads underneath. Tapping it again clears it. */
+    fun selectDate(date: LocalDate) {
+        raw.update { s ->
+            if (s.selection == date) s.copy(selection = null, remembered = s.remembered - pageKey(s))
+            else s.copy(selected = date, selection = date).let { it.copy(remembered = it.remembered + (pageKey(it) to date)) }
+        }
+        loadDay()
+    }
+
+    /** The page on screen, keyed for [RawState.remembered]: its month's 1st, or its week's first day. */
+    private fun pageKey(s: RawState): LocalDate = if (s.view == CalendarView.Month) s.month.atDay(1) else DateTimes.startOfWeek(s.selected)
+
+    /** The page [date] is on in [s]'s view. */
+    private fun pageOf(s: RawState, date: LocalDate): LocalDate =
+        if (s.view == CalendarView.Month) YearMonth.from(date).atDay(1) else DateTimes.startOfWeek(date)
+
+    /** Remembers this page's pick before paging away; the new page shows its own. */
+    private fun RawState.leavingPage(): RawState = selection?.let { copy(remembered = remembered + (pageKey(this) to it)) } ?: this
+
+    private fun RawState.arrived(): RawState = copy(selection = remembered[pageKey(this)])
 
     fun previous() = step(-1)
 
@@ -254,7 +279,7 @@ class GroupCalendarViewModel @Inject constructor(
         lastDelta = if (today.isAfter(r.selected)) 1 else -1
         val month = YearMonth.from(today)
         raw.update { s ->
-            val moved = s.copy(month = month, selected = today, userPicked = true)
+            val moved = s.leavingPage().copy(month = month, selected = today).arrived()
             months[month]?.let { moved.copy(availability = it) } ?: moved
         }
         if (r.month != month) loadMonth() else loadDay()
@@ -269,7 +294,7 @@ class GroupCalendarViewModel @Inject constructor(
         lastDelta = if (date.isAfter(r.selected)) 1 else -1
         val month = YearMonth.from(date)
         raw.update { s ->
-            val moved = s.copy(month = month, selected = date, userPicked = true)
+            val moved = s.leavingPage().copy(month = month, selected = date, selection = date).let { it.copy(remembered = it.remembered + (pageKey(it) to date)) }
             months[month]?.let { moved.copy(availability = it) } ?: moved
         }
         if (r.month != month) loadMonth() else loadDay()
@@ -376,14 +401,14 @@ class GroupCalendarViewModel @Inject constructor(
                 val month = r.month.plusMonths(delta)
                 val selected = if (YearMonth.from(DateTimes.today()) == month) DateTimes.today() else month.atDay(1)
                 raw.update { s ->
-                    val moved = s.copy(month = month, selected = selected, userPicked = false)
+                    val moved = s.leavingPage().copy(month = month, selected = selected).arrived()
                     // Already fetched (usually: neighbours are prefetched): show it as the page slides in.
-                    months[month]?.let { moved.copy(availability = it, selected = defaultSelection(moved, it)) } ?: moved
+                    months[month]?.let { moved.copy(availability = it) } ?: moved
                 }
                 loadMonth()
             }
             CalendarView.Week -> {
-                raw.update { it.copy(selected = it.selected.plusWeeks(delta)) }
+                raw.update { s -> s.leavingPage().copy(selected = s.selected.plusWeeks(delta)).arrived() }
                 syncMonthToSelection()
                 loadForView()
             }
@@ -408,9 +433,9 @@ class GroupCalendarViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     if (raw.value.month != month) return@launch
                     raw.update { s ->
-                        s.copy(loading = false, availability = result.value, error = null, selected = defaultSelection(s, result.value))
+                        s.copy(loading = false, availability = result.value, error = null)
                     }
-                    if (raw.value.day?.date != raw.value.selected.toString() || silent) loadDay()
+                    if (raw.value.selection?.let { raw.value.day?.date != it.toString() } == true || silent) loadDay()
                     findFreeNeighbours()
                     prefetchMonth(month.plusMonths(1))
                     prefetchMonth(month.minusMonths(1))
@@ -455,18 +480,13 @@ class GroupCalendarViewModel @Inject constructor(
         return result
     }
 
-    /** Keeps a day the user picked; otherwise the first day that works, then today, then the 1st. */
-    private fun defaultSelection(s: RawState, availability: Availability): LocalDate {
-        if (s.userPicked && YearMonth.from(s.selected) == s.month) return s.selected
-        availability.days.firstOrNull { it.status == DayStatus.Match }?.date?.let(DateTimes::parseDate)?.let { return it }
-        val today = DateTimes.today()
-        return if (YearMonth.from(today) == s.month) today else s.month.atDay(1)
-    }
-
     /** Who's free on the selected day, shown under the grid. */
     private fun loadDay() {
         dayJob?.cancel()
-        val date = raw.value.selected
+        val date = raw.value.selection ?: run {
+            raw.update { it.copy(dayLoading = false) }
+            return
+        }
         days[date]?.let { cached ->
             raw.update { it.copy(dayLoading = false, day = cached) }
             return
@@ -515,12 +535,12 @@ class GroupCalendarViewModel @Inject constructor(
             CalendarView.Month -> DateTimes.shortMonthYear(r.month.atDay(1))
             CalendarView.Week -> if (weekDates.isEmpty()) "" else DateTimes.weekRange(weekDates.first(), weekDates.last()).let { shortenMonth(it, weekDates) }
         }
-        val day = r.day?.takeIf { it.date == r.selected.toString() }
+        val day = r.selection?.let { sel -> r.day?.takeIf { it.date == sel.toString() } }
         val awayFromToday = when (r.view) {
             CalendarView.Month -> r.month != YearMonth.from(today)
             CalendarView.Week -> weekStart != DateTimes.startOfWeek(today)
         }
-        val monthRows = AvailabilityUiMapper.monthRows(r.month, r.availability, group, meId, r.selected, today)
+        val monthRows = AvailabilityUiMapper.monthRows(r.month, r.availability, group, meId, r.selection, today)
         val nameOf = { id: String -> AvailabilityUiMapper.displayName(group, id, meId) }
         return GroupCalendarUiState(
             shortlist = r.shortlist,
@@ -551,15 +571,17 @@ class GroupCalendarViewModel @Inject constructor(
             heading = heading,
             columnLabels = AvailabilityUiMapper.columnLabels(columns),
             monthRows = monthRows,
-            detail = if (YearMonth.from(r.selected) == r.month) AvailabilityUiMapper.detail(r.selected, r.availability, group, meId, today) else null,
+            // Only once a day's been tapped: nothing is selected to begin with.
+            detail = r.selection?.takeIf { r.view == CalendarView.Week || YearMonth.from(it) == r.month }
+                ?.let { AvailabilityUiMapper.detail(it, r.availability, group, meId, today) },
             syncBanner = AvailabilityUiMapper.syncBanner(r.availability, group, isAdmin),
             coverageNote = AvailabilityUiMapper.coverageNote(r.availability, group, meId),
             nudging = r.nudging,
-            weekColumns = AvailabilityUiMapper.weekColumns(r.week, group, meId, r.selected) { date -> dayStatus(r, date) },
+            weekColumns = AvailabilityUiMapper.weekColumns(r.week, group, meId, r.selection) { date -> dayStatus(r, date) },
             weekDates = r.week.mapNotNull { DateTimes.parseDate(it.date) },
             dayFree = day?.everyoneFree?.firstOrNull()?.let { it.start to it.end },
             weekLoading = r.weekLoading,
-            dayTitle = DateTimes.shortDay(r.selected),
+            dayTitle = DateTimes.shortDay(r.selection ?: r.selected),
             dayNote = day?.let(AvailabilityUiMapper::dayNote),
             everyone = day?.let(AvailabilityUiMapper::everyoneBands).orEmpty(),
             timelineRows = day?.let { AvailabilityUiMapper.timelineRows(it, group, meId) }.orEmpty(),

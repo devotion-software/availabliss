@@ -45,7 +45,7 @@ struct WeekGrid: View {
             HStack(spacing: 6) {
                 hourLabels
                 ForEach(model.weekDays, id: \.self) { day in
-                    let selected = day == model.selectedDay
+                    let selected = day == model.selection
                     WeekColumn(day: day, detail: model.dayDetails[day], axis: axis, group: group)
                         // Days that don't work for everyone step back, like the month's plain cells.
                         .opacity(model.works(day) ? 1 : WeekFade.opacity)
@@ -177,10 +177,10 @@ struct WeekCards: View {
         VStack(spacing: 8) {
             ForEach(model.weekDays, id: \.self) { day in
                 WeekDayCard(
-                    day: day, detail: model.dayDetails[day], status: model.day(day)?.status, works: model.works(day), group: group, isSelected: day == model.selectedDay
+                    day: day, detail: model.dayDetails[day], status: model.day(day)?.status, works: model.works(day), group: group, isSelected: day == model.selection
                 )
                 .onTapGesture { withAnimation(.spring(response: 0.3)) { model.pick(day) } }
-                .accessibilityAddTraits(day == model.selectedDay ? [.isButton, .isSelected] : .isButton)
+                .accessibilityAddTraits(day == model.selection ? [.isButton, .isSelected] : .isButton)
             }
         }
     }

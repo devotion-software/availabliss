@@ -3,27 +3,29 @@ import SwiftUI
 /// The card under the month / week: what the selected day means, who's free when, and Propose.
 struct DayDetailCard: View {
     let model: GroupAvailabilityViewModel
+    /// The day tapped.
+    let day: CalendarDay
     let group: Group
     let me: String?
     let propose: (ProposalDraft) -> Void
     @Environment(\.theme) private var theme
 
-    private var isPast: Bool { model.selectedDay < .today() }
+    private var isPast: Bool { day < .today() }
 
     var body: some View {
-        let slot = model.slot(for: model.selectedDay)
-        let works = !isPast && slot != nil && model.day(model.selectedDay)?.status == .match
+        let slot = model.slot(for: day)
+        let works = !isPast && slot != nil && model.day(day)?.status == .match
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(works ? (slot?.label ?? "") : Formatting.shortDay(model.selectedDay)).displayFont(16, .semibold, relativeTo: .headline)
+                    Text(works ? (slot?.label ?? "") : Formatting.shortDay(day)).displayFont(16, .semibold, relativeTo: .headline)
                     Text(subtitle(works: works, slot: slot)).bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
                 }
                 Spacer()
                 StatusPill(
                     text: works ? (slot?.missingCount ?? 0 > 0 ? "Most of us" : "Works") : (isPast ? "Past" : "Doesn\u{2019}t fit"), tone: works ? .mint : .neutral)
             }
-            if works, let who = model.day(model.selectedDay)?.preferredBy, !who.isEmpty {
+            if works, let who = model.day(day)?.preferredBy, !who.isEmpty {
                 Label {
                     Text(
                         "\(Formatting.list(who.map { $0 == me ? "You" : (group.member($0)?.firstName ?? "Someone") })) \(who.count == 1 && who.first != me ? "prefers" : "prefer") this"
@@ -36,8 +38,8 @@ struct DayDetailCard: View {
             }
             if isPast {
                 // Nothing to plan on a day that's gone.
-            } else if let detail = model.dayDetails[model.selectedDay] {
-                DayTimeline(detail: detail, date: model.selectedDay, group: group, me: me)
+            } else if let detail = model.dayDetails[day] {
+                DayTimeline(detail: detail, date: day, group: group, me: me)
                     .padding(.vertical, 2)
             } else {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 90)
@@ -46,12 +48,11 @@ struct DayDetailCard: View {
         }
         .padding(14)
         .glass(cornerRadius: 22)
-        .animation(.easeInOut(duration: 0.2), value: model.selectedDay)
+        .animation(.easeInOut(duration: 0.2), value: day)
     }
 
     @ViewBuilder
     private func proposeButton(works: Bool, slot: Slot?) -> some View {
-        let day = model.selectedDay
         if works, let slot {
             Button("Propose this \(group.requirement.slotNoun.rawValue)") {
                 propose(ProposalDraft(slot: slot, requirement: group.requirement))
@@ -79,7 +80,7 @@ struct DayDetailCard: View {
 
     private func subtitle(works: Bool, slot: Slot?) -> String {
         if isPast { return "This day is in the past" }
-        guard let info = model.day(model.selectedDay) else { return "Outside the search range" }
+        guard let info = model.day(day) else { return "Outside the search range" }
         if works, let slot {
             let from = "\(Formatting.shortDay(slot.start)) \(Formatting.time(slot.start))"
             guard let missing = slot.missingMemberIds, !missing.isEmpty else { return "Everyone synced is free from \(from)" }

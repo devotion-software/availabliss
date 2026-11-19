@@ -7,11 +7,23 @@ import Observation
 final class GroupAvailabilityViewModel {
     enum Mode: Hashable { case month, week }
 
-    var mode: Mode = .month
+    var mode: Mode = .month {
+        didSet {
+            guard mode != oldValue else { return }
+            // Same day, other view: kept if it's on the new page, else what was picked there before.
+            if let selection, !isOnPage(selection) {
+                remember(selection, on: Self.page(of: selection, mode: oldValue))
+                self.selection = rememberedSelections[pageKey]
+            }
+        }
+    }
     private(set) var month: CalendarDay = CalendarDay.today().firstOfMonth
+    /// Which week the Week view shows (and where the month paging starts): not a selection.
     var selectedDay: CalendarDay = .today()
-    /// True once the user taps a day; reloads then keep their choice.
-    private var userPickedDay = false
+    /// The day tapped, whose detail shows underneath; nil until you tap one (and after tapping it again).
+    private(set) var selection: CalendarDay?
+    /// The day picked on each month or week page (by `pageKey`), restored when you come back to it.
+    private var rememberedSelections: [CalendarDay: CalendarDay] = [:]
     private(set) var availability: Availability?
     private(set) var dayDetails: [CalendarDay: DayAvailability] = [:]
     private(set) var isLoading = false
@@ -110,7 +122,7 @@ final class GroupAvailabilityViewModel {
         case .month: await loadMonth()
         case .week: await loadWeek()
         }
-        if dayDetails[selectedDay] == nil { await loadDay(selectedDay) }
+        if let selection, dayDetails[selection] == nil { await loadDay(selection) }
         await findFreeNeighbours()
     }
 
@@ -184,9 +196,11 @@ final class GroupAvailabilityViewModel {
     /// To the month or week holding `day`, with it selected. Follow with `load()`.
     func jump(to day: CalendarDay) {
         lastDelta = day > selectedDay ? 1 : -1
+        leavePage()
         month = day.firstOfMonth
         selectedDay = day
-        userPickedDay = true
+        selection = day
+        remember(day, on: pageKey)
         if let cached = months[month] { show(cached) }
     }
 
@@ -199,14 +213,15 @@ final class GroupAvailabilityViewModel {
     /// Follow with `load()`.
     func advance(by delta: Int) {
         lastDelta = delta < 0 ? -1 : 1
+        leavePage()
         switch mode {
         case .month:
             month = month.addingMonths(delta)
             selectedDay = month == CalendarDay.today().firstOfMonth ? .today() : month
-            userPickedDay = false
         case .week: selectedDay = selectedDay.adding(days: 7 * delta)
         }
         if mode != .month, selectedDay.firstOfMonth != month { month = selectedDay.firstOfMonth }
+        selection = rememberedSelections[pageKey]
         // Already fetched (usually: neighbours are prefetched): show it as the page slides in.
         if let cached = months[month] { show(cached) }
     }
@@ -221,9 +236,10 @@ final class GroupAvailabilityViewModel {
     func jumpToToday() {
         let today = CalendarDay.today()
         lastDelta = (mode == .month ? today.firstOfMonth > month : today > selectedDay) ? 1 : -1
+        leavePage()
         month = today.firstOfMonth
         selectedDay = today
-        userPickedDay = true
+        selection = rememberedSelections[pageKey]
         if let cached = months[month] { show(cached) }
     }
 
@@ -233,17 +249,35 @@ final class GroupAvailabilityViewModel {
     /// What one page of the calendar shows: the month, or the week of the selected day.
     var pageKey: CalendarDay { mode == .month ? month : selectedDay.startOfWeek() }
 
-    /// A day tapped in the month or week grid: its detail shows underneath.
+    /// A day tapped in the month or week grid: its detail shows underneath. Tapping it again clears it.
     func pick(_ date: CalendarDay) {
         if let lastSwipeAt, Date.now.timeIntervalSince(lastSwipeAt) < 0.4 { return }
+        if selection == date {
+            selection = nil
+            rememberedSelections[pageKey] = nil
+            return
+        }
+        selection = date
         selectedDay = date
-        userPickedDay = true
+        remember(date, on: pageKey)
     }
 
     /// Loads who's free on the selected day, if it isn't loaded yet.
     func loadSelectedDay() async {
-        if dayDetails[selectedDay] == nil { await loadDay(selectedDay) }
+        if let selection, dayDetails[selection] == nil { await loadDay(selection) }
     }
+
+    /// Keeps this page's pick for when you come back, before paging away (the new page shows its own).
+    private func leavePage() {
+        if let selection { remember(selection, on: pageKey) }
+    }
+
+    private func remember(_ day: CalendarDay, on page: CalendarDay) { rememberedSelections[page] = day }
+
+    /// The month (or week, by its first day) a day is on in `mode`.
+    private static func page(of day: CalendarDay, mode: Mode) -> CalendarDay { mode == .month ? day.firstOfMonth : day.startOfWeek() }
+
+    private func isOnPage(_ day: CalendarDay) -> Bool { Self.page(of: day, mode: mode) == pageKey }
 
     /// Something changed (busy time, the timing): forget what's cached and reload what's on screen.
     func invalidate() async {
@@ -257,13 +291,9 @@ final class GroupAvailabilityViewModel {
         await load()
     }
 
-    /// The displayed month's availability, picking a day that works unless the user chose one.
+    /// The displayed month's availability. Nothing is selected until you tap a day.
     private func show(_ loaded: Availability) {
         availability = loaded
-        // Start on a day that works rather than one outside the group's timing.
-        if !userPickedDay, let firstMatch = loaded.days.first(where: { $0.status == .match }) {
-            selectedDay = firstMatch.date
-        }
     }
 
     private func loadMonth() async {

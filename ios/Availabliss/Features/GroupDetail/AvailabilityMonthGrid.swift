@@ -26,12 +26,12 @@ struct MonthGrid: View {
                                 info: model.day(date),
                                 note: note(for: date),
                                 compact: model.columns.count > 4,
-                                isSelected: date == model.selectedDay
+                                isSelected: date == model.selection
                             ) {
                                 withAnimation(.spring(response: 0.3)) { model.pick(date) }
                             }
                             // Above its neighbours, so their cells don't cover the selection ring.
-                            .zIndex(date == model.selectedDay ? 1 : 0)
+                            .zIndex(date == model.selection ? 1 : 0)
                         } else {
                             Color.clear.frame(height: 54).accessibilityHidden(true)
                         }
