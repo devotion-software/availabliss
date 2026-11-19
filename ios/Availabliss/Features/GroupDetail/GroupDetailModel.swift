@@ -1,6 +1,11 @@
 import Foundation
 import Observation
 
+/// The chat's header buttons (in GroupTopBar), handled by the chat.
+enum ChatHeaderRequest {
+    case search, media
+}
+
 /// The group being viewed, shared by its calendar and the Chat / Plans / Timing screens pushed over it
 /// (see `GroupDetailStore`). It loads once and follows live updates for as long as any of them is open.
 @MainActor
@@ -14,8 +19,8 @@ final class GroupDetailModel {
     var unreadCount = 0
     /// Whether the chat is on screen, so new messages there don't count as unread.
     @ObservationIgnored var isChatVisible = false
-    /// Search in the chat's header was tapped: the chat shows its search sheet.
-    var showsChatSearch = false
+    /// A button in the chat's header was tapped: the chat shows that sheet.
+    var chatHeaderRequest: ChatHeaderRequest?
     @ObservationIgnored private var unreadLoaded = false
 
     /// Proposals (by date) and upcoming events, for the calendar's Plans card and the Plans screen.

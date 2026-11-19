@@ -259,6 +259,21 @@ data class UserAt(val userId: String, val at: String)
 @Serializable
 data class MessagesResponse(val messages: List<Message>, val hasMore: Boolean)
 
+/** A photo or file on a chat's media page, with the message it was sent in. */
+@Serializable
+data class GroupMediaItem(
+    val messageId: String,
+    /** Null if the sender has deleted their account. */
+    val authorId: String? = null,
+    /** When its message was sent. */
+    val createdAt: String,
+    val attachment: Attachment,
+)
+
+/** A page of a chat's photos and GIFs, or files and passes: newest first. */
+@Serializable
+data class GroupMediaPage(val items: List<GroupMediaItem>, val hasMore: Boolean)
+
 /** A message's thread: the first message of its chain of replies, then every reply under it, oldest first. */
 @Serializable
 data class MessageThread(

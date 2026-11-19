@@ -1,5 +1,12 @@
-import { authed, badRequest, json } from '#lib/server/http';
-import { MAX_FILE_BYTES, uploadAttachment } from '#lib/server/attachments';
+import { authed, badRequest, json, query } from '#lib/server/http';
+import { listGroupMedia, MAX_FILE_BYTES, uploadAttachment } from '#lib/server/attachments';
+import { groupMediaQuerySchema } from '#lib/schemas';
+
+/** The chat's media page: its photos and GIFs, or files and passes, newest first. */
+export const GET = authed<{ id: string }>(async ({ params, url, userId }) => {
+	const { kind, before, limit } = query(url, groupMediaQuerySchema);
+	return json(await listGroupMedia(params.id, userId, kind, before ?? null, limit));
+});
 
 /**
  * Uploads one photo, GIF or file for the group's chat (multipart/form-data, field `file`).

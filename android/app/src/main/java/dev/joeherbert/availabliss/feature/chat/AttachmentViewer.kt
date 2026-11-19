@@ -57,6 +57,8 @@ fun AttachmentViewer(
     onShare: (Attachment) -> Unit,
     onSave: (Attachment) -> Unit,
     onDismiss: () -> Unit,
+    /** From the media page: Show in chat for the picture at this index. */
+    onShowInChat: ((Int) -> Unit)? = null,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -90,6 +92,9 @@ fun AttachmentViewer(
                         color = Color.White,
                     )
                     Spacer(Modifier.weight(1f))
+                }
+                if (onShowInChat != null) {
+                    PlainIconButton(AvIcons.Chat, "Show in chat", { onShowInChat(pager.currentPage) }, tint = Color.White, background = Color.Black.copy(alpha = 0.35f))
                 }
                 if (current != null) {
                     if (current.id in downloads) {

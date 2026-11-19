@@ -6,11 +6,11 @@
  * members inside messages), or to a signed-in member without one.
  */
 import { createHmac, hkdfSync, timingSafeEqual } from 'node:crypto';
-import { and, asc, eq, inArray, isNull, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, or } from 'drizzle-orm';
 import sharp from 'sharp';
-import type { Attachment, AttachmentKind, WalletPass } from '#lib/types';
+import type { Attachment, AttachmentKind, GroupMediaItem, WalletPass } from '#lib/types';
 import { db } from './db';
-import { messageAttachments } from './db/schema';
+import { messageAttachments, messages } from './db/schema';
 import { env } from './env';
 import { ApiError, badRequest, notFound } from './http';
 import { newId, newToken } from './ids';
@@ -144,6 +144,57 @@ export async function attachmentsFor(messageIds: string[]): Promise<Map<string, 
 		result.set(row.messageId!, list);
 	}
 	return result;
+}
+
+/** What each tab of a chat's media page shows. */
+export const MEDIA_KINDS = { media: ['image', 'gif'], files: ['file', 'pass'] } as const satisfies Record<string, readonly AttachmentKind[]>;
+
+/**
+ * Everything sent in a group's chat, newest first (in message order within a message): its photos
+ * and GIFs (`media`) or files and Wallet passes (`files`). Pass the last one's id as `before` for
+ * the page after. Attachments of deleted messages are gone for good, so never listed.
+ */
+export async function listGroupMedia(
+	groupId: string,
+	userId: string,
+	kind: keyof typeof MEDIA_KINDS,
+	before: string | null,
+	limit: number
+): Promise<{ items: GroupMediaItem[]; hasMore: boolean }> {
+	await requireMember(groupId, userId);
+	let after: { seq: number; position: number } | null = null;
+	if (before) {
+		const [anchor] = await db
+			.select({ seq: messages.seq, position: messageAttachments.position })
+			.from(messageAttachments)
+			.innerJoin(messages, eq(messages.id, messageAttachments.messageId))
+			.where(and(eq(messageAttachments.id, before), eq(messageAttachments.groupId, groupId)));
+		if (!anchor) throw notFound('Attachment not found');
+		after = anchor;
+	}
+	const rows = await db
+		.select({ attachment: messageAttachments, messageId: messages.id, authorId: messages.authorId, createdAt: messages.createdAt })
+		.from(messageAttachments)
+		.innerJoin(messages, eq(messages.id, messageAttachments.messageId))
+		.where(
+			and(
+				eq(messageAttachments.groupId, groupId),
+				inArray(messageAttachments.kind, [...MEDIA_KINDS[kind]]),
+				isNull(messages.deletedAt),
+				after ? or(lt(messages.seq, after.seq), and(eq(messages.seq, after.seq), gt(messageAttachments.position, after.position))) : undefined
+			)
+		)
+		.orderBy(desc(messages.seq), asc(messageAttachments.position))
+		.limit(limit + 1);
+	return {
+		items: rows.slice(0, limit).map((r) => ({
+			messageId: r.messageId,
+			authorId: r.authorId,
+			createdAt: r.createdAt.toISOString(),
+			attachment: toAttachment(r.attachment)
+		})),
+		hasMore: rows.length > limit
+	};
 }
 
 /**

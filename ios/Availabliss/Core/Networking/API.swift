@@ -255,6 +255,11 @@ enum API {
         static func messages(groupId: String, before: String? = nil, limit: Int = 50) -> Endpoint<MessagesPage> {
             .init(.get, "/groups/\(groupId.pathEncoded)/messages", query: ["before": before, "limit": String(limit)])
         }
+        /// A chat's media page: photos and GIFs (`media`) or files and passes (`files`), newest first;
+        /// `before` is the last attachment's id, for the next page.
+        static func media(groupId: String, kind: String, before: String? = nil) -> Endpoint<GroupMediaPage> {
+            .init(.get, "/groups/\(groupId.pathEncoded)/attachments", query: ["kind": kind, "before": before, "limit": "60"])
+        }
         /// Messages containing `query` (2–100 characters, any case), newest first.
         static func search(groupId: String, query: String, limit: Int = 50) -> Endpoint<MessagesPage> {
             .init(.get, "/groups/\(groupId.pathEncoded)/messages/search", query: ["q": query, "limit": String(limit)])

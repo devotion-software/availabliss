@@ -113,10 +113,13 @@ private struct GroupTopBar: View {
         AnyView(GroupTile(monogram: group.monogram, colorToken: group.color, imageURL: group.image, size: 40, cornerRadius: 14))
     }
 
-    /// Search, in the chat's header.
+    /// Photos and files, and Search, in the chat's header.
     @ViewBuilder private var chatActions: some View {
         if section == .chat {
-            IconButton(systemImage: "magnifyingglass", label: "Search chat") { detail.showsChatSearch = true }
+            HStack(spacing: 8) {
+                IconButton(systemImage: "photo.on.rectangle", label: "Photos and files") { detail.chatHeaderRequest = .media }
+                IconButton(systemImage: "magnifyingglass", label: "Search chat") { detail.chatHeaderRequest = .search }
+            }
         }
     }
 

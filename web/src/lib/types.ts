@@ -420,6 +420,16 @@ export interface Attachment {
 	pass: WalletPass | null;
 }
 
+/** A photo or file on a chat's media page, with the message it was sent in. */
+export interface GroupMediaItem {
+	messageId: string;
+	/** Null if the sender has deleted their account. */
+	authorId: string | null;
+	/** When its message was sent. */
+	createdAt: string;
+	attachment: Attachment;
+}
+
 export type WalletPassStyle = 'boardingPass' | 'eventTicket' | 'coupon' | 'storeCard' | 'generic';
 
 export interface WalletPassField {

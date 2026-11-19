@@ -24,6 +24,7 @@ import dev.joeherbert.availabliss.core.network.model.EventsResponse
 import dev.joeherbert.availabliss.core.network.model.Group
 import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.core.network.model.GroupInvitesResponse
+import dev.joeherbert.availabliss.core.network.model.GroupMediaPage
 import dev.joeherbert.availabliss.core.network.model.GroupsResponse
 import dev.joeherbert.availabliss.core.network.model.HolidaysResponse
 import dev.joeherbert.availabliss.core.network.model.InviteLink
@@ -426,6 +427,15 @@ interface AvailablissApi {
         @Query("before") before: String? = null,
         @Query("limit") limit: Int = 50,
     ): MessagesResponse
+
+    /** A chat's photos and GIFs ([kind] "media") or files and passes ("files"), newest first; [before] is the last attachment id. */
+    @GET("api/v1/groups/{id}/attachments")
+    suspend fun getGroupMedia(
+        @Path("id") groupId: String,
+        @Query("kind") kind: String,
+        @Query("before") before: String? = null,
+        @Query("limit") limit: Int = 60,
+    ): GroupMediaPage
 
     /** Messages containing [query] (2–100 characters, any case), newest first. */
     @GET("api/v1/groups/{id}/messages/search")

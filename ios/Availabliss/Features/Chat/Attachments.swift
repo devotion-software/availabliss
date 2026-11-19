@@ -445,6 +445,8 @@ private struct UploadRing: View {
 struct AttachmentViewer: View {
     let attachments: [Attachment]
     @State var selection: String
+    /// Adds Show in chat (from the media page), with the showing picture's id.
+    var onShowInChat: ((String) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var shareURL: URL?
     @State private var isPreparingShare = false
@@ -476,6 +478,15 @@ struct AttachmentViewer: View {
                     Text("\(index + 1) of \(attachments.count)").font(.system(size: 15, weight: .semibold))
                 }
                 Spacer()
+                if let onShowInChat {
+                    Button {
+                        dismiss()
+                        onShowInChat(selection)
+                    } label: {
+                        Image(systemName: "text.bubble").font(.system(size: 17, weight: .semibold)).frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Show in chat")
+                }
                 Button {
                     Task { await share() }
                 } label: {

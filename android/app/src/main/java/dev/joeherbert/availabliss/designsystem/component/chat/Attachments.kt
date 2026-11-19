@@ -281,7 +281,7 @@ private fun ImageTile(image: AttachmentUi, onOpen: (String) -> Unit, onLongClick
     }
 }
 
-private fun FileIcon.vector(): ImageVector = when (this) {
+fun FileIcon.vector(): ImageVector = when (this) {
     FileIcon.Document -> AvIcons.FileText
     FileIcon.Archive -> AvIcons.Archive
     FileIcon.Audio -> AvIcons.Music

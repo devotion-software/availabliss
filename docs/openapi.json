@@ -2908,6 +2908,99 @@
 			}
 		},
 		"/api/v1/groups/{id}/attachments": {
+			"get": {
+				"operationId": "getGroupsByIdAttachments",
+				"tags": [
+					"Chat"
+				],
+				"summary": "Photos or files sent in the chat (newest first)",
+				"description": "Signed in.",
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "kind",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"default": "media",
+							"type": "string",
+							"enum": [
+								"media",
+								"files"
+							]
+						}
+					},
+					{
+						"name": "before",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						}
+					},
+					{
+						"name": "limit",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"default": 60,
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/GroupMediaPage"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "validation_error: the body or query is invalid",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "unauthorized: not signed in",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "rate_limited (see Retry-After)",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					}
+				}
+			},
 			"post": {
 				"operationId": "postGroupsByIdAttachments",
 				"tags": [
@@ -10279,6 +10372,55 @@
 					"invitedBy"
 				],
 				"description": "An invite that can still be used (`GET /groups/:id/invites`)."
+			},
+			"GroupMediaItem": {
+				"type": "object",
+				"properties": {
+					"messageId": {
+						"type": "string"
+					},
+					"authorId": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "Null if the sender has deleted their account."
+					},
+					"createdAt": {
+						"type": "string",
+						"description": "When its message was sent."
+					},
+					"attachment": {
+						"$ref": "#/components/schemas/Attachment"
+					}
+				},
+				"required": [
+					"messageId",
+					"authorId",
+					"createdAt",
+					"attachment"
+				],
+				"description": "A photo or file on a chat's media page, with the message it was sent in."
+			},
+			"GroupMediaPage": {
+				"type": "object",
+				"properties": {
+					"items": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/GroupMediaItem"
+						},
+						"description": "Newest first."
+					},
+					"hasMore": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"items",
+					"hasMore"
+				],
+				"description": "GET /groups/:id/attachments"
 			},
 			"GroupPreference": {
 				"type": "object",

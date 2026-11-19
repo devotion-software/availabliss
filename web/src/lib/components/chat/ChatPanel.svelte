@@ -9,6 +9,7 @@
 	import PollComposerSheet from './PollComposerSheet.svelte';
 	import LocationSheet from './LocationSheet.svelte';
 	import ChatSearchSheet from './ChatSearchSheet.svelte';
+	import ChatMediaSheet from './ChatMediaSheet.svelte';
 	import IconButton from '#lib/components/ui/IconButton.svelte';
 	import { dropFiles } from './drop-files';
 
@@ -23,6 +24,7 @@
 	let pollOpen = $state(false);
 	let locationOpen = $state(false);
 	let searchOpen = $state(false);
+	let mediaOpen = $state(false);
 	let list: ReturnType<typeof MessageList> | undefined = $state();
 	let composer: ReturnType<typeof Composer> | undefined = $state();
 
@@ -49,6 +51,7 @@
 	<header>
 		<h2 id="chat-panel-{group.id}">Chat</h2>
 		{#if thread.unseen}<span class="new">{thread.unseen} new</span>{/if}
+		<IconButton icon="image" label="Photos and files" variant="plain" size={36} onclick={() => (mediaOpen = true)} />
 		<IconButton icon="search" label="Search chat" variant="plain" size={36} onclick={() => (searchOpen = true)} />
 		<a href="/app/groups/{group.id}/chat">Open<span class="sr-only"> full chat</span></a>
 	</header>
@@ -73,6 +76,7 @@
 
 <PollComposerSheet bind:open={pollOpen} onsubmit={(poll) => thread.sendPoll(poll)} />
 <LocationSheet bind:open={locationOpen} onsend={(location) => thread.sendLocation(location)} />
+<ChatMediaSheet bind:open={mediaOpen} {group} meId={me.id} onshowinchat={(id) => list?.showInChat(id)} />
 <ChatSearchSheet bind:open={searchOpen} {group} meId={me.id} onpick={(id) => list?.showInChat(id)} />
 
 <style>

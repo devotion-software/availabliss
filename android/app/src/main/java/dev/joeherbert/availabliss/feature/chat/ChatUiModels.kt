@@ -48,8 +48,11 @@ data class ThreadActionsUi(val messageId: String, val title: String, val snippet
 /** Scroll the chat to [messageId] and flash it ("Show in chat" from a thread). */
 data class ShowInChatRequest(val messageId: String, val nonce: Long = System.nanoTime())
 
-/** The full-screen photo viewer: a message's photos and GIFs, opened at [startIndex]. */
-data class ViewerUi(val attachments: List<Attachment>, val startIndex: Int)
+/**
+ * The full-screen photo viewer: a message's photos and GIFs, opened at [startIndex]. From the media
+ * page, [messageIds] holds each picture's message (alongside [attachments]) for Show in chat.
+ */
+data class ViewerUi(val attachments: List<Attachment>, val startIndex: Int, val messageIds: List<String>? = null)
 
 /** Poll creation form. */
 data class PollDraft(
@@ -115,6 +118,8 @@ data class ChatUiState(
     val locationSheet: LocationSheetUi? = null,
     /** Non-null while the Search chat sheet is open. */
     val search: ChatSearchUi? = null,
+    /** Non-null while the Photos and files sheet is open. */
+    val media: ChatMediaUi? = null,
 )
 
 /** The Share a location sheet: a place search and what it found, or the place picked from it. */

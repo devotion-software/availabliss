@@ -4,7 +4,18 @@
  * `components.schemas` in docs/openapi.json (scripts/openapi.ts). api-types.check.ts checks
  * that the server functions really return these shapes, so they can't drift silently.
  */
-import type { ApiErrorBody, AppNotification, Group, GroupEvent, GroupInvite, Message, MergeCandidate, ResponseKind, Slot } from './types';
+import type {
+	ApiErrorBody,
+	AppNotification,
+	Group,
+	GroupEvent,
+	GroupInvite,
+	GroupMediaItem,
+	Message,
+	MergeCandidate,
+	ResponseKind,
+	Slot
+} from './types';
 
 /** GET /health */
 export interface Health {
@@ -102,6 +113,13 @@ export interface MessageSearch {
 	/** Newest first. */
 	messages: Message[];
 	/** More matched than `limit`: search for something more specific. */
+	hasMore: boolean;
+}
+
+/** GET /groups/:id/attachments */
+export interface GroupMediaPage {
+	/** Newest first. */
+	items: GroupMediaItem[];
 	hasMore: boolean;
 }
 

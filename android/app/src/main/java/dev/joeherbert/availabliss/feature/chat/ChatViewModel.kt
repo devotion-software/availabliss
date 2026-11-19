@@ -67,6 +67,7 @@ class ChatViewModel @Inject constructor(
     private val threads = ChatThreads(session)
     private val location = ChatLocation(session, places)
     private val search = ChatSearch(session, threads)
+    private val media = ChatMedia(session, threads, attachments)
     private val live = ChatLiveUpdates(session, groups, receipts, composer)
 
     private val meIds = users.user.map { it?.id }.distinctUntilChanged()
@@ -220,6 +221,14 @@ class ChatViewModel @Inject constructor(
     // endregion
 
     // region Location
+    fun openMedia() = media.open()
+    fun closeMedia() = media.close()
+    fun showMediaKind(kind: MediaKind) = media.showKind(kind)
+    fun loadMoreMedia() = media.loadMore()
+    fun viewMediaPhoto(index: Int) = media.viewPhoto(index)
+    fun openMediaFile(attachment: Attachment) = media.openFile(attachment)
+    fun showMediaInChat(messageId: String) = media.showInChat(messageId)
+
     fun openSearch() = search.open()
     fun closeSearch() = search.close()
     fun onSearchQuery(value: String) = search.onQuery(value)

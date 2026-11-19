@@ -98,18 +98,23 @@ internal class ChatAttachments(
         val a = m.attachments.firstOrNull { it.id == attachmentId } ?: return
         if (a.isVisual) {
             val visuals = m.attachments.filter { it.isVisual }
-            data.update { it.copy(viewer = ViewerUi(visuals, visuals.indexOf(a).coerceAtLeast(0)), menuOpen = false) }
+            viewPictures(ViewerUi(visuals, visuals.indexOf(a).coerceAtLeast(0)))
         } else {
-            withDownload(a) { file ->
-                if (!files.open(file, a.mime)) {
-                    val why = if (a.kind == AttachmentKind.Pass) {
-                        "No app on this phone opens Wallet passes. Google Wallet can't add Apple Wallet passes directly: try an app that supports .pkpass files"
-                    } else {
-                        "No app on this phone can open ${a.name}"
-                    }
-                    data.update { it.copy(message = UserMessage(why)) }
-                }
+            openFile(a)
+        }
+    }
+
+    fun viewPictures(viewer: ViewerUi) = data.update { it.copy(viewer = viewer, menuOpen = false) }
+
+    /** Downloads a file and opens it in an app that can. */
+    fun openFile(a: Attachment) = withDownload(a) { file ->
+        if (!files.open(file, a.mime)) {
+            val why = if (a.kind == AttachmentKind.Pass) {
+                "No app on this phone opens Wallet passes. Google Wallet can't add Apple Wallet passes directly: try an app that supports .pkpass files"
+            } else {
+                "No app on this phone can open ${a.name}"
             }
+            data.update { it.copy(message = UserMessage(why)) }
         }
     }
 

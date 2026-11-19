@@ -80,6 +80,7 @@ internal data class ChatData(
     val viewer: ViewerUi? = null,
     val locationSheet: LocationSheetUi? = null,
     val search: SearchSession? = null,
+    val media: MediaSession? = null,
 ) {
     /** The chat's loaded messages and the open thread's, to find one tapped in either. */
     val allMessages: List<Message> get() = messages + thread?.messages.orEmpty()

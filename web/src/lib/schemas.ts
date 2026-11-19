@@ -431,6 +431,12 @@ export const messageSearchQuerySchema = z.object({
 	q: z.string().trim().min(2, 'Search for at least 2 characters').max(100),
 	limit: z.coerce.number().int().min(1).max(100).default(50)
 });
+/** GET /groups/:id/attachments?kind&before&limit */
+export const groupMediaQuerySchema = z.object({
+	kind: z.enum(['media', 'files']).default('media'),
+	before: z.string().min(1).optional(),
+	limit: z.coerce.number().int().min(1).max(100).default(60)
+});
 /** GET /groups/:id/availability/day?date */
 export const dayQuerySchema = z.object({ date: dateString });
 

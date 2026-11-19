@@ -50,9 +50,12 @@ struct ChatView: View {
         case thread(String)
         /// Search in the chat, from the header.
         case search
+        /// Photos and files sent in the chat, from the header.
+        case media
         var id: String {
             switch self {
             case .search: "search"
+            case .media: "media"
             case .thread(let id): "thread-\(id)"
             case .info(let message): "info-\(message.id)"
             }
@@ -94,12 +97,12 @@ struct ChatView: View {
         .onAppear { app.router.visibleChatGroupId = group.id }
         .onDisappear { if app.router.visibleChatGroupId == group.id { app.router.visibleChatGroupId = nil } }
         .sheet(item: $sheet) { sheet in sheetContent(sheet) }
-        // Search in the header (GroupTopBar) asks through the shared model.
-        .onChange(of: detail.showsChatSearch) { _, shows in
-            guard shows else { return }
-            detail.showsChatSearch = false
+        // The header's buttons (in GroupTopBar) ask through the shared model.
+        .onChange(of: detail.chatHeaderRequest) { _, request in
+            guard let request else { return }
+            detail.chatHeaderRequest = nil
             showsMenu = false
-            sheet = .search
+            sheet = request == .search ? .search : .media
         }
         .errorAlert($model.error)
     }
@@ -293,6 +296,11 @@ struct ChatView: View {
             }
         case .search:
             ChatSearchSheet(group: group, me: me, api: detail.api) { target in
+                self.sheet = nil
+                showRequest = target
+            }
+        case .media:
+            ChatMediaSheet(group: group, me: me, api: detail.api) { target in
                 self.sheet = nil
                 showRequest = target
             }

@@ -246,6 +246,23 @@ struct MessageInfo: Decodable, Sendable {
     let pending: [String]
 }
 
+/// A photo or file on a chat's media page, with the message it was sent in.
+struct GroupMediaItem: Decodable, Sendable, Identifiable, Equatable {
+    let messageId: String
+    /// Nil if the sender has deleted their account.
+    let authorId: String?
+    /// When its message was sent.
+    let createdAt: Date
+    let attachment: Attachment
+    var id: String { attachment.id }
+}
+
+/// A page of a chat's photos and GIFs, or files and passes: newest first.
+struct GroupMediaPage: Decodable, Sendable {
+    let items: [GroupMediaItem]
+    let hasMore: Bool
+}
+
 struct MessagesPage: Decodable, Sendable {
     let messages: [Message]
     let hasMore: Bool

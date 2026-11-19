@@ -19,8 +19,10 @@
 		/** Who sent them, for the title. */
 		title?: string;
 		onclose: () => void;
+		/** Adds Show in chat (from the media page): goes to the message the showing picture was sent in. */
+		onshowinchat?: (index: number) => void;
 	}
-	let { pictures, index = $bindable(), title = 'Photo', onclose }: Props = $props();
+	let { pictures, index = $bindable(), title = 'Photo', onclose, onshowinchat }: Props = $props();
 
 	const ZOOM = 2.5;
 	const MAX_ZOOM = 4;
@@ -247,6 +249,11 @@
 			{#if canShare}
 				<button type="button" class="tool" aria-label="Share" title="Share" disabled={sharing} onclick={share}>
 					<Icon name="share" size={20} />
+				</button>
+			{/if}
+			{#if onshowinchat}
+				<button type="button" class="tool" aria-label="Show in chat" title="Show in chat" onclick={() => index !== null && onshowinchat(index)}>
+					<Icon name="chat" size={20} />
 				</button>
 			{/if}
 			<a class="tool" href={downloadUrl(current.url)} download={current.name} aria-label="Download" title="Download">

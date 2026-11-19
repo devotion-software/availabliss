@@ -152,8 +152,9 @@ data class ChatActions(
     val onLocation: () -> Unit = {},
     /** Tapped a shared place: ask which maps app to open it in. */
     val onOpenLocation: (MessageLocation) -> Unit = {},
-    /** Search in the header. */
+    /** Search, and Photos and files, in the header. */
     val onSearch: () -> Unit = {},
+    val onMedia: () -> Unit = {},
 )
 
 /** The group's chat (full screen; back returns to the calendar tab). */
@@ -200,6 +201,7 @@ fun GroupChatTab(
         ChatActions(
             onBack = { currentOnBack() },
             onSearch = viewModel::openSearch,
+            onMedia = viewModel::openMedia,
             onRetry = viewModel::load,
             onLoadOlder = viewModel::loadOlder,
             onDraftChange = viewModel::onDraftChange,
@@ -292,6 +294,18 @@ fun GroupChatTab(
             onDismiss = viewModel::closeLocationSheet,
         )
     }
+    state.media?.let { media ->
+        ChatMediaSheet(
+            media = media,
+            onKind = viewModel::showMediaKind,
+            onLoadMore = viewModel::loadMoreMedia,
+            onRetry = { viewModel.showMediaKind(media.kind) },
+            onViewPhoto = viewModel::viewMediaPhoto,
+            onOpenFile = viewModel::openMediaFile,
+            onShowInChat = viewModel::showMediaInChat,
+            onDismiss = viewModel::closeMedia,
+        )
+    }
     state.search?.let { search ->
         ChatSearchSheet(search, onQuery = viewModel::onSearchQuery, onPick = viewModel::pickSearchResult, onDismiss = viewModel::closeSearch)
     }
@@ -304,6 +318,7 @@ fun GroupChatTab(
             onShare = viewModel::shareAttachment,
             onSave = viewModel::saveAttachment,
             onDismiss = viewModel::closeViewer,
+            onShowInChat = viewer.messageIds?.let { ids -> { index: Int -> ids.getOrNull(index)?.let(viewModel::showMediaInChat) } },
         )
     }
     if (state.confirmDeleteId != null) {
@@ -330,7 +345,7 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
     val listState = rememberLazyListState()
     AvailablissBackground(OrbLayout.Chat) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-            ChatHeader(state, actions.onBack, actions.onSearch, actions.onOpenGroup)
+            ChatHeader(state, actions.onBack, actions.onSearch, actions.onMedia, actions.onOpenGroup)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     state.loading && state.items.isEmpty() -> LoadingIndicator(Modifier.align(Alignment.Center))
@@ -373,7 +388,7 @@ fun GroupChatContent(state: ChatUiState, draft: String, actions: ChatActions) {
 }
 
 @Composable
-private fun ChatHeader(state: ChatUiState, onBack: () -> Unit, onSearch: () -> Unit, onOpenGroup: (() -> Unit)? = null) {
+private fun ChatHeader(state: ChatUiState, onBack: () -> Unit, onSearch: () -> Unit, onMedia: () -> Unit, onOpenGroup: (() -> Unit)? = null) {
     val colors = AvailablissTheme.colors
     Row(
         Modifier
@@ -404,6 +419,7 @@ private fun ChatHeader(state: ChatUiState, onBack: () -> Unit, onSearch: () -> U
                 Icon(AvIcons.Forward, contentDescription = null, tint = colors.muted, modifier = Modifier.size(18.dp))
             }
         }
+        PlainIconButton(AvIcons.Photo, "Photos and files", onMedia)
         PlainIconButton(AvIcons.Search, "Search chat", onSearch)
     }
 }

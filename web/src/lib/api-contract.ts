@@ -290,6 +290,10 @@ export const endpoints: Endpoint[] = [
 		body: s.createMessageSchema, status: 201, response: 'Message', errors: { 409: 'Replying to a deleted message' }, rateLimit: '30 / minute'
 	},
 	{
+		method: 'GET', path: '/groups/{id}/attachments', tag: 'Chat', auth: 'user', summary: "Photos or files sent in the chat (newest first)",
+		query: s.groupMediaQuerySchema, response: 'GroupMediaPage'
+	},
+	{
 		method: 'POST', path: '/groups/{id}/attachments', tag: 'Chat', auth: 'user', summary: 'Upload a photo, GIF or file to send in a message',
 		body: {
 			contentType: 'multipart/form-data',
