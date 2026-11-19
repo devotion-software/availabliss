@@ -20,6 +20,7 @@
 		"db:studio": "drizzle-kit studio",
 		"test:e2e": "playwright test",
 		"openapi": "bun scripts/openapi.ts",
+		"models:check": "bun scripts/check-client-models.ts",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write ."
 	},
