@@ -122,6 +122,8 @@ export interface GroupMediaPage {
 	/** Newest first. */
 	items: GroupMediaItem[];
 	hasMore: boolean;
+	/** First page only (no `before`): whether the chat has any Wallet passes (the Passes tab shows then). */
+	hasPasses?: boolean;
 }
 
 /** GET /chats */

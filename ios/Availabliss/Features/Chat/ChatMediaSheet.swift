@@ -1,9 +1,10 @@
 import QuickLook
 import SwiftUI
 
-/// Everything sent in the chat: Photos (a grid, newest first, opening the full-screen viewer) and Files
-/// (with who sent each and when, opening in QuickLook), each with Show in chat. More load as you reach
-/// the end. Like web and Android.
+/// Everything sent in the chat: Photos (a grid, newest first, opening the full-screen viewer), Files
+/// (with who sent each and when, opening in QuickLook) and, when any have been sent, Passes (each drawn
+/// like the pass, with Add to Apple Wallet), each with Show in chat. More load as you reach the end.
+/// Like web and Android.
 struct ChatMediaSheet: View {
     let group: Group
     let me: String?
@@ -14,8 +15,14 @@ struct ChatMediaSheet: View {
     @Environment(\.theme) private var theme
 
     enum Kind: String, CaseIterable {
-        case media, files
-        var title: String { self == .media ? "Photos" : "Files" }
+        case media, files, passes
+        var title: String {
+            switch self {
+            case .media: "Photos"
+            case .files: "Files"
+            case .passes: "Passes"
+            }
+        }
     }
 
     struct Page {
@@ -27,7 +34,10 @@ struct ChatMediaSheet: View {
     }
 
     @State private var kind = Kind.media
-    @State private var pages: [Kind: Page] = [.media: Page(), .files: Page()]
+    @State private var pages: [Kind: Page] = [.media: Page(), .files: Page(), .passes: Page()]
+    /// Whether the chat has any passes (from the first page of any tab): the Passes tab only shows then.
+    @State private var hasPasses = false
+    private var kinds: [Kind] { hasPasses || kind == .passes ? Kind.allCases : [.media, .files] }
     @State private var viewing: String?
     @State private var previewFile: URL?
     @State private var openingFileId: String?
@@ -39,7 +49,7 @@ struct ChatMediaSheet: View {
     var body: some View {
         BottomSheet(title: "Photos and files") {
             Picker("Show", selection: $kind) {
-                ForEach(Kind.allCases, id: \.self) { Text($0.title).tag($0) }
+                ForEach(kinds, id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
 
@@ -47,9 +57,11 @@ struct ChatMediaSheet: View {
                 note("Couldn't load them. Check your connection and try again.")
                 Button("Try again") { Task { await load(kind) } }.buttonStyle(.textAction)
             } else if page.loaded && page.items.isEmpty {
-                note(kind == .media ? "No photos sent in this chat yet." : "No files sent in this chat yet.")
+                note("No \(kind.title.lowercased()) sent in this chat yet.")
             } else if kind == .media {
                 photoGrid
+            } else if kind == .passes {
+                passList
             } else {
                 fileList
             }
@@ -163,6 +175,31 @@ struct ChatMediaSheet: View {
         .surfaceBackground(cornerRadius: 18)
     }
 
+    private var passList: some View {
+        VStack(spacing: 16) {
+            ForEach(page.items) { item in
+                if let pass = item.attachment.pass {
+                    VStack(alignment: .leading, spacing: 4) {
+                        WalletPassCard(attachment: item.attachment, pass: pass, isLoading: openingFileId == item.id) {
+                            Task { await open(item.attachment) }
+                        }
+                        HStack {
+                            Text("\(author(item)) · \(Formatting.chatDay(item.createdAt))")
+                                .bodyFont(12, relativeTo: .caption)
+                                .foregroundStyle(theme.muted)
+                                .lineLimit(1)
+                            Spacer(minLength: 8)
+                            Button("Show in chat") { showInChat(item.messageId) }
+                                .buttonStyle(.textAction)
+                        }
+                        .padding(.leading, 4)
+                    }
+                    .onAppear { loadMore(after: item) }
+                }
+            }
+        }
+    }
+
     private func note(_ text: String) -> some View {
         Text(text).bodyFont(14).foregroundStyle(theme.muted).fixedSize(horizontal: false, vertical: true)
     }
@@ -193,6 +230,7 @@ struct ChatMediaSheet: View {
             let result = try await api.send(API.Chat.media(groupId: group.id, kind: kind.rawValue, before: before))
             current.items = more ? current.items + result.items : result.items
             current.hasMore = result.hasMore
+            if let has = result.hasPasses { hasPasses = has }
             current.loaded = true
             current.failed = false
         } catch {

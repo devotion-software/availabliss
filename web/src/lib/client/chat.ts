@@ -4,6 +4,8 @@ import type { ApiErrorBody, Attachment, GroupMediaItem, Message, MessageInfo, Me
 export interface GroupMediaPage {
 	items: GroupMediaItem[];
 	hasMore: boolean;
+	/** First page only: whether the chat has any Wallet passes (the Passes tab shows then). */
+	hasPasses?: boolean;
 }
 
 export interface MessagePage {
@@ -20,7 +22,7 @@ export interface PollInput {
 export const listMessages = (groupId: string, opts: { before?: string; limit?: number } = {}, fetch?: Fetch) =>
 	api.get<MessagePage>(`/groups/${groupId}/messages`, { fetch, query: { before: opts.before, limit: opts.limit ?? 50 } });
 /** A chat's photos and GIFs (`media`) or files and passes (`files`), newest first; `before` is the last attachment id. */
-export const listGroupMedia = (groupId: string, kind: 'media' | 'files', before?: string) =>
+export const listGroupMedia = (groupId: string, kind: 'media' | 'files' | 'passes', before?: string) =>
 	api.get<GroupMediaPage>(`/groups/${groupId}/attachments`, { query: { kind, before, limit: 60 } });
 /** Messages containing `q` (2–100 characters, any case), newest first. */
 export const searchMessages = (groupId: string, q: string, opts: { limit?: number; signal?: AbortSignal } = {}) =>

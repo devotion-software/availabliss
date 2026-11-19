@@ -433,7 +433,7 @@ interface AvailablissApi {
     @GET("api/v1/chats")
     suspend fun getChats(): ChatListResponse
 
-    /** A chat's photos and GIFs ([kind] "media") or files and passes ("files"), newest first; [before] is the last attachment id. */
+    /** A chat's photos, GIFs and videos ([kind] "media"), files ("files") or Wallet passes ("passes"), newest first; [before] is the last attachment id. */
     @GET("api/v1/groups/{id}/attachments")
     suspend fun getGroupMedia(
         @Path("id") groupId: String,

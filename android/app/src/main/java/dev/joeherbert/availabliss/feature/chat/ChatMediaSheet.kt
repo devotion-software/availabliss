@@ -38,6 +38,7 @@ import dev.joeherbert.availabliss.designsystem.component.Segment
 import dev.joeherbert.availabliss.designsystem.component.SegmentedControl
 import dev.joeherbert.availabliss.designsystem.component.SegmentedStyle
 import dev.joeherbert.availabliss.designsystem.component.TextAction
+import dev.joeherbert.availabliss.designsystem.component.chat.WalletPassCard
 import dev.joeherbert.availabliss.designsystem.component.chat.fileIconFor
 import dev.joeherbert.availabliss.designsystem.component.chat.formatDuration
 import dev.joeherbert.availabliss.designsystem.component.chat.vector
@@ -48,8 +49,9 @@ import dev.joeherbert.availabliss.designsystem.theme.Shapes
 private const val COLUMNS = 3
 
 /**
- * Everything sent in the chat: Photos (a grid, newest first, opening the full-screen viewer) and Files
- * (with who sent each and when, opening on a tap), each with Show in chat. Older ones load with Show
+ * Everything sent in the chat: Photos (a grid, newest first, opening the full-screen viewer), Files
+ * (with who sent each and when, opening on a tap) and, when any have been sent, Passes (each drawn
+ * like the pass), each with Show in chat. Older ones load with Show
  * older. Like web and iOS.
  */
 @Composable
@@ -66,7 +68,17 @@ fun ChatMediaSheet(
     val colors = AvailablissTheme.colors
     AvBottomSheet(title = "Photos and files", onDismissRequest = onDismiss) {
         SegmentedControl(
-            segments = listOf(Segment(MediaKind.Media, "Photos", AvIcons.Photo), Segment(MediaKind.Files, "Files", AvIcons.File)),
+            segments = media.kinds.map { kind ->
+                Segment(
+                    kind,
+                    kind.title,
+                    when (kind) {
+                        MediaKind.Media -> AvIcons.Photo
+                        MediaKind.Files -> AvIcons.File
+                        MediaKind.Passes -> AvIcons.Ticket
+                    },
+                )
+            },
             selected = media.kind,
             onSelect = onKind,
             style = SegmentedStyle.Inset,
@@ -78,8 +90,11 @@ fun ChatMediaSheet(
                 TextAction("Try again", onClick = onRetry)
             }
             media.loaded && media.items.isEmpty() ->
-                Note(if (media.kind == MediaKind.Media) "No photos sent in this chat yet." else "No files sent in this chat yet.")
+                Note("No ${media.kind.title.lowercase()} sent in this chat yet.")
             media.kind == MediaKind.Media -> PhotoGrid(media.items, onViewPhoto)
+            media.kind == MediaKind.Passes -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                media.items.forEach { item -> PassRow(item, onOpen = { onOpenFile(item.attachment) }, onShowInChat = { onShowInChat(item.messageId) }) }
+            }
             else -> Column(Modifier.fillMaxWidth().clip(Shapes.panel).background(colors.surface).padding(horizontal = 14.dp)) {
                 media.items.forEachIndexed { index, item ->
                     if (index > 0) RowDivider()
@@ -94,7 +109,28 @@ fun ChatMediaSheet(
         }
         // The sheet isn't a lazy list (it scrolls as a whole), so older ones load on request.
         if (media.hasMore && !media.loading) {
-            TextAction(if (media.kind == MediaKind.Media) "Show older photos" else "Show older files", onClick = onLoadMore, modifier = Modifier.align(Alignment.CenterHorizontally))
+            TextAction("Show older ${media.kind.title.lowercase()}", onClick = onLoadMore, modifier = Modifier.align(Alignment.CenterHorizontally))
+        }
+    }
+}
+
+/** A pass drawn like the pass (tap to open it), with who sent it, when and Show in chat under it. */
+@Composable
+private fun PassRow(item: MediaItemUi, onOpen: () -> Unit, onShowInChat: () -> Unit) {
+    val ui = item.attachment.toUi()
+    val pass = ui.pass ?: return
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        WalletPassCard(ui, pass, onOpen = { onOpen() })
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                item.meta,
+                style = AvailablissTheme.type.caption,
+                color = AvailablissTheme.colors.muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            TextAction("Show in chat", onClick = onShowInChat)
         }
     }
 }

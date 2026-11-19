@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 enum class MediaKind(val wire: String, val title: String) {
     Media("media", "Photos"),
     Files("files", "Files"),
+    Passes("passes", "Passes"),
 }
 
 internal data class MediaPage(
@@ -23,7 +24,12 @@ internal data class MediaPage(
     val failed: Boolean = false,
 )
 
-internal data class MediaSession(val kind: MediaKind = MediaKind.Media, val pages: Map<MediaKind, MediaPage> = emptyMap()) {
+internal data class MediaSession(
+    val kind: MediaKind = MediaKind.Media,
+    val pages: Map<MediaKind, MediaPage> = emptyMap(),
+    /** Whether the chat has any passes (from the first page of any tab): the Passes tab only shows then. */
+    val hasPasses: Boolean = false,
+) {
     fun page(k: MediaKind = kind) = pages[k] ?: MediaPage()
 }
 
@@ -36,6 +42,8 @@ data class MediaItemUi(
 
 data class ChatMediaUi(
     val kind: MediaKind,
+    /** The tabs to show: Passes only when the chat has any. */
+    val kinds: List<MediaKind>,
     val items: List<MediaItemUi>,
     val hasMore: Boolean,
     val loaded: Boolean,
@@ -47,6 +55,7 @@ internal fun MediaSession.toUi(directory: MemberDirectory): ChatMediaUi {
     val p = page()
     return ChatMediaUi(
         kind = kind,
+        kinds = if (hasPasses || kind == MediaKind.Passes) MediaKind.entries else listOf(MediaKind.Media, MediaKind.Files),
         items = p.items.map { item ->
             val who = replyAuthorName(item.authorId, null, directory)
             val day = DateTimes.localDateTime(item.createdAt)?.let { dayLabel(it.toLocalDate()) }.orEmpty()
@@ -89,14 +98,17 @@ internal class ChatMedia(private val session: ChatSession, private val threads: 
         session.scope.launch {
             val before = if (more) current.items.lastOrNull()?.attachment?.id else null
             when (val result = session.chat.media(session.groupId, kind.wire, before)) {
-                is ApiResult.Success -> update(kind) {
-                    it.copy(
-                        items = if (more) it.items + result.value.items else result.value.items,
-                        hasMore = result.value.hasMore,
-                        loaded = true,
-                        loading = false,
-                        failed = false,
-                    )
+                is ApiResult.Success -> {
+                    result.value.hasPasses?.let { has -> data.update { d -> d.copy(media = d.media?.copy(hasPasses = has)) } }
+                    update(kind) {
+                        it.copy(
+                            items = if (more) it.items + result.value.items else result.value.items,
+                            hasMore = result.value.hasMore,
+                            loaded = true,
+                            loading = false,
+                            failed = false,
+                        )
+                    }
                 }
                 is ApiResult.Failure -> update(kind) { it.copy(loading = false, failed = true) }
             }

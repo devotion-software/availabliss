@@ -276,7 +276,12 @@ data class GroupMediaItem(
 
 /** A page of a chat's photos and GIFs, or files and passes: newest first. */
 @Serializable
-data class GroupMediaPage(val items: List<GroupMediaItem>, val hasMore: Boolean)
+data class GroupMediaPage(
+    val items: List<GroupMediaItem>,
+    val hasMore: Boolean,
+    /** First page only: whether the chat has any Wallet passes (the Passes tab shows then). */
+    val hasPasses: Boolean? = null,
+)
 
 /** A message's thread: the first message of its chain of replies, then every reply under it, oldest first. */
 @Serializable

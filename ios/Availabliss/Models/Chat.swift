@@ -271,6 +271,8 @@ struct GroupMediaItem: Decodable, Sendable, Identifiable, Equatable {
 struct GroupMediaPage: Decodable, Sendable {
     let items: [GroupMediaItem]
     let hasMore: Bool
+    /// First page only: whether the chat has any Wallet passes (the Passes tab shows then).
+    var hasPasses: Bool?
 }
 
 struct MessagesPage: Decodable, Sendable {

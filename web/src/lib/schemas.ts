@@ -438,7 +438,7 @@ export const messageSearchQuerySchema = z.object({
 });
 /** GET /groups/:id/attachments?kind&before&limit */
 export const groupMediaQuerySchema = z.object({
-	kind: z.enum(['media', 'files']).default('media'),
+	kind: z.enum(['media', 'files', 'passes']).default('media'),
 	before: z.string().min(1).optional(),
 	limit: z.coerce.number().int().min(1).max(100).default(60)
 });

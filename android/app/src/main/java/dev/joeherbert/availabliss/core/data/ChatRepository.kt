@@ -43,7 +43,7 @@ class ChatRepository @Inject constructor(
     /** Every group chat you're in, latest message first. */
     suspend fun chats(): ApiResult<ChatListResponse> = call { api.getChats() }
 
-    /** A chat's photos and GIFs ([kind] "media") or files and passes ("files"), newest first; [before] is the last attachment id. */
+    /** A chat's photos, GIFs and videos ([kind] "media"), files ("files") or Wallet passes ("passes"), newest first; [before] is the last attachment id. */
     suspend fun media(groupId: String, kind: String, before: String? = null): ApiResult<GroupMediaPage> =
         call { api.getGroupMedia(groupId, kind, before) }
 

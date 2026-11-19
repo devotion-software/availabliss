@@ -12,10 +12,12 @@
 	import Button from '#lib/components/ui/Button.svelte';
 	import AttachmentViewer from './AttachmentViewer.svelte';
 	import FileIcon from './FileIcon.svelte';
+	import PassCard from './PassCard.svelte';
 
 	/**
-	 * Everything sent in the chat: Photos (a grid, newest first, opening the full-screen viewer) and
-	 * Files (with who sent each and when, downloading on a tap). More load as you reach the end.
+	 * Everything sent in the chat: Photos (a grid, newest first, opening the full-screen viewer),
+	 * Files (with who sent each and when, downloading on a tap) and, when any have been sent, Passes
+	 * (each drawn like the pass, with Add to Wallet). More load as you reach the end.
 	 */
 	interface Props {
 		open: boolean;
@@ -26,15 +28,18 @@
 	}
 	let { open = $bindable(), group, meId, onshowinchat }: Props = $props();
 
-	type Kind = 'media' | 'files';
+	type Kind = 'media' | 'files' | 'passes';
 	const fmt = useFormat();
 	const members = $derived(memberMap(group));
 
 	let kind = $state<Kind>('media');
 	const pages = $state<Record<Kind, { items: GroupMediaItem[]; hasMore: boolean; loaded: boolean; loading: boolean; failed: boolean }>>({
 		media: { items: [], hasMore: false, loaded: false, loading: false, failed: false },
-		files: { items: [], hasMore: false, loaded: false, loading: false, failed: false }
+		files: { items: [], hasMore: false, loaded: false, loading: false, failed: false },
+		passes: { items: [], hasMore: false, loaded: false, loading: false, failed: false }
 	});
+	/** Whether the chat has any passes (from the first page of any tab): the Passes tab only shows then. */
+	let hasPasses = $state(false);
 	const page = $derived(pages[kind]);
 	let viewing = $state<number | null>(null);
 	let sentinel: HTMLElement | undefined = $state();
@@ -47,6 +52,7 @@
 			const res = await listGroupMedia(group.id, k, more ? p.items.at(-1)?.attachment.id : undefined);
 			p.items = more ? [...p.items, ...res.items] : res.items;
 			p.hasMore = res.hasMore;
+			if (res.hasPasses !== undefined) hasPasses = res.hasPasses;
 			p.loaded = true;
 			p.failed = false;
 		} catch {
@@ -60,7 +66,7 @@
 	$effect(() => {
 		if (!open) return;
 		untrack(() => {
-			for (const k of ['media', 'files'] as const) pages[k].loaded = false;
+			for (const k of ['media', 'files', 'passes'] as const) pages[k].loaded = false;
 		});
 	});
 	$effect(() => {
@@ -96,7 +102,8 @@
 		<SegmentedControl
 			options={[
 				{ value: 'media', label: 'Photos', icon: 'image' },
-				{ value: 'files', label: 'Files', icon: 'paperclip' }
+				{ value: 'files', label: 'Files', icon: 'paperclip' },
+				...(hasPasses || kind === 'passes' ? [{ value: 'passes' as const, label: 'Passes', icon: 'ticket' as const }] : [])
 			]}
 			bind:value={kind}
 			label="Show"
@@ -108,7 +115,13 @@
 			<p class="note">Couldn’t load them. Check your connection and try again.</p>
 			<Button variant="secondary" onclick={() => load(kind)}>Try again</Button>
 		{:else if page.loaded && !page.items.length}
-			<p class="note">{kind === 'media' ? 'No photos sent in this chat yet.' : 'No files sent in this chat yet.'}</p>
+			<p class="note">
+				{kind === 'media'
+					? 'No photos sent in this chat yet.'
+					: kind === 'files'
+						? 'No files sent in this chat yet.'
+						: 'No passes sent in this chat yet.'}
+			</p>
 		{:else if kind === 'media'}
 			<ul class="grid">
 				{#each page.items as item, i (item.attachment.id)}
@@ -123,6 +136,18 @@
 							{#if item.attachment.kind === 'gif'}<span class="badge">GIF</span>{/if}
 							{#if item.attachment.kind === 'video'}<span class="badge">▶ {formatDuration(item.attachment.duration)}</span>{/if}
 						</button>
+					</li>
+				{/each}
+			</ul>
+		{:else if kind === 'passes'}
+			<ul class="passes">
+				{#each page.items as item (item.attachment.id)}
+					<li>
+						<PassCard attachment={item.attachment} />
+						<div class="pass-meta">
+							<span>{author(item)} · {fmt.current.dayDivider(item.createdAt)}</span>
+							<button type="button" class="show" onclick={() => showInChat(item.messageId)}>Show in chat</button>
+						</div>
 					</li>
 				{/each}
 			</ul>
@@ -199,6 +224,28 @@
 		font-weight: 700;
 		color: #fff;
 		background: rgba(0, 0, 0, 0.55);
+	}
+	.passes {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.passes li {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.pass-meta {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		padding-left: 4px;
+		font-size: 12px;
+		color: var(--muted);
 	}
 	.files {
 		list-style: none;

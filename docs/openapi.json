@@ -2975,7 +2975,8 @@
 							"type": "string",
 							"enum": [
 								"media",
-								"files"
+								"files",
+								"passes"
 							]
 						}
 					},
@@ -10579,6 +10580,10 @@
 					},
 					"hasMore": {
 						"type": "boolean"
+					},
+					"hasPasses": {
+						"type": "boolean",
+						"description": "First page only (no `before`): whether the chat has any Wallet passes (the Passes tab shows then)."
 					}
 				},
 				"required": [

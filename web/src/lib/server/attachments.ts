@@ -161,12 +161,16 @@ export async function attachmentsFor(messageIds: string[]): Promise<Map<string, 
 }
 
 /** What each tab of a chat's media page shows. */
-export const MEDIA_KINDS = { media: ['image', 'gif', 'video'], files: ['file', 'pass'] } as const satisfies Record<string, readonly AttachmentKind[]>;
+export const MEDIA_KINDS = { media: ['image', 'gif', 'video'], files: ['file'], passes: ['pass'] } as const satisfies Record<
+	string,
+	readonly AttachmentKind[]
+>;
 
 /**
- * Everything sent in a group's chat, newest first (in message order within a message): its photos
- * and GIFs (`media`) or files and Wallet passes (`files`). Pass the last one's id as `before` for
- * the page after. Attachments of deleted messages are gone for good, so never listed.
+ * Everything sent in a group's chat, newest first (in message order within a message): its photos,
+ * GIFs and videos (`media`), files (`files`) or Wallet passes (`passes`). Pass the last one's id as
+ * `before` for the page after. Attachments of deleted messages are gone for good, so never listed.
+ * The first page also says whether the chat has any passes, so the apps only show a Passes tab then.
  */
 export async function listGroupMedia(
 	groupId: string,
@@ -174,7 +178,7 @@ export async function listGroupMedia(
 	kind: keyof typeof MEDIA_KINDS,
 	before: string | null,
 	limit: number
-): Promise<{ items: GroupMediaItem[]; hasMore: boolean }> {
+): Promise<{ items: GroupMediaItem[]; hasMore: boolean; hasPasses?: boolean }> {
 	await requireMember(groupId, userId);
 	let after: { seq: number; position: number } | null = null;
 	if (before) {
@@ -207,8 +211,20 @@ export async function listGroupMedia(
 			createdAt: r.createdAt.toISOString(),
 			attachment: toAttachment(r.attachment)
 		})),
-		hasMore: rows.length > limit
+		hasMore: rows.length > limit,
+		...(!before && { hasPasses: kind === 'passes' ? rows.length > 0 : await hasPasses(groupId) })
 	};
+}
+
+/** Whether a group's chat has any Wallet passes (in messages that aren't deleted). */
+async function hasPasses(groupId: string): Promise<boolean> {
+	const [row] = await db
+		.select({ id: messageAttachments.id })
+		.from(messageAttachments)
+		.innerJoin(messages, eq(messages.id, messageAttachments.messageId))
+		.where(and(eq(messageAttachments.groupId, groupId), eq(messageAttachments.kind, 'pass'), isNull(messages.deletedAt)))
+		.limit(1);
+	return row !== undefined;
 }
 
 /**
