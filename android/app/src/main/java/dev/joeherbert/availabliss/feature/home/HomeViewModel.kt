@@ -28,8 +28,11 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -129,6 +132,8 @@ class HomeViewModel @Inject constructor(
     init {
         refresh()
         viewModelScope.launch { addToCalendar.loadCalendars() }
+        // Plans already in a calendar (e.g. from before a reinstall) count as added.
+        viewModelScope.launch { raw.map { it.upcoming.take(UP_NEXT_LIMIT) }.distinctUntilChanged().collectLatest { addToCalendar.findExistingEvents(it) } }
         viewModelScope.launch {
             liveEvents.payloads.collect { payload ->
                 when (payload) {

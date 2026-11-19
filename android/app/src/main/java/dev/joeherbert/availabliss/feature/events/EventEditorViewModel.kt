@@ -93,6 +93,7 @@ class EventEditorViewModel @Inject constructor(
                 val e = result.value
                 event = e
                 addToCalendar.loadCalendars()
+                addToCalendar.findExistingEvents(listOf(e))
                 _state.update {
                     it.copy(
                         loading = false,

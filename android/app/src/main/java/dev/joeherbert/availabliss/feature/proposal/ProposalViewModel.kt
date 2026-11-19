@@ -31,8 +31,11 @@ import dev.joeherbert.availabliss.navigation.ProposalRoute
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -157,6 +160,14 @@ class ProposalViewModel @Inject constructor(
     init {
         refresh()
         viewModelScope.launch { addToCalendar.loadCalendars() }
+        // A plan already in a calendar (e.g. from before a reinstall) counts as added.
+        viewModelScope.launch {
+            data.map { d ->
+                d.proposal?.takeIf { it.eventId != null }?.let { p ->
+                    CalendarEventDraft.from(p, fallbackTitle = d.group?.name ?: "Availabliss plan")?.let { p.eventId!! to it }
+                }
+            }.distinctUntilChanged().collectLatest { plan -> if (plan != null) addToCalendar.findExisting(listOf(plan)) }
+        }
         viewModelScope.launch {
             liveEvents.payloads.collect { payload ->
                 when (payload) {

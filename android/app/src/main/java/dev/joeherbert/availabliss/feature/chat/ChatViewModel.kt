@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -110,6 +111,8 @@ class ChatViewModel @Inject constructor(
             shared.text?.takeIf { it.isNotBlank() }?.let(::onDraftChange)
         }
         viewModelScope.launch { addToCalendar.loadCalendars() }
+        // Plans already in a calendar (e.g. from before a reinstall) count as added.
+        viewModelScope.launch { data.map { it.events.values.toList() }.distinctUntilChanged().collectLatest { addToCalendar.findExistingEvents(it) } }
         viewModelScope.launch {
             liveEvents.payloadsFor(groupId).collect { live.onLive(it) }
         }

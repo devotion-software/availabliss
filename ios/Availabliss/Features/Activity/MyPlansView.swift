@@ -171,14 +171,14 @@ struct MyPlansView: View {
         Button {
             open(plan)
         } label: {
-            MyPlanRow(plan: plan, added: app.deviceCalendar.addedState(plan.id) != .notAdded, quiet: quiet)
+            MyPlanRow(plan: plan, added: app.deviceCalendar.addedState(plan.event) != .notAdded, quiet: quiet)
         }
         .buttonStyle(.pressable)
     }
 
     /// Coming up plans not in this phone's calendar yet.
     private var notAdded: [MyPlan] {
-        model.going.filter { app.deviceCalendar.addedState($0.id) == .notAdded }
+        model.going.filter { app.deviceCalendar.addedState($0.event) == .notAdded }
     }
 
     private func open(_ plan: MyPlan) {

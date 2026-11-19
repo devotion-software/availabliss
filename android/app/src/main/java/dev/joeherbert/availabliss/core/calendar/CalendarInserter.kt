@@ -104,6 +104,32 @@ class CalendarInserter @Inject constructor(
     }
 
     /**
+     * An event already in one of the phone's calendars with [draft]'s title and times (e.g. added
+     * before the app was reinstalled), as its id and calendar id. Null without permission to read.
+     */
+    suspend fun findMatching(draft: CalendarEventDraft): Pair<Long, Long>? = withContext(io) {
+        if (!reader.hasReadPermission()) return@withContext null
+        val (start, end, _) = draft.normalised()
+        val title = draft.title.trim().lowercase()
+        runCatching {
+            context.contentResolver.query(
+                CalendarContract.Events.CONTENT_URI,
+                arrayOf(CalendarContract.Events._ID, CalendarContract.Events.CALENDAR_ID, CalendarContract.Events.TITLE, CalendarContract.Events.DTEND, CalendarContract.Events.ALL_DAY),
+                "${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ? AND ${CalendarContract.Events.DELETED} = 0",
+                arrayOf((start - 60_000).toString(), (start + 60_000).toString()),
+                null,
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    val sameTitle = c.getString(2)?.trim()?.lowercase() == title
+                    val sameEnd = !c.isNull(3) && kotlin.math.abs(c.getLong(3) - end) < 60_000
+                    if (sameTitle && sameEnd && (c.getInt(4) == 1) == draft.allDay) return@use c.getLong(0) to c.getLong(1)
+                }
+                null
+            }
+        }.getOrNull()
+    }
+
+    /**
      * Moves event [eventId] to [calendarId]. Calendar providers don't reliably move an event
      * between accounts in place, so it's copied into the new calendar and the old one deleted.
      * Returns the new event's id, or null if it couldn't be moved.

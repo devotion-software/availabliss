@@ -38,12 +38,12 @@ struct AddToCalendarButton: View {
     /// Without the chip, an added plan shows nothing at all (and takes no space in its stack).
     private var hiddenOnceAdded: Bool {
         guard !showsAddedChip, !justAdded, !isSaving, choice == nil else { return false }
-        if case .added = app.deviceCalendar.addedState(event.id) { return true }
+        if case .added = app.deviceCalendar.addedState(event) { return true }
         return false
     }
 
     private var content: some View {
-        let state = app.deviceCalendar.addedState(event.id)
+        let state = app.deviceCalendar.addedState(event)
         return VStack(spacing: 8) {
             switch state {
             case .notAdded:

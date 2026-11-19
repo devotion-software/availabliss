@@ -14,7 +14,10 @@ import dev.joeherbert.availabliss.feature.common.AddToCalendarState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -68,6 +71,12 @@ class MyPlansViewModel @Inject constructor(
     init {
         refresh()
         viewModelScope.launch { addToCalendar.loadCalendars() }
+        // Plans already in a calendar (e.g. from before a reinstall) count as added.
+        viewModelScope.launch {
+            data.map { it.plans }.distinctUntilChanged().collectLatest { p ->
+                if (p != null) addToCalendar.findExistingEvents((p.going + p.notGoing).map { it.event })
+            }
+        }
         viewModelScope.launch { liveEvents.reconnected.collect { refresh() } }
     }
 

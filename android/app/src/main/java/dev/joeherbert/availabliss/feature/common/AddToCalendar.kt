@@ -46,6 +46,7 @@ import dev.joeherbert.availabliss.core.calendar.CalendarInserter
 import dev.joeherbert.availabliss.core.calendar.DeviceCalendarInfo
 import dev.joeherbert.availabliss.core.calendar.InsertResult
 import dev.joeherbert.availabliss.core.data.AppPreferences
+import dev.joeherbert.availabliss.core.network.model.GroupEvent
 import dev.joeherbert.availabliss.designsystem.component.AvBottomSheet
 import dev.joeherbert.availabliss.designsystem.component.ButtonStyle
 import dev.joeherbert.availabliss.designsystem.component.ColorSwatch
@@ -61,6 +62,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 /** What the calendar choice sheet is open for. */
@@ -169,7 +172,7 @@ class AddToCalendarDelegate @Inject constructor(
      * the calendar app since is offered again. Without permission to read calendars they can't be
      * checked, so they count as still there.
      */
-    private suspend fun refreshAdded() {
+    private suspend fun refreshAdded() = lookups.withLock {
         val canRead = inserter.canReadCalendars()
         val found = addedEvents.all().mapNotNull { (key, added) ->
             val calendarId = inserter.calendarOf(added.eventId)
@@ -182,6 +185,27 @@ class AddToCalendarDelegate @Inject constructor(
         // Keys added by the calendar app this session aren't remembered, so keep them.
         _state.update { s -> s.copy(inCalendar = s.inCalendar.filterKeys { it in s.added && it !in found } + found) }
     }
+
+    /** Serialises [refreshAdded] and [findExisting], so neither drops what the other found. */
+    private val lookups = Mutex()
+
+    /**
+     * The plans a screen shows (by key): any not known to be in a calendar but with an event of the
+     * same title and times there (e.g. added before the app was reinstalled) count as added, and are
+     * remembered so they can be moved like any other.
+     */
+    suspend fun findExisting(plans: List<Pair<String, CalendarEventDraft>>) = lookups.withLock {
+        for ((key, draft) in plans.distinctBy { it.first }) {
+            if (key in _state.value.inCalendar) continue
+            val (eventId, calendarId) = inserter.findMatching(draft) ?: continue
+            addedEvents.set(key, AddedCalendarEvent(eventId))
+            _state.update { it.copy(inCalendar = it.inCalendar + (key to calendarId)) }
+        }
+    }
+
+    /** [findExisting] for plain events, keyed by event id. */
+    suspend fun findExistingEvents(events: Collection<GroupEvent>) =
+        findExisting(events.mapNotNull { e -> CalendarEventDraft.from(e)?.let { e.id to it } })
 
     /**
      * Adds the plan, first asking which calendar when there's a choice. For a plan already in a

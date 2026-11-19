@@ -343,12 +343,46 @@ final class DeviceCalendarService {
         case added(EKCalendar?)
     }
 
-    func addedState(_ eventId: String) -> AddedState {
-        guard let record = addedEvents[eventId] else { return .notAdded }
-        guard hasFullAccess else { return .added(nil) }
-        // Deleted in the calendar app since: offer Add to calendar again.
-        guard let item = addedItem(record) else { return .notAdded }
-        return .added(item.calendar)
+    func addedState(_ event: GroupEvent) -> AddedState {
+        if let record = addedEvents[event.id] {
+            guard hasFullAccess else { return .added(nil) }
+            if let item = addedItem(record) { return .added(item.calendar) }
+        }
+        // Not added from this install (e.g. the app was reinstalled), or deleted in the calendar
+        // app since: it still counts as added if the calendar has an event with the same title and times.
+        if let item = matchingItem(for: event) { return .added(item.calendar) }
+        return .notAdded
+    }
+
+    /// Matches found by `matchingItem`, by plan id, for the current `storeVersion`.
+    @ObservationIgnored private var matches: [String: (version: Int, key: String, itemId: String?)] = [:]
+
+    /// An event in the phone's calendars with the plan's title and times (needs full access).
+    private func matchingItem(for event: GroupEvent) -> EKEvent? {
+        let version = storeVersion
+        guard hasFullAccess else { return nil }
+        let key = "\(event.title)|\(event.start.timeIntervalSince1970)|\(event.end.timeIntervalSince1970)|\(event.allDay)"
+        if let cached = matches[event.id], cached.version == version, cached.key == key {
+            return cached.itemId.flatMap { store.event(withIdentifier: $0) }
+        }
+        let probe = EKEvent(eventStore: store)
+        fill(probe, from: event, includeNote: false)
+        let title = event.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let predicate = store.predicateForEvents(withStart: probe.startDate.addingTimeInterval(-60), end: probe.endDate.addingTimeInterval(60), calendars: nil)
+        let found = store.events(matching: predicate).first { item in
+            item.title?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == title
+                && item.isAllDay == probe.isAllDay
+                && sameTime(item.startDate, probe.startDate, allDay: probe.isAllDay)
+                && sameTime(item.endDate, probe.endDate, allDay: probe.isAllDay)
+        }
+        matches[event.id] = (version, key, found?.eventIdentifier)
+        return found
+    }
+
+    /// Same minute, or the same day for all-day events.
+    private func sameTime(_ a: Date?, _ b: Date, allDay: Bool) -> Bool {
+        guard let a else { return false }
+        return allDay ? Calendar.current.isDate(a, inSameDayAs: b) : abs(a.timeIntervalSince(b)) < 60
     }
 
     private func addedItem(_ record: AddedEvent) -> EKEvent? {
@@ -422,10 +456,11 @@ final class DeviceCalendarService {
     /// Moves an added plan to another calendar, or adds it there again if it was deleted from
     /// the calendar since. Remembers the calendar for next time.
     func move(_ event: GroupEvent, to calendar: EKCalendar) async throws {
-        guard let record = addedEvents[event.id], let item = addedItem(record) else {
+        guard let item = addedEvents[event.id].flatMap(addedItem) ?? matchingItem(for: event) else {
             try await add(event, to: calendar)
             return
         }
+        let record = addedEvents[event.id] ?? AddedEvent(itemId: item.eventIdentifier ?? "")
         UserDefaults.standard.set(calendar.calendarIdentifier, forKey: Self.lastAddCalendarKey)
         guard item.calendar?.calendarIdentifier != calendar.calendarIdentifier else { return }
         let previous = item.calendar
