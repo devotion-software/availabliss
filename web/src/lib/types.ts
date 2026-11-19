@@ -580,8 +580,8 @@ export type LinkProvider = 'apple' | 'google';
 
 /** GET /me/accounts */
 export interface LinkedAccounts {
-	/** Apple / Google sign-ins on this account (email always works too). */
-	linked: { provider: LinkProvider; linkedAt: string }[];
+	/** Apple / Google sign-ins on this account (email always works too), with the address that sign-in uses when known. */
+	linked: { provider: LinkProvider; linkedAt: string; email: string | null }[];
 	/** Providers this server can link. */
 	available: LinkProvider[];
 }

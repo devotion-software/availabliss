@@ -20,7 +20,12 @@ object LinkProviders {
 }
 
 @Serializable
-data class LinkedAccount(val provider: String, val linkedAt: String)
+data class LinkedAccount(
+    val provider: String,
+    val linkedAt: String,
+    /** The address that sign-in uses (an Apple one may be a Hide My Email address), when known. */
+    val email: String? = null,
+)
 
 /** `GET /me/accounts`. [available] = providers this server can link. */
 @Serializable
@@ -29,6 +34,8 @@ data class LinkedAccounts(
     val available: List<String> = emptyList(),
 ) {
     fun isLinked(provider: String): Boolean = linked.any { it.provider == provider }
+
+    fun email(provider: String): String? = linked.firstOrNull { it.provider == provider }?.email
 }
 
 /** `POST /me/accounts/link`. Null [nonce] / [merge] are omitted (encodeDefaults = false). */

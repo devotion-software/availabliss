@@ -31,6 +31,8 @@
 	let confirmMerge = $state(false);
 
 	const isLinked = (p: LinkProvider) => !!accounts?.linked.some((a) => a.provider === p);
+	/** The address a linked sign-in uses (an Apple one may be a Hide My Email address), when known. */
+	const linkedEmail = (p: LinkProvider) => accounts?.linked.find((a) => a.provider === p)?.email ?? null;
 
 	async function load() {
 		try {
@@ -132,7 +134,7 @@
 				<span class="tile brand"><BrandIcon brand={provider} /></span>
 				<span class="text">
 					<span class="name">{LABEL[provider]}</span>
-					<span class="sub">{isLinked(provider) ? 'Linked' : 'Not linked'}</span>
+					<span class="sub">{isLinked(provider) ? (linkedEmail(provider) ?? 'Linked') : 'Not linked'}</span>
 				</span>
 				{#if isLinked(provider)}
 					<span class="on"><Icon name="check" size={14} strokeWidth={3} />Linked</span>

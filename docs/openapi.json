@@ -10651,14 +10651,21 @@
 								},
 								"linkedAt": {
 									"type": "string"
+								},
+								"email": {
+									"type": [
+										"string",
+										"null"
+									]
 								}
 							},
 							"required": [
 								"provider",
-								"linkedAt"
+								"linkedAt",
+								"email"
 							]
 						},
-						"description": "Apple / Google sign-ins on this account (email always works too)."
+						"description": "Apple / Google sign-ins on this account (email always works too), with the address that sign-in uses when known."
 					},
 					"available": {
 						"type": "array",

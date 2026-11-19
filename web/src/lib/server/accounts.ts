@@ -4,6 +4,7 @@
  * its own Availabliss account.
  */
 import { and, asc, count, eq, sql, type Column } from 'drizzle-orm';
+import { tokenEmail } from './id-token';
 import type { MySqlTable } from 'drizzle-orm/mysql-core';
 import { APIError } from 'better-auth';
 import { nanoid } from 'nanoid';
@@ -48,13 +49,13 @@ export function availableProviders(): LinkProvider[] {
 
 export async function listLinkedAccounts(userId: string): Promise<LinkedAccounts> {
 	const rows = await db
-		.select({ provider: account.providerId, createdAt: account.createdAt })
+		.select({ provider: account.providerId, createdAt: account.createdAt, idToken: account.idToken })
 		.from(account)
 		.where(eq(account.userId, userId))
 		.orderBy(asc(account.createdAt));
 	const linked = rows
-		.filter((r): r is { provider: LinkProvider; createdAt: Date } => r.provider === 'apple' || r.provider === 'google')
-		.map((r) => ({ provider: r.provider, linkedAt: r.createdAt.toISOString() }));
+		.filter((r): r is { provider: LinkProvider; createdAt: Date; idToken: string | null } => r.provider === 'apple' || r.provider === 'google')
+		.map((r) => ({ provider: r.provider, linkedAt: r.createdAt.toISOString(), email: tokenEmail(r.idToken) }));
 	return { linked, available: availableProviders() };
 }
 

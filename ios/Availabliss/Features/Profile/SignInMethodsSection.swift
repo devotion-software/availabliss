@@ -32,7 +32,7 @@ struct SignInMethodsSection: View {
                 }
                 ForEach(accounts?.available ?? []) { provider in
                     Rectangle().fill(theme.line).frame(height: 1)
-                    row(icon: icon(provider), title: provider.label, subtitle: accounts?.isLinked(provider) == true ? "Linked" : "Not linked") {
+                    row(icon: icon(provider), title: provider.label, subtitle: accounts?.subtitle(provider) ?? "Not linked") {
                         if accounts?.isLinked(provider) == true {
                             linkedBadge("Linked")
                         } else {

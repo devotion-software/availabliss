@@ -337,7 +337,7 @@ private fun SignInMethodsPanel(state: YouUiState, onLink: (String) -> Unit) {
                 },
                 title = label,
                 subtitle = when {
-                    linked -> null
+                    linked -> state.accounts?.email(provider)
                     // No Apple SDK on Android (sign-in is a web flow with no id token), so link it elsewhere.
                     !linkable && provider == LinkProviders.APPLE -> "Link on the web or iPhone app"
                     !linkable -> "Link on the web"

@@ -13,12 +13,20 @@ struct LinkedAccounts: Decodable, Sendable, Equatable {
     struct Linked: Decodable, Sendable, Equatable {
         let provider: LinkProvider
         let linkedAt: Date
+        /// The address that sign-in uses (an Apple one may be a Hide My Email address), when known.
+        var email: String?
     }
     let linked: [Linked]
     /// Providers this server can link.
     let available: [LinkProvider]
 
     func isLinked(_ provider: LinkProvider) -> Bool { linked.contains { $0.provider == provider } }
+
+    /// "ana@icloud.com" for a linked sign-in whose address is known, "Linked" otherwise, "Not linked".
+    func subtitle(_ provider: LinkProvider) -> String {
+        guard let link = linked.first(where: { $0.provider == provider }) else { return "Not linked" }
+        return link.email ?? "Linked"
+    }
 }
 
 /// The account a sign-in already belongs to (409 from POST /me/accounts/link), shown before merging.
