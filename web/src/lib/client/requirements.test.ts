@@ -2,6 +2,11 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import type { Requirement, RequirementLength } from '#lib/types';
 import {
 	applyPreset,
+	daysPhrase,
+	kindPhrase,
+	spanEndPhrase,
+	spanStartPhrase,
+	windowPhrase,
 	coveringRange,
 	mergeRanges,
 	rangeNote,
@@ -150,5 +155,31 @@ describe('date range lists', () => {
 		]);
 		expect(ranges[1]).toEqual(christmas);
 		expect(rangeNote({ from: '2027-01-04', to: '2027-01-05' }, [christmas])?.blocked).toBe(false);
+	});
+});
+
+describe('the timing sentence', () => {
+	const req = (preset: Parameters<typeof applyPreset>[1]) => applyPreset(defaultRequirement('UTC', '2026-11-20'), preset);
+	test('kinds', () => {
+		expect(kindPhrase(req('weekend'))).toBe('a weekend');
+		expect(kindPhrase(req('2h'))).toBe('2 hours');
+		expect(kindPhrase({ ...req('2h'), length: { type: 'duration', minutes: 150 } })).toBe('2½ hours');
+		expect(kindPhrase({ ...req('2h'), length: { type: 'duration', minutes: 45 } })).toBe('45 minutes');
+		expect(kindPhrase({ ...req('day'), length: { type: 'days', count: 3 } })).toBe('3 days in a row');
+	});
+	test('a span', () => {
+		const span = req('weekend').length as Extract<RequirementLength, { type: 'span' }>;
+		expect(spanStartPhrase(span)).toBe('Friday 18:00');
+		expect(spanEndPhrase(span)).toBe('Sunday night');
+		expect(spanEndPhrase({ ...span, endTime: '17:00', weeksLater: 1 })).toBe('the following Sunday 17:00');
+		expect(spanStartPhrase({ ...span, startTime: '00:00' })).toBe('Friday');
+	});
+	test('times and days', () => {
+		expect(windowPhrase(null)).toBe('any time of day');
+		expect(windowPhrase({ from: '18:00', to: '23:59' })).toBe('between 18:00 and midnight');
+		expect(daysPhrase([])).toBe('any day');
+		expect(daysPhrase([4, 5, 6])).toBe('Fridays to Sundays');
+		expect(daysPhrase([0, 2, 4])).toBe('Mondays, Wednesdays and Fridays');
+		expect(daysPhrase([5, 6])).toBe('weekends');
 	});
 });

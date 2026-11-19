@@ -108,3 +108,59 @@ extension Requirement {
         }
     }
 }
+
+// MARK: - The timing sentence
+
+/// "We're looking for a weekend, from Friday 18:00 to Sunday night, any time between 20 Nov and 28 Feb."
+/// Each phrase is a tappable part of the sentence. Same wording as web's and Android's.
+extension Requirement {
+    /// "a weekend", "2 hours", "2½ hours", "45 minutes", "3 days in a row".
+    var kindPhrase: String {
+        switch TimingPreset.detect(length, window: window) {
+        case .twoHours: return "2 hours"
+        case .evening: return "an evening"
+        case .oneDay: return "a whole day"
+        case .weekend: return "a weekend"
+        case .week: return "a week"
+        case .custom: break
+        }
+        switch length {
+        case .duration(let minutes):
+            if minutes % 60 == 0 { return Formatting.plural(minutes / 60, "hour") }
+            if minutes % 30 == 0 { return minutes < 60 ? "½ hour" : "\(minutes / 60)½ hours" }
+            return Formatting.plural(minutes, "minute")
+        case .days(let count): return count == 1 ? "a day" : "\(count) days in a row"
+        case .span: return "a stretch of days"
+        }
+    }
+
+    /// "Friday 18:00", "Tuesday" (from the start of the day).
+    static func startPhrase(_ span: RequirementLength.Span) -> String {
+        let midnight = span.startTime == WallTime(hour: 0, minute: 0)
+        return Weekday.full(span.startDay) + (midnight ? "" : " \(span.startTime)")
+    }
+
+    /// "Sunday night" (the end of the day), "Sunday 17:00", "the following Thursday night".
+    static func endPhrase(_ span: RequirementLength.Span) -> String {
+        let day = (span.weeksLater == 1 ? "the following " : "") + Weekday.full(span.endDay)
+        return span.endTime.isEndOfDay ? "\(day) night" : "\(day) \(span.endTime)"
+    }
+
+    /// "any time of day", "between 18:00 and midnight".
+    static func windowPhrase(_ window: TimeWindow?) -> String {
+        guard let window else { return "any time of day" }
+        return "between \(window.from) and \(window.to.isEndOfDay ? "midnight" : window.to.description)"
+    }
+
+    /// "any day", "weekdays", "weekends", "Fridays to Sundays", "Mondays, Wednesdays and Fridays".
+    static func daysPhrase(_ days: [Int]) -> String {
+        let sorted = Array(Set(days)).sorted()
+        if sorted.isEmpty || sorted.count == 7 { return "any day" }
+        if sorted == [0, 1, 2, 3, 4] { return "weekdays" }
+        if sorted == [5, 6] { return "weekends" }
+        let names = sorted.map { Weekday.full($0) + "s" }
+        let contiguous = zip(sorted, sorted.dropFirst()).allSatisfy { $1 == $0 + 1 }
+        if contiguous && sorted.count > 2 { return "\(names[0]) to \(names[names.count - 1])" }
+        return names.count == 1 ? names[0] : names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+    }
+}

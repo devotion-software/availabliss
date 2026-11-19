@@ -222,22 +222,49 @@ struct FitSummary: View {
 struct TimingForm: View {
     @Bindable var model: TimingEditorViewModel
     @Environment(\.theme) private var theme
-    @State private var editingEnds: TimingEndsSheet.Target?
-    @State private var showsAddRange = false
-    @State private var showsSearchRange = false
+    @State private var sheet: SentenceSheet?
     @State private var showsAuthorities = false
+
+    /// What each part of the sentence opens.
+    enum SentenceSheet: String, Identifiable {
+        case kind, start, end, window, days, range
+        var id: String { rawValue }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            lengthSection
-            startsSection
-            extrasSection
-            rangeSection
+            GlassPanel {
+                TimingSentence(requirement: model.draft) { sheet = $0 }
+                Text("Tap any underlined part to change it.")
+                    .bodyFont(12, relativeTo: .caption)
+                    .foregroundStyle(theme.muted)
+                FlowLayout(spacing: 8) {
+                    // With every day allowed, bank holidays are already included.
+                    if !model.allowsEveryDay {
+                        Chip(label: (model.draft.bankHolidays ? "\u{2713} " : "+ ") + "Bank holidays count as weekends", isOn: model.draft.bankHolidays) {
+                            model.draft.bankHolidays.toggle()
+                        }
+                    }
+                    Chip(label: (model.draft.schoolHolidaysOnly ? "\u{2713} " : "+ ") + "Only school holidays", isOn: model.draft.schoolHolidaysOnly) {
+                        model.draft.schoolHolidaysOnly.toggle()
+                    }
+                }
+                if model.draft.schoolHolidaysOnly {
+                    Button(model.authorityName.map { "\($0) term dates" } ?? "Choose whose term dates") { showsAuthorities = true }
+                        .buttonStyle(.textAction)
+                        .disabled(model.authorities.isEmpty)
+                }
+            }
         }
-        .sheet(item: $editingEnds) { target in TimingEndsSheet(model: model, target: target) }
-        .sheet(isPresented: $showsAddRange) { DateRangeSheet(existing: model.draft.dates) { model.addDateRange($0) } }
-        .sheet(isPresented: $showsSearchRange) {
-            SearchRangeSheet(range: model.draft.range) { model.draft.range = $0 }
+        .sheet(item: $sheet) { which in
+            switch which {
+            case .kind: KindSheet(model: model)
+            case .start: TimingEndsSheet(model: model, target: .start)
+            case .end: TimingEndsSheet(model: model, target: .end)
+            case .window: WindowSheet(model: model)
+            case .days: DaysSheet(model: model)
+            case .range: RangeSheet(model: model)
+            }
         }
         .sheet(isPresented: $showsAuthorities) {
             SearchablePicker(title: "School holidays", items: model.authorities.map { ($0.id, $0.name) }, selection: model.draft.schoolAuthority) {
@@ -245,76 +272,186 @@ struct TimingForm: View {
             }
         }
     }
+}
 
-    private var lengthSection: some View {
-        GlassPanel {
-            Text("How long?").sectionLabelStyle()
+/// The group's timing as one sentence, each underlined part opening its editor. Like web and Android.
+struct TimingSentence: View {
+    let requirement: Requirement
+    let open: (TimingForm.SentenceSheet) -> Void
+    @Environment(\.theme) private var theme
+    @Environment(\.isEnabled) private var isEnabled
+
+    private enum Piece: Hashable {
+        case words(String)
+        case part(String, TimingForm.SentenceSheet, after: String)
+    }
+
+    private var pieces: [Piece] {
+        var out: [Piece] = [.words("We\u{2019}re looking for")]
+        func add(_ text: String, _ sheet: TimingForm.SentenceSheet, after: String) { out.append(.part(text, sheet, after: after)) }
+        if case .span(let span) = requirement.length {
+            add(requirement.kindPhrase, .kind, after: ",")
+            out.append(.words("from"))
+            add(Requirement.startPhrase(span), .start, after: "")
+            out.append(.words("to"))
+            add(Requirement.endPhrase(span), .end, after: ",")
+        } else {
+            add(requirement.kindPhrase, .kind, after: ",")
+            if case .duration = requirement.length {
+                add(Requirement.windowPhrase(requirement.window), .window, after: ",")
+            } else if requirement.window != nil {
+                add(Requirement.windowPhrase(requirement.window), .window, after: ",")
+            }
+            out.append(.words("on"))
+            add(Requirement.daysPhrase(requirement.days), .days, after: ",")
+        }
+        if requirement.dates.isEmpty {
+            out.append(.words("any time between"))
+            add(Formatting.dayMonth(requirement.range.from), .range, after: "")
+            out.append(.words("and"))
+            add(Formatting.dayMonth(requirement.range.to), .range, after: ".")
+        } else {
+            out.append(.words("on"))
+            add(Formatting.plural(requirement.dates.count, "chosen date range"), .range, after: ".")
+        }
+        return out
+    }
+
+    var body: some View {
+        FlowLayout(spacing: 6) {
+            ForEach(Array(pieces.enumerated()), id: \.offset) { _, piece in
+                switch piece {
+                case .words(let text):
+                    ForEach(text.split(separator: " ").map(String.init), id: \.self) { Text($0) }
+                case .part(let text, let sheet, let after):
+                    HStack(spacing: 0) {
+                        Button {
+                            open(sheet)
+                        } label: {
+                            Text(text)
+                                .foregroundStyle(theme.accentInk)
+                                .padding(.horizontal, sheet == .kind ? 6 : 1)
+                                .background(sheet == .kind ? RoundedRectangle(cornerRadius: 8).fill(theme.accentSoft) : nil)
+                                .overlay(alignment: .bottom) {
+                                    if isEnabled {
+                                        Rectangle().fill(theme.accentInk.opacity(0.6)).frame(height: 2)
+                                    }
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Changes this part of the timing")
+                        if !after.isEmpty { Text(after) }
+                    }
+                }
+            }
+        }
+        .displayFont(24, .semibold)
+        .foregroundStyle(theme.ink)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// "We're looking for…": a few quick picks, or any length in hours (15-minute steps), days or start-to-end.
+private struct KindSheet: View {
+    @Bindable var model: TimingEditorViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        BottomSheet(title: "We\u{2019}re looking for\u{2026}") {
             FlowLayout(spacing: 8) {
-                ForEach(TimingPreset.allCases) { preset in
+                ForEach(TimingPreset.allCases.filter { $0 != .custom }) { preset in
                     Chip(label: preset.label, isOn: model.preset == preset, height: 40, fontSize: 14) { model.choose(preset) }
                 }
+                Chip(label: "Any length", isOn: model.preset == .custom, height: 40, fontSize: 14) { model.choose(.custom) }
             }
             if model.preset == .custom {
                 CustomLengthEditor(model: model)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
+            Button("Done") { dismiss() }.buttonStyle(.primary)
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: model.preset)
+    }
+}
+
+/// The time of day: any time, or from–until (any times).
+private struct WindowSheet: View {
+    @Bindable var model: TimingEditorViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        BottomSheet(title: "Time of day") {
+            if case .duration = model.draft.length {
+            } else {
+                Toggle(isOn: Binding(get: { !model.hasWindow }, set: { model.hasWindow = !$0 })) {
+                    Text("Any time of day").bodyFont(15, .medium)
+                }
+                .toggleStyle(.glassSwitch)
+            }
+            if model.hasWindow || isDuration {
+                DatePicker("From", selection: time(\.from), displayedComponents: .hourAndMinute).bodyFont(15, .medium)
+                DatePicker("Until", selection: time(\.to), displayedComponents: .hourAndMinute).bodyFont(15, .medium)
+                FlowLayout(spacing: 8) {
+                    Chip(label: "Daytime and evening", isOn: false) { model.draft.window = TimingPreset.defaultDurationWindow }
+                    Chip(label: "Working hours", isOn: false) {
+                        model.draft.window = TimeWindow(from: WallTime(hour: 9, minute: 0), to: WallTime(hour: 17, minute: 0))
+                    }
+                    Chip(label: "Evenings", isOn: false) { model.draft.window = TimingPreset.eveningWindow }
+                }
+            }
+            Button("Done") { dismiss() }.buttonStyle(.primary)
+        }
     }
 
-    private var startsSection: some View {
-        GlassPanel {
-            Text("Starts and ends").sectionLabelStyle()
-            HStack(spacing: 8) {
-                FieldTile(label: "Starts", value: model.startsLabel) { editingEnds = .start }
-                FieldTile(label: "Ends", value: model.endsLabel) { editingEnds = .end }
+    private var isDuration: Bool { if case .duration = model.draft.length { true } else { false } }
+
+    private func time(_ end: WritableKeyPath<TimeWindow, WallTime>) -> Binding<Date> {
+        Binding(
+            get: { (model.draft.window ?? TimingPreset.defaultDurationWindow)[keyPath: end].date() },
+            set: { date in
+                var window = model.draft.window ?? TimingPreset.defaultDurationWindow
+                window[keyPath: end] = WallTime(date)
+                model.draft.window = window
             }
+        )
+    }
+}
+
+/// Which days it can fall on: any combination, or a quick pick.
+private struct DaysSheet: View {
+    @Bindable var model: TimingEditorViewModel
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        BottomSheet(title: "On which days?") {
             HStack(spacing: 6) {
                 ForEach(Weekday.all, id: \.self) { day in
                     WeekdayToggle(day: day, isOn: model.isDayOn(day)) { model.toggleDay(day) }
                 }
             }
-            .disabled(model.isSpan)
-            .opacity(model.isSpan ? 0.7 : 1)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Days it can fall on")
-            if model.isSpan {
-                Text("Set by the start and end days.").bodyFont(12, relativeTo: .caption).foregroundStyle(theme.muted)
+            FlowLayout(spacing: 8) {
+                Chip(label: "Any day", isOn: false) { model.draft.days = [] }
+                Chip(label: "Weekdays", isOn: false) { model.draft.days = [0, 1, 2, 3, 4] }
+                Chip(label: "Weekends", isOn: false) { model.draft.days = [5, 6] }
+                Chip(label: "Fri to Sun", isOn: false) { model.draft.days = [4, 5, 6] }
             }
+            Button("Done") { dismiss() }.buttonStyle(.primary)
         }
     }
+}
 
-    private var extrasSection: some View {
-        VStack(spacing: 0) {
-            // With every day allowed, bank holidays are already included.
-            if !model.allowsEveryDay {
-                Toggle(isOn: $model.draft.bankHolidays) {
-                    ToggleLabel(title: "Bank holidays", subtitle: "Treat like a weekend day · owner's region")
-                }
-                .toggleStyle(.glassSwitch)
-                .frame(minHeight: 60)
-                Rectangle().fill(theme.line).frame(height: 1)
-            }
-            Toggle(isOn: $model.draft.schoolHolidaysOnly) {
-                ToggleLabel(title: "School holidays only", subtitle: model.authorityName.map { "\($0) term dates" } ?? "Choose whose term dates")
-            }
-            .toggleStyle(.glassSwitch)
-            .frame(minHeight: 60)
-            if model.draft.schoolHolidaysOnly {
-                Button(model.authorityName == nil ? "Choose school authority" : "Change school authority") { showsAuthorities = true }
-                    .buttonStyle(.textAction)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .disabled(model.authorities.isEmpty)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 4)
-        .glass(cornerRadius: 24)
-    }
+/// Any time between two dates (any dates, on a calendar), or only on certain date ranges.
+private struct RangeSheet: View {
+    @Bindable var model: TimingEditorViewModel
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
+    @State private var showsSearchRange = false
+    @State private var showsAddRange = false
 
-    private var rangeSection: some View {
-        GlassPanel {
-            Text("Search between").sectionLabelStyle()
+    var body: some View {
+        BottomSheet(title: "When could it be?") {
+            Text("Any time between").sectionLabelStyle()
             HStack(spacing: 8) {
                 FieldTile(label: "From", value: Formatting.dayMonthYear(model.draft.range.from.startDate())) { showsSearchRange = true }
                 Image(systemName: "arrow.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(theme.muted)
@@ -334,7 +471,12 @@ struct TimingForm: View {
                     .overlay(Capsule().strokeBorder(theme.line3, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
                     .frame(minHeight: 44)
             }
+            Button("Done") { dismiss() }.buttonStyle(.primary)
         }
+        .sheet(isPresented: $showsSearchRange) {
+            SearchRangeSheet(range: model.draft.range) { model.draft.range = $0 }
+        }
+        .sheet(isPresented: $showsAddRange) { DateRangeSheet(existing: model.draft.dates) { model.addDateRange($0) } }
     }
 }
 
@@ -418,7 +560,7 @@ struct TimingEndsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        BottomSheet(title: target == .start ? "Starts" : "Ends") {
+        BottomSheet(title: target == .start ? "Starting" : "Ending") {
             if model.isSpan {
                 Picker("Day", selection: dayBinding) {
                     ForEach(Weekday.all, id: \.self) { Text(Weekday.full($0)).tag($0) }
@@ -427,6 +569,12 @@ struct TimingEndsSheet: View {
                 .frame(height: 140)
                 DatePicker("Time", selection: timeBinding, displayedComponents: .hourAndMinute)
                     .bodyFont(15, .medium)
+                if target == .end {
+                    Toggle(isOn: Binding(get: { model.span.weeksLater == 1 }, set: { model.span.weeksLater = $0 ? 1 : 0 })) {
+                        Text("The following week").bodyFont(15, .medium)
+                    }
+                    .toggleStyle(.glassSwitch)
+                }
             } else {
                 Toggle(isOn: $model.hasWindow) {
                     Text("Only at certain times of day").bodyFont(15, .medium)

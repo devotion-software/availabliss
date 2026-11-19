@@ -1,23 +1,13 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
-	import type { Member, Requirement, Weekday } from '#lib/types';
-	import { PRESETS, WEEKDAY_NAMES, applyPreset, presetOf, type PresetId } from '#lib/client/requirements';
+	import type { Member, Requirement } from '#lib/types';
 	import { listSchoolAuthorities } from '#lib/client/regions';
 	import Chip from '#lib/components/ui/Chip.svelte';
-	import TextField from '#lib/components/ui/TextField.svelte';
 	import Select from '#lib/components/ui/Select.svelte';
-	import Toggle from '#lib/components/ui/Toggle.svelte';
-	import DayPicker from './DayPicker.svelte';
-	import CustomLength from './CustomLength.svelte';
-	import SettingRow from './SettingRow.svelte';
 	import WhoNeedsFree from './WhoNeedsFree.svelte';
 	import DateRangeChips from './DateRangeChips.svelte';
-	import Sheet from '#lib/components/ui/Sheet.svelte';
-	import Button from '#lib/components/ui/Button.svelte';
-	import DateRangeCalendar from '#lib/components/ui/DateRangeCalendar.svelte';
-	import { formatDayKeyYear } from '#lib/client/format';
+	import TimingSentence from './TimingSentence.svelte';
 
-	/** The group timing editor (Requirements.dc.html). Read-only when `readonly`. */
+	/** The group timing editor: the timing as one sentence (TimingSentence), holiday options and who needs to be free. Read-only when `readonly`. */
 	interface Props {
 		requirement: Requirement;
 		readonly?: boolean;
@@ -29,44 +19,6 @@
 		meId?: string;
 	}
 	let { requirement = $bindable(), readonly = false, country, regionLabel, members, meId }: Props = $props();
-
-	const uid = $props.id();
-	const detected = $derived(presetOf(requirement));
-	// Set from the start too, so SSR renders the right mode.
-	let customMode = $state(untrack(() => presetOf(requirement) === 'custom'));
-	$effect.pre(() => {
-		// Start in custom mode when the saved timing matches no preset.
-		if (detected === 'custom') customMode = true;
-	});
-	const selected = $derived<PresetId>(customMode ? 'custom' : detected);
-
-	function pick(id: PresetId) {
-		customMode = id === 'custom';
-		if (id !== 'custom') requirement = applyPreset(requirement, id);
-	}
-
-	const dayOptions = WEEKDAY_NAMES.map((n, i) => ({ value: String(i), label: n }));
-	const asDay = (v: string) => Number(v) as Weekday;
-	const valueOf = (e: Event) => (e.currentTarget as HTMLInputElement).value;
-
-	// "Search between": one range calendar in a sheet, applied on Done.
-	let pickingRange = $state(false);
-	let rangeFrom = $state('');
-	let rangeTo = $state('');
-	function openRange() {
-		rangeFrom = requirement.range.from;
-		rangeTo = requirement.range.to;
-		pickingRange = true;
-	}
-	function applyRange(e: SubmitEvent) {
-		e.preventDefault();
-		if (rangeFrom && rangeTo) requirement.range = { from: rangeFrom, to: rangeTo };
-		pickingRange = false;
-	}
-
-	function setPartOfDay(on: boolean) {
-		requirement.window = on ? { from: '18:00', to: '23:59' } : null;
-	}
 
 	// School authorities for the viewer's country.
 	let authorities = $state<{ value: string; label: string }[]>([]);
@@ -83,82 +35,31 @@
 	<legend class="sr-only">Group timing</legend>
 
 	<section class="glass card">
-		<h2 class="eyebrow">How long?</h2>
+		<TimingSentence bind:requirement {readonly} />
 		<div class="chips">
-			{#each PRESETS as p (p.id)}
-				<Chip selected={selected === p.id} onclick={() => pick(p.id)}>{p.label}</Chip>
-			{/each}
-		</div>
-		{#if selected === 'custom'}
-			<CustomLength bind:requirement />
-		{/if}
-	</section>
-
-	<section class="glass card">
-		<h2 class="eyebrow">Starts and ends</h2>
-		{#if requirement.length.type === 'span'}
-			{@const span = requirement.length}
-			<div class="pair">
-				<div class="box">
-					<span class="box-label">Starts</span>
-					<Select label="Start day" hideLabel options={dayOptions} value={String(span.startDay)} onchange={(v) => (span.startDay = asDay(v))} />
-					<TextField label="Start time" hideLabel type="time" value={span.startTime} onchange={(e) => (span.startTime = valueOf(e))} />
-				</div>
-				<div class="box">
-					<span class="box-label">Ends</span>
-					<Select label="End day" hideLabel options={dayOptions} value={String(span.endDay)} onchange={(v) => (span.endDay = asDay(v))} />
-					<TextField label="End time" hideLabel type="time" value={span.endTime} onchange={(e) => (span.endTime = valueOf(e))} />
-				</div>
-			</div>
-			<div class="inline-row">
-				<span id="wl-{uid}">Ends the following week</span>
-				<Toggle checked={span.weeksLater === 1} labelledby="wl-{uid}" disabled={readonly} onchange={(on) => (span.weeksLater = on ? 1 : 0)} />
-			</div>
-		{:else}
-			{#if requirement.length.type === 'days'}
-				<div class="inline-row">
-					<span id="pod-{uid}">Only part of the day</span>
-					<Toggle checked={requirement.window !== null} labelledby="pod-{uid}" disabled={readonly} onchange={setPartOfDay} />
-				</div>
+			<!-- With every day allowed (none picked means any), bank holidays are already included. -->
+			{#if requirement.length.type === 'span' || (requirement.days.length > 0 && new Set(requirement.days).size < 7)}
+				<Chip selected={requirement.bankHolidays} disabled={readonly} onclick={() => (requirement.bankHolidays = !requirement.bankHolidays)}>
+					{requirement.bankHolidays ? '✓' : '+'} Bank holidays count as weekends{regionLabel ? ` (${regionLabel})` : ''}
+				</Chip>
 			{/if}
-			{#if requirement.window}
-				{@const win = requirement.window}
-				<div class="pair">
-					<TextField
-						label={requirement.length.type === 'duration' ? 'Can happen from' : 'Starts from'}
-						type="time"
-						value={win.from}
-						onchange={(e) => (win.from = valueOf(e))}
-					/>
-					<TextField label="Until" type="time" value={win.to} onchange={(e) => (win.to = valueOf(e))} />
-				</div>
-			{:else}
-				<p class="plain">Whole days, any time from midnight to midnight.</p>
-			{/if}
-			<DayPicker bind:days={requirement.days} />
-			{#if requirement.days.length === 0}<p class="plain">No days picked means any day of the week.</p>{/if}
-		{/if}
-	</section>
-
-	<section class="glass list">
-		<!-- With every day allowed (none picked means any), bank holidays are already included. -->
-		{#if requirement.length.type === 'span' || (requirement.days.length > 0 && new Set(requirement.days).size < 7)}
-			<SettingRow
-				name="Bank holidays"
-				sub="{regionLabel ? `${regionLabel} · ` : ''}treat like a weekend day"
-				bind:checked={requirement.bankHolidays}
+			<Chip
+				selected={requirement.schoolHolidaysOnly}
 				disabled={readonly}
-			/>
-		{/if}
-		<SettingRow
-			name="School holidays only"
-			sub={authorityName ?? (requirement.customSchoolHolidays.length ? 'Custom term dates' : 'Choose whose term dates')}
-			bind:checked={requirement.schoolHolidaysOnly}
-			disabled={readonly}
-		>
-			{#if requirement.schoolHolidaysOnly && authorities.length}
+				onclick={() => (requirement.schoolHolidaysOnly = !requirement.schoolHolidaysOnly)}
+			>
+				{requirement.schoolHolidaysOnly ? '✓' : '+'} Only school holidays
+			</Chip>
+		</div>
+	</section>
+
+	{#if requirement.schoolHolidaysOnly}
+		<section class="glass card">
+			<h2 class="eyebrow">Whose school holidays?</h2>
+			{#if authorities.length}
 				<Select
 					label="School authority"
+					hideLabel
 					placeholder="Choose…"
 					options={authorities}
 					value={requirement.schoolAuthority ?? ''}
@@ -166,51 +67,24 @@
 					onchange={(v) => (requirement.schoolAuthority = v || null)}
 				/>
 			{/if}
-			{#if requirement.schoolHolidaysOnly}
-				<div class="custom-holidays">
-					<span class="eyebrow">{authorities.length ? 'Or add term breaks yourself' : 'Term breaks'}</span>
-					<DateRangeChips
-						bind:ranges={requirement.customSchoolHolidays}
-						{readonly}
-						start={requirement.range.from}
-						addLabel="+ Add school holiday"
-						emptyText="No custom school holidays."
-						sheetTitle="Add school holiday"
-						sheetDescription="Counts as a school holiday for this group."
-					/>
-				</div>
-			{/if}
-		</SettingRow>
-	</section>
-
-	<section class="glass card">
-		<h2 class="eyebrow">Search between</h2>
-		<div class="between">
-			<button type="button" class="pick" aria-label="Search from {formatDayKeyYear(requirement.range.from)}" onclick={openRange}>
-				<span class="pick-label">From</span>
-				{formatDayKeyYear(requirement.range.from)}
-			</button>
-			<span class="arrow" aria-hidden="true">→</span>
-			<button type="button" class="pick" aria-label="Search until {formatDayKeyYear(requirement.range.to)}" onclick={openRange}>
-				<span class="pick-label">Until</span>
-				{formatDayKeyYear(requirement.range.to)}
-			</button>
-		</div>
-		<h2 class="eyebrow">Or only these dates</h2>
-		<DateRangeChips bind:ranges={requirement.dates} {readonly} start={requirement.range.from} emptyText="Any date in the search window." />
-	</section>
+			<span class="eyebrow">{authorities.length ? 'Or add term breaks yourself' : 'Term breaks'}</span>
+			<DateRangeChips
+				bind:ranges={requirement.customSchoolHolidays}
+				{readonly}
+				start={requirement.range.from}
+				addLabel="+ Add school holiday"
+				emptyText="No custom school holidays."
+				sheetTitle="Add school holiday"
+				sheetDescription="Counts as a school holiday for this group."
+			/>
+			{#if !authorityName && !requirement.customSchoolHolidays.length}<p class="plain">Choose whose term dates to use.</p>{/if}
+		</section>
+	{/if}
 
 	{#if members && members.length > 1}
 		<WhoNeedsFree bind:requirement {members} {meId} {readonly} />
 	{/if}
 </fieldset>
-
-<Sheet bind:open={pickingRange} title="Search between" placement="center" width={420}>
-	<form class="range-form" onsubmit={applyRange} novalidate>
-		<DateRangeCalendar bind:from={rangeFrom} bind:to={rangeTo} label="Search between" />
-		<Button type="submit" variant="solid" block disabled={!rangeFrom}>Done</Button>
-	</form>
-</Sheet>
 
 <style>
 	.editor {
@@ -229,94 +103,13 @@
 		flex-direction: column;
 		gap: 12px;
 	}
-	.list {
-		border-radius: 24px;
-		padding: 4px 16px;
-	}
 	.chips {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
 	}
-	.pair {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 8px;
-	}
-	.box {
-		border-radius: 16px;
-		border: 1px solid var(--glass-border);
-		background: var(--surface);
-		padding: 10px;
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		min-width: 0;
-	}
-	.box-label {
-		font-size: 11px;
-		font-weight: 600;
-		color: var(--muted);
-	}
-	.inline-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		min-height: 44px;
-		font-size: 15px;
-		font-weight: 600;
-	}
-	.custom-holidays {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-		padding-bottom: 12px;
-	}
 	.plain {
 		font-size: 13px;
-		color: var(--muted);
-	}
-	.between {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-	.pick {
-		flex: 1;
-		min-width: 0;
-		min-height: 56px;
-		border-radius: var(--radius-control);
-		border: 1px solid var(--line-2);
-		background: var(--surface);
-		padding: 6px 14px;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: flex-start;
-		gap: 2px;
-		font-size: 15px;
-		font-weight: 600;
-		color: var(--ink);
-		text-align: left;
-		white-space: nowrap;
-	}
-	.pick:focus-visible {
-		outline: none;
-		border-color: var(--accent);
-		box-shadow: 0 0 0 3px var(--accent-soft);
-	}
-	.pick-label {
-		font-size: 11px;
-		font-weight: 600;
-		color: var(--muted);
-	}
-	.range-form {
-		display: flex;
-		flex-direction: column;
-		gap: 14px;
-	}
-	.arrow {
 		color: var(--muted);
 	}
 	/* Read-only: controls keep their look but stop inviting interaction. */

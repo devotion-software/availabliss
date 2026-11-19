@@ -171,6 +171,8 @@ data class TimingActions(
     val onDayCount: (Int) -> Unit = {},
     val onWeeksLater: (Boolean) -> Unit = {},
     val onToggleDay: (Int) -> Unit = {},
+    val onWindow: (dev.joeherbert.availabliss.core.network.model.TimeWindow?) -> Unit = {},
+    val onDays: (Set<Int>) -> Unit = {},
     val onBankHolidays: (Boolean) -> Unit = {},
     val onSchoolHolidays: (Boolean) -> Unit = {},
     val onStartTime: (java.time.LocalTime) -> Unit = {},
@@ -255,11 +257,9 @@ fun GroupTimingContent(state: GroupTimingUiState, actions: TimingActions, snackb
 fun TimingEditorSections(state: TimingEditorUiState, canEdit: Boolean, actions: TimingActions) {
     var picker by rememberSaveable { mutableStateOf(TimingPicker.None) }
     val draft = state.draft
-    LengthSection(draft, canEdit, actions)
-    StartsEndsSection(state, canEdit, draft, actions, openPicker = { picker = it })
-    ExtrasSection(state, canEdit, draft, actions, openPicker = { picker = it })
+    Section { TimingSentenceSection(state, canEdit, actions) }
+    if (draft.schoolHolidaysOnly) SchoolHolidaysSection(state, canEdit, draft, actions, openPicker = { picker = it })
     if (state.members.isNotEmpty()) WhoNeedsToBeFreeSection(state, canEdit, actions)
-    RangeSection(state, canEdit, draft, actions, openPicker = { picker = it })
     TimingPickers(state, picker, actions, close = { picker = TimingPicker.None })
 }
 
@@ -274,22 +274,6 @@ fun FitSummary(state: TimingEditorUiState, modifier: Modifier = Modifier) {
         }
         if (state.counting) {
             CircularProgressIndicator(Modifier.padding(start = 8.dp).size(14.dp), color = colors.muted, strokeWidth = 2.dp)
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun LengthSection(draft: TimingDraft, enabled: Boolean, actions: TimingActions) {
-    Section {
-        SectionLabel("How long?")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TimingPreset.entries.forEach { preset ->
-                Chip(preset.label, selected = draft.preset == preset, onClick = { if (enabled) actions.onPreset(preset) }, height = 40.dp)
-            }
-        }
-        if (draft.preset == TimingPreset.Custom) {
-            CustomLengthEditor(draft, enabled, actions.onCustomKind, actions.onDuration, actions.onDayCount, actions.onWeeksLater)
         }
     }
 }
@@ -336,97 +320,25 @@ private fun Stepper(value: String, what: String, enabled: Boolean, onMinus: () -
     }
 }
 
+/** "Whose school holidays?": the authority's term dates, or the group's own (shown with "Only school holidays"). */
 @Composable
-private fun StartsEndsSection(state: TimingEditorUiState, canEdit: Boolean, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
+private fun SchoolHolidaysSection(state: TimingEditorUiState, canEdit: Boolean, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
     val colors = AvailablissTheme.colors
     Section {
-        SectionLabel("Starts and ends")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FieldTile(
-                "Starts",
-                state.startsLabel,
-                onClick = { if (canEdit) openPicker(if (draft.isSpan) TimingPicker.SpanStart else TimingPicker.StartTime) },
-                modifier = Modifier.weight(1f),
-            )
-            FieldTile(
-                "Ends",
-                state.endsLabel,
-                onClick = { if (canEdit) openPicker(if (draft.isSpan) TimingPicker.SpanEnd else TimingPicker.EndTime) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(
-            Modifier.fillMaxWidth().semantics { contentDescription = "Days it can fall on" },
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            (0..6).forEach { day ->
-                val on = day in state.highlightedDays
-                val toggleable = canEdit && !draft.isSpan
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(44.dp)
-                        .clip(Shapes.controlSmall)
-                        .background(if (on) colors.accent else colors.surface)
-                        .border(1.dp, if (on) colors.accent else colors.glassBorder, Shapes.controlSmall)
-                        .toggleable(value = on, enabled = toggleable, role = Role.Checkbox, onValueChange = { actions.onToggleDay(day) })
-                        .semantics { contentDescription = DateTimes.longWeekday(day) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        DateTimes.narrowWeekday(day),
-                        style = AvailablissTheme.type.bodySmallStrong.copy(fontWeight = FontWeight.Bold),
-                        color = if (on) colors.onAccent else colors.ink,
-                    )
-                }
-            }
-        }
-        val hint = when {
-            draft.isSpan -> "Set by when it starts and ends"
-            draft.days.isEmpty() -> "Any day of the week"
-            else -> null
-        }
-        hint?.let { Text(it, style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted) }
-    }
-}
-
-@Composable
-private fun ExtrasSection(state: TimingEditorUiState, canEdit: Boolean, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
-    val colors = AvailablissTheme.colors
-    Column(Modifier.fillMaxWidth().glass(Shapes.card).padding(horizontal = 16.dp, vertical = 4.dp)) {
-        // With every day allowed (none picked means any), bank holidays are already included.
-        if (draft.isSpan || (draft.days.isNotEmpty() && draft.days.toSet().size < 7)) {
-            ToggleRow(
-                title = "Bank holidays",
-                subtitle = state.bankSubtitle,
-                checked = draft.bankHolidays,
-                onCheckedChange = { if (canEdit) actions.onBankHolidays(it) },
-            )
-            RowDivider()
-        }
-        ToggleRow(
-            title = "School holidays only",
-            subtitle = state.schoolSubtitle,
-            checked = draft.schoolHolidaysOnly,
-            onCheckedChange = { if (canEdit) actions.onSchoolHolidays(it) },
+        SectionLabel("Whose school holidays?")
+        Text(state.schoolSubtitle, style = AvailablissTheme.type.bodySmallStrong, color = colors.ink)
+        Text(
+            "Add your own holiday dates if your school's aren't listed.",
+            style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
+            color = colors.muted,
         )
-        if (draft.schoolHolidaysOnly) {
-            // The group's own term breaks, for authorities we don't have dates for (or extra days off).
-            Column(Modifier.padding(bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "Add your own holiday dates if your school's aren't listed.",
-                    style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
-                    color = colors.muted,
-                )
-                RangeChips(
-                    ranges = draft.customSchoolHolidays,
-                    canEdit = canEdit,
-                    addLabel = "+ Add school holiday",
-                    onAdd = { openPicker(TimingPicker.SchoolHolidays) },
-                    onRemove = { actions.onRemoveRange(RangeList.SchoolHolidays, it) },
-                )
-            }
-        }
+        RangeChips(
+            ranges = draft.customSchoolHolidays,
+            canEdit = canEdit,
+            addLabel = "+ Add school holiday",
+            onAdd = { openPicker(TimingPicker.SchoolHolidays) },
+            onRemove = { actions.onRemoveRange(RangeList.SchoolHolidays, it) },
+        )
     }
 }
 
@@ -495,37 +407,6 @@ private fun RangeChips(ranges: List<DateRange>, canEdit: Boolean, addLabel: Stri
 }
 
 @Composable
-private fun RangeSection(state: TimingEditorUiState, canEdit: Boolean, draft: TimingDraft, actions: TimingActions, openPicker: (TimingPicker) -> Unit) {
-    val colors = AvailablissTheme.colors
-    Section {
-        SectionLabel("Search between")
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ValueBox(
-                DateTimes.dayMonthYear(state.rangeFrom),
-                onClick = { if (canEdit) openPicker(TimingPicker.SearchRange) },
-                contentDescription = "From ${DateTimes.dayMonthYear(state.rangeFrom)}",
-                modifier = Modifier.weight(1f),
-            )
-            Icon(AvIcons.ArrowRight, null, tint = colors.muted, modifier = Modifier.size(16.dp))
-            ValueBox(
-                DateTimes.dayMonthYear(state.rangeTo),
-                onClick = { if (canEdit) openPicker(TimingPicker.SearchRange) },
-                contentDescription = "To ${DateTimes.dayMonthYear(state.rangeTo)}",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        SectionLabel("Or only these dates", Modifier.padding(top = 4.dp))
-        RangeChips(
-            ranges = draft.dates,
-            canEdit = canEdit,
-            addLabel = "+ Add date range",
-            onAdd = { openPicker(TimingPicker.Dates) },
-            onRemove = { actions.onRemoveRange(RangeList.Dates, it) },
-        )
-    }
-}
-
-@Composable
 private fun SaveBar(state: GroupTimingUiState, editor: TimingEditorUiState, onSave: () -> Unit, modifier: Modifier = Modifier) {
     val colors = AvailablissTheme.colors
     Row(
@@ -568,11 +449,11 @@ private fun TimingPickers(state: TimingEditorUiState, picker: TimingPicker, acti
         TimingPicker.None -> Unit
         TimingPicker.StartTime -> AvTimePickerDialog("Starts", state.startTime, actions.onStartTime, close)
         TimingPicker.EndTime -> AvTimePickerDialog("Ends", state.endTime, actions.onEndTime, close)
-        TimingPicker.SpanStart -> SpanEndSheet("Starts", state.spanStart, onDone = {
+        TimingPicker.SpanStart -> SpanEndSheet("Starts", state.spanStart, following = null, onDone = {
             actions.onSpanStart(it)
             close()
         }, onDismiss = close)
-        TimingPicker.SpanEnd -> SpanEndSheet("Ends", state.spanEnd, onDone = {
+        TimingPicker.SpanEnd -> SpanEndSheet("Ends", state.spanEnd, following = null, onDone = {
             actions.onSpanEnd(it)
             close()
         }, onDismiss = close)
@@ -595,23 +476,6 @@ private fun RangePicker(draft: TimingDraft, list: RangeList, actions: TimingActi
         note = { from, to -> DateRanges.note(range(from, to), existing) },
         canPick = { from, to -> DateRanges.covering(range(from, to), existing) == null },
     )
-}
-
-/** Picks the weekday and time for one end of a span. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SpanEndSheet(title: String, initial: SpanEnd, onDone: (SpanEnd) -> Unit, onDismiss: () -> Unit) {
-    var day by remember { mutableStateOf(initial.day) }
-    var time by remember { mutableStateOf(initial.time) }
-    var pickingTime by remember { mutableStateOf(false) }
-    AvBottomSheet(title = title, onDismissRequest = onDismiss) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            (0..6).forEach { d -> Chip(DateTimes.shortWeekday(d), selected = d == day, onClick = { day = d }) }
-        }
-        FieldTile("Time", DateTimes.time(time), onClick = { pickingTime = true }, modifier = Modifier.fillMaxWidth())
-        PrimaryButton("Done", onClick = { onDone(SpanEnd(day, time)) }, height = 52.dp, shape = Shapes.control, modifier = Modifier.fillMaxWidth())
-    }
-    if (pickingTime) AvTimePickerDialog(title, time, { time = it }, { pickingTime = false })
 }
 
 @Preview(widthDp = 390, heightDp = 844)

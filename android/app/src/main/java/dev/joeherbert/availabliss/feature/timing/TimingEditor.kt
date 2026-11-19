@@ -108,6 +108,12 @@ class TimingEditor(
         if (d.isSpan) d else d.copy(days = if (day in d.days) d.days - day else d.days + day)
     }
 
+    /** The time of day (any time when null), for hours and days lengths. */
+    fun setWindow(window: TimeWindow?) = edit { d -> if (d.isSpan) d else RequirementPresets.withLength(d, d.length, window) }
+
+    /** Which days it can fall on (empty: any day). */
+    fun setDays(days: Set<Int>) = edit { d -> if (d.isSpan) d else d.copy(days = days) }
+
     fun setBankHolidays(on: Boolean) = edit { it.copy(bankHolidays = on) }
 
     fun setSchoolHolidaysOnly(on: Boolean) = edit { d ->
@@ -166,6 +172,8 @@ class TimingEditor(
         onDayCount = ::changeDayCount,
         onWeeksLater = ::setWeeksLater,
         onToggleDay = ::toggleDay,
+        onWindow = ::setWindow,
+        onDays = ::setDays,
         onBankHolidays = ::setBankHolidays,
         onSchoolHolidays = ::setSchoolHolidaysOnly,
         onStartTime = ::setStartTime,

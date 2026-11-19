@@ -203,3 +203,60 @@ export function rangeNote(range: DateRange, ranges: readonly DateRange[]): { tex
 			: `Joins up with ${joining.length} of your ranges, so they\u2019ll become one.`;
 	return { text, blocked: false };
 }
+
+// ─── The timing sentence ("We're looking for a weekend, from Friday 18:00 to Sunday night…") ───
+
+/** Each preset as it reads in the sentence. */
+const KIND_PHRASES: Record<Exclude<PresetId, 'custom'>, string> = {
+	'2h': '2 hours',
+	'4h': '4 hours',
+	evening: 'an evening',
+	day: 'a whole day',
+	weekend: 'a weekend',
+	'tue-thu': 'Tuesday to Thursday',
+	'tue-next-thu': 'Tuesday to the following Thursday',
+	week: 'a week'
+};
+
+/** The first gap: "a weekend", "2 hours", "3 days", "2½ hours". */
+export function kindPhrase(req: Requirement): string {
+	const preset = presetOf(req);
+	if (preset !== 'custom') return KIND_PHRASES[preset];
+	const { length } = req;
+	if (length.type === 'duration') {
+		const h = length.minutes / 60;
+		if (Number.isInteger(h)) return plural(h, 'hour');
+		if (Number.isInteger(h * 2)) return `${Math.floor(h) || ''}½ hours`.trim();
+		return plural(length.minutes, 'minute');
+	}
+	if (length.type === 'days') return length.count === 1 ? 'a day' : `${length.count} days in a row`;
+	return 'a stretch of days';
+}
+
+/** "Friday 18:00", "Tuesday" (from the start of the day). */
+export const spanStartPhrase = (length: Extract<RequirementLength, { type: 'span' }>) =>
+	`${WEEKDAY_NAMES[length.startDay]}${length.startTime === '00:00' ? '' : ` ${length.startTime}`}`;
+
+/** "Sunday night" (the end of the day), "Sunday 17:00", "the following Thursday night". */
+export function spanEndPhrase(length: Extract<RequirementLength, { type: 'span' }>): string {
+	const day = `${length.weeksLater ? 'the following ' : ''}${WEEKDAY_NAMES[length.endDay]}`;
+	return length.endTime === '23:59' ? `${day} night` : `${day} ${length.endTime}`;
+}
+
+/** "any time of day", "between 18:00 and midnight", "between 08:00 and 23:00". */
+export function windowPhrase(window: TimeWindow | null): string {
+	if (!window) return 'any time of day';
+	return `between ${window.from} and ${window.to === '23:59' ? 'midnight' : window.to}`;
+}
+
+/** "any day", "Fridays to Sundays", "weekdays", "Mondays, Wednesdays and Fridays". */
+export function daysPhrase(days: readonly number[]): string {
+	const sorted = [...new Set(days)].sort((a, b) => a - b);
+	if (sorted.length === 0 || sorted.length === 7) return 'any day';
+	if (sameJson(sorted, [0, 1, 2, 3, 4])) return 'weekdays';
+	if (sameJson(sorted, [5, 6])) return 'weekends';
+	const names = sorted.map((d) => `${WEEKDAY_NAMES[d]}s`);
+	const contiguous = sorted.every((d, i) => i === 0 || d === sorted[i - 1] + 1);
+	if (contiguous && sorted.length > 2) return `${names[0]} to ${names.at(-1)}`;
+	return names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+}
