@@ -7,6 +7,8 @@ struct MembersView: View {
     @Environment(\.theme) private var theme
     @State private var model: MembersViewModel
     @State private var confirmation: Confirmation?
+    /// The member whose name in the group is being changed.
+    @State private var renaming: Member?
 
     private enum Confirmation: Identifiable {
         case remove(Member)
@@ -32,8 +34,9 @@ struct MembersView: View {
                 }
                 if !model.sortedMembers.isEmpty {
                     GlassList(data: model.sortedMembers, id: \.userId, header: Formatting.plural(model.sortedMembers.count, "member"), rowMinHeight: 58) { member in
-                        MemberRow(member: member, isMe: member.userId == me, canManage: canManage(member)) { action in
+                        MemberRow(member: member, isMe: member.userId == me, canManage: canManage(member), canRename: canRename(member)) { action in
                             switch action {
+                            case .rename: renaming = member
                             case .makeAdmin: Task { await model.setRole(.admin, for: member) }
                             case .makeMember: Task { await model.setRole(.member, for: member) }
                             case .remove: confirmation = .remove(member)
@@ -72,6 +75,12 @@ struct MembersView: View {
                 [ConfirmOption("Remove \(member.firstName)", kind: .destructive) { Task { await model.remove(member) } }]
             }
         }
+        .sheet(item: $renaming) { member in
+            let isMe = member.userId == me
+            MemberNameSheet(member: member, isMe: isMe, accountName: isMe ? app.session.user?.accountName : nil) { name in
+                await model.setName(name, for: member, isMe: isMe)
+            }
+        }
         .errorAlert($model.error)
         .toast($model.toast)
     }
@@ -80,6 +89,9 @@ struct MembersView: View {
         guard member.userId != me, member.role != .owner, let role = model.group?.role else { return false }
         return role == .owner || (role == .admin && member.role == .member)
     }
+
+    /// Your own name in the group, or as an admin anyone's.
+    private func canRename(_ member: Member) -> Bool { member.userId == me || model.isAdmin }
 
     /// Two ways in: a link anyone can use, or invites for particular people (by email or username)
     /// that only they can accept. Then the invites still live, each with Revoke.
@@ -120,11 +132,12 @@ struct MembersView: View {
 }
 
 private struct MemberRow: View {
-    enum Action { case makeAdmin, makeMember, remove }
+    enum Action { case rename, makeAdmin, makeMember, remove }
 
     let member: Member
     let isMe: Bool
     let canManage: Bool
+    let canRename: Bool
     let perform: (Action) -> Void
     @Environment(\.theme) private var theme
 
@@ -133,39 +146,133 @@ private struct MemberRow: View {
             Avatar(name: member.name, imageURL: member.image, color: theme.tile(forUser: member.userId))
             VStack(alignment: .leading, spacing: 0) {
                 Text(isMe ? "\(member.name) (you)" : member.name).bodyFont(15, .semibold).lineLimit(1)
-                Text(member.synced ? "Synced" : "Not synced yet").bodyFont(12, relativeTo: .caption).foregroundStyle(member.synced ? theme.muted : theme.warnInk)
+                HStack(spacing: 6) {
+                    Text(member.synced ? "Synced" : "Not synced yet").foregroundStyle(member.synced ? theme.muted : theme.warnInk)
+                    if member.nameInGroup != nil {
+                        Text("·").foregroundStyle(theme.muted).accessibilityHidden(true)
+                        Label("Name in this group", systemImage: "tag")
+                            .labelStyle(.titleAndIcon)
+                            .foregroundStyle(theme.muted)
+                    }
+                }
+                .bodyFont(12, relativeTo: .caption)
+                .lineLimit(1)
             }
             Spacer(minLength: 4)
             if member.role != .member {
                 StatusPill(text: member.role.label, tone: member.role == .owner ? .indigo : .neutral)
             }
-            if canManage {
+            if canManage || canRename {
                 Menu {
-                    if member.role == .member {
+                    if canRename {
                         Button {
-                            perform(.makeAdmin)
+                            perform(.rename)
                         } label: {
-                            Label("Make admin", systemImage: "shield")
-                        }
-                    } else {
-                        Button {
-                            perform(.makeMember)
-                        } label: {
-                            Label("Remove admin", systemImage: "shield.slash")
+                            Label("Change name in group", systemImage: "pencil")
                         }
                     }
-                    Button(role: .destructive) {
-                        perform(.remove)
-                    } label: {
-                        Label("Remove from group", systemImage: "person.badge.minus")
-                    }
+                    if canManage { manageActions }
                 } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16, weight: .semibold)).foregroundStyle(theme.muted).frame(width: 44, height: 44)
                 }
-                .accessibilityLabel("Manage \(member.name)")
+                .accessibilityLabel(isMe ? "Your options" : "Manage \(member.name)")
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var manageActions: some View {
+        if member.role == .member {
+            Button {
+                perform(.makeAdmin)
+            } label: {
+                Label("Make admin", systemImage: "shield")
+            }
+        } else {
+            Button {
+                perform(.makeMember)
+            } label: {
+                Label("Remove admin", systemImage: "shield.slash")
+            }
+        }
+        Button(role: .destructive) {
+            perform(.remove)
+        } label: {
+            Label("Remove from group", systemImage: "person.badge.minus")
+        }
+    }
+}
+
+/// Changes the name someone goes by in the group (yours, or as an admin anyone's): prefilled with
+/// the name they chose, Save, and a way back to their account name.
+private struct MemberNameSheet: View {
+    let member: Member
+    let isMe: Bool
+    /// Yours; others' account names aren't known.
+    let accountName: String?
+    let save: (String?) async -> Bool
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
+    @State private var name: String
+    @State private var isSaving = false
+
+    private static let maxLength = 80
+
+    init(member: Member, isMe: Bool, accountName: String?, save: @escaping (String?) async -> Bool) {
+        self.member = member
+        self.isMe = isMe
+        self.accountName = accountName
+        self.save = save
+        _name = State(initialValue: member.nameInGroup ?? "")
+    }
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// Blank (or, for you, your account name itself) means going by the account name.
+    private var nameToSave: String? { trimmed.isEmpty || trimmed == accountName ? nil : trimmed }
+    private var changed: Bool { nameToSave != member.nameInGroup }
+
+    var body: some View {
+        BottomSheet(title: "Change name in group") {
+            Text(caption)
+                .bodyFont(13, relativeTo: .subheadline)
+                .foregroundStyle(theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            InputField(placeholder: accountName ?? member.name, text: $name)
+                .textContentType(isMe ? .nickname : nil)
+                .submitLabel(.done)
+                .onSubmit { submit(nameToSave) }
+                .onChange(of: name) { _, new in if new.count > Self.maxLength { name = String(new.prefix(Self.maxLength)) } }
+            Button {
+                submit(nameToSave)
+            } label: {
+                LoadingLabel(title: "Save", isLoading: isSaving)
+            }
+            .buttonStyle(.accent)
+            .disabled(!changed || isSaving)
+            if member.nameInGroup != nil {
+                Button(isMe ? "Use my account name" : "Use their account name") { submit(nil) }
+                    .buttonStyle(.textAction)
+                    .frame(maxWidth: .infinity)
+                    .disabled(isSaving)
+            }
+        }
+    }
+
+    private var caption: String {
+        if isMe {
+            let account = accountName.map { ", \($0)" } ?? ""
+            return "Only this group sees it. Leave it blank to go by your account name\(account)."
+        }
+        return "Only this group sees it. Leave it blank for \(member.firstName) to go by their account name."
+    }
+
+    private func submit(_ value: String?) {
+        guard value != member.nameInGroup, !isSaving else { return }
+        Task {
+            isSaving = true
+            defer { isSaving = false }
+            if await save(value) { dismiss() }
+        }
     }
 }
 

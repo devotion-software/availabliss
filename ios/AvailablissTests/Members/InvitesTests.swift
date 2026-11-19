@@ -43,9 +43,16 @@ struct InvitesTests {
     }
 
     @Test func linkLimitLabels() {
-        #expect(LinkLimit.choices.map(\.label) == ["1", "5", "10", "25", "Unlimited"])
+        #expect(LinkLimit.people(25).label == "25")
+        #expect(LinkLimit.unlimited.label == "Unlimited")
         #expect(LinkLimit.standard.accessibilityLabel == "One person")
         #expect(LinkLimit.people(5).accessibilityLabel == "5 people")
+    }
+
+    @Test func linkLimitsAreKeptToTheServersRange() {
+        #expect(LinkLimit.people(clamping: 0) == .people(1))
+        #expect(LinkLimit.people(clamping: 42) == .people(42))
+        #expect(LinkLimit.people(clamping: 5000) == .people(1000))
     }
 
     @Test func nextNameAddsATwo() {

@@ -122,6 +122,10 @@ enum API {
         static func setMyName(groupId: String, displayName: String?) -> Endpoint<Member> {
             .init(.patch, "/groups/\(groupId.pathEncoded)/members/me", body: MemberNameBody(displayName: displayName))
         }
+        /// Sets (or with nil, clears) the name someone goes by in the group: yours, or as an admin anyone's.
+        static func setName(groupId: String, userId: String, displayName: String?) -> Endpoint<Member> {
+            .init(.patch, "/groups/\(groupId.pathEncoded)/members/\(userId.pathEncoded)", body: MemberNameBody(displayName: displayName))
+        }
         /// Removes a member (an admin removing someone else).
         static func removeMember(groupId: String, userId: String) -> Endpoint<EmptyResponse> {
             .init(.delete, "/groups/\(groupId.pathEncoded)/members/\(userId.pathEncoded)")

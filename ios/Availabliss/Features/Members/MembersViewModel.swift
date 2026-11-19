@@ -104,6 +104,23 @@ final class MembersViewModel {
         }
     }
 
+    /// Sets (nil: clears) the name `member` goes by in the group: yours, or as an admin anyone's.
+    /// Returns whether it worked.
+    func setName(_ name: String?, for member: Member, isMe: Bool) async -> Bool {
+        do {
+            let updated = try await api.send(
+                isMe
+                    ? API.Groups.setMyName(groupId: groupId, displayName: name)
+                    : API.Groups.setName(groupId: groupId, userId: member.userId, displayName: name))
+            if let index = group?.members.firstIndex(where: { $0.userId == member.userId }) { group?.members[index] = updated }
+            toast = name == nil ? (isMe ? "Back to your account name" : "Back to their account name") : "Name updated"
+            return true
+        } catch {
+            self.error = error.userMessage
+            return false
+        }
+    }
+
     func remove(_ member: Member) async {
         do {
             try await api.send(API.Groups.removeMember(groupId: groupId, userId: member.userId))

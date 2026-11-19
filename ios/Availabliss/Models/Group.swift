@@ -289,9 +289,13 @@ enum LinkLimit: Hashable, Sendable {
     case people(Int)
     case unlimited
 
-    /// The choices offered when making a link; one person is what links always were.
-    static let choices: [LinkLimit] = [.people(1), .people(5), .people(10), .people(25), .unlimited]
+    /// One person is what links always were.
     static let standard: LinkLimit = .people(1)
+    /// The most people a link can be for (the server's limit).
+    static let maxPeople = 1000
+
+    /// `n` people, kept to 1–`maxPeople`.
+    static func people(clamping n: Int) -> LinkLimit { .people(min(max(n, 1), maxPeople)) }
 
     var label: String {
         switch self {
