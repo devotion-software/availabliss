@@ -74,6 +74,7 @@
 		<p class="plain">A time only works when everyone who isn't optional is free.</p>
 	{/if}
 
+	{#if members.length}<h3 class="optional-title">Mark anyone whose attendance is optional</h3>{/if}
 	<ul class="members">
 		{#each members as m (m.userId)}
 			<li class="member">
@@ -94,6 +95,12 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
+	}
+	.optional-title {
+		margin: 6px 0 0;
+		font-size: 15px;
+		font-weight: 600;
+		color: var(--ink);
 	}
 	.stepper {
 		display: flex;

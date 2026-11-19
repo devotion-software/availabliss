@@ -157,6 +157,11 @@ struct WhoNeedsToBeFreeSection: View {
             .foregroundStyle(theme.muted)
             .fixedSize(horizontal: false, vertical: true)
             if !members.isEmpty {
+                Text("Mark anyone whose attendance is optional")
+                    .bodyFont(15, .semibold)
+                    .foregroundStyle(theme.ink)
+                    .padding(.top, 6)
+                    .accessibilityAddTraits(.isHeader)
                 VStack(spacing: 0) {
                     ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
                         if index > 0 { Rectangle().fill(theme.line).frame(height: 1) }

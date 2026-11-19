@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -374,6 +375,14 @@ private fun WhoNeedsToBeFreeSection(state: TimingEditorUiState, canEdit: Boolean
             style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal),
             color = colors.muted,
         )
+        if (state.members.isNotEmpty()) {
+            Text(
+                "Mark anyone whose attendance is optional",
+                style = AvailablissTheme.type.bodyMedium,
+                color = colors.ink,
+                modifier = Modifier.padding(top = 6.dp).semantics { heading() },
+            )
+        }
         Column {
             state.members.forEachIndexed { i, member ->
                 if (i > 0) RowDivider()
