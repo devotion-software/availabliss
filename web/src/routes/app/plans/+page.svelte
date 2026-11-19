@@ -35,7 +35,8 @@
 	<section aria-labelledby="coming-up">
 		<div class="section-head">
 			<h2 class="eyebrow" id="coming-up">Coming up{plans.going.length ? ` · ${plans.going.length}` : ''}</h2>
-			{#if plans.going.length}
+			<!-- Gone once every plan coming up has been added from this browser. -->
+			{#if plans.going.some((p) => !added.has(p.id))}
 				<Button href={myPlansIcsUrl()} download size="sm" variant="secondary" icon="calendar-plus" onclick={addedAll}>Add all to calendar</Button>
 			{/if}
 		</div>

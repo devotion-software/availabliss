@@ -118,17 +118,17 @@ struct MyPlansView: View {
         HStack {
             Text("Coming up").displayFont(19, .semibold).accessibilityAddTraits(.isHeader)
             Spacer()
-            if !model.going.isEmpty {
+            // Gone once every plan coming up is in your calendar (as on Android).
+            if !notAdded.isEmpty || isAdding {
                 Button(action: startAddAll) {
                     if isAdding {
                         ProgressView().controlSize(.small)
                     } else {
-                        Label("Add all to calendar", systemImage: notAdded.isEmpty ? "calendar.badge.checkmark" : "calendar.badge.plus")
+                        Label("Add all to calendar", systemImage: "calendar.badge.plus")
                     }
                 }
                 .buttonStyle(.glassPill)
-                .disabled(notAdded.isEmpty || isAdding)
-                .accessibilityHint(notAdded.isEmpty ? "They're all in your calendar" : "")
+                .disabled(isAdding)
             }
         }
         .padding(.top, 6)
