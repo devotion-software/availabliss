@@ -92,9 +92,12 @@ class RootViewModel @Inject constructor(
         }
     }
 
-    /** Skip or Get started on the intro: on to sign in, and never shown again. */
-    fun finishIntro() {
-        viewModelScope.launch { prefs.setHasSeenIntro() }
+    /** Skip or Get started on the intro: on to sign in, never shown again, keeping the name typed there. */
+    fun finishIntro(name: String) {
+        viewModelScope.launch {
+            if (name.isNotBlank()) prefs.setIntroName(name)
+            prefs.setHasSeenIntro()
+        }
     }
 
     fun consume(link: DeepLink) = deepLinkBus.consume(link)

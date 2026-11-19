@@ -40,7 +40,11 @@ final class RegionViewModel {
     func load(user: User?) async {
         isLoading = true
         defer { isLoading = false }
-        if name.isEmpty { name = user?.name ?? "" }
+        // An account without a name yet starts from the one typed on the intro.
+        if name.isEmpty {
+            let accountName = user?.name ?? ""
+            name = accountName.isEmpty ? (IntroName.saved ?? "") : accountName
+        }
         username.prefill(user?.username)
         do {
             async let countriesRequest = api.send(API.Regions.countries())

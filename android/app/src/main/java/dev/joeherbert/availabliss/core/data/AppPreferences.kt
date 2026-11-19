@@ -143,6 +143,13 @@ class AppPreferences @Inject constructor(
         store.edit { it[KEY_SEEN_INTRO] = true }
     }
 
+    /** The name typed on the intro's welcome, for the sign-up step that asks for it. */
+    val introName: Flow<String?> = store.data.map { prefs -> prefs[KEY_INTRO_NAME]?.takeIf { it.isNotBlank() } }
+
+    suspend fun setIntroName(name: String) {
+        store.edit { it[KEY_INTRO_NAME] = name }
+    }
+
     suspend fun pushToken(): String? = store.data.first()[KEY_PUSH_TOKEN]
 
     suspend fun setPushToken(token: String?) {
@@ -186,5 +193,6 @@ class AppPreferences @Inject constructor(
         val KEY_ADD_TO_CALENDAR = longPreferencesKey("add_to_calendar_id")
         val KEY_ADDED_CALENDAR_EVENTS = stringPreferencesKey("added_calendar_events")
         val KEY_SEEN_INTRO = booleanPreferencesKey("seen_intro")
+        val KEY_INTRO_NAME = stringPreferencesKey("intro_name")
     }
 }

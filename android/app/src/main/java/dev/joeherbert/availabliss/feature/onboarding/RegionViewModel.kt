@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.joeherbert.availabliss.core.common.UserMessage
+import dev.joeherbert.availabliss.core.data.AppPreferences
 import dev.joeherbert.availabliss.core.data.RegionsRepository
 import dev.joeherbert.availabliss.core.data.UserRepository
 import dev.joeherbert.availabliss.core.network.ApiResult
@@ -14,6 +15,7 @@ import dev.joeherbert.availabliss.feature.common.UsernameFieldState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.ZoneId
@@ -79,6 +81,7 @@ data class RegionUiState(
 class RegionViewModel @Inject constructor(
     private val regions: RegionsRepository,
     private val users: UserRepository,
+    private val prefs: AppPreferences,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(RegionUiState())
@@ -96,6 +99,8 @@ class RegionViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
             val user = users.user.value
+            // An account without a name yet starts from the one typed on the intro.
+            val introName = prefs.introName.first().orEmpty()
             usernameEditor.prefill(user?.username)
             var country = user?.country
             var subdivision = user?.subdivision
@@ -122,7 +127,7 @@ class RegionViewModel @Inject constructor(
                     subdivision = subdivision,
                     schoolAuthority = user?.schoolAuthority,
                     timezone = timezone,
-                    name = it.name.ifEmpty { user?.name.orEmpty() },
+                    name = it.name.ifEmpty { user?.name.orEmpty().ifEmpty { introName } },
                 )
             }
             country?.let { loadCountryDetails(it) }

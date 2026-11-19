@@ -3,6 +3,7 @@ package dev.joeherbert.availabliss.feature.intro
 // The intro's little animated scenes, built from the app's own pieces: a group card, calendar rows
 // turning into busy time, the month grid lighting up, a proposal filling with replies, and a chat.
 // Each is drawn at 340 × 320dp and plays while its page shows (with Remove animations, its last frame).
+// Each leaves a space (IntroNameSlot) where your name lands on that page, sized like the names around it.
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
@@ -51,12 +52,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import dev.joeherbert.availabliss.designsystem.component.Avatar
 import dev.joeherbert.availabliss.designsystem.component.AvatarPerson
 import dev.joeherbert.availabliss.designsystem.component.GroupTile
+import dev.joeherbert.availabliss.designsystem.component.VennLogo
 import dev.joeherbert.availabliss.designsystem.component.availability.LegendItem
 import dev.joeherbert.availabliss.designsystem.component.glass
 import dev.joeherbert.availabliss.designsystem.component.softShadow
@@ -156,15 +159,32 @@ private fun ScenePill(modifier: Modifier = Modifier, content: @Composable RowSco
 
 // endregion
 
+// region 0. Welcome
+
+/** The logo and "Hello," with your name under it, filled in as you type. */
+@Composable
+internal fun WelcomeScene(page: Int) {
+    Column(Modifier.offset(y = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        VennLogo(84.dp, contentDescription = null)
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Hello,", style = AvailablissTheme.type.displayMedium.copy(fontSize = 34.sp), color = AvailablissTheme.colors.ink)
+            IntroNameSlot(page, scale = 34f / 15f)
+        }
+    }
+}
+
+// endregion
+
 // region 1. Make a group
 
 /** A group card filling up as friends join from the invite link. */
 @Composable
-internal fun GroupScene(active: Boolean, reduceMotion: Boolean) {
+internal fun GroupScene(page: Int, active: Boolean, reduceMotion: Boolean) {
     val colors = AvailablissTheme.colors
     // Step 1 sends the link; steps 2–5 bring in a friend each.
     val step = rememberStep(active, reduceMotion, listOf(600, 700, 450, 450, 450))
     val members = 1 + maxOf(0, step - 1)
+    val you = LocalIntroName.current
     Box(contentAlignment = Alignment.Center) {
         // Another of your groups peeking out behind, for depth.
         GroupHeader(
@@ -186,13 +206,24 @@ internal fun GroupScene(active: Boolean, reduceMotion: Boolean) {
             Modifier.offset(y = (-6).dp).width(300.dp).glass(CardShape).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            GroupHeader("Lake District crew", "LD", colors.t3, if (members == 1) "1 member" else "$members members")
+            // Made by you: your name lands here.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GroupTile("LD", colors.t3, size = 50.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Lake District crew", style = AvailablissTheme.type.titleXSmall.copy(fontSize = 18.sp), color = colors.ink, maxLines = 1)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Made by", style = AvailablissTheme.type.labelRegular, color = colors.muted)
+                        IntroNameSlot(page, scale = 13f / 15f)
+                    }
+                }
+            }
             Divider()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
                     friends.forEachIndexed { index, friend ->
                         val p = pop(index < members, damping = 0.5f)
-                        Avatar(friend.person, Modifier.popIn(p, from = 0.3f), size = 42.dp, background = friend.tile(colors), border = colors.bg)
+                        val person = if (index == 0) AvatarPerson("you", you.ifEmpty { "?" }) else friend.person
+                        Avatar(person, Modifier.popIn(p, from = 0.3f), size = 42.dp, background = friend.tile(colors), border = colors.bg)
                     }
                 }
                 Spacer(Modifier.weight(1f))
@@ -251,17 +282,24 @@ private val events = listOf(
 
 /** Your day's events turning, one by one, into plain busy time: all the group ever sees. */
 @Composable
-internal fun CalendarScene(active: Boolean, reduceMotion: Boolean) {
+internal fun CalendarScene(page: Int, active: Boolean, reduceMotion: Boolean) {
     val colors = AvailablissTheme.colors
     val step = rememberStep(active, reduceMotion, listOf(800, 550, 400, 400, 450))
     Column(Modifier.offset(y = 10.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Column(Modifier.width(300.dp).glass(CardShape).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             val shared = fade(step >= 1, 320)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) {
-                    val style = AvailablissTheme.type.titleXSmall.copy(fontSize = 18.sp)
-                    Text("Your Tuesday", style = style, color = colors.ink, modifier = Modifier.graphicsLayer { alpha = 1f - shared })
-                    Text("What your group sees", style = style, color = colors.ink, modifier = Modifier.graphicsLayer { alpha = shared })
+                // Whose day it is: your name lands here.
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IntroNameSlot(page, scale = 17f / 15f)
+                        Text("\u2019s Tuesday", style = AvailablissTheme.type.bodyMedium.copy(fontSize = 17.sp), color = colors.ink)
+                    }
+                    Box {
+                        val style = AvailablissTheme.type.label
+                        Text("In your calendar", style = style, color = colors.muted, modifier = Modifier.graphicsLayer { alpha = 1f - shared })
+                        Text("As your group sees it", style = style, color = colors.muted, modifier = Modifier.graphicsLayer { alpha = shared })
+                    }
                 }
                 Box(Modifier.size(32.dp).clip(CircleShape).background(colors.accentSoft), contentAlignment = Alignment.Center) {
                     Icon(if (step >= 1) AvIcons.Shield else AvIcons.Calendar, null, tint = colors.accentInk, modifier = Modifier.size(16.dp))
@@ -345,15 +383,26 @@ private const val PICKED = 5
  * work for everyone light up in the accent, in a wave.
  */
 @Composable
-internal fun MonthScene(active: Boolean, reduceMotion: Boolean) {
+internal fun MonthScene(page: Int, active: Boolean, reduceMotion: Boolean) {
     val colors = AvailablissTheme.colors
+    val you = LocalIntroName.current
     val step = rememberStep(active, reduceMotion, listOf(600, 600, 1100), holdMs = 3200)
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.width(330.dp).glass(CardShape).padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Row(Modifier.padding(bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("June", style = AvailablissTheme.type.headlineSmall.copy(fontSize = 20.sp), color = colors.ink, modifier = Modifier.weight(1f))
+            Row(Modifier.padding(bottom = 5.dp), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("June", style = AvailablissTheme.type.headlineSmall.copy(fontSize = 20.sp), color = colors.ink)
+                    // Who's in it: your name lands here.
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IntroNameSlot(page, scale = 12f / 15f)
+                        Text("and 3 friends", style = AvailablissTheme.type.caption.copy(fontWeight = FontWeight.Normal), color = colors.muted)
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy((-7).dp)) {
-                    friends.take(4).forEach { Avatar(it.person, size = 24.dp, background = it.tile(colors), border = colors.bg) }
+                    friends.take(4).forEachIndexed { index, friend ->
+                        val person = if (index == 0) AvatarPerson("you", you.ifEmpty { "?" }) else friend.person
+                        Avatar(person, size = 24.dp, background = friend.tile(colors), border = colors.bg)
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -437,8 +486,9 @@ private fun DayCell(index: Int, step: Int, modifier: Modifier) {
 
 /** A proposal: the replies tick in, then "Everyone's in." */
 @Composable
-internal fun ProposalScene(active: Boolean, reduceMotion: Boolean) {
+internal fun ProposalScene(page: Int, active: Boolean, reduceMotion: Boolean) {
     val colors = AvailablissTheme.colors
+    val you = LocalIntroName.current
     val step = rememberStep(active, reduceMotion, listOf(800, 550, 550, 700), holdMs = 3200)
     val replies = 1 + minOf(step, 3)
     val confirmed = pop(step >= 4, 0.6f)
@@ -487,8 +537,15 @@ internal fun ProposalScene(active: Boolean, reduceMotion: Boolean) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             friends.take(4).forEachIndexed { index, friend ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Avatar(friend.person, size = 30.dp, background = friend.tile(colors))
-                    Text(friend.name, style = AvailablissTheme.type.bodyMedium, color = colors.ink, modifier = Modifier.weight(1f))
+                    if (index == 0) {
+                        // Your reply: your name lands here, by your face.
+                        Avatar(AvatarPerson("you", you.ifEmpty { "?" }), size = 30.dp, background = friend.tile(colors))
+                        IntroNameSlot(page)
+                        Spacer(Modifier.weight(1f))
+                    } else {
+                        Avatar(friend.person, size = 30.dp, background = friend.tile(colors))
+                        Text(friend.name, style = AvailablissTheme.type.bodyMedium, color = colors.ink, modifier = Modifier.weight(1f))
+                    }
                     ReplyChip(index < replies)
                 }
             }
@@ -526,11 +583,11 @@ private fun ReplyChip(accepted: Boolean) {
 
 // region 5. Chat with the group
 
-/** The group's chat: messages arrive, someone's typing, and your reply gets a heart. */
+/** The group's chat: you ask, the replies arrive (someone's typing first), and your message gets a heart. */
 @Composable
-internal fun ChatScene(active: Boolean, reduceMotion: Boolean) {
+internal fun ChatScene(page: Int, active: Boolean, reduceMotion: Boolean) {
     val colors = AvailablissTheme.colors
-    val step = rememberStep(active, reduceMotion, listOf(600, 700, 1100, 900, 600))
+    val step = rememberStep(active, reduceMotion, listOf(700, 700, 1100, 700))
     Column(Modifier.width(310.dp).height(290.dp).glass(CardShape).padding(16.dp)) {
         Row(Modifier.padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GroupTile("LD", colors.t3, size = 32.dp, radius = 11.dp)
@@ -540,12 +597,13 @@ internal fun ChatScene(active: Boolean, reduceMotion: Boolean) {
         Divider()
         Column(
             Modifier.weight(1f).fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(0.dp)),
-            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom),
+            // From the top, so your message (and your name over it) stays put as the replies arrive.
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Mine(page, "Lakes in June, anyone?", hearted = step >= 4)
             Arrival(step >= 1, mine = false) { Incoming(friends[1], "Saturday works for me!") }
             Arrival(step == 2, mine = false) { Typing(friends[2], reduceMotion) }
-            Arrival(step >= 3, mine = false) { Incoming(friends[2], "Shall we book the Old Bell?") }
-            Arrival(step >= 4, mine = true) { Mine("Booked! Table for four at 7.", hearted = step >= 5) }
+            Arrival(step >= 3, mine = false) { Incoming(friends[2], "I'll book the Old Bell.") }
         }
     }
 }
@@ -590,9 +648,11 @@ private fun Incoming(friend: Friend, text: String) {
 }
 
 @Composable
-private fun Mine(text: String, hearted: Boolean) {
+private fun Mine(page: Int, text: String, hearted: Boolean) {
     val colors = AvailablissTheme.colors
-    Row(Modifier.fillMaxWidth().padding(start = 50.dp, bottom = 10.dp), horizontalArrangement = Arrangement.End) {
+    // Your name lands over your message, where the others' names go over theirs.
+    Column(Modifier.fillMaxWidth().padding(start = 50.dp, bottom = 10.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        IntroNameSlot(page, scale = 11f / 15f, muted = true, modifier = Modifier.padding(end = 4.dp))
         Box {
             Text(
                 text,

@@ -26,6 +26,12 @@ final class AppModel {
         didSet { UserDefaults.standard.set(hasSeenIntro, forKey: Self.hasSeenIntroKey) }
     }
     private static let hasSeenIntroKey = "hasSeenIntro"
+
+    /// Skip or Get started on the intro: on to sign in, keeping the name typed there for the sign-up step.
+    func finishIntro(name: String) {
+        if !name.isEmpty { UserDefaults.standard.set(name, forKey: IntroName.key) }
+        hasSeenIntro = true
+    }
     /// Activity items known to be unread, so an update to one doesn't count it twice.
     @ObservationIgnored private var unreadIDs: Set<String> = []
     /// Bumped when another account is merged into this one, so screens showing account data reload.

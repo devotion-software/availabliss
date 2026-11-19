@@ -1,27 +1,42 @@
 import SwiftUI
 
-/// The first-launch intro: five pages on what Availabliss does, shown once before sign-in.
+/// The first-launch intro, shown once before sign-in: a welcome that asks your name, then five pages on
+/// what Availabliss does. Your name is one piece of text that travels with you: it slides from page to
+/// page into each scene (the group you made, your calendar, the month, your reply, your message) as you
+/// swipe, taking on the size and colour of the names around it.
 /// Swipe or tap Next; Skip or Get started goes on to sign in.
 struct IntroView: View {
-    let onFinish: () -> Void
+    /// Called with the name typed on the welcome page (empty if skipped).
+    let onFinish: (String) -> Void
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var page: Int? = 0
-    /// Pages whose text has risen in (kept here: the pages' own state goes when they scroll away).
+    /// Pages whose text has risen in.
     @State private var seen: Set<Int> = [0]
+    @State private var name = IntroName.saved ?? ""
+    /// The name's own size (at 15pt), so every page can leave a space that fits it.
+    @State private var nameSize = CGSize(width: 60, height: 20)
 
     private var current: Int { page ?? 0 }
     private var isLast: Bool { current == IntroPage.all.count - 1 }
+    private var firstName: String { IntroName.first(of: name) }
+    /// The welcome page needs a name before you can go on (Skip still skips the whole intro).
+    private var needsName: Bool { current == 0 && firstName.isEmpty }
 
     var body: some View {
         VStack(spacing: 0) {
             topBar
             ScrollView(.horizontal) {
-                LazyHStack(spacing: 0) {
+                // Not lazy: every page's space for the name chip has to be there to slide between.
+                HStack(spacing: 0) {
                     ForEach(IntroPage.all) { item in
-                        IntroPageView(page: item, isActive: item.id == current, shown: seen.contains(item.id))
+                        IntroPageView(page: item, isActive: item.id == current, shown: seen.contains(item.id), name: $name, onSubmitName: next)
                             .containerRelativeFrame(.horizontal)
                             .id(item.id)
+                            // Added to the page's own name space (a plain preference would replace it).
+                            .transformAnchorPreference(key: IntroAnchors.self, value: .bounds) { value, anchor in
+                                if item.id == 0 { value[IntroAnchors.firstPage] = IntroSlot(anchor: anchor, muted: false) }
+                            }
                     }
                 }
                 .scrollTargetLayout()
@@ -30,16 +45,75 @@ struct IntroView: View {
             .scrollIndicators(.hidden)
             .scrollPosition(id: $page)
             .scrollBounceBehavior(.basedOnSize)
+            .scrollDisabled(needsName)
+            .scrollDismissesKeyboard(.immediately)
             controls
         }
+        .environment(\.introNameSize, nameSize)
+        .environment(\.introName, firstName)
+        .overlayPreferenceValue(IntroAnchors.self) { slots in
+            GeometryReader { proxy in
+                let placement = namePlacement(slots, in: proxy)
+                TravellingName(name: firstName, muted: placement?.muted ?? 0)
+                    .scaleEffect(placement?.scale ?? 1)
+                    .position(placement?.center ?? .zero)
+                    .opacity(placement == nil ? 0 : 1)
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
         .foregroundStyle(theme.ink)
+        .background {
+            // The name's size, measured on a hidden copy: measuring the moving one fed back into the
+            // spaces it moves between, and never settled. Whole points, so it can't jitter either.
+            TravellingName(name: firstName, muted: 0)
+                .hidden()
+                .onGeometryChange(for: CGSize.self) {
+                    CGSize(width: $0.size.width.rounded(.up), height: $0.size.height.rounded(.up))
+                } action: {
+                    nameSize = $0
+                }
+                .accessibilityHidden(true)
+        }
         .background {
             // The orbs drift to a new place for each page, ending where sign-in's sit.
             ScreenBackground(orbs: IntroPage.all[current].orbs)
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.9), value: current)
         }
         .sensoryFeedback(.selection, trigger: current)
-        .onChange(of: current) { _, new in seen.insert(new) }
+        .onChange(of: current) { _, new in
+            seen.insert(new)
+            Self.dismissKeyboard()
+        }
+    }
+
+    /// Where the name sits: between the spaces left for it on the two pages either side of the scroll
+    /// position, in proportion. (Both pages move with the scroll, so the scroll itself cancels out and
+    /// the name glides straight from one space to the next.)
+    private func namePlacement(_ slots: [Int: IntroSlot], in proxy: GeometryProxy) -> (center: CGPoint, scale: CGFloat, muted: CGFloat)? {
+        guard let first = slots[IntroAnchors.firstPage].map({ proxy[$0.anchor] }), first.width > 0 else { return nil }
+        let position = min(max(-first.minX / first.width, 0), CGFloat(IntroPage.all.count - 1))
+        let from = Int(position.rounded(.down))
+        let fraction = position - CGFloat(from)
+        let a = slots[from]
+        let b = slots[min(from + 1, IntroPage.all.count - 1)]
+        guard let startSlot = a ?? b, let endSlot = b ?? a else { return nil }
+        let start = proxy[startSlot.anchor], end = proxy[endSlot.anchor]
+        let t = (a != nil && b != nil) ? fraction : 0
+        let center = CGPoint(x: start.midX + (end.midX - start.midX) * t, y: start.midY + (end.midY - start.midY) * t)
+        let height = start.height + (end.height - start.height) * t
+        let muted = (startSlot.muted ? 1 : 0) * (1 - t) + (endSlot.muted ? 1 : 0) * t
+        return (center, nameSize.height > 0 ? height / nameSize.height : 1, muted)
+    }
+
+    private func next() {
+        guard !needsName else { return }
+        Self.dismissKeyboard()
+        if isLast {
+            onFinish(name.trimmingCharacters(in: .whitespacesAndNewlines))
+        } else {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.9)) { page = current + 1 }
+        }
     }
 
     private var topBar: some View {
@@ -47,7 +121,7 @@ struct IntroView: View {
             VennLogo(size: 30)
             Text("Availabliss").displayFont(19, .bold)
             Spacer()
-            Button("Skip", action: onFinish)
+            Button("Skip") { onFinish(name.trimmingCharacters(in: .whitespacesAndNewlines)) }
                 .buttonStyle(TextActionButtonStyle(fontSize: 15))
                 .opacity(isLast ? 0 : 1)
                 .disabled(isLast)
@@ -63,13 +137,7 @@ struct IntroView: View {
     private var controls: some View {
         VStack(spacing: 22) {
             PageDots(count: IntroPage.all.count, current: current)
-            Button {
-                if isLast {
-                    onFinish()
-                } else {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.9)) { page = current + 1 }
-                }
-            } label: {
+            Button(action: next) {
                 ZStack {
                     // Both labels are laid out so the button never changes size; they cross-fade.
                     Text("Next").opacity(isLast ? 0 : 1)
@@ -78,6 +146,8 @@ struct IntroView: View {
                 .animation(.easeInOut(duration: 0.25), value: isLast)
             }
             .buttonStyle(.filled(isLast ? .accent : .primary, height: 54, cornerRadius: 18))
+            .disabled(needsName)
+            .animation(.easeInOut(duration: 0.2), value: needsName)
             .accessibilityLabel(isLast ? "Get started" : "Next")
             .accessibilityValue("Page \(current + 1) of \(IntroPage.all.count)")
         }
@@ -85,7 +155,88 @@ struct IntroView: View {
         .padding(.top, 8)
         .padding(.bottom, 12)
     }
+
+    private static func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 }
+
+// MARK: - The travelling name
+
+/// The name typed on the welcome page, kept for the sign-up step that asks for it.
+enum IntroName {
+    static let key = "introName"
+
+    static var saved: String? {
+        let value = UserDefaults.standard.string(forKey: key)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value?.isEmpty == false ? value : nil
+    }
+
+    /// The first word, as the intro shows it.
+    static func first(of name: String) -> String {
+        String(name.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ").first ?? "")
+    }
+}
+
+/// Your first name: the one element that moves through the whole intro. Drawn at 15pt semibold (like the
+/// scenes' names) and scaled to each space; `muted` (0–1) blends it from ink to the muted grey that
+/// the chat's author names use.
+private struct TravellingName: View {
+    let name: String
+    let muted: CGFloat
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        // Before a name is typed, the welcome says "Hello, there".
+        let text = name.isEmpty ? "there" : name
+        ZStack {
+            Text(text).foregroundStyle(theme.ink).opacity(name.isEmpty ? 0 : 1 - muted)
+            Text(text).foregroundStyle(theme.muted).opacity(name.isEmpty ? 1 : muted)
+        }
+        .bodyFont(15, .semibold)
+        .lineLimit(1)
+        .fixedSize()
+    }
+}
+
+/// The space a scene leaves for your name on `page`, at `scale` of 15pt (so 13pt is 13 / 15), in the
+/// muted grey when `muted`. The name itself is drawn over the pages and slides between these.
+struct IntroNameSlot: View {
+    let page: Int
+    var scale: CGFloat = 1
+    var muted = false
+    @Environment(\.introNameSize) private var size
+
+    var body: some View {
+        Color.clear
+            .frame(width: size.width * scale, height: size.height * scale)
+            .anchorPreference(key: IntroAnchors.self, value: .bounds) { [page: IntroSlot(anchor: $0, muted: muted)] }
+            .accessibilityHidden(true)
+    }
+}
+
+/// A space for the name, and how it's drawn there.
+struct IntroSlot {
+    let anchor: Anchor<CGRect>
+    let muted: Bool
+}
+
+/// Each page's name space, by page, plus the first page's frame (for the scroll position).
+private struct IntroAnchors: PreferenceKey {
+    static let firstPage = -1
+    static var defaultValue: [Int: IntroSlot] { [:] }
+    static func reduce(value: inout [Int: IntroSlot], nextValue: () -> [Int: IntroSlot]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
+extension EnvironmentValues {
+    @Entry var introNameSize = CGSize(width: 60, height: 20)
+    /// Your first name, for the scenes' avatars.
+    @Entry var introName = ""
+}
+
+// MARK: - Pages
 
 /// The dots under the pages: the current one stretches into a pill in the accent.
 private struct PageDots: View {
@@ -106,19 +257,21 @@ private struct PageDots: View {
     }
 }
 
-/// One page: its illustration above, title and a line of text below.
+/// One page: its illustration above, title and a line of text (or, on the welcome, the name field) below.
 private struct IntroPageView: View {
     let page: IntroPage
     let isActive: Bool
     /// The text rises in the first time the page shows.
     let shown: Bool
+    @Binding var name: String
+    let onSubmitName: () -> Void
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
-            // Smaller illustration on shorter phones, so the text always fits under it.
-            let art = min(320, max(220, proxy.size.height - 210))
+            // Smaller illustration on shorter phones (and with the keyboard up), so the text always fits.
+            let art = min(320, max(page.kind == .welcome ? 120 : 220, proxy.size.height - 210))
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
                 // Drawn at 340 × 320 and scaled to fit.
@@ -147,12 +300,23 @@ private struct IntroPageView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
                         .entrance(shown, delay: 0.07, reduceMotion: reduceMotion)
+                    if page.kind == .welcome {
+                        InputField(placeholder: "Your first name", text: $name)
+                            .textContentType(.givenName)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled()
+                            .submitLabel(.next)
+                            .onSubmit(onSubmitName)
+                            .accessibilityLabel("Your name")
+                            .padding(.top, 4)
+                            .entrance(shown, delay: 0.14, reduceMotion: reduceMotion)
+                    }
                     Text(page.body)
-                        .bodyFont(16)
+                        .bodyFont(page.kind == .welcome ? 14 : 16)
                         .lineSpacing(2)
                         .foregroundStyle(theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
-                        .entrance(shown, delay: 0.14, reduceMotion: reduceMotion)
+                        .entrance(shown, delay: page.kind == .welcome ? 0.21 : 0.14, reduceMotion: reduceMotion)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 28)
@@ -168,11 +332,12 @@ private struct IntroPageView: View {
 
     @ViewBuilder private var illustration: some View {
         switch page.kind {
-        case .group: GroupIllustration(isActive: isActive)
-        case .calendars: CalendarIllustration(isActive: isActive)
-        case .grid: MonthIllustration(isActive: isActive)
-        case .proposal: ProposalIllustration(isActive: isActive)
-        case .chat: ChatIllustration(isActive: isActive)
+        case .welcome: WelcomeIllustration(page: page.id)
+        case .group: GroupIllustration(page: page.id, isActive: isActive)
+        case .calendars: CalendarIllustration(page: page.id, isActive: isActive)
+        case .grid: MonthIllustration(page: page.id, isActive: isActive)
+        case .proposal: ProposalIllustration(page: page.id, isActive: isActive)
+        case .chat: ChatIllustration(page: page.id, isActive: isActive)
         }
     }
 }
@@ -188,7 +353,7 @@ extension View {
 
 /// What each page says. The same pages, order and words as Android's intro.
 struct IntroPage: Identifiable {
-    enum Kind { case group, calendars, grid, proposal, chat }
+    enum Kind { case welcome, group, calendars, grid, proposal, chat }
 
     let id: Int
     let kind: Kind
@@ -199,31 +364,37 @@ struct IntroPage: Identifiable {
 
     static let all: [IntroPage] = [
         IntroPage(
-            id: 0, kind: .group, eyebrow: "Make a group",
+            id: 0, kind: .welcome, eyebrow: "Welcome to Availabliss",
+            title: "First things first: what's your name?",
+            body: "So your friends know it's you.",
+            orbs: OrbLayout.appearance
+        ),
+        IntroPage(
+            id: 1, kind: .group, eyebrow: "Make a group",
             title: "Bring your people together.",
             body: "Start a group for friends, family or a team, and invite everyone with a link.",
             orbs: OrbLayout.groups
         ),
         IntroPage(
-            id: 1, kind: .calendars, eyebrow: "Connect your calendars",
+            id: 2, kind: .calendars, eyebrow: "Connect your calendars",
             title: "Your plans stay private.",
             body: "Connect your calendars once. Your group only ever sees when you're busy, never what you're doing.",
             orbs: OrbLayout.calendars
         ),
         IntroPage(
-            id: 2, kind: .grid, eyebrow: "See what works",
+            id: 3, kind: .grid, eyebrow: "See what works",
             title: "Spot the days everyone's free.",
             body: "The group calendar lights up the days and times that work for everyone. No more \u{201C}what about Thursday?\u{201D}",
             orbs: OrbLayout.groupCalendar
         ),
         IntroPage(
-            id: 3, kind: .proposal, eyebrow: "Propose a time",
+            id: 4, kind: .proposal, eyebrow: "Propose a time",
             title: "Suggest it. Everyone replies.",
             body: "Pick a time and the group says yes, maybe or no. When everyone's in, it's a plan.",
             orbs: OrbLayout.proposal
         ),
         IntroPage(
-            id: 4, kind: .chat, eyebrow: "Chat with the group",
+            id: 5, kind: .chat, eyebrow: "Chat with the group",
             title: "Talk it through together.",
             body: "Sort out the details in the group chat: where to go, who's driving, what to bring.",
             orbs: OrbLayout.signIn

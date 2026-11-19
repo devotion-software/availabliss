@@ -3,6 +3,7 @@ import SwiftUI
 // The intro's little animated scenes, built from the app's own pieces: a group card, calendar rows
 // turning into busy time, the month grid lighting up, a proposal filling with replies, and a chat.
 // Each is drawn at 340 × 320 and plays while its page shows (with Reduce Motion, its last frame).
+// Each leaves a space (`IntroNameSlot`) where your name lands on that page, sized like the names around it.
 
 // MARK: - Playback
 
@@ -66,12 +67,31 @@ private let friends = [
     Friend(name: "Jo", tile: "t4"), Friend(name: "Tom", tile: "t5"),
 ]
 
+// MARK: - 0. Welcome
+
+/// The logo and "Hello," with your name under it, filled in as you type.
+struct WelcomeIllustration: View {
+    let page: Int
+    var body: some View {
+        VStack(spacing: 18) {
+            VennLogo(size: 84)
+            VStack(spacing: 6) {
+                Text("Hello,").displayFont(34, .heavy)
+                IntroNameSlot(page: page, scale: 34 / 15)
+            }
+        }
+        .offset(y: 6)
+    }
+}
+
 // MARK: - 1. Make a group
 
 /// A group card filling up as friends join from the invite link.
 struct GroupIllustration: View {
+    let page: Int
     let isActive: Bool
     @Environment(\.theme) private var theme
+    @Environment(\.introName) private var you
     @State private var step = 0
 
     /// Step 1 sends the link; steps 2–5 bring in a friend each.
@@ -99,12 +119,23 @@ struct GroupIllustration: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 14) {
-            groupHeader(title: "Lake District crew", monogram: "LD", tile: "t3", subtitle: "\(members) \(members == 1 ? "member" : "members")")
+            // Made by you: your name lands here.
+            HStack(spacing: 12) {
+                GroupTile(monogram: "LD", colorToken: "t3", size: 50, cornerRadius: 16)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Lake District crew").displayFont(18, .bold).lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text("Made by").bodyFont(13).foregroundStyle(theme.muted)
+                        IntroNameSlot(page: page, scale: 13 / 15)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
             Rectangle().fill(theme.line).frame(height: 1)
             HStack(spacing: -10) {
                 ForEach(Array(friends.enumerated()), id: \.offset) { index, friend in
                     let joined = index < members
-                    Avatar(name: friend.name, color: theme.tile(friend.tile), size: 42, border: theme.bg)
+                    Avatar(name: index == 0 ? you : friend.name, color: theme.tile(friend.tile), size: 42, border: theme.bg)
                         .scaleEffect(joined ? 1 : 0.3)
                         .opacity(joined ? 1 : 0)
                         .animation(.spring(response: 0.42, dampingFraction: 0.55), value: joined)
@@ -158,6 +189,7 @@ struct GroupIllustration: View {
 
 /// Your day's events turning, one by one, into plain busy time: all the group ever sees.
 struct CalendarIllustration: View {
+    let page: Int
     let isActive: Bool
     @Environment(\.theme) private var theme
     @State private var step = 0
@@ -172,11 +204,19 @@ struct CalendarIllustration: View {
         VStack(spacing: 18) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    ZStack(alignment: .leading) {
-                        Text("Your Tuesday").opacity(step >= 1 ? 0 : 1)
-                        Text("What your group sees").opacity(step >= 1 ? 1 : 0)
+                    // Whose day it is: your name lands here.
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 0) {
+                            IntroNameSlot(page: page, scale: 17 / 15)
+                            Text("\u{2019}s Tuesday").bodyFont(17, .semibold)
+                        }
+                        ZStack(alignment: .leading) {
+                            Text("In your calendar").opacity(step >= 1 ? 0 : 1)
+                            Text("As your group sees it").opacity(step >= 1 ? 1 : 0)
+                        }
+                        .bodyFont(13, .semibold)
+                        .foregroundStyle(theme.muted)
                     }
-                    .displayFont(18, .bold)
                     Spacer()
                     Image(systemName: step >= 1 ? "eye.slash" : "calendar")
                         .font(.system(size: 15, weight: .semibold))
@@ -254,8 +294,10 @@ struct CalendarIllustration: View {
 /// A few weeks of the month grid: busy days darken, days outside the timing fade, then the days that
 /// work for everyone light up in the accent, in a wave.
 struct MonthIllustration: View {
+    let page: Int
     let isActive: Bool
     @Environment(\.theme) private var theme
+    @Environment(\.introName) private var you
     @State private var step = 0
 
     private enum Cell { case works, busy, outside, free }
@@ -272,12 +314,19 @@ struct MonthIllustration: View {
     var body: some View {
         VStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("June").displayFont(20, .bold)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("June").displayFont(20, .bold)
+                        // Who's in it: your name lands here.
+                        HStack(spacing: 4) {
+                            IntroNameSlot(page: page, scale: 12 / 15)
+                            Text("and 3 friends").bodyFont(12).foregroundStyle(theme.muted)
+                        }
+                    }
                     Spacer()
                     HStack(spacing: -7) {
-                        ForEach(Array(friends.prefix(4).enumerated()), id: \.offset) { _, friend in
-                            Avatar(name: friend.name, color: theme.tile(friend.tile), size: 24, border: theme.bg)
+                        ForEach(Array(friends.prefix(4).enumerated()), id: \.offset) { index, friend in
+                            Avatar(name: index == 0 ? you : friend.name, color: theme.tile(friend.tile), size: 24, border: theme.bg)
                         }
                     }
                 }
@@ -360,8 +409,10 @@ struct MonthIllustration: View {
 
 /// A proposal: the replies tick in, then "Everyone's in."
 struct ProposalIllustration: View {
+    let page: Int
     let isActive: Bool
     @Environment(\.theme) private var theme
+    @Environment(\.introName) private var you
     @State private var step = 0
 
     private var replies: Int { 1 + min(step, 3) }
@@ -397,8 +448,14 @@ struct ProposalIllustration: View {
                     let friend = friends[index]
                     let accepted = index < replies
                     HStack(spacing: 10) {
-                        Avatar(name: friend.name, color: theme.tile(friend.tile), size: 30)
-                        Text(friend.name).bodyFont(15, .semibold)
+                        if index == 0 {
+                            // Your reply: your name lands here, by your face.
+                            Avatar(name: you, color: theme.tile(friend.tile), size: 30)
+                            IntroNameSlot(page: page)
+                        } else {
+                            Avatar(name: friend.name, color: theme.tile(friend.tile), size: 30)
+                            Text(friend.name).bodyFont(15, .semibold)
+                        }
                         Spacer()
                         replyChip(accepted)
                     }
@@ -451,8 +508,9 @@ private struct ChipLabelStyle: LabelStyle {
 
 // MARK: - 5. Chat with the group
 
-/// The group's chat: messages arrive, someone's typing, and your reply gets a heart.
+/// The group's chat: you ask, the replies arrive (someone's typing first), and your message gets a heart.
 struct ChatIllustration: View {
+    let page: Int
     let isActive: Bool
     @Environment(\.theme) private var theme
     @State private var step = 0
@@ -469,8 +527,9 @@ struct ChatIllustration: View {
             }
             .padding(.bottom, 12)
             Rectangle().fill(theme.line).frame(height: 1)
+            // From the top, so your message (and your name over it) stays put as the replies arrive.
             VStack(spacing: 8) {
-                Spacer(minLength: 0)
+                mine("Lakes in June, anyone?")
                 if step >= 1 {
                     incoming(friends[1], "Saturday works for me!").transition(arrival(mine: false))
                 }
@@ -478,20 +537,18 @@ struct ChatIllustration: View {
                     TypingBubble(friend: friends[2]).transition(arrival(mine: false))
                 }
                 if step >= 3 {
-                    incoming(friends[2], "Shall we book the Old Bell?").transition(arrival(mine: false))
+                    incoming(friends[2], "I'll book the Old Bell.").transition(arrival(mine: false))
                 }
-                if step >= 4 {
-                    mine("Booked! Table for four at 7.").transition(arrival(mine: true))
-                }
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.top, 10)
             .clipped()
         }
         .padding(16)
         .frame(width: 310, height: 290)
         .glass(cornerRadius: 28)
-        .playback($step, isActive: isActive, gaps: [0.6, 0.7, 1.1, 0.9, 0.6], hold: 3)
+        .playback($step, isActive: isActive, gaps: [0.7, 0.7, 1.1, 0.7], hold: 3)
     }
 
     private func arrival(mine: Bool) -> AnyTransition {
@@ -520,26 +577,34 @@ struct ChatIllustration: View {
     private func mine(_ text: String) -> some View {
         HStack {
             Spacer(minLength: 50)
-            Text(text)
-                .bodyFont(14)
-                .foregroundStyle(theme.onAccent)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(bubble(mine: true).fill(theme.accent))
-                .overlay(alignment: .bottomLeading) {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(theme.accentInk)
-                        .frame(width: 22, height: 22)
-                        .background(Circle().fill(theme.bg))
-                        .overlay(Circle().strokeBorder(theme.glassBorder, lineWidth: 1))
-                        .offset(x: -8, y: 10)
-                        .scaleEffect(step >= 5 ? 1 : 0.2)
-                        .opacity(step >= 5 ? 1 : 0)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.5), value: step)
-                }
-                .padding(.bottom, 10)
+            // Your name lands over your message, where the others' names go over theirs.
+            VStack(alignment: .trailing, spacing: 4) {
+                IntroNameSlot(page: page, scale: 11 / 15, muted: true).padding(.trailing, 4)
+                yourBubble(text)
+            }
         }
+    }
+
+    private func yourBubble(_ text: String) -> some View {
+        Text(text)
+            .bodyFont(14)
+            .foregroundStyle(theme.onAccent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(bubble(mine: true).fill(theme.accent))
+            .overlay(alignment: .bottomLeading) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(theme.accentInk)
+                    .frame(width: 22, height: 22)
+                    .background(Circle().fill(theme.bg))
+                    .overlay(Circle().strokeBorder(theme.glassBorder, lineWidth: 1))
+                    .offset(x: -8, y: 10)
+                    .scaleEffect(step >= 4 ? 1 : 0.2)
+                    .opacity(step >= 4 ? 1 : 0)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.5), value: step)
+            }
+            .padding(.bottom, 10)
     }
 
     private func bubble(mine: Bool) -> UnevenRoundedRectangle {

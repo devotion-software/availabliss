@@ -33,7 +33,7 @@ struct RootView: View {
         case .failed:
             SplashView(error: failureMessage) { Task { await app.launch() } }
         case .intro:
-            IntroView { app.hasSeenIntro = true }
+            IntroView { name in app.finishIntro(name: name) }
                 .transition(.opacity)
         case .signIn:
             SignInView(auth: app.auth)
