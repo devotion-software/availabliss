@@ -12,8 +12,9 @@ export interface EventInput {
 
 export type UpcomingEvent = GroupEvent & { groupName: string };
 
-export const listEvents = (groupId: string, from: string, to: string, fetch?: Fetch) =>
-	api.get<{ events: GroupEvent[] }>(`/groups/${groupId}/events`, { fetch, query: { from, to } }).then((r) => r.events);
+/** The group's events from `from` (and up to `to`, when given). */
+export const listEvents = (groupId: string, from: string, to?: string, fetch?: Fetch) =>
+	api.get<{ events: GroupEvent[] }>(`/groups/${groupId}/events`, { fetch, query: { from, ...(to && { to }) } }).then((r) => r.events);
 export const createEvent = (groupId: string, body: EventInput) => api.post<GroupEvent>(`/groups/${groupId}/events`, body);
 export const updateEvent = (id: string, patch: Partial<EventInput>) => api.patch<GroupEvent>(`/events/${id}`, patch);
 export const deleteEvent = (id: string) => api.del(`/events/${id}`);

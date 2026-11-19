@@ -6,6 +6,10 @@
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
 	import ProposeSheet from '#lib/components/events/ProposeSheet.svelte';
 	import ProposalRow from '#lib/components/proposals/ProposalRow.svelte';
+	import EventEditSheet from '#lib/components/events/EventEditSheet.svelte';
+	import Icon from '#lib/components/ui/Icon.svelte';
+	import { useFormat } from '#lib/client/format';
+	import type { GroupEvent } from '#lib/types';
 
 	let { data } = $props();
 
@@ -20,10 +24,14 @@
 	);
 
 	let proposing = $state(false);
+	let editing = $state<GroupEvent | null>(null);
+	const fmt = useFormat();
+	const isAdmin = $derived(data.group.role === 'owner' || data.group.role === 'admin');
+	const canEdit = (e: GroupEvent) => e.createdBy === data.user.id || isAdmin;
 
 	$effect(() => {
 		const id = data.group.id;
-		const off = live.on(['proposal.created', 'proposal.updated', 'proposal.confirmed'], (e) => {
+		const off = live.on(['proposal.created', 'proposal.updated', 'proposal.confirmed', 'event.changed'], (e) => {
 			if (e.groupId === id) invalidate('app:proposals');
 		});
 		const offReconnect = live.onReconnect(() => invalidate('app:proposals'));
@@ -45,11 +53,36 @@
 		crumbs={[{ label: 'Groups', href: '/app' }, { label: data.group.name, href: `/app/groups/${data.group.id}` }, { label: 'Plans' }]}
 	>
 		{#snippet actions()}
+			<Button variant="secondary" size="sm" icon="calendar-plus" href="/app/groups/{data.group.id}/events/new">Add event</Button>
 			<Button variant="accent" size="sm" icon="plus" onclick={() => (proposing = true)}>Propose</Button>
 		{/snippet}
 	</PageHeader>
 
-	{#if data.proposals.length === 0}
+	<!-- Events coming up (added straight to the calendar, or confirmed plans): their creator or an admin can edit or delete them. -->
+	{#if data.events.length}
+		<section class="section" aria-labelledby="sec-events">
+			<h2 id="sec-events" class="eyebrow">Coming up</h2>
+			<div class="list">
+				{#each data.events as event (event.id)}
+					<div class="event glass">
+						{#if event.image}<img class="cover" src={event.image} alt="" />{/if}
+						<div class="row">
+							<span class="icon"><Icon name="calendar" size={18} /></span>
+							<span class="text">
+								<span class="title">{event.title}</span>
+								<span class="meta">{[fmt.current.when(event.start, event.end, event.allDay), event.location].filter(Boolean).join(' · ')}</span>
+							</span>
+							{#if canEdit(event)}
+								<Button variant="ghost" size="sm" icon="pencil" onclick={() => (editing = event)} aria-label="Edit {event.title}">Edit</Button>
+							{/if}
+						</div>
+					</div>
+				{/each}
+			</div>
+		</section>
+	{/if}
+
+	{#if data.proposals.length === 0 && data.events.length === 0}
 		<div class="glass empty">
 			<EmptyState
 				icon="check-circle"
@@ -79,6 +112,9 @@
 </div>
 
 <ProposeSheet bind:open={proposing} group={data.group} meId={data.user.id} />
+{#key editing?.id}
+	<EventEditSheet event={editing} onclose={() => (editing = null)} onchanged={() => invalidate('app:proposals')} />
+{/key}
 
 <style>
 	.page {
@@ -103,5 +139,49 @@
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
+	}
+	.event {
+		border-radius: 22px;
+		overflow: hidden;
+	}
+	.cover {
+		display: block;
+		width: 100%;
+		height: 120px;
+		object-fit: cover;
+	}
+	.row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 12px 14px;
+	}
+	.icon {
+		width: 38px;
+		height: 38px;
+		flex: none;
+		border-radius: 12px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+	}
+	.text {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.title {
+		font-weight: 600;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.meta {
+		font-size: 13px;
+		color: var(--muted);
 	}
 </style>
