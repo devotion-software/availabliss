@@ -56,7 +56,6 @@ class ActivityViewModel @Inject constructor(
     val state: StateFlow<ActivityUiState> = _state.asStateFlow()
 
     init {
-        refresh()
         viewModelScope.launch {
             liveEvents.payloads.filterIsInstance<LivePayload.NotificationCreated>().collect { event ->
                 upsert(event.notification)
@@ -69,27 +68,38 @@ class ActivityViewModel @Inject constructor(
         }
     }
 
-    private var resumedBefore = false
-
     /**
-     * Back on Activity (after the first time): catch up, e.g. an invite opened from here was joined or
-     * declined (a declined one's item goes).
+     * Each time Activity shows: load it (catching up, e.g. an invite opened from here was joined or
+     * declined), then mark everything but chats read, as iOS and web do. The items keep their unread
+     * look until you next come back, so you can still see what's new.
      */
     fun resumed() {
-        if (resumedBefore) refresh() else resumedBefore = true
+        viewModelScope.launch {
+            if (load()) markSeen()
+        }
     }
 
     fun refresh() {
-        viewModelScope.launch {
-            when (val result = notifications.refresh()) {
-                is ApiResult.Success -> {
-                    raw = result.value.notifications.sortedByDescending { it.createdAt }
-                    _state.update { it.copy(loading = false, error = null) }
-                    publish()
-                }
-                is ApiResult.Failure -> _state.update { it.copy(loading = false, error = result.error.message) }
-            }
+        viewModelScope.launch { load() }
+    }
+
+    private suspend fun load(): Boolean = when (val result = notifications.refresh()) {
+        is ApiResult.Success -> {
+            raw = result.value.notifications.sortedByDescending { it.createdAt }
+            _state.update { it.copy(loading = false, error = null) }
+            publish()
+            true
         }
+        is ApiResult.Failure -> {
+            _state.update { it.copy(loading = false, error = result.error.message) }
+            false
+        }
+    }
+
+    /** Everything but chats, which stay unread until the chat is read. */
+    private suspend fun markSeen() {
+        if (raw.none { it.readAt == null && it.kind != NotificationKind.Message }) return
+        if (notifications.markRead(null) is ApiResult.Success) notifications.refresh()
     }
 
     /** Marks [item] read and returns where it should open. */
@@ -100,24 +110,6 @@ class ActivityViewModel @Inject constructor(
             viewModelScope.launch { notifications.markRead(listOf(item.id)) }
         }
         return item.link
-    }
-
-    /** Everything but chats, which stay unread until the chat is read. */
-    fun markAllRead() {
-        if (raw.none { it.readAt == null && it.kind != NotificationKind.Message }) return
-        val now = DateTimes.toIso(java.time.Instant.now())
-        val before = raw
-        raw = raw.map { if (it.kind == NotificationKind.Message) it else it.copy(readAt = it.readAt ?: now) }
-        publish()
-        viewModelScope.launch {
-            val result = notifications.markRead(null)
-            notifications.refresh()
-            if (result is ApiResult.Failure) {
-                raw = before
-                publish()
-                _state.update { it.copy(message = UserMessage(result.error.message)) }
-            }
-        }
     }
 
     /**

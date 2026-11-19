@@ -90,7 +90,6 @@ fun ActivityScreen(
         showPermissionCard = permission.denied,
         onOpenSettings = permission.openSettings,
         onItem = { item -> viewModel.open(item)?.let(onOpenLink) },
-        onMarkAllRead = viewModel::markAllRead,
         onRetry = viewModel::refresh,
         onOpenMyPlans = onOpenMyPlans,
     )
@@ -135,7 +134,6 @@ fun ActivityContent(
     showPermissionCard: Boolean,
     onOpenSettings: () -> Unit,
     onItem: (NotificationUi) -> Unit,
-    onMarkAllRead: () -> Unit,
     onRetry: () -> Unit,
     onOpenMyPlans: () -> Unit = {},
 ) {
@@ -147,7 +145,6 @@ fun ActivityContent(
                 subtitle = if (state.unread > 0) "${state.unread} new" else "You're all caught up",
                 modifier = Modifier.padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.screen, bottom = Spacing.s),
             ) {
-                if (state.items.any { it.unread }) TextAction("Mark all read", onMarkAllRead)
                 GlassIconButton(AvIcons.Calendar, "My plans", onOpenMyPlans)
             }
             LazyColumn(
@@ -276,7 +273,6 @@ private fun ActivityPreview() {
             showPermissionCard = false,
             onOpenSettings = {},
             onItem = {},
-            onMarkAllRead = {},
             onRetry = {},
         )
     }
