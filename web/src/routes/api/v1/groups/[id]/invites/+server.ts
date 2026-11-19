@@ -107,9 +107,7 @@ export const POST = authed<{ id: string }>(async ({ event, params, userId }) => 
 		// An emailed invite to someone who already has an account reaches them in the app too
 		// (Activity and a push), like an invite by username.
 		const emailed = created.filter((c) => c.email).map((c) => c.email!.toLowerCase());
-		const accounts = emailed.length
-			? await db.select({ id: user.id, email: user.email }).from(user).where(inArray(user.email, emailed))
-			: [];
+		const accounts = emailed.length ? await db.select({ id: user.id, email: user.email }).from(user).where(inArray(user.email, emailed)) : [];
 		const inGroup = accounts.length ? new Set(await memberIds(params.id)) : new Set<string>();
 		for (const c of created.filter((c) => c.email)) {
 			const account = accounts.find((a) => a.email.toLowerCase() === c.email!.toLowerCase());
