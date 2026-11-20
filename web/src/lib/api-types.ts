@@ -139,9 +139,11 @@ export interface NotificationList {
 
 /** POST /requirements/preview: slots the timing produces before anyone's busy time. */
 export interface RequirementPreview {
+	/** Slots the timing produces (the "13" in "13 weekends fit this timing"). */
 	count: number;
 	from: string;
 	to: string;
+	/** e.g. "13 weekends fit this timing". */
 	summary: string;
 }
 

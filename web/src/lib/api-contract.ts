@@ -57,6 +57,12 @@ export interface Endpoint {
 	errors?: Partial<Record<ErrorStatus, string>>;
 	/** A tighter limit than the default per-user budget (docs/API.md, Rate limits). */
 	rateLimit?: string;
+	/** Exempt from rate limiting (hooks.server.ts), so never 429. */
+	unlimited?: true;
+	/** An error whose body isn't the plain ApiErrorBody. */
+	errorShapes?: Partial<Record<ErrorStatus, Shape>>;
+	/** A second success response, and when it's sent. */
+	alsoResponds?: { status: SuccessStatus; when: string; response: RawContent };
 }
 
 // ── Schema helpers ───────────────────────────────────────────────────────────
@@ -136,26 +142,26 @@ export const endpoints: Endpoint[] = [
 
 	// Me
 	{ method: 'GET', path: '/me', tag: 'Me', auth: 'user', summary: 'Your account', response: 'User' },
-	{ method: 'PATCH', path: '/me', tag: 'Me', auth: 'user', summary: 'Update your account', body: s.updateMeSchema, response: 'User', errors: { 409: 'That username is taken' } },
+	{ method: 'PATCH', path: '/me', tag: 'Me', auth: 'user', summary: 'Update your account', description: 'Changing `busyBufferMinutes` publishes `availability.changed` to your groups.', body: s.updateMeSchema, response: 'User', errors: { 409: 'That username is taken' } },
 	{ method: 'DELETE', path: '/me', tag: 'Me', auth: 'user', summary: 'Delete your account and all its data', status: 204 },
 	{ method: 'GET', path: '/usernames/{username}', tag: 'Me', auth: 'user', summary: 'Whether a username can be yours, and who has it', response: 'UsernameCheck', rateLimit: '60 / minute' },
-	{ method: 'PUT', path: '/me/avatar', tag: 'Me', auth: 'user', summary: 'Set your profile picture', body: imageUpload, response: 'User' },
-	{ method: 'DELETE', path: '/me/avatar', tag: 'Me', auth: 'user', summary: 'Remove your profile picture', response: 'User' },
-	{ method: 'GET', path: '/me/busy', tag: 'Me', auth: 'user', summary: 'Your own merged busy time', query: s.busyQuerySchema, response: obj({ intervals: list('BusyInterval') }) },
-	{ method: 'POST', path: '/me/busy/ignores', tag: 'Me', auth: 'user', summary: 'Mark a calendar event (or its series) not busy', body: s.busyIgnoreSchema, status: 201, response: obj({ id: str }), errors: { 404: 'Calendar not found' } },
-	{ method: 'DELETE', path: '/me/busy/ignores/{id}', tag: 'Me', auth: 'user', summary: 'Count it as busy again', status: 204 },
+	{ method: 'PUT', path: '/me/avatar', tag: 'Me', auth: 'user', summary: 'Set your profile picture', description: 'Shrunk to fit 512 px.', body: imageUpload, response: 'User' },
+	{ method: 'DELETE', path: '/me/avatar', tag: 'Me', auth: 'user', summary: 'Remove your profile picture', description: 'No picture: show initials.', response: 'User' },
+	{ method: 'GET', path: '/me/busy', tag: 'Me', auth: 'user', summary: 'Your own merged busy time', description: "A calendar event's `label` and `title` only ever go to their owner. `busyBufferMinutes` isn't added.", query: s.busyQuerySchema, response: obj({ intervals: list('BusyInterval') }) },
+	{ method: 'POST', path: '/me/busy/ignores', tag: 'Me', auth: 'user', summary: 'Mark a calendar event (or its series) not busy', description: 'That event (or with `series`, every occurrence) stops counting as busy, for everyone; publishes `availability.changed`.', body: s.busyIgnoreSchema, status: 201, response: obj({ id: str }), errors: { 404: 'Calendar not found' } },
+	{ method: 'DELETE', path: '/me/busy/ignores/{id}', tag: 'Me', auth: 'user', summary: 'Count it as busy again', description: 'Publishes `availability.changed`.', status: 204 },
 	{ method: 'GET', path: '/me/accounts', tag: 'Me', auth: 'user', summary: 'Linked Apple / Google sign-ins', response: 'LinkedAccounts' },
-	{ method: 'POST', path: '/me/accounts/link', tag: 'Me', auth: 'user', summary: 'Link Apple / Google with a native id token', body: s.linkAccountSchema, response: 'LinkResult', errors: { 409: 'That sign-in has its own account (`AccountConflict`): send again with `merge: true` to merge it' } },
-	{ method: 'POST', path: '/me/accounts/merge-intent', tag: 'Me', auth: 'user', summary: 'Web: remember a merge before signing in with the provider (sets a cookie)', body: s.mergeIntentSchema, status: 204 },
+	{ method: 'POST', path: '/me/accounts/link', tag: 'Me', auth: 'user', summary: 'Link Apple / Google with a native id token', description: "Native only (web: docs/API.md, Linking). With `merge: true` the other account's groups, busy time, calendars, chats, templates and Pro move here, and it is deleted.", body: s.linkAccountSchema, response: 'LinkResult', errors: { 409: 'That sign-in has its own account (`AccountConflict`): send again with `merge: true` to merge it', 400: "The id token can't be verified (e.g. it expired while the merge prompt was open), or this provider isn't set up. Never 401, so it can't be mistaken for the session ending" }, errorShapes: { 409: 'AccountConflict' } },
+	{ method: 'POST', path: '/me/accounts/merge-intent', tag: 'Me', auth: 'user', summary: 'Web: remember a merge before signing in with the provider (sets a cookie)', description: 'Web only: sets a short-lived cookie, then sign in with the provider with `callbackURL: "/link/complete"` (docs/API.md, Linking).', body: s.mergeIntentSchema, status: 204 },
 	{ method: 'GET', path: '/me/notification-settings', tag: 'Notifications', auth: 'user', summary: 'Your notification settings', response: 'NotificationSettings' },
-	{ method: 'PATCH', path: '/me/notification-settings', tag: 'Notifications', auth: 'user', summary: 'Update your notification settings', body: s.notificationSettingsSchema, response: 'NotificationSettings' },
+	{ method: 'PATCH', path: '/me/notification-settings', tag: 'Notifications', auth: 'user', summary: 'Update your notification settings', description: 'Leaving out `quietHours.catchUp` keeps it as it was.', body: s.notificationSettingsSchema, response: 'NotificationSettings' },
 	{ method: 'GET', path: '/me/plans', tag: 'Events', auth: 'user', summary: 'Every plan across your groups', response: 'MyPlans' },
 	{ method: 'GET', path: '/me/plans.ics', tag: 'Events', auth: 'user', summary: 'Every plan you are going to, as one .ics', response: icsFile('Every plan in `going` from GET /me/plans') },
 	{ method: 'GET', path: '/me/upcoming', tag: 'Events', auth: 'user', summary: 'Events in the next 60 days, all groups', response: obj({ events: list('UpcomingEvent') }) },
 	{ method: 'GET', path: '/me/calendar-feed', tag: 'Calendar feed', auth: 'user', summary: 'Your secret calendar feed link (made the first time)', response: 'CalendarFeed' },
 	{ method: 'POST', path: '/me/calendar-feed/reset', tag: 'Calendar feed', auth: 'user', summary: 'A new feed link; the old one stops working', response: 'CalendarFeed' },
 	{
-		method: 'GET', root: true, path: '/calendar/{file}', tag: 'Calendar feed', auth: 'none', summary: 'Subscribable calendar feed (`<token>.ics`)',
+		method: 'GET', root: true, path: '/calendar/{file}', tag: 'Calendar feed', auth: 'none', summary: 'Subscribable calendar feed (`<token>.ics`)', description: "Leaves out plans you said you can't make. Stable UIDs and a rising SEQUENCE, so subscribed calendars pick up edits and cancellations.",
 		query: z.object({ group: z.string().optional().describe('Only this group') }),
 		response: icsFile("Your groups' plans from 60 days back"), errors: { 404: 'Unknown or reset link' }
 	},
@@ -167,7 +173,7 @@ export const endpoints: Endpoint[] = [
 		method: 'POST', path: '/billing/revenuecat', tag: 'Billing', auth: 'none', summary: 'RevenueCat webhook',
 		description: '`Authorization` must equal REVENUECAT_WEBHOOK_AUTH.',
 		body: { contentType: 'application/json', description: 'A RevenueCat webhook `{ event }`', schema: { type: 'object' } },
-		response: obj({ ok: { type: 'boolean', const: true } }), errors: { 401: 'Wrong Authorization header' }
+		response: obj({ ok: { type: 'boolean', const: true } }), errors: { 401: 'Wrong Authorization header' }, unlimited: true
 	},
 
 	// AI planner
@@ -176,7 +182,7 @@ export const endpoints: Endpoint[] = [
 
 	// Timing templates
 	{ method: 'GET', path: '/me/templates', tag: 'Templates', auth: 'user', summary: 'Your saved timings (sorted by name)', response: obj({ templates: list('RequirementTemplate') }) },
-	{ method: 'POST', path: '/me/templates', tag: 'Templates', auth: 'user', summary: 'Save a timing (at most 50)', body: s.createTemplateSchema, status: 201, response: 'RequirementTemplate' },
+	{ method: 'POST', path: '/me/templates', tag: 'Templates', auth: 'user', summary: 'Save a timing (at most 50)', body: s.createTemplateSchema, status: 201, response: 'RequirementTemplate', errors: { 400: 'You already have 50 saved timings' } },
 	{ method: 'PATCH', path: '/me/templates/{id}', tag: 'Templates', auth: 'user', summary: 'Rename or change a saved timing', body: s.updateTemplateSchema, response: 'RequirementTemplate' },
 	{ method: 'DELETE', path: '/me/templates/{id}', tag: 'Templates', auth: 'user', summary: 'Delete a saved timing', status: 204 },
 
@@ -191,34 +197,35 @@ export const endpoints: Endpoint[] = [
 	{ method: 'GET', path: '/calendars', tag: 'Calendars', auth: 'user', summary: 'Your calendar connections', response: obj({ connections: list('CalendarConnection') }) },
 	{
 		method: 'GET', path: '/calendars/oauth/{provider}/start', tag: 'Calendars', auth: 'user', summary: 'Web: redirect to Google / Microsoft consent',
-		query: z.object({ redirect: z.string().optional().describe('Where to land afterwards (a web path)') }), status: 302, errors: { 404: 'Unknown provider' }
+		query: z.object({ redirect: z.string().optional().describe('Where to land afterwards: a web path, or availabliss://calendars for the apps') }), status: 302, errors: { 404: 'Unknown provider' }
 	},
-	{ method: 'POST', path: '/calendars/oauth/{provider}/url', tag: 'Calendars', auth: 'user', summary: 'Native: the consent URL to open in a browser sheet', body: s.oauthUrlSchema, response: obj({ url: str }), errors: { 404: 'Unknown provider' }, rateLimit: '10 / 10 minutes' },
+	{ method: 'POST', path: '/calendars/oauth/{provider}/url', tag: 'Calendars', auth: 'user', summary: 'Native: the consent URL to open in a browser sheet', description: "Native apps use this and open `url` in ASWebAuthenticationSession / Custom Tabs, which can't send the bearer token.", body: s.oauthUrlSchema, response: obj({ url: str }), errors: { 404: 'Unknown provider' }, rateLimit: '10 / 10 minutes' },
 	{
 		method: 'GET', path: '/calendars/oauth/{provider}/callback', tag: 'Calendars', auth: 'none', summary: 'OAuth callback (called by the provider)',
 		query: z.object({ state: z.string().optional(), code: z.string().optional(), error: z.string().optional() }),
-		status: 302, description: 'Web: links the calendar, then redirects with `?connected=` or `?error=`. Native: redirects to `availabliss://…?complete=<code>&provider=`.'
+		status: 302, description: 'Web: links the calendar, then redirects with `?connected=` or `?error=`, only if the session belongs to whoever started the flow (else `?error=wrong_account`). Native: redirects to `availabliss://…?complete=<code>&provider=`. Each state works once.'
 	},
-	{ method: 'POST', path: '/calendars/oauth/{provider}/complete', tag: 'Calendars', auth: 'user', summary: 'Native: finish a Google / Microsoft connection', body: s.oauthCompleteSchema, response: 'CalendarConnection', errors: { 403: 'A different user started the flow', 404: 'Unknown provider' }, rateLimit: '10 / 10 minutes' },
+	{ method: 'POST', path: '/calendars/oauth/{provider}/complete', tag: 'Calendars', auth: 'user', summary: 'Native: finish a Google / Microsoft connection', body: s.oauthCompleteSchema, response: 'CalendarConnection', errors: { 403: 'A different user started the flow', 404: 'Unknown provider', 400: 'The code was already used or is older than 10 minutes' }, rateLimit: '10 / 10 minutes' },
 	{ method: 'POST', path: '/calendars/caldav', tag: 'Calendars', auth: 'user', summary: 'Connect a CalDAV calendar (iCloud by default)', body: s.caldavSchema, status: 201, response: 'CalendarConnection', rateLimit: '10 / 10 minutes' },
-	{ method: 'PUT', path: '/calendars/device', tag: 'Calendars', auth: 'user', summary: "Upload busy time from the phone's calendars", body: s.deviceSyncSchema, response: 'CalendarConnection', rateLimit: '30 / minute' },
+	{ method: 'PUT', path: '/calendars/device', tag: 'Calendars', auth: 'user', summary: "Upload busy time from the phone's calendars", description: 'Busy outside [rangeStart, rangeEnd] is ignored; only differences are written.', body: s.deviceSyncSchema, response: 'CalendarConnection', rateLimit: '30 / minute' },
 	{ method: 'PATCH', path: '/calendars/{connectionId}/calendars/{calendarId}', tag: 'Calendars', auth: 'user', summary: 'Whether a calendar counts as busy', body: s.calendarBusySchema, response: 'CalendarConnection' },
-	{ method: 'POST', path: '/calendars/{connectionId}/sync', tag: 'Calendars', auth: 'user', summary: 'Sync now', response: 'CalendarConnection', rateLimit: '6 / minute' },
+	{ method: 'POST', path: '/calendars/{connectionId}/sync', tag: 'Calendars', auth: 'user', summary: 'Sync now', description: "Pulls a Google / Outlook / iCloud connection now. A failed sync shows as `status: 'error' | 'reauth_required'`, not an HTTP error. At most once per connection per 30 s (a call in between returns it unchanged). Phone calendars aren't pulled: the app uploads with PUT /calendars/device.", response: 'CalendarConnection', rateLimit: '6 / minute' },
 	{ method: 'DELETE', path: '/calendars/{connectionId}', tag: 'Calendars', auth: 'user', summary: 'Disconnect a calendar', status: 204 },
 	{
 		method: 'POST', path: '/calendars/push/google', tag: 'Calendars', auth: 'none', summary: 'Google Calendar change notification (called by Google)',
-		description: 'No body: `X-Goog-Channel-ID`, `X-Goog-Channel-Token` and `X-Goog-Resource-State` headers.', response: { contentType: 'text/plain', description: 'Empty' }
+		description: 'No body: `X-Goog-Channel-ID`, `X-Goog-Channel-Token` and `X-Goog-Resource-State` headers.', response: { contentType: 'text/plain', description: 'Empty' }, unlimited: true
 	},
 	{
 		method: 'POST', path: '/calendars/push/microsoft', tag: 'Calendars', auth: 'none', summary: 'Microsoft Graph change notifications (called by Microsoft)',
 		query: z.object({ validationToken: z.string().optional().describe("Graph's check when a subscription is created: echoed as text/plain with 200") }),
 		body: { contentType: 'application/json', description: 'Graph change notifications `{ value: [...] }`', schema: { type: 'object' } },
-		status: 202
+		status: 202, unlimited: true,
+		alsoResponds: { status: 200, when: 'With `?validationToken`', response: { contentType: 'text/plain', description: 'The validation token, echoed', schema: { type: 'string' } } }
 	},
 
 	// Manual busy blocks
 	{ method: 'GET', path: '/blocks', tag: 'Blocks', auth: 'user', summary: 'Your busy blocks ("My time")', response: obj({ blocks: list('ManualBlock') }) },
-	{ method: 'POST', path: '/blocks', tag: 'Blocks', auth: 'user', summary: 'Add a busy block', body: s.createBlockSchema, status: 201, response: 'ManualBlock' },
+	{ method: 'POST', path: '/blocks', tag: 'Blocks', auth: 'user', summary: 'Add a busy block', body: s.createBlockSchema, status: 201, response: 'ManualBlock', errors: { 400: 'That time has already passed (a one-off ending before yesterday, or a repeat whose `until` is before yesterday)' } },
 	{ method: 'PATCH', path: '/blocks/{id}', tag: 'Blocks', auth: 'user', summary: 'Change a busy block', body: s.updateBlockSchema, response: 'ManualBlock' },
 	{ method: 'DELETE', path: '/blocks/{id}', tag: 'Blocks', auth: 'user', summary: 'Delete a busy block', status: 204 },
 
@@ -226,33 +233,33 @@ export const endpoints: Endpoint[] = [
 	{ method: 'GET', path: '/groups', tag: 'Groups', auth: 'user', summary: 'Your groups', response: obj({ groups: list('GroupSummary') }) },
 	{ method: 'POST', path: '/groups', tag: 'Groups', auth: 'user', summary: 'Create a group (you are the owner)', body: s.createGroupSchema, status: 201, response: 'Group', errors: { 402: 'A free account already owns 3 groups' }, rateLimit: '20 / hour' },
 	{ method: 'GET', path: '/groups/{id}', tag: 'Groups', auth: 'user', summary: 'A group', response: 'Group' },
-	{ method: 'PATCH', path: '/groups/{id}', tag: 'Groups', auth: 'admin', summary: 'Change a group (name, colour, timing, archived, rhythm …)', body: s.updateGroupSchema, response: 'Group' },
+	{ method: 'PATCH', path: '/groups/{id}', tag: 'Groups', auth: 'admin', summary: 'Change a group (name, colour, timing, archived, rhythm …)', description: 'Publishes `group.updated`.', body: s.updateGroupSchema, response: 'Group' },
 	{ method: 'DELETE', path: '/groups/{id}', tag: 'Groups', auth: 'owner', summary: 'Delete a group', status: 204 },
-	{ method: 'PUT', path: '/groups/{id}/image', tag: 'Groups', auth: 'admin', summary: "Set the group's photo", body: imageUpload, response: 'Group' },
-	{ method: 'DELETE', path: '/groups/{id}/image', tag: 'Groups', auth: 'admin', summary: "Remove the group's photo", response: 'Group' },
+	{ method: 'PUT', path: '/groups/{id}/image', tag: 'Groups', auth: 'admin', summary: "Set the group's photo", description: 'Shrunk to fit 512 px; publishes `group.updated`.', body: imageUpload, response: 'Group' },
+	{ method: 'DELETE', path: '/groups/{id}/image', tag: 'Groups', auth: 'admin', summary: "Remove the group's photo", description: 'No photo: the monogram tile. Publishes `group.updated`.', response: 'Group' },
 	{ method: 'GET', path: '/groups/{id}/next', tag: 'Groups', auth: 'user', summary: "The free time nearest the group's next meet-up (rhythm)", response: obj({ suggestion: nullable('NextSuggestion') }) },
 	{ method: 'PUT', path: '/groups/{id}/mute', tag: 'Notifications', auth: 'user', summary: 'Mute a group', body: s.muteGroupSchema, response: 'NotificationSettings' },
 	{ method: 'DELETE', path: '/groups/{id}/mute', tag: 'Notifications', auth: 'user', summary: 'Unmute a group', response: 'NotificationSettings' },
-	{ method: 'POST', path: '/groups/{id}/nudge', tag: 'Groups', auth: 'admin', summary: "Nudge members who haven't synced (once per 12 hours)", response: obj({ nudged: num }) },
-	{ method: 'POST', path: '/groups/{id}/leave', tag: 'Members', auth: 'user', summary: 'Leave a group (the owner names the new owner)', body: s.leaveGroupSchema, status: 204, errors: { 409: "Nobody else is an admin, or you're the only member" } },
-	{ method: 'PATCH', path: '/groups/{id}/members/{userId}', tag: 'Members', auth: 'user', summary: "Change a member's role (admins) or name in the group (yourself, or an admin for anyone)", body: s.memberUpdateSchema, response: 'Member' },
+	{ method: 'POST', path: '/groups/{id}/nudge', tag: 'Groups', auth: 'admin', summary: "Nudge members who haven't synced (once per 12 hours)", description: "Pushes or emails the members who haven't synced.", response: obj({ nudged: num }), errors: { 429: 'Nudged in the last 12 hours' } },
+	{ method: 'POST', path: '/groups/{id}/leave', tag: 'Members', auth: 'user', summary: 'Leave a group (the owner names the new owner)', body: s.leaveGroupSchema, status: 204, errors: { 409: "Nobody else is an admin, or you're the only member", 400: "The owner without `newOwnerId`, or one who isn't another admin (issue path `newOwnerId`)" } },
+	{ method: 'PATCH', path: '/groups/{id}/members/{userId}', tag: 'Members', auth: 'user', summary: "Change a member's role (admins) or name in the group (yourself, or an admin for anyone)", description: 'A role change sends the member a `role.changed` notification. Publishes `member.changed`.', body: s.memberUpdateSchema, response: 'Member', errors: { 403: "Changing a role as a non-admin or the owner's role, or someone else's name as a non-admin", 404: 'Not a member' } },
 	{
 		method: 'DELETE', path: '/groups/{id}/members/{userId}', tag: 'Members', auth: 'user', summary: 'Remove a member (admin), or yourself (leave)',
-		description: 'An admin removes someone (never the owner); anyone can remove themselves.', status: 204
+		description: 'An admin removes someone (never the owner); anyone can remove themselves. Yourself = leave, as POST /groups/{id}/leave with no new owner (so 400 / 409 as there). Publishes `member.changed` `{ userId, removed: true }`.', status: 204, errors: { 403: 'Removing the owner, or someone else as a non-admin', 404: 'Not a member' }
 	},
-	{ method: 'PATCH', path: '/groups/{id}/members/me', tag: 'Members', auth: 'user', summary: 'The name you go by in this group', body: s.memberNameSchema, response: 'Member' },
+	{ method: 'PATCH', path: '/groups/{id}/members/me', tag: 'Members', auth: 'user', summary: 'The name you go by in this group', description: 'Publishes `member.changed`.', body: s.memberNameSchema, response: 'Member' },
 	{ method: 'GET', path: '/groups/{id}/preferences', tag: 'Preferences', auth: 'user', summary: "Every member's preferred times", response: obj({ preferences: list('GroupPreference') }) },
-	{ method: 'POST', path: '/groups/{id}/preferences', tag: 'Preferences', auth: 'user', summary: 'Add a preferred time', body: s.preferenceSchema, status: 201, response: 'GroupPreference' },
-	{ method: 'PUT', path: '/groups/{id}/preferences/{prefId}', tag: 'Preferences', auth: 'user', summary: 'Change one of your preferred times', body: s.preferenceSchema, response: 'GroupPreference' },
-	{ method: 'DELETE', path: '/groups/{id}/preferences/{prefId}', tag: 'Preferences', auth: 'user', summary: 'Delete one of your preferred times', status: 204 },
+	{ method: 'POST', path: '/groups/{id}/preferences', tag: 'Preferences', auth: 'user', summary: 'Add a preferred time', body: s.preferenceSchema, status: 201, response: 'GroupPreference', errors: { 400: 'You already have 20 in this group' } },
+	{ method: 'PUT', path: '/groups/{id}/preferences/{prefId}', tag: 'Preferences', auth: 'user', summary: 'Change one of your preferred times', description: 'The kind can change too.', body: s.preferenceSchema, response: 'GroupPreference', errors: { 404: 'Not one of yours' } },
+	{ method: 'DELETE', path: '/groups/{id}/preferences/{prefId}', tag: 'Preferences', auth: 'user', summary: 'Delete one of your preferred times', status: 204, errors: { 404: 'Not one of yours' } },
 
 	// Invites
-	{ method: 'GET', path: '/groups/{id}/invites', tag: 'Invites', auth: 'admin', summary: 'Live invites, newest first', response: obj({ invites: list('GroupInvite') }) },
-	{ method: 'POST', path: '/groups/{id}/invites', tag: 'Invites', auth: 'admin', summary: 'Invite by link, email, username or user id', body: s.inviteSchema, status: 201, response: 'InvitesCreated', errors: { 404: 'A username or user id nobody (you can invite) has', 409: 'Someone is already in the group' }, rateLimit: '30 / hour' },
+	{ method: 'GET', path: '/groups/{id}/invites', tag: 'Invites', auth: 'admin', summary: 'Live invites, newest first', description: 'Unexpired and not used up.', response: obj({ invites: list('GroupInvite') }) },
+	{ method: 'POST', path: '/groups/{id}/invites', tag: 'Invites', auth: 'admin', summary: 'Invite by link, email, username or user id', description: "At most 20 people in all. `token`, `url` and `expiresAt` are the first invite's. Links last 14 days. See docs/API.md, Invites.", body: s.inviteSchema, status: 201, response: 'InvitesCreated', errors: { 404: 'A username or user id nobody (you can invite) has', 409: 'Someone is already in the group' }, rateLimit: '30 / hour' },
 	{ method: 'DELETE', path: '/groups/{id}/invites/{inviteId}', tag: 'Invites', auth: 'admin', summary: 'Revoke an invite', status: 204 },
 	{ method: 'GET', path: '/invites/{token}', tag: 'Invites', auth: 'none', summary: 'Preview an invite', response: 'InvitePreview', errors: { 404: 'Expired, revoked or used up' }, rateLimit: '30 / 10 minutes per IP' },
-	{ method: 'POST', path: '/invites/{token}/accept', tag: 'Invites', auth: 'user', summary: 'Join with an invite', response: 'JoinedGroup', errors: { 403: 'The invite is for someone else', 404: 'Expired, revoked or used up' }, rateLimit: '30 / 10 minutes per IP' },
-	{ method: 'POST', path: '/invites/{token}/decline', tag: 'Invites', auth: 'user', summary: 'Decline an invite sent to you', status: 204, errors: { 403: "Someone else's invite, or a link" } },
+	{ method: 'POST', path: '/invites/{token}/accept', tag: 'Invites', auth: 'user', summary: 'Join with an invite', description: 'Joining also removes your other invites to that group. `joined` is false when you were already a member.', response: 'JoinedGroup', errors: { 403: 'The invite is for someone else', 404: 'Expired, revoked or used up' }, rateLimit: '30 / 10 minutes per IP' },
+	{ method: 'POST', path: '/invites/{token}/decline', tag: 'Invites', auth: 'user', summary: 'Decline an invite sent to you', description: 'Removes it and its Activity item; nobody is told.', status: 204, errors: { 403: "Someone else's invite, or a link" } },
 
 	// Availability
 	{ method: 'POST', path: '/requirements/preview', tag: 'Availability', auth: 'user', summary: 'How many slots a timing produces', body: s.requirementPreviewSchema, response: 'RequirementPreview', rateLimit: '120 / minute' },
@@ -262,13 +269,13 @@ export const endpoints: Endpoint[] = [
 
 	// Proposals
 	{ method: 'GET', path: '/groups/{id}/proposals', tag: 'Proposals', auth: 'user', summary: "A group's proposals", query: s.proposalsQuerySchema, response: obj({ proposals: list('Proposal') }) },
-	{ method: 'POST', path: '/groups/{id}/proposals', tag: 'Proposals', auth: 'user', summary: 'Propose a time (posts a chat card)', body: s.createProposalSchema, status: 201, response: 'Proposal' },
+	{ method: 'POST', path: '/groups/{id}/proposals', tag: 'Proposals', auth: 'user', summary: 'Propose a time (posts a chat card)', description: 'The creator accepts automatically.', body: s.createProposalSchema, status: 201, response: 'Proposal' },
 	{ method: 'GET', path: '/proposals/{id}', tag: 'Proposals', auth: 'user', summary: 'A proposal', response: 'Proposal' },
 	{ method: 'POST', path: '/proposals/{id}/respond', tag: 'Proposals', auth: 'user', summary: 'Reply to a proposal', body: s.respondSchema, response: 'Proposal', errors: { 409: 'Cancelled, or you joined after it was confirmed' } },
 	{ method: 'POST', path: '/proposals/{id}/override', tag: 'Proposals', auth: 'admin', summary: "Set someone's reply", body: s.overrideSchema, response: 'Proposal', errors: { 409: 'No longer open' } },
 	{ method: 'POST', path: '/proposals/{id}/confirm', tag: 'Proposals', auth: 'user', summary: 'Confirm anyway (creator or admin)', response: 'Proposal', errors: { 403: 'Not the creator or an admin', 409: 'Not open, or nobody else has accepted' } },
-	{ method: 'POST', path: '/proposals/{id}/keep', tag: 'Proposals', auth: 'user', summary: 'Keep the plan after a drop-out (creator or admin)', response: 'Proposal', errors: { 403: 'Not the creator or an admin', 409: 'Not confirmed' } },
-	{ method: 'DELETE', path: '/proposals/{id}', tag: 'Proposals', auth: 'user', summary: 'Cancel a proposal or plan (creator or admin)', status: 204, errors: { 403: 'Not the creator or an admin', 409: 'Already cancelled' } },
+	{ method: 'POST', path: '/proposals/{id}/keep', tag: 'Proposals', auth: 'user', summary: 'Keep the plan after a drop-out (creator or admin)', description: 'Clears `needsReview`.', response: 'Proposal', errors: { 403: 'Not the creator or an admin', 409: 'Not confirmed' } },
+	{ method: 'DELETE', path: '/proposals/{id}', tag: 'Proposals', auth: 'user', summary: 'Cancel a proposal or plan (creator or admin)', description: "Marks it cancelled; a confirmed plan's event is deleted too.", status: 204, errors: { 403: 'Not the creator or an admin', 409: 'Already cancelled' } },
 
 	// Events
 	{ method: 'GET', path: '/groups/{id}/events', tag: 'Events', auth: 'user', summary: "A group's events (default: 30 days back to a year ahead)", query: s.eventsQuerySchema, response: obj({ events: list('GroupEvent') }) },
@@ -276,9 +283,9 @@ export const endpoints: Endpoint[] = [
 	{ method: 'GET', path: '/events/{id}', tag: 'Events', auth: 'user', summary: 'An event', response: 'GroupEvent' },
 	{ method: 'PATCH', path: '/events/{id}', tag: 'Events', auth: 'user', summary: 'Change an event (creator or admin)', body: s.updateEventSchema, response: 'GroupEvent', errors: { 403: 'Not the creator or an admin' } },
 	{ method: 'DELETE', path: '/events/{id}', tag: 'Events', auth: 'user', summary: 'Delete an event (creator or admin)', status: 204, errors: { 403: 'Not the creator or an admin' } },
-	{ method: 'PUT', path: '/events/{id}/image', tag: 'Events', auth: 'user', summary: "Set an event's cover photo (creator or admin)", body: imageUpload, response: 'GroupEvent', errors: { 403: 'Not the creator or an admin' } },
+	{ method: 'PUT', path: '/events/{id}/image', tag: 'Events', auth: 'user', summary: "Set an event's cover photo (creator or admin)", description: 'Shrunk to fit 1600 px; publishes `event.changed`.', body: imageUpload, response: 'GroupEvent', errors: { 403: 'Not the creator or an admin' } },
 	{ method: 'DELETE', path: '/events/{id}/image', tag: 'Events', auth: 'user', summary: "Remove an event's cover photo (creator or admin)", response: 'GroupEvent', errors: { 403: 'Not the creator or an admin' } },
-	{ method: 'GET', path: '/events/{id}/ics', tag: 'Events', auth: 'user', summary: 'An event as an .ics file', response: icsFile('The event') },
+	{ method: 'GET', path: '/events/{id}/ics', tag: 'Events', auth: 'user', summary: 'An event as an .ics file', description: `For the web's "Add to calendar"; the apps write to the phone's calendar directly.`, response: icsFile('The event') },
 
 	// Chat
 	{ method: 'GET', path: '/groups/{id}/messages', tag: 'Chat', auth: 'user', summary: 'A page of messages (newest last)', query: s.messagesQuerySchema, response: 'MessagePage' },
@@ -288,50 +295,57 @@ export const endpoints: Endpoint[] = [
 	},
 	{
 		method: 'POST', path: '/groups/{id}/messages', tag: 'Chat', auth: 'user', summary: 'Send a message, photos / files, a place, or a poll',
-		body: s.createMessageSchema, status: 201, response: 'Message', errors: { 409: 'Replying to a deleted message' }, rateLimit: '30 / minute'
+		body: s.createMessageSchema, status: 201, response: 'Message', errors: { 409: 'Replying to a deleted message', 400: "`replyToId` isn't in this chat or is a group update, or `attachmentIds` aren't your own unsent uploads to this group" }, rateLimit: '30 / minute'
 	},
 	{
 		method: 'GET', path: '/groups/{id}/attachments', tag: 'Chat', auth: 'user', summary: "Photos or files sent in the chat (newest first)",
 		query: s.groupMediaQuerySchema, response: 'GroupMediaPage'
 	},
 	{
-		method: 'POST', path: '/groups/{id}/attachments', tag: 'Chat', auth: 'user', summary: 'Upload a photo, GIF or file to send in a message',
+		method: 'POST', path: '/groups/{id}/attachments', tag: 'Chat', auth: 'user', summary: 'Upload a photo, GIF or file to send in a message', description: "Send its id in `attachmentIds` within a day, or it's deleted. Photos (JPEG, PNG, WebP, GIF, HEIC; up to 15 MB) are turned upright, stripped of metadata and shrunk to at most 2560 px (JPEG, or PNG if transparent); animated GIFs are kept as sent. Files: up to 25 MB, from an allow-list of extensions (docs/API.md, Chat). Wallet passes come back as kind 'pass'. Videos (mp4, m4v, mov): 3 minutes and 100 MB, or with Pro 10 minutes and 300 MB, kept as sent; `poster` becomes `thumbnailUrl`.",
 		body: {
 			contentType: 'multipart/form-data',
-			description: 'One file in the field `file`',
-			schema: { type: 'object', properties: { file: { type: 'string', contentMediaType: 'application/octet-stream' } }, required: ['file'] }
+			description: 'One file in the field `file`; for a video, optionally a JPEG / PNG frame from it in `poster`',
+			schema: {
+				type: 'object',
+				properties: {
+					file: { type: 'string', contentMediaType: 'application/octet-stream' },
+					poster: { type: 'string', contentMediaType: 'image/*', description: "A video's poster frame (becomes thumbnailUrl)" }
+				},
+				required: ['file']
+			}
 		},
-		status: 201, response: 'Attachment', rateLimit: '60 / 10 minutes'
+		status: 201, response: 'Attachment', rateLimit: '60 / 10 minutes', errors: { 400: 'Not an allowed type, too big, or unreadable' }
 	},
 	{ method: 'POST', path: '/groups/{id}/messages/receipts', tag: 'Chat', auth: 'user', summary: 'Mark messages delivered or seen', body: s.receiptsSchema, status: 204 },
-	{ method: 'PATCH', path: '/messages/{id}', tag: 'Chat', auth: 'user', summary: 'Edit your own text message', body: s.editMessageSchema, response: 'Message' },
-	{ method: 'DELETE', path: '/messages/{id}', tag: 'Chat', auth: 'user', summary: 'Delete your own text message', status: 204 },
+	{ method: 'PATCH', path: '/messages/{id}', tag: 'Chat', auth: 'user', summary: 'Edit your own text message', body: s.editMessageSchema, response: 'Message', errors: { 400: 'Not a text message, or a shared place', 403: 'Not your message', 409: 'Deleted' } },
+	{ method: 'DELETE', path: '/messages/{id}', tag: 'Chat', auth: 'user', summary: 'Delete your own text message', description: 'It stays in the chat as deleted; its attachments are deleted for good.', status: 204, errors: { 400: 'Not a text message', 403: 'Not your message', 409: 'Already deleted' } },
 	{
 		method: 'PUT', path: '/messages/{id}/reaction', tag: 'Chat', auth: 'user', summary: 'React to a message with an emoji',
 		description: 'One reaction per person per message: reacting again replaces it. Not for group updates or deleted messages. The author gets a push (not for their own messages).',
-		body: s.reactionSchema, response: 'MessageReactions', errors: { 409: 'The message was deleted' }
+		body: s.reactionSchema, response: 'MessageReactions', errors: { 409: 'The message was deleted', 400: 'A group update' }
 	},
-	{ method: 'DELETE', path: '/messages/{id}/reaction', tag: 'Chat', auth: 'user', summary: 'Take back your reaction to a message', response: 'MessageReactions' },
+	{ method: 'DELETE', path: '/messages/{id}/reaction', tag: 'Chat', auth: 'user', summary: 'Take back your reaction to a message', description: "No change if you hadn't reacted.", response: 'MessageReactions' },
 	{ method: 'GET', path: '/messages/{id}/info', tag: 'Chat', auth: 'user', summary: 'Who has seen a message', response: 'MessageInfo' },
-	{ method: 'GET', path: '/messages/{id}/thread', tag: 'Chat', auth: 'user', summary: 'The thread a message is in', response: 'MessageThread' },
+	{ method: 'GET', path: '/messages/{id}/thread', tag: 'Chat', auth: 'user', summary: 'The thread a message is in', description: 'At most 200 messages (the earliest; `truncated` when there were more).', response: 'MessageThread' },
 	{
-		method: 'PATCH', path: '/polls/{id}', tag: 'Chat', auth: 'user', summary: "Edit a poll (its author): question, pick-one / pick-any, a text poll's options",
-		body: s.updatePollSchema, response: 'Poll', errors: { 403: 'Not the author', 409: 'The poll is closed' }
+		method: 'PATCH', path: '/polls/{id}', tag: 'Chat', auth: 'user', summary: "Edit a poll (its author): question, pick-one / pick-any, a text poll's options", description: 'Publishes `poll.updated`.',
+		body: s.updatePollSchema, response: 'Poll', errors: { 403: 'Not the author', 409: 'The poll is closed', 400: "A date poll's times can't be changed" }
 	},
-	{ method: 'POST', path: '/polls/{id}/vote', tag: 'Chat', auth: 'user', summary: 'Vote in a poll (empty removes your vote)', body: s.voteSchema, response: 'Poll', errors: { 409: 'The poll is closed' } },
+	{ method: 'POST', path: '/polls/{id}/vote', tag: 'Chat', auth: 'user', summary: 'Vote in a poll (empty removes your vote)', body: s.voteSchema, response: 'Poll', errors: { 409: 'The poll is closed', 400: 'More than one option in a pick-one poll, or an unknown option' } },
 	{ method: 'POST', path: '/polls/{id}/close', tag: 'Chat', auth: 'user', summary: "Close a poll (its author)", response: 'Poll', errors: { 403: 'Not the author' } },
 	{
-		method: 'GET', path: '/attachments/{id}', tag: 'Chat', auth: 'none', summary: "An attachment's file (signed link, or a signed-in member)",
+		method: 'GET', path: '/attachments/{id}', tag: 'Chat', auth: 'none', summary: "An attachment's file (signed link, or a signed-in member)", description: 'Signed links work 7–8 days and are unchanged within a day (cacheable); refetch the message for fresh ones. Photos, GIFs and passes are served inline (a pass as application/vnd.apple.pkpass); files as a download. Range requests supported. Not rate limited.',
 		query: signedLinkQuery.extend({ download: z.literal('1').optional().describe('Download a photo instead of showing it') }),
-		response: { contentType: '*/*', description: 'The file', schema: { type: 'string', contentMediaType: 'application/octet-stream' } }, errors: { 404: 'No valid signature and not a member' }
+		response: { contentType: '*/*', description: 'The file', schema: { type: 'string', contentMediaType: 'application/octet-stream' } }, errors: { 404: 'No valid signature and not a member' }, unlimited: true
 	},
 	{
 		method: 'GET', path: '/attachments/{id}/thumb', tag: 'Chat', auth: 'none', summary: "A photo's preview (signed link, or a signed-in member)",
-		query: signedLinkQuery, response: { contentType: 'image/*', description: 'The preview', schema: { type: 'string', contentMediaType: 'image/*' } }, errors: { 404: 'No valid signature and not a member' }
+		query: signedLinkQuery, response: { contentType: 'image/*', description: 'The preview', schema: { type: 'string', contentMediaType: 'image/*' } }, errors: { 404: 'No valid signature and not a member' }, unlimited: true
 	},
 	{
 		method: 'GET', root: true, path: '/media/{key}', tag: 'Chat', auth: 'none', summary: 'A profile picture, group photo or event cover (signed link)',
-		description: '`key` may contain slashes. The links come from `User.image`, `Group.image`, `GroupEvent.image` and so on.',
+		description: '`key` may contain slashes. The links come from `User.image`, `Group.image`, `GroupEvent.image` and so on; they work 7–8 days and stay the same all day, so cache by URL.',
 		query: signedLinkQuery, response: { contentType: 'image/jpeg', description: 'The picture', schema: { type: 'string', contentMediaType: 'image/jpeg' } }, errors: { 404: 'No valid signature' }
 	},
 
@@ -342,7 +356,7 @@ export const endpoints: Endpoint[] = [
 	},
 
 	// Notifications & devices
-	{ method: 'GET', path: '/chats', tag: 'Chat', auth: 'user', summary: 'Your group chats, latest message first', response: 'ChatList' },
+	{ method: 'GET', path: '/chats', tag: 'Chat', auth: 'user', summary: 'Your group chats, latest message first', description: 'Archived groups only appear while something in them is unread; chats with no messages come last (newest group first).', response: 'ChatList' },
 	{ method: 'GET', path: '/notifications', tag: 'Notifications', auth: 'user', summary: 'Your Activity', response: 'NotificationList' },
 	{ method: 'POST', path: '/notifications/read', tag: 'Notifications', auth: 'user', summary: 'Mark notifications read (no ids: all except chats)', body: s.readNotificationsSchema, status: 204 },
 	{ method: 'POST', path: '/devices', tag: 'Notifications', auth: 'user', summary: 'Register an APNs / FCM token', body: s.deviceSchema, status: 204 },

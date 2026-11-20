@@ -147,10 +147,15 @@ function operation(e: Endpoint, components: Record<string, JsonSchema>): Json {
 	if (e.body || e.query) errors[400] = ERROR_TEXT[400];
 	if (e.auth !== 'none') errors[401] = ERROR_TEXT[401];
 	if (e.auth === 'admin' || e.auth === 'owner') errors[403] = e.auth === 'admin' ? 'Not a group admin' : 'Not the group owner';
-	if (!e.root || e.path.startsWith('/api/')) errors[429] = ERROR_TEXT[429];
+	if ((!e.root || e.path.startsWith('/api/')) && !e.unlimited) errors[429] = ERROR_TEXT[429];
 	Object.assign(errors, e.errors);
 	for (const [code, text] of Object.entries(errors).sort(([a], [b]) => Number(a) - Number(b))) {
-		responses[code] = { description: text, content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiErrorBody' } } } };
+		const shape = e.errorShapes?.[Number(code) as keyof typeof e.errorShapes] ?? 'ApiErrorBody';
+		responses[code] = { description: text, content: content(shape, components) };
+	}
+	if (e.alsoResponds) {
+		const { status: also, when, response } = e.alsoResponds;
+		responses[also] = { description: `${when}: ${response.description}`, content: content(response, components) };
 	}
 
 	const description = [e.description, AUTH_TEXT[e.auth], e.rateLimit && `Rate limit: ${e.rateLimit}.`].filter(Boolean).join('\n\n');

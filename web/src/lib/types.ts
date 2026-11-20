@@ -18,20 +18,21 @@ export type TileColor = (typeof TILE_COLORS)[number];
 export const CALENDAR_PROVIDERS = ['google', 'microsoft', 'caldav', 'device'] as const;
 export type CalendarProvider = (typeof CALENDAR_PROVIDERS)[number];
 
+export const REPEATS = ['none', 'daily', 'weekdays', 'weekly', 'fortnightly', 'monthly', 'monthlyWeekday', 'yearly'] as const;
 /**
  * How a block repeats. `monthly` is the same date each month (skipped in months without it);
  * `monthlyWeekday` the same weekday of the month (e.g. the 2nd Tuesday, or the last one if it
- * started in a month's last seven days); `yearly` the same date each year.
+ * started in a month's last seven days); `yearly` the same date each year (29 Feb: leap years only).
  */
-export const REPEATS = ['none', 'daily', 'weekdays', 'weekly', 'fortnightly', 'monthly', 'monthlyWeekday', 'yearly'] as const;
 export type Repeat = (typeof REPEATS)[number];
 
+export const RESPONSE_KINDS = ['pending', 'accepted', 'maybe', 'declined'] as const;
 /**
  * A reply to a proposal. `maybe` is a soft yes ("I can make it if I must"): counted apart from
  * `accepted`, and it doesn't count towards everyone being in, so a proposal only confirms itself
- * when every reply is a firm yes (the proposer or an admin can still confirm anyway).
+ * when every reply is a firm yes (the proposer or an admin can still confirm anyway). Treat values
+ * you don't know as `pending`.
  */
-export const RESPONSE_KINDS = ['pending', 'accepted', 'maybe', 'declined'] as const;
 export type ResponseKind = (typeof RESPONSE_KINDS)[number];
 
 /** Weekday index, 0 = Monday … 6 = Sunday. */
@@ -52,28 +53,45 @@ export interface TimeWindow {
 }
 
 export type RequirementLength =
-	| { type: 'duration'; minutes: number }
-	| { type: 'days'; count: number }
+	| {
+			type: 'duration';
+			/** The slot's length, e.g. 120 = 2 hours. */
+			minutes: number;
+	  }
+	| {
+			type: 'days';
+			/** Whole consecutive days (7 = a week). */
+			count: number;
+	  }
 	| {
 			type: 'span';
 			startDay: Weekday;
+			/** HH:MM, e.g. Fri 18:00 → Sun 23:59 for a weekend. */
 			startTime: string;
 			endDay: Weekday;
+			/** HH:MM */
 			endTime: string;
-			/** Extra weeks between the start and end day: 0 = same week, 1 = the following week, up to 4. */
+			/** Extra weeks between the start and end day: 0 = same week, 1 = "Tue → following Thu", 3 = "Tue → Thu 3 weeks later", up to 4. */
 			weeksLater: number;
 	  };
 
 export interface Requirement {
 	length: RequirementLength;
+	/** Daily time window, e.g. evenings 18:00–23:59; null = the whole day. */
 	window: TimeWindow | null;
+	/** Allowed weekdays; empty = any. Ignored for `span`. */
 	days: Weekday[];
+	/** Include bank holidays (the owner's region): allowed whatever `days` says, and a span stretches over adjacent ones (Good Friday starts a Fri-evening span on Thursday evening; Easter Monday ends a Sun-night span on Monday night). */
 	bankHolidays: boolean;
+	/** Only inside school holidays (`schoolAuthority`'s, or `customSchoolHolidays`). */
 	schoolHolidaysOnly: boolean;
 	schoolAuthority: string | null;
 	customSchoolHolidays: DateRange[];
+	/** The search window. */
 	range: DateRange;
+	/** If non-empty, only these date ranges are considered (repeats of an identical range are dropped on save). */
 	dates: DateRange[];
+	/** IANA zone the times above are in. */
 	timezone: string;
 	/**
 	 * "Most of us are free": a time works when at least this many of the required members (synced,
@@ -88,39 +106,46 @@ export interface User {
 	id: string;
 	name: string;
 	email: string;
-	/** Lowercase, without the "@". */
+	/** Lowercase, without the "@". Every account gets one when it's made (null only briefly for older accounts). */
 	username: string | null;
+	/** A signed /media link (works 7–8 days and stays the same all day, so cache by URL), or a sign-in provider's own picture URL; null for none. */
 	image: string | null;
 	themeMode: ThemeMode;
 	colorTheme: ColorTheme;
+	/** ISO 3166-1 alpha-2, e.g. "GB". */
 	country: string | null;
+	/** ISO 3166-2, e.g. "GB-ENG". */
 	subdivision: string | null;
+	/** An id from GET /regions/school-authorities. */
 	schoolAuthority: string | null;
+	/** IANA zone, e.g. "Europe/London". */
 	timezone: string;
+	/** False until the sign-up wizard is finished. */
 	onboarded: boolean;
-	/** Minutes counted as busy before and after each busy time when finding free slots (0 = none). */
+	/** Minutes counted as busy before and after each busy time when finding free slots and clashes (0 = none). Not applied in GET /me/busy. */
 	busyBufferMinutes: BusyBufferMinutes;
 	/** Pushes before a confirmed plan you're going to: the day before, an hour before, both or none. */
 	eventReminders: EventReminders;
 	/** Shows "Add to calendar" on plans (off for people who subscribe to their plans instead). */
 	showAddToCalendar: boolean;
-	/** Groups you create start with auto-archive on (archived once their latest plan has passed). */
+	/** Groups you create start with auto-archive on (archived once their latest plan has passed). Off by default. */
 	autoArchiveNewGroups: boolean;
 }
 
-/** Kinds of push you can turn off, each covering some notification kinds (see NOTIFICATION_CATEGORY_KINDS). */
 export const NOTIFICATION_CATEGORIES = ['chat', 'proposals', 'plans', 'reminders', 'nudges'] as const;
+/**
+ * Kinds of push you can turn off, each covering some notification kinds (NOTIFICATION_CATEGORY_KINDS):
+ * chat = message; proposals = proposal.created, proposal.changed; plans = proposal.confirmed,
+ * event.created; reminders = reminder; nudges = nudge.
+ */
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
 export interface NotificationSettings {
 	/** Categories whose pushes (and emails) are off. Activity still lists everything. */
 	off: NotificationCategory[];
-	/**
-	 * No pushes between these local times (in your time zone), e.g. 22:00–07:00; null for none. With
-	 * `catchUp`, one push when they end says what came in meanwhile (if anything did).
-	 */
+	/** No pushes between these local times (in your time zone, may wrap midnight), e.g. 22:00–07:00; null for none. With `catchUp`, when they end one push (`kind: 'quiet.summary'`, with `groupId` if it was all one group) says how many updates came in meanwhile that are still unread. */
 	quietHours: { from: string; to: string; catchUp: boolean } | null;
-	/** Groups you've muted: no pushes from them until `until` (null = until you unmute). */
+	/** Groups you've muted (active mutes only): no pushes from them until `until` (null = until you unmute). */
 	mutes: { groupId: string; until: string | null }[];
 }
 
@@ -133,17 +158,17 @@ export type BusyBufferMinutes = (typeof BUSY_BUFFER_MINUTES)[number];
 
 export interface Member {
 	userId: string;
-	/** The name they go by in this group: `nameInGroup` when set, else their account name. */
+	/** The name they go by in this group: `nameInGroup` when set, else their account name, or their email address if they've set no name. */
 	name: string;
 	/** The name they chose for this group, or null to use their account name. */
 	nameInGroup: string | null;
 	image: string | null;
 	role: Role;
+	/** Has connected a calendar or marked any busy time by hand. */
 	synced: boolean;
 	joinedAt: string;
 }
 
-/** What one slot is called: "2 weekends work", "3 evenings work". */
 /** What one slot is called: "2 weekends work", "14 dates fit this timing". */
 export type SlotNoun = 'weekend' | 'evening' | 'day' | 'week' | 'date' | 'slot';
 
@@ -153,6 +178,7 @@ export interface MemberPreview {
 	image: string | null;
 }
 
+/** Drives the badge on the groups list: `matches` is e.g. "2 weekends work". */
 export type GroupStatus =
 	| { kind: 'matches'; count: number; noun: SlotNoun }
 	| { kind: 'needs_reply'; proposalId: string }
@@ -163,6 +189,7 @@ export interface GroupSummary {
 	id: string;
 	name: string;
 	color: TileColor;
+	/** 1–3 characters, shown on the tile without a photo. */
 	monogram: string;
 	/** The group's photo, shown instead of the monogram tile; null for none. */
 	image: string | null;
@@ -171,10 +198,12 @@ export interface GroupSummary {
 	archived: boolean;
 	memberCount: number;
 	syncedCount: number;
+	/** The timing in words, e.g. "A weekend · Fri 18:00 → Sun · Nov – Jan". */
 	requirementSummary: string;
+	/** Drives the badge on the groups list. */
 	status: GroupStatus;
 	unreadCount: number;
-	/** First few members, for avatar stacks. */
+	/** The first 5 members, for avatar stacks. */
 	memberPreview: MemberPreview[];
 }
 
@@ -199,10 +228,11 @@ export interface BusyInterval {
 	start: string;
 	end: string;
 	source: 'calendar' | 'manual';
+	/** The calendar's name (calendar busy) or the block's note (manual). Only ever sent to its owner. */
 	label: string | null;
 	calendarId: string | null;
 	blockId: string | null;
-	/** Calendar busy: the event's name, when the calendar gives one. Only ever sent to its owner. */
+	/** Calendar busy: the event's name, when the calendar gives one. Stored encrypted; only ever sent to its owner. */
 	title?: string | null;
 	/** Calendar busy: the event's opaque key ('' when the calendar gives no ids). */
 	eventKey?: string;
@@ -215,6 +245,7 @@ export interface BusyInterval {
 export interface CalendarConnection {
 	id: string;
 	provider: CalendarProvider;
+	/** "you@gmail.com", "iCloud", "Sam's iPhone". */
 	label: string;
 	status: 'ok' | 'error' | 'reauth_required';
 	lastSyncedAt: string | null;
@@ -225,11 +256,14 @@ export interface CalendarConnection {
 
 export interface ManualBlock {
 	id: string;
+	/** The first occurrence. */
 	start: string;
 	end: string;
 	allDay: boolean;
 	repeat: Repeat;
+	/** YYYY-MM-DD, the last date a repeat can occur; null = forever. */
 	until: string | null;
+	/** Private to the owner. */
 	note: string | null;
 }
 
@@ -238,9 +272,13 @@ export type SlotPosition = 'start' | 'middle' | 'end' | 'single';
 
 export interface AvailabilityDay {
 	date: string;
+	/** `hidden` = can't be part of any slot; `match` = a time that works. */
 	status: DayStatus;
+	/** Synced members busy during the relevant window that day. */
 	busyMemberIds: string[];
+	/** For drawing multi-day slots as one band. */
 	slotPosition: SlotPosition | null;
+	/** A bank or school holiday's name. */
 	holiday: string | null;
 	/** A bank holiday in the group owner's region (`holiday` is then its name); left out otherwise. */
 	bankHoliday?: true;
@@ -253,6 +291,7 @@ export interface AvailabilityDay {
 export interface Slot {
 	start: string;
 	end: string;
+	/** e.g. "Fri 13 – Sun 15 Nov". */
 	label: string;
 	/** Members whose preferences this slot fits. */
 	preferredBy?: string[];
@@ -260,7 +299,7 @@ export interface Slot {
 	score?: number;
 	/** Pro: people this time suits who've compromised in the group's recent plans. */
 	fairFor?: string[];
-	/** Synced members busy at this time (with a quorum or optional members); empty when everyone's free. */
+	/** Synced members busy at this time, optional members included (with a quorum or optional members); empty when everyone's free. Rank slots with fewer missing first. */
 	missingMemberIds?: string[];
 }
 
@@ -279,15 +318,21 @@ export interface GroupPreference {
 }
 
 export interface Availability {
+	/** YYYY-MM-DD */
 	from: string;
+	/** YYYY-MM-DD */
 	to: string;
+	/** Weekday columns worth drawing (others can never match). */
 	visibleWeekdays: Weekday[];
+	/** One per date in [from, to]. */
 	days: AvailabilityDay[];
+	/** Every slot that works, sorted by start. */
 	slots: Slot[];
 	syncedCount: number;
 	memberCount: number;
+	/** Members who haven't synced yet (ignored when finding times). */
 	pendingMemberIds: string[];
-	/** Synced members whose calendars are only checked up to `until` (ISO instant), before the end of this range. */
+	/** Synced members whose calendars are only checked up to `until` (ISO instant), before the end of this range: later days may hide clashes, and they count as free there. */
 	checkedUntil: { userId: string; until: string }[];
 }
 
@@ -298,8 +343,11 @@ export interface Interval {
 
 export interface DayAvailability {
 	date: string;
+	/** The part of the day the requirement cares about. */
 	window: Interval | null;
+	/** Each member's busy time, merged; `pending` = not synced. Calendar and hand-marked busy look the same: `manual` is always false (kept so older apps still decode). */
 	members: { userId: string; pending: boolean; busy: (Interval & { manual: boolean })[] }[];
+	/** When every synced member is free. */
 	everyoneFree: Interval[];
 	/** With a quorum or optional members: when enough of the group is free (includes everyoneFree). */
 	mostFree?: Interval[];
@@ -326,6 +374,7 @@ export interface Proposal {
 	status: 'open' | 'confirmed' | 'cancelled';
 	createdBy: string;
 	createdAt: string;
+	/** The event, once confirmed. */
 	eventId: string | null;
 	/**
 	 * Confirmed proposals: who confirmed it before everyone had accepted ("Confirm anyway"),
@@ -350,6 +399,7 @@ export interface GroupEvent {
 	location: string | null;
 	note: string | null;
 	start: string;
+	/** All-day: the exclusive midnight after the last day. */
 	end: string;
 	allDay: boolean;
 	/** A cover photo; null for none. */
@@ -363,7 +413,7 @@ export interface Poll {
 	question: string;
 	multi: boolean;
 	closed: boolean;
-	/** A date poll's options each carry `slot` (the time it stands for); text polls have none. */
+	/** A date poll's options each carry `slot` (the time it stands for; the label is made in the group's time zone): show who's busy per option with GET /groups/:id/conflicts. Text polls have none. */
 	options: { id: string; label: string; voterIds: string[]; slot?: { start: string; end: string; allDay: boolean } | null }[];
 }
 
@@ -372,6 +422,7 @@ export type MessageKind = 'text' | 'poll' | 'proposal' | 'event' | 'system';
 export interface Message {
 	id: string;
 	groupId: string;
+	/** Null for system messages (group updates). */
 	authorId: string | null;
 	kind: MessageKind;
 	body: string | null;
@@ -383,6 +434,7 @@ export interface Message {
 	editedAt: string | null;
 	/** Deleted by its author: shown as "This message was deleted" (body is null). */
 	deleted: boolean;
+	/** Only on your own messages; `seenBy` in the order they read it. */
 	receipt: { delivered: number; seen: number; recipients: number; seenBy: string[] } | null;
 	/** A compact preview of the message this one replies to, or null. */
 	replyTo: MessageReply | null;
@@ -393,9 +445,9 @@ export interface Message {
 	 * for older apps; `caption` is just the caption, or null. Null for messages without attachments.
 	 */
 	caption: string | null;
-	/** A place shared in the chat (a one-off pin). `body` is then a fallback for older apps; null once deleted. */
+	/** A place shared in the chat (kind 'text', a one-off pin). `body` is then a fallback for older apps; null otherwise and once deleted. */
 	location: MessageLocation | null;
-	/** Emoji reactions, one per person, grouped by emoji in the order each was first used (empty once deleted). */
+	/** Emoji reactions, one per person, grouped by emoji in the order each was first used (empty once deleted). Older apps: treat a missing field as []. */
 	reactions: MessageReaction[];
 }
 
@@ -411,9 +463,15 @@ export interface MessageReactions {
 	reactions: MessageReaction[];
 }
 
-/** A place shared in a chat message: where it is and, if it's a named place, what it's called. */
+/**
+ * A place shared in a chat message: where it is and, if it's a named place, what it's called. The
+ * message's `body` is a fallback for older apps ("📍 Name", the address, a Google Maps link, one per
+ * line). It can't be edited, only deleted.
+ */
 export interface MessageLocation {
+	/** WGS 84 degrees. */
 	lat: number;
+	/** WGS 84 degrees. */
 	lng: number;
 	/** A place's name ("Dishoom Shoreditch"), or null for "my location". */
 	name: string | null;
@@ -425,10 +483,16 @@ export interface MessageLocation {
 export const ATTACHMENT_KINDS = ['image', 'gif', 'file', 'pass', 'video'] as const;
 export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
 
-/** A photo, GIF or file in a chat message. URLs are signed and expire after about a week: refetch the message for fresh ones. */
+/**
+ * A photo, GIF or file in a chat message. URLs are signed and expire after about a week: refetch
+ * the message for fresh ones. Sent without a caption, the message's `body` is a summary for older
+ * apps ("📷 Photo", "GIF", "📷 3 photos", "📎 Plan.pdf", "📎 2 files", "🎟️ Concert ticket"…).
+ */
 export interface Attachment {
 	id: string;
+	/** gif = animated (show `url`); pass = an Apple Wallet pass; video plays (older apps show it as a file). More kinds may come: show an unknown kind as a file. */
 	kind: AttachmentKind;
+	/** File name, e.g. "Plan.pdf". */
 	name: string;
 	mime: string;
 	/** Bytes of the stored file. */
@@ -436,8 +500,9 @@ export interface Attachment {
 	/** Pixels, for images and GIFs (null for files). */
 	width: number | null;
 	height: number | null;
+	/** Signed link to the file; no auth header needed. */
 	url: string;
-	/** A smaller JPEG/PNG preview for photos, or a Wallet pass's logo; null for GIFs (show `url`, animated) and files. */
+	/** A smaller preview for photos (at most 720 px), or a Wallet pass's logo (PNG, at most 480×160); null for GIFs (show `url`, animated) and files. */
 	thumbnailUrl: string | null;
 	/** For `kind: 'pass'` (an Apple Wallet .pkpass / .pkpasses): what to show on its card. Null otherwise. */
 	pass: WalletPass | null;
@@ -467,10 +532,16 @@ export interface WalletPassField {
 	date: boolean;
 }
 
-/** Details read from a Wallet pass's pass.json (English text where it is localised). */
+/**
+ * Details read from a Wallet pass's pass.json (English text where it is localised): a .pkpass, or a
+ * .pkpasses bundle of up to 10 (details are the first one's). The file itself is kept exactly as
+ * sent, because it's signed.
+ */
 export interface WalletPass {
 	style: WalletPassStyle;
+	/** May be "". */
 	organizationName: string;
+	/** May be "". */
 	description: string;
 	logoText: string | null;
 	/** With serialNumber, identifies the pass (e.g. to tell whether it is already in Wallet). */
@@ -495,6 +566,7 @@ export interface WalletPass {
 /** A message's thread: the first message of its chain of replies, then every reply under it, oldest first. */
 export interface MessageThread {
 	rootId: string;
+	/** The root (found by following `replyTo` up) and every reply under it, oldest first, deleted ones included; at most 200 (the earliest). */
 	messages: Message[];
 	/** More replies than the server returns (the earliest are kept). */
 	truncated: boolean;
@@ -506,8 +578,9 @@ export interface MessageReply {
 	authorId: string | null;
 	authorName: string | null;
 	kind: MessageKind;
-	/** A short one-line snippet: the text, or a poll's question. Null once deleted. */
+	/** One line, at most 140 characters: the text, a poll's question, the attachment summary when there's no caption ("📷 Photo"), or "📍 Name" / "📍 Location" for a place. Null once deleted. */
 	text: string | null;
+	/** Deleted since: show "Deleted message". */
 	deleted: boolean;
 }
 
@@ -526,7 +599,9 @@ export interface MessageInfo {
 	messageId: string;
 	sentAt: string;
 	seen: { userId: string; at: string }[];
+	/** Delivered but not seen. */
 	delivered: { userId: string; at: string }[];
+	/** Not delivered yet. */
 	pending: string[];
 }
 
@@ -548,6 +623,14 @@ export const NOTIFICATION_KINDS = [
 	 */
 	'reminder'
 ] as const;
+/**
+ * What an Activity item (and its push) is about. `proposal.changed`: a confirmed plan changed
+ * (someone can't make it any more, or it was cancelled). `role.changed`: your role in a group changed
+ * (`data.role` is the new one). `reminder`: a confirmed plan is tomorrow or in an hour
+ * (`data.eventId`), or a proposal you haven't replied to is within a day (`data.proposalId`);
+ * `data.reminder` is 'day', 'hour', 'reply' or 'next' ("Same again?"). Show kinds you don't know
+ * with a generic icon, and open the group (or proposal) from `data`.
+ */
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export interface AppNotification {
@@ -558,6 +641,7 @@ export interface AppNotification {
 	kind: NotificationKind;
 	title: string;
 	body: string;
+	/** Ids to open it with, e.g. `{ proposalId }`. */
 	data: Record<string, string>;
 	readAt: string | null;
 	createdAt: string;
@@ -581,6 +665,7 @@ export type LiveEventType =
 export interface LiveEvent {
 	type: LiveEventType;
 	groupId: string | null;
+	/** The affected resource (Message, Poll, Proposal…): see docs/API.md, Live updates. */
 	payload: unknown;
 }
 
@@ -612,6 +697,7 @@ export interface UserSummary {
 }
 
 export interface UsernameCheck {
+	/** As normalised (lowercase, no "@"). */
 	username: string;
 	/** Why it can't be used as written, or null. */
 	problem: string | null;
@@ -663,7 +749,7 @@ export interface Plan {
 	canCreateGroup: boolean;
 	/** RevenueCat public SDK keys, null when billing isn't set up (hide purchase UI). */
 	purchase: { ios: string | null; android: string | null; web: string | null; entitlement: string };
-	/** The optional AI planner is set up on this server (it still needs Pro to use). */
+	/** The optional AI planner: `available` = set up on this server; `included` = usable on this plan (Pro). */
 	aiPlanner: { available: boolean; included: boolean };
 }
 
@@ -678,9 +764,12 @@ export interface RequirementTemplate {
 /** POST /groups/:id/planner (Pro): a suggested time, ideas and a plan. */
 export interface PlannerResult {
 	best: { slot: Slot; why: string };
+	/** Up to 3. */
 	alternatives: { slot: Slot; why: string }[];
 	ideas: { title: string; description: string }[];
 	checklist: string[];
+	/** Prefill for "Propose this". */
 	proposalTitle: string;
+	/** Prefill for "Propose this". */
 	proposalNote: string;
 }

@@ -33,7 +33,10 @@ export const MAX_INSTANT_RANGE_DAYS = 120;
 /** `{ [fromKey], [toKey] }` ISO instants with to > from and at most `maxDays` apart. */
 export function instantRangeSchema<F extends string, T extends string>(fromKey: F, toKey: T, maxDays = MAX_INSTANT_RANGE_DAYS) {
 	return z
-		.object({ [fromKey]: isoDateTime, [toKey]: isoDateTime } as Record<F | T, typeof isoDateTime>)
+		.object({
+			[fromKey]: isoDateTime.describe(`ISO instant; at most ${maxDays} days before the end`),
+			[toKey]: isoDateTime.describe('ISO instant; after the start')
+		} as Record<F | T, typeof isoDateTime>)
 		.transform((r) => {
 			const raw = r as Record<string, string>;
 			return { from: Date.parse(raw[fromKey]), to: Date.parse(raw[toKey]) };
@@ -94,8 +97,11 @@ export const requirementSchema = z.object({
 			startTime: timeString,
 			endDay: weekday,
 			endTime: timeString,
-			/** Extra weeks between the start and end day: 0 = same week, 1 = the following week, up to 4. */
-			weeksLater: z.int().min(0).max(MAX_WEEKS_LATER)
+			weeksLater: z
+				.int()
+				.min(0)
+				.max(MAX_WEEKS_LATER)
+				.describe('Extra weeks between the start and end day: 0 = same week, 1 = "Tue → following Thu", up to 4')
 		})
 	]),
 	window: timeWindowSchema.nullable(),
@@ -144,12 +150,16 @@ export const notificationSettingsSchema = z
 	.object({
 		off: z.array(z.enum(NOTIFICATION_CATEGORIES)).max(NOTIFICATION_CATEGORIES.length),
 		quietHours: z
-			.object({ from: clock, to: clock, catchUp: z.boolean().optional() })
+			.object({
+				from: clock.describe('Local time (User.timezone); may wrap midnight'),
+				to: clock,
+				catchUp: z.boolean().optional().describe('One push when quiet hours end, counting what came in. Left out keeps it as it was')
+			})
 			.refine((q) => q.from !== q.to, 'Pick different start and end times')
 			.nullable()
 	})
 	.partial();
-export const muteGroupSchema = z.object({ until: z.iso.datetime({ offset: true }).nullable() });
+export const muteGroupSchema = z.object({ until: z.iso.datetime({ offset: true }).nullable().describe('ISO instant; null = until unmuted') });
 
 export const createGroupSchema = z.object({
 	name: trimmed(80),
@@ -162,12 +172,13 @@ export const createGroupSchema = z.object({
  * `autoArchive` archives it by itself once its latest event has passed.
  */
 export const updateGroupSchema = createGroupSchema.partial().extend({
-	archived: z.boolean().optional(),
-	autoArchive: z.boolean().optional(),
+	archived: z.boolean().optional().describe('true archives it for everyone, false unarchives'),
+	autoArchive: z.boolean().optional().describe('Archive it by itself once its latest event has passed and nothing else is planned'),
 	rhythm: z
 		.object({ every: z.enum(RHYTHMS), prompt: z.boolean().default(true) })
 		.nullable()
 		.optional()
+		.describe('How often it meets (null for none); with `prompt`, "Same again?" after each plan')
 });
 
 export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
@@ -180,6 +191,7 @@ export const memberNameSchema = z.object({
 		.max(80)
 		.nullable()
 		.transform((v) => v || null)
+		.describe('Trimmed, at most 80; null or blank goes back to the account name')
 });
 
 /**
@@ -188,10 +200,13 @@ export const memberNameSchema = z.object({
  */
 export const memberUpdateSchema = z
 	.object({ role: memberRoleSchema.shape.role.optional(), displayName: memberNameSchema.shape.displayName.optional() })
-	.refine((v) => v.role !== undefined || v.displayName !== undefined, 'Send a role or a displayName');
+	.refine((v) => v.role !== undefined || v.displayName !== undefined, 'Send a role or a displayName')
+	.describe("At least one. `role`: admins only. `displayName`: yours, or as an admin anyone's");
 
 /** Leaving: the owner names the admin who becomes owner. */
-export const leaveGroupSchema = z.object({ newOwnerId: z.string().min(1).nullish() });
+export const leaveGroupSchema = z.object({
+	newOwnerId: z.string().min(1).nullish().describe('The owner only: an admin of the group who becomes the owner')
+});
 
 /**
  * Nothing: a link anyone can use. `emails` (or one `email`) and `usernames`: one invite each,
@@ -202,22 +217,37 @@ export const inviteSchema = z
 		email: z.email().optional(),
 		emails: z.array(z.email()).max(20, 'Invite up to 20 people at a time').optional(),
 		usernames: z.array(username).max(20, 'Invite up to 20 people at a time').optional(),
-		// People who already share a group with you (e.g. a new group with the same people).
-		userIds: z.array(z.string().min(1).max(64)).max(20, 'Invite up to 20 people at a time').optional(),
-		// For a link: how many people can join with it (null: no limit). Left out: one, as before.
-		maxUses: z.number().int().min(1).max(1000).nullable().optional()
+		userIds: z
+			.array(z.string().min(1).max(64))
+			.max(20, 'Invite up to 20 people at a time')
+			.optional()
+			.describe('People who already share a group with you (e.g. a new group with the same people)'),
+		maxUses: z
+			.number()
+			.int()
+			.min(1)
+			.max(1000)
+			.nullable()
+			.optional()
+			.describe('For a link: how many people can join with it (null: no limit). Left out: one')
 	})
 	.refine((i) => (i.emails?.length ?? 0) + (i.usernames?.length ?? 0) + (i.userIds?.length ?? 0) <= 20, {
 		message: 'Invite up to 20 people at a time'
-	});
+	})
+	.describe(
+		'Nothing: a link anyone can use for 14 days. Emails / usernames / userIds: one invite each that only that person can use; at most 20 people in all'
+	);
 
 const blockShape = {
-	start: isoDateTime,
+	start: isoDateTime.describe('The first occurrence'),
 	end: isoDateTime,
 	allDay: z.boolean().default(false),
 	repeat: z.enum(REPEATS).default('none'),
-	until: dateString.nullish().transform((v) => v ?? null),
-	note: optionalText(120)
+	until: dateString
+		.nullish()
+		.transform((v) => v ?? null)
+		.describe('YYYY-MM-DD, the last date a repeat can occur'),
+	note: optionalText(120).describe('Private to you')
 };
 /** Compares instants, not strings: offsets and fractional seconds make string order differ from time order. */
 const endsAfterStart = (b: { start?: string; end?: string }) => !b.start || !b.end || Date.parse(b.start) < Date.parse(b.end);
@@ -227,18 +257,20 @@ export const updateBlockSchema = z.object(blockShape).partial().refine(endsAfter
 
 export const caldavSchema = z.object({
 	username: trimmed(255),
-	appPassword: trimmed(255),
-	serverUrl: z.url({ protocol: /^https$/, error: 'Calendar servers must use https' }).optional()
+	appPassword: trimmed(255).describe('An app-specific password'),
+	serverUrl: z
+		.url({ protocol: /^https$/, error: 'Calendar servers must use https' })
+		.optional()
+		.describe('Defaults to iCloud')
 });
 
 export const deviceSyncSchema = z.object({
-	deviceId: trimmed(64),
-	deviceName: trimmed(80),
-	rangeStart: isoDateTime,
+	deviceId: trimmed(64).describe('Stable per install'),
+	deviceName: trimmed(80).describe('"Sam\'s iPhone"'),
+	rangeStart: isoDateTime.describe('The window the busy list covers: it replaces what was there (busy outside it is ignored)'),
 	rangeEnd: isoDateTime,
-	// Uploads split into ranges: the end of the whole sync, and whether more ranges follow.
-	coveredUntil: isoDateTime.optional(),
-	more: z.boolean().optional(),
+	coveredUntil: isoDateTime.optional().describe('A sync sent as several ranges: the end of the whole sync (defaults to rangeEnd)'),
+	more: z.boolean().optional().describe('More ranges of this sync follow: groups are refreshed once, after the last'),
 	calendars: z
 		.array(
 			z.object({
@@ -257,8 +289,8 @@ export const deviceSyncSchema = z.object({
 				calendarExternalId: trimmed(255),
 				start: isoDateTime,
 				end: isoDateTime,
-				eventKey: z.string().max(64).optional(),
-				title: z.string().max(500).nullable().optional()
+				eventKey: z.string().max(64).optional().describe("The app's hash of the event's series id, so a series can be marked not busy"),
+				title: z.string().max(500).nullable().optional().describe("The event's name: stored encrypted, only ever shown to you")
 			})
 		)
 		.max(20000)
@@ -270,10 +302,10 @@ const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM');
 
 /** A member's preferred time for a group: specific dates, or repeating weekdays (optionally within a window). */
 export const preferenceSchema = z.discriminatedUnion('kind', [
-	z.object({ kind: z.literal('dates'), from: z.iso.date(), to: z.iso.date() }),
+	z.object({ kind: z.literal('dates'), from: z.iso.date().describe('Inclusive'), to: z.iso.date().describe('Inclusive') }),
 	z.object({
 		kind: z.literal('weekly'),
-		days: z.array(z.number().int().min(0).max(6)).max(7).default([]),
+		days: z.array(z.number().int().min(0).max(6)).max(7).default([]).describe('Weekdays, 0 = Monday; empty = any'),
 		window: z.object({ from: hhmm, to: hhmm }).nullable().default(null)
 	})
 ]);
@@ -284,7 +316,7 @@ export const busyIgnoreSchema = z.object({
 	eventKey: z.string().max(64),
 	start: isoDateTime,
 	end: isoDateTime,
-	series: z.boolean().default(false)
+	series: z.boolean().default(false).describe('Every occurrence, not just this one')
 });
 
 const eventShape = {
@@ -306,14 +338,20 @@ export const overrideSchema = z.object({ userId: z.string().min(1), response: z.
 export const createEventSchema = z.object(eventShape).refine(endsAfterStart, { message: 'Ends before it starts' });
 export const updateEventSchema = z.object(eventShape).partial().refine(endsAfterStart, { message: 'Ends before it starts' });
 
+const replyToId = z.string().min(1).max(36).nullish().describe('A message in the same chat, not a group update (400) and not deleted (409)');
+
 export const createMessageSchema = z.union([
 	// Photos / files uploaded first (POST /groups/:id/attachments), with an optional caption.
 	z.object({
 		body: optionalText(4000),
-		attachmentIds: z.array(z.string().min(1).max(36)).min(1).max(10),
-		replyToId: z.string().min(1).max(36).nullish()
+		attachmentIds: z
+			.array(z.string().min(1).max(36))
+			.min(1)
+			.max(10)
+			.describe('From POST /groups/:id/attachments: your own unsent uploads to this group. `body` is the caption'),
+		replyToId
 	}),
-	z.object({ body: trimmed(4000), replyToId: z.string().min(1).max(36).nullish() }),
+	z.object({ body: trimmed(4000), replyToId }),
 	// A place: the sender's current location or one they searched for.
 	z.object({
 		location: z.object({
@@ -328,8 +366,9 @@ export const createMessageSchema = z.union([
 				.max(100_000)
 				.nullish()
 				.transform((v) => v ?? null)
+				.describe("Metres, for a device's position")
 		}),
-		replyToId: z.string().min(1).max(36).nullish()
+		replyToId
 	}),
 	z.object({
 		poll: z.union([
@@ -349,7 +388,8 @@ export const createMessageSchema = z.union([
 					)
 					.min(2)
 					.max(5)
-					.refine((list) => new Set(list.map((s) => s.start + s.end)).size === list.length, 'Pick different times'),
+					.refine((list) => new Set(list.map((s) => s.start + s.end)).size === list.length, 'Pick different times')
+					.describe('A date poll: 2–5 different times'),
 				multi: z.boolean().default(true)
 			})
 		])
@@ -357,7 +397,9 @@ export const createMessageSchema = z.union([
 ]);
 
 // Empty only for a message with attachments (removes its caption).
-export const editMessageSchema = z.object({ body: z.string().trim().max(4000) });
+export const editMessageSchema = z.object({
+	body: z.string().trim().max(4000).describe('With attachments this is the caption, and "" removes it')
+});
 
 /** A single emoji (one grapheme: flags, skin tones and joined sequences included). */
 export const isSingleEmoji = (text: string) => {
@@ -366,8 +408,11 @@ export const isSingleEmoji = (text: string) => {
 };
 export const reactionSchema = z.object({ emoji: z.string().trim().min(1).max(64).refine(isSingleEmoji, 'React with one emoji') });
 
-export const receiptsSchema = z.object({ upTo: z.string().min(1), state: z.enum(['delivered', 'seen']) });
-export const voteSchema = z.object({ optionIds: z.array(z.string().min(1)).max(10) });
+export const receiptsSchema = z.object({
+	upTo: z.string().min(1).describe('A message id: it and everything before it'),
+	state: z.enum(['delivered', 'seen'])
+});
+export const voteSchema = z.object({ optionIds: z.array(z.string().min(1)).max(10).describe('Empty removes your vote') });
 /**
  * PATCH /polls/:id (its author): the question, pick-one or pick-any, and for a text poll its options
  * in order. An option with an `id` keeps its votes (renamed if its label changed); one without is
@@ -376,17 +421,20 @@ export const voteSchema = z.object({ optionIds: z.array(z.string().min(1)).max(1
 export const updatePollSchema = z
 	.object({
 		question: trimmed(200),
-		multi: z.boolean(),
+		multi: z.boolean().describe("Switching to pick-one keeps each person's first pick"),
 		options: z
 			.array(z.object({ id: z.string().min(1).max(36).optional(), label: trimmed(100) }))
 			.min(2)
 			.max(10)
+			.describe('Text polls only, in order: an `id` keeps that option and its votes, no `id` adds one, one left out goes with its votes')
 	})
 	.partial();
-export const readNotificationsSchema = z.object({ ids: z.array(z.string()).max(500).optional() });
+export const readNotificationsSchema = z.object({
+	ids: z.array(z.string()).max(500).optional().describe('Left out: everything except chats (read by reading the chat)')
+});
 export const deviceSchema = z.object({
 	platform: z.enum(['ios', 'android']),
-	token: trimmed(512),
+	token: trimmed(512).describe('The APNs / FCM token'),
 	name: optionalText(80)
 });
 
@@ -400,10 +448,9 @@ export const linkProviderSchema = z.enum(['apple', 'google']);
 /** POST /me/accounts/link (native apps: an id token from Sign in with Apple / Google). */
 export const linkAccountSchema = z.object({
 	provider: linkProviderSchema,
-	idToken: z.string().min(10).max(8192),
-	nonce: z.string().max(512).optional(),
-	/** The sign-in has its own account and the person confirmed merging it into this one. */
-	merge: z.boolean().optional()
+	idToken: z.string().min(10).max(8192).describe('From Sign in with Apple / Google'),
+	nonce: z.string().max(512).optional().describe('Apple: the raw nonce'),
+	merge: z.boolean().optional().describe('The sign-in has its own account and the person confirmed merging it into this one')
 });
 
 /** POST /me/accounts/merge-intent (web) */
@@ -420,7 +467,9 @@ export const nativeExchangeSchema = z.object({
 });
 
 /** POST /calendars/oauth/:provider/url */
-export const oauthUrlSchema = z.object({ redirect: z.string().max(200).optional() });
+export const oauthUrlSchema = z.object({
+	redirect: z.string().max(200).optional().describe('Where to land afterwards: a web path, or availabliss://calendars for the apps')
+});
 /** POST /calendars/oauth/:provider/complete */
 export const oauthCompleteSchema = z.object({ code: z.string().min(1).max(100) });
 
@@ -435,25 +484,37 @@ export const eventsQuerySchema = z.object({ from: isoDateTime.optional(), to: is
 export const proposalsQuerySchema = z.object({ status: z.enum(['open', 'confirmed', 'cancelled']).optional() });
 /** GET /groups/:id/messages?before&limit */
 export const messagesQuerySchema = z.object({
-	before: z.string().min(1).optional(),
+	before: z.string().min(1).optional().describe('A message id: the messages before it'),
 	limit: z.coerce.number().int().min(1).max(100).default(50)
 });
 /** GET /groups/:id/messages/search?q */
 export const messageSearchQuerySchema = z.object({
-	q: z.string().trim().min(2, 'Search for at least 2 characters').max(100),
+	q: z
+		.string()
+		.trim()
+		.min(2, 'Search for at least 2 characters')
+		.max(100)
+		.describe(
+			"Any case. Matches text, captions, poll questions and options, file names, and places' names and addresses (not deleted messages or group updates)"
+		),
 	limit: z.coerce.number().int().min(1).max(100).default(50)
 });
 /** GET /groups/:id/attachments?kind&before&limit */
 export const groupMediaQuerySchema = z.object({
-	kind: z.enum(['media', 'files', 'passes']).default('media'),
-	before: z.string().min(1).optional(),
+	kind: z
+		.enum(['media', 'files', 'passes'])
+		.default('media')
+		.describe('media = photos, GIFs and videos; files = other files; passes = Wallet passes'),
+	before: z.string().min(1).optional().describe("The last item's attachment id, for the next page (404 if it isn't in this group)"),
 	limit: z.coerce.number().int().min(1).max(100).default(60)
 });
 /** GET /groups/:id/availability/day?date */
 export const dayQuerySchema = z.object({ date: dateString });
 
 /** POST /groups/:id/planner */
-export const plannerSchema = z.object({ notes: z.string().trim().max(500).nullish() });
+export const plannerSchema = z.object({
+	notes: z.string().trim().max(500).nullish().describe('Anything the AI should know (it never sees names or calendars)')
+});
 /** POST /groups/:id/planner/draft */
 export const plannerDraftSchema = z
 	.object({ start: z.iso.datetime({ offset: true }), end: z.iso.datetime({ offset: true }), notes: z.string().trim().max(500).nullish() })
@@ -473,7 +534,7 @@ export const holidaysQuerySchema = z
 		country: z.string().length(2).toUpperCase(),
 		subdivision: z.string().max(10).optional(),
 		from: dateString,
-		to: dateString
+		to: dateString.describe(`At most ${MAX_HOLIDAY_DAYS} days after from`)
 	})
 	.refine((q) => q.from <= q.to, { message: 'Range ends before it starts' })
 	.refine((q) => daysBetween(q.from, q.to) <= MAX_HOLIDAY_DAYS, { message: `Ask for at most ${MAX_HOLIDAY_DAYS} days at a time` });

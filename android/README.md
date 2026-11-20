@@ -179,7 +179,7 @@ dev.joeherbert.availabliss
 ├── AvailablissApp / MainActivity      Hilt app, WorkManager config, deep-link intake, theme
 ├── navigation/                        Type-safe routes, RootViewModel (signed out / onboarding / main), NavHost + floating tab bar
 ├── core/
-│   ├── network/   AvailablissApi (every /api/v1 endpoint), BetterAuthApi, models mirroring API.md,
+│   ├── network/   AvailablissApi (every /api/v1 endpoint), BetterAuthApi, models mirroring docs/openapi.json (`make models-check`),
 │   │              ApiError (sealed) + ApiResult, AuthInterceptor (Bearer), PasskeyCookieJar, JsonPatch
 │   ├── auth/      TokenStore (EncryptedSharedPreferences), AuthRepository (OTP, Google, passkey, Apple),
 │   │              CredentialAuthenticator (Credential Manager), SessionManager (post-sign-in + sign-out cleanup)

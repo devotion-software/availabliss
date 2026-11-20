@@ -103,7 +103,7 @@ Availabliss/
     Billing/      RevenueCat wrapper for Pro purchases
     Calendar/     EventKit: permission, busy calendars, device sync upload, add-to-calendar, background refresh
     Utilities/    date/text formatting
-  Models/         Codable types mirroring docs/API.md (CalendarDay / WallTime for YYYY-MM-DD / HH:MM)
+  Models/         Codable types mirroring docs/openapi.json (`make models-check`) (CalendarDay / WallTime for YYYY-MM-DD / HH:MM)
   DesignSystem/   Theme tokens (colour scheme × colour theme), Glass, Orbs, buttons, SegmentedControl, Chip,
                   switch style, Avatar(Stack), GroupTile, StatusPill, rings, TabBar, BottomSheet, Stripes
   Features/       one folder per screen: View + ViewModel

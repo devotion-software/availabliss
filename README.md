@@ -65,7 +65,7 @@ and every pull request, and only builds the platforms a change touches:
 
 - **One API for every client.** The SvelteKit app serves the web UI and
   `/api/v1` ([guide](docs/API.md); [OpenAPI 3.1](docs/openapi.json), generated from
-  `web/src/lib/api-contract.ts`). The web uses a session cookie; the native
+  `web/src/lib/api-contract.ts`, browsable at http://localhost:5190/dev/api-docs while `make dev` runs). The web uses a session cookie; the native
   apps send `Authorization: Bearer <token>` (Better Auth `bearer` plugin).
 - **Privacy.** Only busy *time ranges* are stored: Google, Microsoft and CalDAV
   read start/end, transparency and the user's own response only (never titles;

@@ -659,7 +659,7 @@
 					"Chat"
 				],
 				"summary": "An attachment's file (signed link, or a signed-in member)",
-				"description": "No session needed.",
+				"description": "Signed links work 7–8 days and are unchanged within a day (cacheable); refetch the message for fresh ones. Photos, GIFs and passes are served inline (a pass as application/vnd.apple.pkpass); files as a download. Range requests supported. Not rate limited.\n\nNo session needed.",
 				"security": [],
 				"parameters": [
 					{
@@ -723,16 +723,6 @@
 					},
 					"404": {
 						"description": "No valid signature and not a member",
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ApiErrorBody"
-								}
-							}
-						}
-					},
-					"429": {
-						"description": "rate_limited (see Retry-After)",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -805,16 +795,6 @@
 					},
 					"404": {
 						"description": "No valid signature and not a member",
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ApiErrorBody"
-								}
-							}
-						}
-					},
-					"429": {
-						"description": "rate_limited (see Retry-After)",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -1043,16 +1023,6 @@
 								}
 							}
 						}
-					},
-					"429": {
-						"description": "rate_limited (see Retry-After)",
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ApiErrorBody"
-								}
-							}
-						}
 					}
 				}
 			}
@@ -1138,7 +1108,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "That time has already passed (a one-off ending before yesterday, or a repeat whose `until` is before yesterday)",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -1470,7 +1440,7 @@
 					"Calendars"
 				],
 				"summary": "Sync now",
-				"description": "Signed in.\n\nRate limit: 6 / minute.",
+				"description": "Pulls a Google / Outlook / iCloud connection now. A failed sync shows as `status: 'error' | 'reauth_required'`, not an HTTP error. At most once per connection per 30 s (a call in between returns it unchanged). Phone calendars aren't pulled: the app uploads with PUT /calendars/device.\n\nSigned in.\n\nRate limit: 6 / minute.",
 				"x-rate-limit": "6 / minute",
 				"parameters": [
 					{
@@ -1586,7 +1556,7 @@
 					"Calendars"
 				],
 				"summary": "Upload busy time from the phone's calendars",
-				"description": "Signed in.\n\nRate limit: 30 / minute.",
+				"description": "Busy outside [rangeStart, rangeEnd] is ignored; only differences are written.\n\nSigned in.\n\nRate limit: 30 / minute.",
 				"x-rate-limit": "30 / minute",
 				"requestBody": {
 					"required": true,
@@ -1649,7 +1619,7 @@
 					"Calendars"
 				],
 				"summary": "OAuth callback (called by the provider)",
-				"description": "Web: links the calendar, then redirects with `?connected=` or `?error=`. Native: redirects to `availabliss://…?complete=<code>&provider=`.\n\nNo session needed.",
+				"description": "Web: links the calendar, then redirects with `?connected=` or `?error=`, only if the session belongs to whoever started the flow (else `?error=wrong_account`). Native: redirects to `availabliss://…?complete=<code>&provider=`. Each state works once.\n\nNo session needed.",
 				"security": [],
 				"parameters": [
 					{
@@ -1760,7 +1730,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "The code was already used or is older than 10 minutes",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -1833,7 +1803,7 @@
 						"name": "redirect",
 						"in": "query",
 						"required": false,
-						"description": "Where to land afterwards (a web path)",
+						"description": "Where to land afterwards: a web path, or availabliss://calendars for the apps",
 						"schema": {
 							"type": "string"
 						}
@@ -1900,7 +1870,7 @@
 					"Calendars"
 				],
 				"summary": "Native: the consent URL to open in a browser sheet",
-				"description": "Signed in.\n\nRate limit: 10 / 10 minutes.",
+				"description": "Native apps use this and open `url` in ASWebAuthenticationSession / Custom Tabs, which can't send the bearer token.\n\nSigned in.\n\nRate limit: 10 / 10 minutes.",
 				"x-rate-limit": "10 / 10 minutes",
 				"parameters": [
 					{
@@ -2001,16 +1971,6 @@
 								"schema": {}
 							}
 						}
-					},
-					"429": {
-						"description": "rate_limited (see Retry-After)",
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ApiErrorBody"
-								}
-							}
-						}
 					}
 				}
 			}
@@ -2046,21 +2006,21 @@
 					}
 				},
 				"responses": {
+					"200": {
+						"description": "With `?validationToken`: The validation token, echoed",
+						"content": {
+							"text/plain": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
 					"202": {
 						"description": "Accepted"
 					},
 					"400": {
 						"description": "validation_error: the body or query is invalid",
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ApiErrorBody"
-								}
-							}
-						}
-					},
-					"429": {
-						"description": "rate_limited (see Retry-After)",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -2079,7 +2039,7 @@
 					"Chat"
 				],
 				"summary": "Your group chats, latest message first",
-				"description": "Signed in.",
+				"description": "Archived groups only appear while something in them is unread; chats with no messages come last (newest group first).\n\nSigned in.",
 				"responses": {
 					"200": {
 						"description": "OK",
@@ -2450,7 +2410,7 @@
 					"Events"
 				],
 				"summary": "An event as an .ics file",
-				"description": "Signed in.",
+				"description": "For the web's \"Add to calendar\"; the apps write to the phone's calendar directly.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -2502,7 +2462,7 @@
 					"Events"
 				],
 				"summary": "Set an event's cover photo (creator or admin)",
-				"description": "Signed in.",
+				"description": "Shrunk to fit 1600 px; publishes `event.changed`.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -2819,7 +2779,7 @@
 					"Groups"
 				],
 				"summary": "Change a group (name, colour, timing, archived, rhythm …)",
-				"description": "Signed in as a group admin or the owner.",
+				"description": "Publishes `group.updated`.\n\nSigned in as a group admin or the owner.",
 				"x-group-role": "admin",
 				"parameters": [
 					{
@@ -2970,6 +2930,7 @@
 						"name": "kind",
 						"in": "query",
 						"required": false,
+						"description": "media = photos, GIFs and videos; files = other files; passes = Wallet passes",
 						"schema": {
 							"default": "media",
 							"type": "string",
@@ -2984,6 +2945,7 @@
 						"name": "before",
 						"in": "query",
 						"required": false,
+						"description": "The last item's attachment id, for the next page (404 if it isn't in this group)",
 						"schema": {
 							"type": "string",
 							"minLength": 1
@@ -3050,7 +3012,7 @@
 					"Chat"
 				],
 				"summary": "Upload a photo, GIF or file to send in a message",
-				"description": "Signed in.\n\nRate limit: 60 / 10 minutes.",
+				"description": "Send its id in `attachmentIds` within a day, or it's deleted. Photos (JPEG, PNG, WebP, GIF, HEIC; up to 15 MB) are turned upright, stripped of metadata and shrunk to at most 2560 px (JPEG, or PNG if transparent); animated GIFs are kept as sent. Files: up to 25 MB, from an allow-list of extensions (docs/API.md, Chat). Wallet passes come back as kind 'pass'. Videos (mp4, m4v, mov): 3 minutes and 100 MB, or with Pro 10 minutes and 300 MB, kept as sent; `poster` becomes `thumbnailUrl`.\n\nSigned in.\n\nRate limit: 60 / 10 minutes.",
 				"x-rate-limit": "60 / 10 minutes",
 				"parameters": [
 					{
@@ -3072,6 +3034,11 @@
 									"file": {
 										"type": "string",
 										"contentMediaType": "application/octet-stream"
+									},
+									"poster": {
+										"type": "string",
+										"contentMediaType": "image/*",
+										"description": "A video's poster frame (becomes thumbnailUrl)"
 									}
 								},
 								"required": [
@@ -3093,7 +3060,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "Not an allowed type, too big, or unreadable",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -3299,6 +3266,7 @@
 						"name": "start",
 						"in": "query",
 						"required": true,
+						"description": "ISO instant; at most 120 days before the end",
 						"schema": {
 							"type": "string",
 							"format": "date-time",
@@ -3309,6 +3277,7 @@
 						"name": "end",
 						"in": "query",
 						"required": true,
+						"description": "ISO instant; after the start",
 						"schema": {
 							"type": "string",
 							"format": "date-time",
@@ -3541,7 +3510,7 @@
 					"Groups"
 				],
 				"summary": "Set the group's photo",
-				"description": "Signed in as a group admin or the owner.",
+				"description": "Shrunk to fit 512 px; publishes `group.updated`.\n\nSigned in as a group admin or the owner.",
 				"x-group-role": "admin",
 				"parameters": [
 					{
@@ -3623,7 +3592,7 @@
 					"Groups"
 				],
 				"summary": "Remove the group's photo",
-				"description": "Signed in as a group admin or the owner.",
+				"description": "No photo: the monogram tile. Publishes `group.updated`.\n\nSigned in as a group admin or the owner.",
 				"x-group-role": "admin",
 				"parameters": [
 					{
@@ -3686,7 +3655,7 @@
 					"Invites"
 				],
 				"summary": "Live invites, newest first",
-				"description": "Signed in as a group admin or the owner.",
+				"description": "Unexpired and not used up.\n\nSigned in as a group admin or the owner.",
 				"x-group-role": "admin",
 				"parameters": [
 					{
@@ -3758,7 +3727,7 @@
 					"Invites"
 				],
 				"summary": "Invite by link, email, username or user id",
-				"description": "Signed in as a group admin or the owner.\n\nRate limit: 30 / hour.",
+				"description": "At most 20 people in all. `token`, `url` and `expiresAt` are the first invite's. Links last 14 days. See docs/API.md, Invites.\n\nSigned in as a group admin or the owner.\n\nRate limit: 30 / hour.",
 				"x-group-role": "admin",
 				"x-rate-limit": "30 / hour",
 				"parameters": [
@@ -3952,7 +3921,7 @@
 						"description": "No content"
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "The owner without `newOwnerId`, or one who isn't another admin (issue path `newOwnerId`)",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -4001,7 +3970,7 @@
 					"Members"
 				],
 				"summary": "Change a member's role (admins) or name in the group (yourself, or an admin for anyone)",
-				"description": "Signed in.",
+				"description": "A role change sends the member a `role.changed` notification. Publishes `member.changed`.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -4061,6 +4030,26 @@
 							}
 						}
 					},
+					"403": {
+						"description": "Changing a role as a non-admin or the owner's role, or someone else's name as a non-admin",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Not a member",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
 					"429": {
 						"description": "rate_limited (see Retry-After)",
 						"content": {
@@ -4079,7 +4068,7 @@
 					"Members"
 				],
 				"summary": "Remove a member (admin), or yourself (leave)",
-				"description": "An admin removes someone (never the owner); anyone can remove themselves.\n\nSigned in.",
+				"description": "An admin removes someone (never the owner); anyone can remove themselves. Yourself = leave, as POST /groups/{id}/leave with no new owner (so 400 / 409 as there). Publishes `member.changed` `{ userId, removed: true }`.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -4112,6 +4101,26 @@
 							}
 						}
 					},
+					"403": {
+						"description": "Removing the owner, or someone else as a non-admin",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Not a member",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
 					"429": {
 						"description": "rate_limited (see Retry-After)",
 						"content": {
@@ -4132,7 +4141,7 @@
 					"Members"
 				],
 				"summary": "The name you go by in this group",
-				"description": "Signed in.",
+				"description": "Publishes `member.changed`.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -4218,6 +4227,7 @@
 						"name": "before",
 						"in": "query",
 						"required": false,
+						"description": "A message id: the messages before it",
 						"schema": {
 							"type": "string",
 							"minLength": 1
@@ -4318,7 +4328,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "`replyToId` isn't in this chat or is a group update, or `attachmentIds` aren't your own unsent uploads to this group",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -4446,6 +4456,7 @@
 						"name": "q",
 						"in": "query",
 						"required": true,
+						"description": "Any case. Matches text, captions, poll questions and options, file names, and places' names and addresses (not deleted messages or group updates)",
 						"schema": {
 							"type": "string",
 							"minLength": 2,
@@ -4704,7 +4715,7 @@
 					"Groups"
 				],
 				"summary": "Nudge members who haven't synced (once per 12 hours)",
-				"description": "Signed in as a group admin or the owner.",
+				"description": "Pushes or emails the members who haven't synced.\n\nSigned in as a group admin or the owner.",
 				"x-group-role": "admin",
 				"parameters": [
 					{
@@ -4756,7 +4767,7 @@
 						}
 					},
 					"429": {
-						"description": "rate_limited (see Retry-After)",
+						"description": "Nudged in the last 12 hours",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -5055,7 +5066,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "You already have 20 in this group",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -5094,7 +5105,7 @@
 					"Preferences"
 				],
 				"summary": "Change one of your preferred times",
-				"description": "Signed in.",
+				"description": "The kind can change too.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -5154,6 +5165,16 @@
 							}
 						}
 					},
+					"404": {
+						"description": "Not one of yours",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
 					"429": {
 						"description": "rate_limited (see Retry-After)",
 						"content": {
@@ -5197,6 +5218,16 @@
 					},
 					"401": {
 						"description": "unauthorized: not signed in",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Not one of yours",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -5309,7 +5340,7 @@
 					"Proposals"
 				],
 				"summary": "Propose a time (posts a chat card)",
-				"description": "Signed in.",
+				"description": "The creator accepts automatically.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -5459,6 +5490,7 @@
 						"name": "to",
 						"in": "query",
 						"required": true,
+						"description": "At most 400 days after from",
 						"schema": {
 							"type": "string",
 							"pattern": "^\\d{4}-\\d{2}-\\d{2}$"
@@ -5571,7 +5603,7 @@
 					"Invites"
 				],
 				"summary": "Join with an invite",
-				"description": "Signed in.\n\nRate limit: 30 / 10 minutes per IP.",
+				"description": "Joining also removes your other invites to that group. `joined` is false when you were already a member.\n\nSigned in.\n\nRate limit: 30 / 10 minutes per IP.",
 				"x-rate-limit": "30 / 10 minutes per IP",
 				"parameters": [
 					{
@@ -5644,7 +5676,7 @@
 					"Invites"
 				],
 				"summary": "Decline an invite sent to you",
-				"description": "Signed in.",
+				"description": "Removes it and its Activity item; nobody is told.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "token",
@@ -5782,7 +5814,7 @@
 					"Me"
 				],
 				"summary": "Update your account",
-				"description": "Signed in.",
+				"description": "Changing `busyBufferMinutes` publishes `availability.changed` to your groups.\n\nSigned in.",
 				"requestBody": {
 					"required": true,
 					"content": {
@@ -5929,7 +5961,7 @@
 					"Me"
 				],
 				"summary": "Link Apple / Google with a native id token",
-				"description": "Signed in.",
+				"description": "Native only (web: docs/API.md, Linking). With `merge: true` the other account's groups, busy time, calendars, chats, templates and Pro move here, and it is deleted.\n\nSigned in.",
 				"requestBody": {
 					"required": true,
 					"content": {
@@ -5952,7 +5984,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "The id token can't be verified (e.g. it expired while the merge prompt was open), or this provider isn't set up. Never 401, so it can't be mistaken for the session ending",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -5976,7 +6008,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ApiErrorBody"
+									"$ref": "#/components/schemas/AccountConflict"
 								}
 							}
 						}
@@ -6001,7 +6033,7 @@
 					"Me"
 				],
 				"summary": "Web: remember a merge before signing in with the provider (sets a cookie)",
-				"description": "Signed in.",
+				"description": "Web only: sets a short-lived cookie, then sign in with the provider with `callbackURL: \"/link/complete\"` (docs/API.md, Linking).\n\nSigned in.",
 				"requestBody": {
 					"required": true,
 					"content": {
@@ -6056,7 +6088,7 @@
 					"Me"
 				],
 				"summary": "Set your profile picture",
-				"description": "Signed in.",
+				"description": "Shrunk to fit 512 px.\n\nSigned in.",
 				"requestBody": {
 					"required": true,
 					"content": {
@@ -6117,7 +6149,7 @@
 					"Me"
 				],
 				"summary": "Remove your profile picture",
-				"description": "Signed in.",
+				"description": "No picture: show initials.\n\nSigned in.",
 				"responses": {
 					"200": {
 						"description": "OK",
@@ -6159,12 +6191,13 @@
 					"Me"
 				],
 				"summary": "Your own merged busy time",
-				"description": "Signed in.",
+				"description": "A calendar event's `label` and `title` only ever go to their owner. `busyBufferMinutes` isn't added.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "from",
 						"in": "query",
 						"required": true,
+						"description": "ISO instant; at most 120 days before the end",
 						"schema": {
 							"type": "string",
 							"format": "date-time",
@@ -6175,6 +6208,7 @@
 						"name": "to",
 						"in": "query",
 						"required": true,
+						"description": "ISO instant; after the start",
 						"schema": {
 							"type": "string",
 							"format": "date-time",
@@ -6244,7 +6278,7 @@
 					"Me"
 				],
 				"summary": "Mark a calendar event (or its series) not busy",
-				"description": "Signed in.",
+				"description": "That event (or with `series`, every occurrence) stops counting as busy, for everyone; publishes `availability.changed`.\n\nSigned in.",
 				"requestBody": {
 					"required": true,
 					"content": {
@@ -6324,7 +6358,7 @@
 					"Me"
 				],
 				"summary": "Count it as busy again",
-				"description": "Signed in.",
+				"description": "Publishes `availability.changed`.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -6493,7 +6527,7 @@
 					"Notifications"
 				],
 				"summary": "Update your notification settings",
-				"description": "Signed in.",
+				"description": "Leaving out `quietHours.catchUp` keeps it as it was.\n\nSigned in.",
 				"requestBody": {
 					"required": true,
 					"content": {
@@ -6797,7 +6831,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "You already have 50 saved timings",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -7037,7 +7071,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "Not a text message, or a shared place",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -7048,6 +7082,26 @@
 					},
 					"401": {
 						"description": "unauthorized: not signed in",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Not your message",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "Deleted",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -7074,7 +7128,7 @@
 					"Chat"
 				],
 				"summary": "Delete your own text message",
-				"description": "Signed in.",
+				"description": "It stays in the chat as deleted; its attachments are deleted for good.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -7089,8 +7143,38 @@
 					"204": {
 						"description": "No content"
 					},
+					"400": {
+						"description": "Not a text message",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
 					"401": {
 						"description": "unauthorized: not signed in",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Not your message",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiErrorBody"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "Already deleted",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -7204,7 +7288,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "A group update",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -7251,7 +7335,7 @@
 					"Chat"
 				],
 				"summary": "Take back your reaction to a message",
-				"description": "Signed in.",
+				"description": "No change if you hadn't reacted.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -7303,7 +7387,7 @@
 					"Chat"
 				],
 				"summary": "The thread a message is in",
-				"description": "Signed in.",
+				"description": "At most 200 messages (the earliest; `truncated` when there were more).\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -7452,7 +7536,7 @@
 					"Chat"
 				],
 				"summary": "Edit a poll (its author): question, pick-one / pick-any, a text poll's options",
-				"description": "Signed in.",
+				"description": "Publishes `poll.updated`.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -7485,7 +7569,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "A date poll's times can't be changed",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -7639,7 +7723,7 @@
 						}
 					},
 					"400": {
-						"description": "validation_error: the body or query is invalid",
+						"description": "More than one option in a pick-one poll, or an unknown option",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -7738,7 +7822,7 @@
 					"Proposals"
 				],
 				"summary": "Cancel a proposal or plan (creator or admin)",
-				"description": "Signed in.",
+				"description": "Marks it cancelled; a confirmed plan's event is deleted too.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -7875,7 +7959,7 @@
 					"Proposals"
 				],
 				"summary": "Keep the plan after a drop-out (creator or admin)",
-				"description": "Signed in.",
+				"description": "Clears `needsReview`.\n\nSigned in.",
 				"parameters": [
 					{
 						"name": "id",
@@ -8448,7 +8532,7 @@
 					"Calendar feed"
 				],
 				"summary": "Subscribable calendar feed (`<token>.ics`)",
-				"description": "No session needed.",
+				"description": "Leaves out plans you said you can't make. Stable UIDs and a rising SEQUENCE, so subscribed calendars pick up edits and cancellations.\n\nNo session needed.",
 				"security": [],
 				"parameters": [
 					{
@@ -8510,7 +8594,7 @@
 					"Chat"
 				],
 				"summary": "A profile picture, group photo or event cover (signed link)",
-				"description": "`key` may contain slashes. The links come from `User.image`, `Group.image`, `GroupEvent.image` and so on.\n\nNo session needed.",
+				"description": "`key` may contain slashes. The links come from `User.image`, `Group.image`, `GroupEvent.image` and so on; they work 7–8 days and stay the same all day, so cache by URL.\n\nNo session needed.",
 				"security": [],
 				"parameters": [
 					{
@@ -8714,7 +8798,8 @@
 						"type": "object",
 						"additionalProperties": {
 							"type": "string"
-						}
+						},
+						"description": "Ids to open it with, e.g. `{ proposalId }`."
 					},
 					"readAt": {
 						"type": [
@@ -8745,10 +8830,12 @@
 						"type": "string"
 					},
 					"kind": {
-						"$ref": "#/components/schemas/AttachmentKind"
+						"$ref": "#/components/schemas/AttachmentKind",
+						"description": "gif = animated (show `url`); pass = an Apple Wallet pass; video plays (older apps show it as a file). More kinds may come: show an unknown kind as a file."
 					},
 					"name": {
-						"type": "string"
+						"type": "string",
+						"description": "File name, e.g. \"Plan.pdf\"."
 					},
 					"mime": {
 						"type": "string"
@@ -8771,14 +8858,15 @@
 						]
 					},
 					"url": {
-						"type": "string"
+						"type": "string",
+						"description": "Signed link to the file; no auth header needed."
 					},
 					"thumbnailUrl": {
 						"type": [
 							"string",
 							"null"
 						],
-						"description": "A smaller JPEG/PNG preview for photos, or a Wallet pass's logo; null for GIFs (show `url`, animated) and files."
+						"description": "A smaller preview for photos (at most 720 px), or a Wallet pass's logo (PNG, at most 480×160); null for GIFs (show `url`, animated) and files."
 					},
 					"pass": {
 						"anyOf": [
@@ -8811,7 +8899,7 @@
 					"thumbnailUrl",
 					"pass"
 				],
-				"description": "A photo, GIF or file in a chat message. URLs are signed and expire after about a week: refetch the message for fresh ones."
+				"description": "A photo, GIF or file in a chat message. URLs are signed and expire after about a week: refetch the message for fresh ones. Sent without a caption, the message's `body` is a summary for older apps (\"📷 Photo\", \"GIF\", \"📷 3 photos\", \"📎 Plan.pdf\", \"📎 2 files\", \"🎟️ Concert ticket\"…)."
 			},
 			"AttachmentKind": {
 				"type": "string",
@@ -8827,28 +8915,33 @@
 				"type": "object",
 				"properties": {
 					"from": {
-						"type": "string"
+						"type": "string",
+						"description": "YYYY-MM-DD"
 					},
 					"to": {
-						"type": "string"
+						"type": "string",
+						"description": "YYYY-MM-DD"
 					},
 					"visibleWeekdays": {
 						"type": "array",
 						"items": {
 							"$ref": "#/components/schemas/Weekday"
-						}
+						},
+						"description": "Weekday columns worth drawing (others can never match)."
 					},
 					"days": {
 						"type": "array",
 						"items": {
 							"$ref": "#/components/schemas/AvailabilityDay"
-						}
+						},
+						"description": "One per date in [from, to]."
 					},
 					"slots": {
 						"type": "array",
 						"items": {
 							"$ref": "#/components/schemas/Slot"
-						}
+						},
+						"description": "Every slot that works, sorted by start."
 					},
 					"syncedCount": {
 						"type": "number"
@@ -8860,7 +8953,8 @@
 						"type": "array",
 						"items": {
 							"type": "string"
-						}
+						},
+						"description": "Members who haven't synced yet (ignored when finding times)."
 					},
 					"checkedUntil": {
 						"type": "array",
@@ -8879,7 +8973,7 @@
 								"until"
 							]
 						},
-						"description": "Synced members whose calendars are only checked up to `until` (ISO instant), before the end of this range."
+						"description": "Synced members whose calendars are only checked up to `until` (ISO instant), before the end of this range: later days may hide clashes, and they count as free there."
 					}
 				},
 				"required": [
@@ -8901,13 +8995,15 @@
 						"type": "string"
 					},
 					"status": {
-						"$ref": "#/components/schemas/DayStatus"
+						"$ref": "#/components/schemas/DayStatus",
+						"description": "`hidden` = can't be part of any slot; `match` = a time that works."
 					},
 					"busyMemberIds": {
 						"type": "array",
 						"items": {
 							"type": "string"
-						}
+						},
+						"description": "Synced members busy during the relevant window that day."
 					},
 					"slotPosition": {
 						"anyOf": [
@@ -8917,13 +9013,15 @@
 							{
 								"type": "null"
 							}
-						]
+						],
+						"description": "For drawing multi-day slots as one band."
 					},
 					"holiday": {
 						"type": [
 							"string",
 							"null"
-						]
+						],
+						"description": "A bank or school holiday's name."
 					},
 					"bankHoliday": {
 						"type": "boolean",
@@ -8984,6 +9082,7 @@
 					},
 					"series": {
 						"default": false,
+						"description": "Every occurrence, not just this one",
 						"type": "boolean"
 					}
 				},
@@ -9014,7 +9113,8 @@
 						"type": [
 							"string",
 							"null"
-						]
+						],
+						"description": "The calendar's name (calendar busy) or the block's note (manual). Only ever sent to its owner."
 					},
 					"calendarId": {
 						"type": [
@@ -9033,7 +9133,7 @@
 							"string",
 							"null"
 						],
-						"description": "Calendar busy: the event's name, when the calendar gives one. Only ever sent to its owner."
+						"description": "Calendar busy: the event's name, when the calendar gives one. Stored encrypted; only ever sent to its owner."
 					},
 					"eventKey": {
 						"type": "string",
@@ -9071,9 +9171,11 @@
 					"appPassword": {
 						"type": "string",
 						"minLength": 1,
-						"maxLength": 255
+						"maxLength": 255,
+						"description": "An app-specific password"
 					},
 					"serverUrl": {
+						"description": "Defaults to iCloud",
 						"type": "string",
 						"format": "uri"
 					}
@@ -9104,7 +9206,8 @@
 						"$ref": "#/components/schemas/CalendarProvider"
 					},
 					"label": {
-						"type": "string"
+						"type": "string",
+						"description": "\"you@gmail.com\", \"iCloud\", \"Sam's iPhone\"."
 					},
 					"status": {
 						"type": "string",
@@ -9225,7 +9328,8 @@
 								"$ref": "#/components/schemas/TileColor"
 							},
 							"monogram": {
-								"type": "string"
+								"type": "string",
+								"description": "1–3 characters, shown on the tile without a photo."
 							},
 							"image": {
 								"type": [
@@ -9279,10 +9383,11 @@
 											"string",
 											"null"
 										],
-										"description": "A short one-line snippet: the text, or a poll's question. Null once deleted."
+										"description": "One line, at most 140 characters: the text, a poll's question, the attachment summary when there's no caption (\"📷 Photo\"), or \"📍 Name\" / \"📍 Location\" for a place. Null once deleted."
 									},
 									"deleted": {
-										"type": "boolean"
+										"type": "boolean",
+										"description": "Deleted since: show \"Deleted message\"."
 									}
 								},
 								"required": [
@@ -9334,7 +9439,8 @@
 					"start": {
 						"type": "string",
 						"format": "date-time",
-						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+						"description": "The first occurrence"
 					},
 					"end": {
 						"type": "string",
@@ -9360,6 +9466,7 @@
 						]
 					},
 					"until": {
+						"description": "YYYY-MM-DD, the last date a repeat can occur",
 						"anyOf": [
 							{
 								"type": "string",
@@ -9371,6 +9478,7 @@
 						]
 					},
 					"note": {
+						"description": "Private to you",
 						"anyOf": [
 							{
 								"type": "string",
@@ -9525,7 +9633,8 @@
 											"weeksLater": {
 												"type": "integer",
 												"minimum": 0,
-												"maximum": 4
+												"maximum": 4,
+												"description": "Extra weeks between the start and end day: 0 = same week, 1 = \"Tue → following Thu\", up to 4"
 											}
 										},
 										"required": [
@@ -9717,9 +9826,11 @@
 									"type": "string",
 									"minLength": 1,
 									"maxLength": 36
-								}
+								},
+								"description": "From POST /groups/:id/attachments: your own unsent uploads to this group. `body` is the caption"
 							},
 							"replyToId": {
+								"description": "A message in the same chat, not a group update (400) and not deleted (409)",
 								"anyOf": [
 									{
 										"type": "string",
@@ -9745,6 +9856,7 @@
 								"maxLength": 4000
 							},
 							"replyToId": {
+								"description": "A message in the same chat, not a group update (400) and not deleted (409)",
 								"anyOf": [
 									{
 										"type": "string",
@@ -9800,6 +9912,7 @@
 										]
 									},
 									"accuracy": {
+										"description": "Metres, for a device's position",
 										"anyOf": [
 											{
 												"type": "number",
@@ -9818,6 +9931,7 @@
 								]
 							},
 							"replyToId": {
+								"description": "A message in the same chat, not a group update (400) and not deleted (409)",
 								"anyOf": [
 									{
 										"type": "string",
@@ -9901,7 +10015,8 @@
 														"start",
 														"end"
 													]
-												}
+												},
+												"description": "A date poll: 2–5 different times"
 											},
 											"multi": {
 												"default": true,
@@ -10055,7 +10170,8 @@
 											"weeksLater": {
 												"type": "integer",
 												"minimum": 0,
-												"maximum": 4
+												"maximum": 4,
+												"description": "Extra weeks between the start and end day: 0 = same week, 1 = \"Tue → following Thu\", up to 4"
 											}
 										},
 										"required": [
@@ -10255,7 +10371,8 @@
 							{
 								"type": "null"
 							}
-						]
+						],
+						"description": "The part of the day the requirement cares about."
 					},
 					"members": {
 						"type": "array",
@@ -10296,13 +10413,15 @@
 								"pending",
 								"busy"
 							]
-						}
+						},
+						"description": "Each member's busy time, merged; `pending` = not synced. Calendar and hand-marked busy look the same: `manual` is always false (kept so older apps still decode)."
 					},
 					"everyoneFree": {
 						"type": "array",
 						"items": {
 							"$ref": "#/components/schemas/Interval"
-						}
+						},
+						"description": "When every synced member is free."
 					},
 					"mostFree": {
 						"type": "array",
@@ -10370,7 +10489,8 @@
 					"token": {
 						"type": "string",
 						"minLength": 1,
-						"maxLength": 512
+						"maxLength": 512,
+						"description": "The APNs / FCM token"
 					},
 					"name": {
 						"anyOf": [
@@ -10395,17 +10515,20 @@
 					"deviceId": {
 						"type": "string",
 						"minLength": 1,
-						"maxLength": 64
+						"maxLength": 64,
+						"description": "Stable per install"
 					},
 					"deviceName": {
 						"type": "string",
 						"minLength": 1,
-						"maxLength": 80
+						"maxLength": 80,
+						"description": "\"Sam's iPhone\""
 					},
 					"rangeStart": {
 						"type": "string",
 						"format": "date-time",
-						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+						"description": "The window the busy list covers: it replaces what was there (busy outside it is ignored)"
 					},
 					"rangeEnd": {
 						"type": "string",
@@ -10413,11 +10536,13 @@
 						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
 					},
 					"coveredUntil": {
+						"description": "A sync sent as several ranges: the end of the whole sync (defaults to rangeEnd)",
 						"type": "string",
 						"format": "date-time",
 						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
 					},
 					"more": {
+						"description": "More ranges of this sync follow: groups are refreshed once, after the last",
 						"type": "boolean"
 					},
 					"calendars": {
@@ -10480,10 +10605,12 @@
 									"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
 								},
 								"eventKey": {
+									"description": "The app's hash of the event's series id, so a series can be marked not busy",
 									"type": "string",
 									"maxLength": 64
 								},
 								"title": {
+									"description": "The event's name: stored encrypted, only ever shown to you",
 									"anyOf": [
 										{
 											"type": "string",
@@ -10517,7 +10644,8 @@
 				"properties": {
 					"body": {
 						"type": "string",
-						"maxLength": 4000
+						"maxLength": 4000,
+						"description": "With attachments this is the caption, and \"\" removes it"
 					}
 				},
 				"required": [
@@ -10546,7 +10674,8 @@
 						"$ref": "#/components/schemas/TileColor"
 					},
 					"monogram": {
-						"type": "string"
+						"type": "string",
+						"description": "1–3 characters, shown on the tile without a photo."
 					},
 					"image": {
 						"type": [
@@ -10569,7 +10698,8 @@
 						"type": "number"
 					},
 					"requirementSummary": {
-						"type": "string"
+						"type": "string",
+						"description": "The timing in words, e.g. \"A weekend · Fri 18:00 → Sun · Nov – Jan\"."
 					},
 					"requirement": {
 						"$ref": "#/components/schemas/Requirement"
@@ -10651,7 +10781,8 @@
 						"type": "string"
 					},
 					"end": {
-						"type": "string"
+						"type": "string",
+						"description": "All-day: the exclusive midnight after the last day."
 					},
 					"allDay": {
 						"type": "boolean"
@@ -10946,7 +11077,8 @@
 							"kind"
 						]
 					}
-				]
+				],
+				"description": "Drives the badge on the groups list: `matches` is e.g. \"2 weekends work\"."
 			},
 			"GroupSummary": {
 				"type": "object",
@@ -10961,7 +11093,8 @@
 						"$ref": "#/components/schemas/TileColor"
 					},
 					"monogram": {
-						"type": "string"
+						"type": "string",
+						"description": "1–3 characters, shown on the tile without a photo."
 					},
 					"image": {
 						"type": [
@@ -10984,10 +11117,12 @@
 						"type": "number"
 					},
 					"requirementSummary": {
-						"type": "string"
+						"type": "string",
+						"description": "The timing in words, e.g. \"A weekend · Fri 18:00 → Sun · Nov – Jan\"."
 					},
 					"status": {
-						"$ref": "#/components/schemas/GroupStatus"
+						"$ref": "#/components/schemas/GroupStatus",
+						"description": "Drives the badge on the groups list."
 					},
 					"unreadCount": {
 						"type": "number"
@@ -10997,7 +11132,7 @@
 						"items": {
 							"$ref": "#/components/schemas/MemberPreview"
 						},
-						"description": "First few members, for avatar stacks."
+						"description": "The first 5 members, for avatar stacks."
 					}
 				},
 				"required": [
@@ -11107,6 +11242,7 @@
 						}
 					},
 					"userIds": {
+						"description": "People who already share a group with you (e.g. a new group with the same people)",
 						"maxItems": 20,
 						"type": "array",
 						"items": {
@@ -11116,6 +11252,7 @@
 						}
 					},
 					"maxUses": {
+						"description": "For a link: how many people can join with it (null: no limit). Left out: one",
 						"anyOf": [
 							{
 								"type": "integer",
@@ -11127,7 +11264,8 @@
 							}
 						]
 					}
-				}
+				},
+				"description": "Nothing: a link anyone can use for 14 days. Emails / usernames / userIds: one invite each that only that person can use; at most 20 people in all"
 			},
 			"InvitePreview": {
 				"type": "object",
@@ -11218,7 +11356,8 @@
 						"$ref": "#/components/schemas/TileColor"
 					},
 					"monogram": {
-						"type": "string"
+						"type": "string",
+						"description": "1–3 characters, shown on the tile without a photo."
 					},
 					"image": {
 						"type": [
@@ -11241,7 +11380,8 @@
 						"type": "number"
 					},
 					"requirementSummary": {
-						"type": "string"
+						"type": "string",
+						"description": "The timing in words, e.g. \"A weekend · Fri 18:00 → Sun · Nov – Jan\"."
 					},
 					"requirement": {
 						"$ref": "#/components/schemas/Requirement"
@@ -11295,6 +11435,7 @@
 				"type": "object",
 				"properties": {
 					"newOwnerId": {
+						"description": "The owner only: an admin of the group who becomes the owner",
 						"anyOf": [
 							{
 								"type": "string",
@@ -11320,13 +11461,16 @@
 					"idToken": {
 						"type": "string",
 						"minLength": 10,
-						"maxLength": 8192
+						"maxLength": 8192,
+						"description": "From Sign in with Apple / Google"
 					},
 					"nonce": {
+						"description": "Apple: the raw nonce",
 						"type": "string",
 						"maxLength": 512
 					},
 					"merge": {
+						"description": "The sign-in has its own account and the person confirmed merging it into this one",
 						"type": "boolean"
 					}
 				},
@@ -11416,7 +11560,9 @@
 							"null"
 						]
 					},
-					"payload": {}
+					"payload": {
+						"description": "The affected resource (Message, Poll, Proposal…): see docs/API.md, Live updates."
+					}
 				},
 				"required": [
 					"type",
@@ -11449,7 +11595,8 @@
 						"type": "string"
 					},
 					"start": {
-						"type": "string"
+						"type": "string",
+						"description": "The first occurrence."
 					},
 					"end": {
 						"type": "string"
@@ -11464,13 +11611,15 @@
 						"type": [
 							"string",
 							"null"
-						]
+						],
+						"description": "YYYY-MM-DD, the last date a repeat can occur; null = forever."
 					},
 					"note": {
 						"type": [
 							"string",
 							"null"
-						]
+						],
+						"description": "Private to the owner."
 					}
 				},
 				"required": [
@@ -11491,7 +11640,7 @@
 					},
 					"name": {
 						"type": "string",
-						"description": "The name they go by in this group: `nameInGroup` when set, else their account name."
+						"description": "The name they go by in this group: `nameInGroup` when set, else their account name, or their email address if they've set no name."
 					},
 					"nameInGroup": {
 						"type": [
@@ -11510,7 +11659,8 @@
 						"$ref": "#/components/schemas/Role"
 					},
 					"synced": {
-						"type": "boolean"
+						"type": "boolean",
+						"description": "Has connected a calendar or marked any busy time by hand."
 					},
 					"joinedAt": {
 						"type": "string"
@@ -11530,6 +11680,7 @@
 				"type": "object",
 				"properties": {
 					"displayName": {
+						"description": "Trimmed, at most 80; null or blank goes back to the account name",
 						"anyOf": [
 							{
 								"type": "string",
@@ -11578,6 +11729,7 @@
 						]
 					},
 					"displayName": {
+						"description": "Trimmed, at most 80; null or blank goes back to the account name",
 						"anyOf": [
 							{
 								"type": "string",
@@ -11588,7 +11740,8 @@
 							}
 						]
 					}
-				}
+				},
+				"description": "At least one. `role`: admins only. `displayName`: yours, or as an admin anyone's"
 			},
 			"MergeCandidate": {
 				"type": "object",
@@ -11639,7 +11792,8 @@
 						"type": [
 							"string",
 							"null"
-						]
+						],
+						"description": "Null for system messages (group updates)."
 					},
 					"kind": {
 						"$ref": "#/components/schemas/MessageKind"
@@ -11717,7 +11871,8 @@
 							{
 								"type": "null"
 							}
-						]
+						],
+						"description": "Only on your own messages; `seenBy` in the order they read it."
 					},
 					"replyTo": {
 						"anyOf": [
@@ -11753,14 +11908,14 @@
 								"type": "null"
 							}
 						],
-						"description": "A place shared in the chat (a one-off pin). `body` is then a fallback for older apps; null once deleted."
+						"description": "A place shared in the chat (kind 'text', a one-off pin). `body` is then a fallback for older apps; null otherwise and once deleted."
 					},
 					"reactions": {
 						"type": "array",
 						"items": {
 							"$ref": "#/components/schemas/MessageReaction"
 						},
-						"description": "Emoji reactions, one per person, grouped by emoji in the order each was first used (empty once deleted)."
+						"description": "Emoji reactions, one per person, grouped by emoji in the order each was first used (empty once deleted). Older apps: treat a missing field as []."
 					}
 				},
 				"required": [
@@ -11826,13 +11981,15 @@
 								"userId",
 								"at"
 							]
-						}
+						},
+						"description": "Delivered but not seen."
 					},
 					"pending": {
 						"type": "array",
 						"items": {
 							"type": "string"
-						}
+						},
+						"description": "Not delivered yet."
 					}
 				},
 				"required": [
@@ -11857,10 +12014,12 @@
 				"type": "object",
 				"properties": {
 					"lat": {
-						"type": "number"
+						"type": "number",
+						"description": "WGS 84 degrees."
 					},
 					"lng": {
-						"type": "number"
+						"type": "number",
+						"description": "WGS 84 degrees."
 					},
 					"name": {
 						"type": [
@@ -11890,7 +12049,7 @@
 					"address",
 					"accuracy"
 				],
-				"description": "A place shared in a chat message: where it is and, if it's a named place, what it's called."
+				"description": "A place shared in a chat message: where it is and, if it's a named place, what it's called. The message's `body` is a fallback for older apps (\"📍 Name\", the address, a Google Maps link, one per line). It can't be edited, only deleted."
 			},
 			"MessagePage": {
 				"type": "object",
@@ -11976,10 +12135,11 @@
 							"string",
 							"null"
 						],
-						"description": "A short one-line snippet: the text, or a poll's question. Null once deleted."
+						"description": "One line, at most 140 characters: the text, a poll's question, the attachment summary when there's no caption (\"📷 Photo\"), or \"📍 Name\" / \"📍 Location\" for a place. Null once deleted."
 					},
 					"deleted": {
-						"type": "boolean"
+						"type": "boolean",
+						"description": "Deleted since: show \"Deleted message\"."
 					}
 				},
 				"required": [
@@ -12023,7 +12183,8 @@
 						"type": "array",
 						"items": {
 							"$ref": "#/components/schemas/Message"
-						}
+						},
+						"description": "The root (found by following `replyTo` up) and every reply under it, oldest first, deleted ones included; at most 200 (the earliest)."
 					},
 					"truncated": {
 						"type": "boolean",
@@ -12050,7 +12211,8 @@
 							{
 								"type": "null"
 							}
-						]
+						],
+						"description": "ISO instant; null = until unmuted"
 					}
 				},
 				"required": [
@@ -12104,7 +12266,8 @@
 						"type": "string"
 					},
 					"end": {
-						"type": "string"
+						"type": "string",
+						"description": "All-day: the exclusive midnight after the last day."
 					},
 					"allDay": {
 						"type": "boolean"
@@ -12237,7 +12400,8 @@
 					"plans",
 					"reminders",
 					"nudges"
-				]
+				],
+				"description": "Kinds of push you can turn off, each covering some notification kinds (NOTIFICATION_CATEGORY_KINDS): chat = message; proposals = proposal.created, proposal.changed; plans = proposal.confirmed, event.created; reminders = reminder; nudges = nudge."
 			},
 			"NotificationKind": {
 				"type": "string",
@@ -12252,7 +12416,8 @@
 					"event.created",
 					"role.changed",
 					"reminder"
-				]
+				],
+				"description": "What an Activity item (and its push) is about. `proposal.changed`: a confirmed plan changed (someone can't make it any more, or it was cancelled). `role.changed`: your role in a group changed (`data.role` is the new one). `reminder`: a confirmed plan is tomorrow or in an hour (`data.eventId`), or a proposal you haven't replied to is within a day (`data.proposalId`); `data.reminder` is 'day', 'hour', 'reply' or 'next' (\"Same again?\"). Show kinds you don't know with a generic icon, and open the group (or proposal) from `data`."
 			},
 			"NotificationList": {
 				"type": "object",
@@ -12308,7 +12473,7 @@
 								"type": "null"
 							}
 						],
-						"description": "No pushes between these local times (in your time zone), e.g. 22:00–07:00; null for none. With `catchUp`, one push when they end says what came in meanwhile (if anything did)."
+						"description": "No pushes between these local times (in your time zone, may wrap midnight), e.g. 22:00–07:00; null for none. With `catchUp`, when they end one push (`kind: 'quiet.summary'`, with `groupId` if it was all one group) says how many updates came in meanwhile that are still unread."
 					},
 					"mutes": {
 						"type": "array",
@@ -12330,7 +12495,7 @@
 								"until"
 							]
 						},
-						"description": "Groups you've muted: no pushes from them until `until` (null = until you unmute)."
+						"description": "Groups you've muted (active mutes only): no pushes from them until `until` (null = until you unmute)."
 					}
 				},
 				"required": [
@@ -12363,13 +12528,15 @@
 								"properties": {
 									"from": {
 										"type": "string",
-										"pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+										"pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+										"description": "Local time (User.timezone); may wrap midnight"
 									},
 									"to": {
 										"type": "string",
 										"pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
 									},
 									"catchUp": {
+										"description": "One push when quiet hours end, counting what came in. Left out keeps it as it was",
 										"type": "boolean"
 									}
 								},
@@ -12402,6 +12569,7 @@
 				"type": "object",
 				"properties": {
 					"redirect": {
+						"description": "Where to land afterwards: a web path, or availabliss://calendars for the apps",
 						"type": "string",
 						"maxLength": 200
 					}
@@ -12515,7 +12683,7 @@
 							"available",
 							"included"
 						],
-						"description": "The optional AI planner is set up on this server (it still needs Pro to use)."
+						"description": "The optional AI planner: `available` = set up on this server; `included` = usable on this plan (Pro)."
 					}
 				},
 				"required": [
@@ -12536,6 +12704,7 @@
 				"type": "object",
 				"properties": {
 					"notes": {
+						"description": "Anything the AI should know (it never sees names or calendars)",
 						"anyOf": [
 							{
 								"type": "string",
@@ -12612,7 +12781,8 @@
 								"slot",
 								"why"
 							]
-						}
+						},
+						"description": "Up to 3."
 					},
 					"ideas": {
 						"type": "array",
@@ -12639,10 +12809,12 @@
 						}
 					},
 					"proposalTitle": {
-						"type": "string"
+						"type": "string",
+						"description": "Prefill for \"Propose this\"."
 					},
 					"proposalNote": {
-						"type": "string"
+						"type": "string",
+						"description": "Prefill for \"Propose this\"."
 					}
 				},
 				"required": [
@@ -12727,7 +12899,7 @@
 								"voterIds"
 							]
 						},
-						"description": "A date poll's options each carry `slot` (the time it stands for); text polls have none."
+						"description": "A date poll's options each carry `slot` (the time it stands for; the label is made in the group's time zone): show who's busy per option with GET /groups/:id/conflicts. Text polls have none."
 					}
 				},
 				"required": [
@@ -12750,12 +12922,14 @@
 							"from": {
 								"type": "string",
 								"format": "date",
-								"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+								"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+								"description": "Inclusive"
 							},
 							"to": {
 								"type": "string",
 								"format": "date",
-								"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+								"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+								"description": "Inclusive"
 							}
 						},
 						"required": [
@@ -12773,6 +12947,7 @@
 							},
 							"days": {
 								"default": [],
+								"description": "Weekdays, 0 = Monday; empty = any",
 								"maxItems": 7,
 								"type": "array",
 								"items": {
@@ -12867,7 +13042,8 @@
 						"type": [
 							"string",
 							"null"
-						]
+						],
+						"description": "The event, once confirmed."
 					},
 					"confirmedBy": {
 						"type": [
@@ -12977,6 +13153,7 @@
 				"type": "object",
 				"properties": {
 					"ids": {
+						"description": "Left out: everything except chats (read by reading the chat)",
 						"maxItems": 500,
 						"type": "array",
 						"items": {
@@ -12990,7 +13167,8 @@
 				"properties": {
 					"upTo": {
 						"type": "string",
-						"minLength": 1
+						"minLength": 1,
+						"description": "A message id: it and everything before it"
 					},
 					"state": {
 						"type": "string",
@@ -13032,7 +13210,8 @@
 					"monthly",
 					"monthlyWeekday",
 					"yearly"
-				]
+				],
+				"description": "How a block repeats. `monthly` is the same date each month (skipped in months without it); `monthlyWeekday` the same weekday of the month (e.g. the 2nd Tuesday, or the last one if it started in a month's last seven days); `yearly` the same date each year (29 Feb: leap years only)."
 			},
 			"Requirement": {
 				"type": "object",
@@ -13048,19 +13227,23 @@
 							{
 								"type": "null"
 							}
-						]
+						],
+						"description": "Daily time window, e.g. evenings 18:00–23:59; null = the whole day."
 					},
 					"days": {
 						"type": "array",
 						"items": {
 							"$ref": "#/components/schemas/Weekday"
-						}
+						},
+						"description": "Allowed weekdays; empty = any. Ignored for `span`."
 					},
 					"bankHolidays": {
-						"type": "boolean"
+						"type": "boolean",
+						"description": "Include bank holidays (the owner's region): allowed whatever `days` says, and a span stretches over adjacent ones (Good Friday starts a Fri-evening span on Thursday evening; Easter Monday ends a Sun-night span on Monday night)."
 					},
 					"schoolHolidaysOnly": {
-						"type": "boolean"
+						"type": "boolean",
+						"description": "Only inside school holidays (`schoolAuthority`'s, or `customSchoolHolidays`)."
 					},
 					"schoolAuthority": {
 						"type": [
@@ -13075,16 +13258,19 @@
 						}
 					},
 					"range": {
-						"$ref": "#/components/schemas/DateRange"
+						"$ref": "#/components/schemas/DateRange",
+						"description": "The search window."
 					},
 					"dates": {
 						"type": "array",
 						"items": {
 							"$ref": "#/components/schemas/DateRange"
-						}
+						},
+						"description": "If non-empty, only these date ranges are considered (repeats of an identical range are dropped on save)."
 					},
 					"timezone": {
-						"type": "string"
+						"type": "string",
+						"description": "IANA zone the times above are in."
 					},
 					"quorum": {
 						"type": [
@@ -13124,7 +13310,8 @@
 								"const": "duration"
 							},
 							"minutes": {
-								"type": "number"
+								"type": "number",
+								"description": "The slot's length, e.g. 120 = 2 hours."
 							}
 						},
 						"required": [
@@ -13140,7 +13327,8 @@
 								"const": "days"
 							},
 							"count": {
-								"type": "number"
+								"type": "number",
+								"description": "Whole consecutive days (7 = a week)."
 							}
 						},
 						"required": [
@@ -13159,17 +13347,19 @@
 								"$ref": "#/components/schemas/Weekday"
 							},
 							"startTime": {
-								"type": "string"
+								"type": "string",
+								"description": "HH:MM, e.g. Fri 18:00 → Sun 23:59 for a weekend."
 							},
 							"endDay": {
 								"$ref": "#/components/schemas/Weekday"
 							},
 							"endTime": {
-								"type": "string"
+								"type": "string",
+								"description": "HH:MM"
 							},
 							"weeksLater": {
 								"type": "number",
-								"description": "Extra weeks between the start and end day: 0 = same week, 1 = the following week, up to 4."
+								"description": "Extra weeks between the start and end day: 0 = same week, 1 = \"Tue → following Thu\", 3 = \"Tue → Thu 3 weeks later\", up to 4."
 							}
 						},
 						"required": [
@@ -13187,7 +13377,8 @@
 				"type": "object",
 				"properties": {
 					"count": {
-						"type": "number"
+						"type": "number",
+						"description": "Slots the timing produces (the \"13\" in \"13 weekends fit this timing\")."
 					},
 					"from": {
 						"type": "string"
@@ -13196,7 +13387,8 @@
 						"type": "string"
 					},
 					"summary": {
-						"type": "string"
+						"type": "string",
+						"description": "e.g. \"13 weekends fit this timing\"."
 					}
 				},
 				"required": [
@@ -13279,7 +13471,8 @@
 											"weeksLater": {
 												"type": "integer",
 												"minimum": 0,
-												"maximum": 4
+												"maximum": 4,
+												"description": "Extra weeks between the start and end day: 0 = same week, 1 = \"Tue → following Thu\", up to 4"
 											}
 										},
 										"required": [
@@ -13494,7 +13687,8 @@
 					"accepted",
 					"maybe",
 					"declined"
-				]
+				],
+				"description": "A reply to a proposal. `maybe` is a soft yes (\"I can make it if I must\"): counted apart from `accepted`, and it doesn't count towards everyone being in, so a proposal only confirms itself when every reply is a firm yes (the proposer or an admin can still confirm anyway). Treat values you don't know as `pending`."
 			},
 			"Rhythm": {
 				"type": "object",
@@ -13556,7 +13750,8 @@
 						"type": "string"
 					},
 					"label": {
-						"type": "string"
+						"type": "string",
+						"description": "e.g. \"Fri 13 – Sun 15 Nov\"."
 					},
 					"preferredBy": {
 						"type": "array",
@@ -13581,7 +13776,7 @@
 						"items": {
 							"type": "string"
 						},
-						"description": "Synced members busy at this time (with a quorum or optional members); empty when everyone's free."
+						"description": "Synced members busy at this time, optional members included (with a quorum or optional members); empty when everyone's free. Rank slots with fewer missing first."
 					}
 				},
 				"required": [
@@ -13683,7 +13878,8 @@
 						"type": "string"
 					},
 					"end": {
-						"type": "string"
+						"type": "string",
+						"description": "All-day: the exclusive midnight after the last day."
 					},
 					"allDay": {
 						"type": "boolean"
@@ -13725,7 +13921,8 @@
 					"start": {
 						"type": "string",
 						"format": "date-time",
-						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+						"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+						"description": "The first occurrence"
 					},
 					"end": {
 						"type": "string",
@@ -13751,6 +13948,7 @@
 						]
 					},
 					"until": {
+						"description": "YYYY-MM-DD, the last date a repeat can occur",
 						"anyOf": [
 							{
 								"type": "string",
@@ -13762,6 +13960,7 @@
 						]
 					},
 					"note": {
+						"description": "Private to you",
 						"anyOf": [
 							{
 								"type": "string",
@@ -13907,7 +14106,8 @@
 											"weeksLater": {
 												"type": "integer",
 												"minimum": 0,
-												"maximum": 4
+												"maximum": 4,
+												"description": "Extra weeks between the start and end day: 0 = same week, 1 = \"Tue → following Thu\", up to 4"
 											}
 										},
 										"required": [
@@ -14071,12 +14271,15 @@
 						]
 					},
 					"archived": {
+						"description": "true archives it for everyone, false unarchives",
 						"type": "boolean"
 					},
 					"autoArchive": {
+						"description": "Archive it by itself once its latest event has passed and nothing else is planned",
 						"type": "boolean"
 					},
 					"rhythm": {
+						"description": "How often it meets (null for none); with `prompt`, \"Same again?\" after each plan",
 						"anyOf": [
 							{
 								"type": "object",
@@ -14218,7 +14421,8 @@
 						"maxLength": 200
 					},
 					"multi": {
-						"type": "boolean"
+						"type": "boolean",
+						"description": "Switching to pick-one keeps each person's first pick"
 					},
 					"options": {
 						"minItems": 2,
@@ -14241,7 +14445,8 @@
 							"required": [
 								"label"
 							]
-						}
+						},
+						"description": "Text polls only, in order: an `id` keeps that option and its votes, no `id` adds one, one left out goes with its votes"
 					}
 				}
 			},
@@ -14322,7 +14527,8 @@
 											"weeksLater": {
 												"type": "integer",
 												"minimum": 0,
-												"maximum": 4
+												"maximum": 4,
+												"description": "Extra weeks between the start and end day: 0 = same week, 1 = \"Tue → following Thu\", up to 4"
 											}
 										},
 										"required": [
@@ -14504,13 +14710,14 @@
 							"string",
 							"null"
 						],
-						"description": "Lowercase, without the \"@\"."
+						"description": "Lowercase, without the \"@\". Every account gets one when it's made (null only briefly for older accounts)."
 					},
 					"image": {
 						"type": [
 							"string",
 							"null"
-						]
+						],
+						"description": "A signed /media link (works 7–8 days and stays the same all day, so cache by URL), or a sign-in provider's own picture URL; null for none."
 					},
 					"themeMode": {
 						"$ref": "#/components/schemas/ThemeMode"
@@ -14522,29 +14729,34 @@
 						"type": [
 							"string",
 							"null"
-						]
+						],
+						"description": "ISO 3166-1 alpha-2, e.g. \"GB\"."
 					},
 					"subdivision": {
 						"type": [
 							"string",
 							"null"
-						]
+						],
+						"description": "ISO 3166-2, e.g. \"GB-ENG\"."
 					},
 					"schoolAuthority": {
 						"type": [
 							"string",
 							"null"
-						]
+						],
+						"description": "An id from GET /regions/school-authorities."
 					},
 					"timezone": {
-						"type": "string"
+						"type": "string",
+						"description": "IANA zone, e.g. \"Europe/London\"."
 					},
 					"onboarded": {
-						"type": "boolean"
+						"type": "boolean",
+						"description": "False until the sign-up wizard is finished."
 					},
 					"busyBufferMinutes": {
 						"$ref": "#/components/schemas/BusyBufferMinutes",
-						"description": "Minutes counted as busy before and after each busy time when finding free slots (0 = none)."
+						"description": "Minutes counted as busy before and after each busy time when finding free slots and clashes (0 = none). Not applied in GET /me/busy."
 					},
 					"eventReminders": {
 						"$ref": "#/components/schemas/EventReminders",
@@ -14556,7 +14768,7 @@
 					},
 					"autoArchiveNewGroups": {
 						"type": "boolean",
-						"description": "Groups you create start with auto-archive on (archived once their latest plan has passed)."
+						"description": "Groups you create start with auto-archive on (archived once their latest plan has passed). Off by default."
 					}
 				},
 				"required": [
@@ -14582,7 +14794,8 @@
 				"type": "object",
 				"properties": {
 					"username": {
-						"type": "string"
+						"type": "string",
+						"description": "As normalised (lowercase, no \"@\")."
 					},
 					"problem": {
 						"type": [
@@ -14650,7 +14863,8 @@
 						"items": {
 							"type": "string",
 							"minLength": 1
-						}
+						},
+						"description": "Empty removes your vote"
 					}
 				},
 				"required": [
@@ -14664,10 +14878,12 @@
 						"$ref": "#/components/schemas/WalletPassStyle"
 					},
 					"organizationName": {
-						"type": "string"
+						"type": "string",
+						"description": "May be \"\"."
 					},
 					"description": {
-						"type": "string"
+						"type": "string",
+						"description": "May be \"\"."
 					},
 					"logoText": {
 						"type": [
@@ -14759,7 +14975,7 @@
 					"labelColor",
 					"count"
 				],
-				"description": "Details read from a Wallet pass's pass.json (English text where it is localised)."
+				"description": "Details read from a Wallet pass's pass.json (English text where it is localised): a .pkpass, or a .pkpasses bundle of up to 10 (details are the first one's). The file itself is kept exactly as sent, because it's signed."
 			},
 			"WalletPassField": {
 				"type": "object",
