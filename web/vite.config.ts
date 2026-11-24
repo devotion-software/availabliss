@@ -34,6 +34,17 @@ const SENTRY_HOSTS = ['https://*.ingest.sentry.io', 'https://*.ingest.us.sentry.
  */
 const uploadSourceMaps = Boolean(process.env.SENTRY_AUTH_TOKEN);
 
+// Says in the build log whether the upload will happen (the Sentry plugin is silent when it won't).
+// Never prints the token itself.
+if (process.argv.includes('build')) {
+	const missing = ['SENTRY_AUTH_TOKEN', 'SENTRY_ORG', 'SENTRY_PROJECT'].filter((name) => !process.env[name]);
+	console.log(
+		missing.length === 0
+			? `[sentry] Uploading source maps for availabliss-web@${pkg.version} to ${process.env.SENTRY_ORG}/${process.env.SENTRY_PROJECT}`
+			: `[sentry] Not uploading source maps: ${missing.join(', ')} not set for the build`
+	);
+}
+
 export default defineConfig({
 	define: {
 		__APP_VERSION__: JSON.stringify(pkg.version)
