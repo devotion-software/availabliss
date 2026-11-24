@@ -69,6 +69,9 @@ export default defineConfig({
 				mode: 'auto',
 				directives: {
 					'script-src': ['self', ...SCRIPT_HOSTS],
+					// Sentry's session replay compresses recordings in a worker it starts from a blob.
+					// Without this, workers fall back to script-src, which blocks it.
+					'worker-src': ['self', 'blob:'],
 					'object-src': ['none'],
 					'base-uri': ['self'],
 					'frame-ancestors': ['none']
