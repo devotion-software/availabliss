@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.sentry)
 }
 
 composeCompiler {
@@ -35,6 +36,12 @@ val apiBaseUrl = config("availabliss.apiBaseUrl", "http://10.0.2.2:5190").trimEn
 val googleWebClientId = config("availabliss.googleWebClientId", "")
 val appLinkHost = config("availabliss.appLinkHost", "availabliss.com")
 
+// Sentry (crash and error reporting): the Android project's DSN. Empty keeps it off, as in development.
+val sentryDsn = config("availabliss.sentryDsn", "")
+// Uploading ProGuard mappings (readable release stack traces) needs a token, org and project, from
+// local.properties (sentry.authToken / sentry.org / sentry.project) or the SENTRY_* environment variables.
+val sentryAuthToken = config("sentry.authToken", System.getenv("SENTRY_AUTH_TOKEN") ?: "")
+
 android {
     namespace = "dev.joeherbert.availabliss"
     compileSdk = 37
@@ -53,6 +60,7 @@ android {
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         buildConfigField("String", "APP_LINK_HOST", "\"$appLinkHost\"")
         buildConfigField("boolean", "FCM_ENABLED", hasGoogleServices.toString())
+        buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
         manifestPlaceholders["appLinkHost"] = appLinkHost
     }
 
@@ -90,6 +98,20 @@ android {
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }
+}
+
+sentry {
+    org.set(config("sentry.org", System.getenv("SENTRY_ORG") ?: ""))
+    projectName.set(config("sentry.project", System.getenv("SENTRY_PROJECT") ?: ""))
+    authToken.set(sentryAuthToken)
+    // Mappings are uploaded only when there's a token, so release builds work without one.
+    includeProguardMapping.set(sentryAuthToken.isNotEmpty())
+    autoUploadProguardMapping.set(sentryAuthToken.isNotEmpty())
+    // The SDK versions come from the version catalog below, not the plugin.
+    autoInstallation { enabled.set(false) }
+    // Source context would upload the app's source code; stack traces with lines are enough.
+    includeSourceContext.set(false)
+    telemetry.set(false)
 }
 
 // AGP 9 compiles Kotlin itself (built-in Kotlin); compiler options live here.
@@ -161,6 +183,11 @@ dependencies {
     implementation(libs.media3.ui)
     // Pro purchases through Google Play Billing (brings the BILLING permission). Not the RevenueCat UI library: the paywall is ours.
     implementation(libs.revenuecat.purchases)
+    // Crash and error reporting, traces and session replay (core/common/CrashReporting.kt).
+    implementation(platform(libs.sentry.bom))
+    implementation(libs.sentry.android)
+    implementation(libs.sentry.okhttp)
+    implementation(libs.sentry.compose)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -44,6 +44,8 @@ final class AppModel {
     private(set) static weak var shared: AppModel?
 
     init(config: AppConfig = .load()) {
+        // First, so a crash while the rest is set up is reported too.
+        CrashReporting.start(config: config)
         self.config = config
         let tokenStore = TokenStore()
         let unauthorized = UnauthorizedRelay()

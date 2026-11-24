@@ -53,6 +53,13 @@ availabliss.googleWebClientId=1234567890-abc.apps.googleusercontent.com
 
 # Host for verified app links (https://<host>/invite/:token, /app/...).
 availabliss.appLinkHost=availabliss.com
+
+# Sentry (see docs/SENTRY.md). The DSN turns crash reporting on; leave it out in development.
+# The token, org and project upload ProGuard mappings with release builds.
+# availabliss.sentryDsn=https://<key>@o123.ingest.sentry.io/456
+# sentry.authToken=sntrys_...
+# sentry.org=your-org
+# sentry.project=availabliss-android
 ```
 
 These become `BuildConfig.API_BASE_URL`, `BuildConfig.GOOGLE_WEB_CLIENT_ID` and

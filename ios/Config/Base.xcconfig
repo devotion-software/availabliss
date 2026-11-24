@@ -16,6 +16,10 @@ GOOGLE_IOS_CLIENT_ID =
 // Reversed client id, e.g. com.googleusercontent.apps.1234-abcd
 GOOGLE_REVERSED_CLIENT_ID = dev.joeherbert.availabliss.google-unset
 
+// Sentry (crash and error reporting). The DSN of the iOS project; leave empty to keep Sentry
+// off, as in development. Remember the $() trick: https:/$()/<key>@o123.ingest.sentry.io/456
+SENTRY_DSN =
+
 // Push environment: development | production
 APS_ENVIRONMENT = development
 

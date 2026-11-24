@@ -10,6 +10,8 @@
 	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
 	<key>AVGoogleRedirectScheme</key>
 	<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+	<key>AVSentryDSN</key>
+	<string>$(SENTRY_DSN)</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>dev.joeherbert.availabliss.calendar-refresh</string>

@@ -16,6 +16,10 @@ packages:
   RevenueCat:
     url: https://github.com/RevenueCat/purchases-ios-spm
     from: 5.100.0
+  # Crash and error reporting, traces and session replay (App/CrashReporting.swift).
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: 9.35.0
 
 settings:
   base:
@@ -48,6 +52,8 @@ targets:
     dependencies:
       - package: RevenueCat
         product: RevenueCat
+      - package: Sentry
+        product: Sentry
       - target: AvailablissWidgets
       - target: AvailablissShare
     settings:
@@ -65,6 +71,24 @@ targets:
         # Development turned on on the device. Release builds keep the normal CDN lookup.
         Debug:
           ASSOCIATED_DOMAIN_MODE: "?mode=developer"
+    postBuildScripts:
+      # Uploads the app's dSYMs to Sentry so crash reports show file names and lines. Release builds
+      # only (archives), and only with SENTRY_AUTH_TOKEN, SENTRY_ORG and SENTRY_PROJECT set in
+      # Config/Secrets.xcconfig and sentry-cli installed (brew install getsentry/tools/sentry-cli).
+      - name: Upload dSYMs to Sentry
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - ${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}
+          - ${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist
+        script: |
+          if [ "$CONFIGURATION" != "Release" ] || [ -z "$SENTRY_AUTH_TOKEN" ]; then exit 0; fi
+          SENTRY_CLI="$(command -v sentry-cli || echo /opt/homebrew/bin/sentry-cli)"
+          if [ ! -x "$SENTRY_CLI" ]; then
+            echo "warning: sentry-cli isn't installed, so dSYMs weren't uploaded to Sentry"
+            exit 0
+          fi
+          "$SENTRY_CLI" debug-files upload "$DWARF_DSYM_FOLDER_PATH/$DWARF_DSYM_FILE_NAME" \
+            || echo "warning: uploading dSYMs to Sentry failed"
     entitlements:
       path: Availabliss/Resources/Availabliss.entitlements
       properties:
@@ -101,6 +125,7 @@ targets:
         AVAssociatedDomainHost: $(ASSOCIATED_DOMAIN_HOST)
         AVGoogleClientID: $(GOOGLE_IOS_CLIENT_ID)
         AVGoogleRedirectScheme: $(GOOGLE_REVERSED_CLIENT_ID)
+        AVSentryDSN: $(SENTRY_DSN)
         CFBundleURLTypes:
           - CFBundleURLName: dev.joeherbert.availabliss
             CFBundleURLSchemes:

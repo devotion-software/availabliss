@@ -1,3 +1,4 @@
+import { sentrySvelteKit } from '@sentry/sveltekit/vite';
 import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
@@ -24,18 +25,38 @@ const BILLING_HOSTS = [
 ] as const;
 /** Social sign-in redirects through these after a form post. */
 const SIGN_IN_HOSTS = ['https://accounts.google.com', 'https://appleid.apple.com', 'https://login.microsoftonline.com'] as const;
+/** Where the browser SDK sends errors, traces and replays (US and EU regions). */
+const SENTRY_HOSTS = ['https://*.ingest.sentry.io', 'https://*.ingest.us.sentry.io', 'https://*.ingest.de.sentry.io'] as const;
+
+/**
+ * Source maps are uploaded to Sentry only when SENTRY_AUTH_TOKEN (plus SENTRY_ORG and
+ * SENTRY_PROJECT) is set at build time, and are then deleted from the build so they aren't served.
+ */
+const uploadSourceMaps = Boolean(process.env.SENTRY_AUTH_TOKEN);
 
 export default defineConfig({
 	define: {
 		__APP_VERSION__: JSON.stringify(pkg.version)
 	},
 	plugins: [
+		// Must come before the SvelteKit plugin.
+		sentrySvelteKit({
+			org: process.env.SENTRY_ORG,
+			project: process.env.SENTRY_PROJECT,
+			authToken: process.env.SENTRY_AUTH_TOKEN,
+			autoUploadSourceMaps: uploadSourceMaps,
+			release: { name: `availabliss-web@${pkg.version}`, create: uploadSourceMaps, finalize: uploadSourceMaps },
+			telemetry: false
+		}),
 		sveltekit({
 			compilerOptions: {
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 			},
 			adapter: adapter(),
+			// Server-side spans for handle, loads, actions and endpoints, sent to Sentry by
+			// src/instrumentation.server.ts.
+			tracing: { server: true },
 			// SvelteKit's origin check also rejects body-less POST/DELETE from the native
 			// apps (no Origin header). hooks.server.ts applies a bearer-aware check instead.
 			csrf: { trustedOrigins: ['*'] },
@@ -60,7 +81,9 @@ export default defineConfig({
 					// Profile and group photos (R2 or Google), chat photos, OpenStreetMap tiles.
 					'img-src': ['self', 'data:', 'blob:', 'https:'],
 					'media-src': ['self', 'blob:', 'https:'],
-					'connect-src': ['self', 'https://nominatim.openstreetmap.org', ...BILLING_HOSTS],
+					'connect-src': ['self', 'https://nominatim.openstreetmap.org', ...BILLING_HOSTS, ...SENTRY_HOSTS],
+					// Sentry's session replay compresses recordings in a worker it starts from a blob.
+					'worker-src': ['self', 'blob:'],
 					'frame-src': ['self', ...BILLING_HOSTS],
 					'form-action': ['self', ...SIGN_IN_HOSTS],
 					'object-src': ['none'],

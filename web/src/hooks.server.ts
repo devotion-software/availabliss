@@ -1,5 +1,7 @@
+import * as Sentry from '@sentry/sveltekit';
 import { APIError } from 'better-auth';
 import { error } from '@sveltejs/kit';
+import { sequence } from '@sveltejs/kit/hooks';
 import { auth } from '#lib/auth';
 import { COLOR_THEMES, THEME_MODES, type ColorTheme, type ThemeMode } from '#lib/types';
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
@@ -153,9 +155,11 @@ async function rateLimit(event: RequestEvent): Promise<Response | null> {
 	return null;
 }
 
-export const handle: Handle = async ({ event, resolve }) => {
+const withRequestId: Handle = async ({ event, resolve }) => {
 	// Everything logged while handling this request carries its id (also sent back as X-Request-Id).
 	const requestId = event.request.headers.get('x-request-id')?.slice(0, 64) || crypto.randomUUID();
+	// So a Sentry event can be matched to its log lines.
+	Sentry.setTag('request_id', requestId);
 	const response = await withRequestContext({ requestId, userId: null, method: event.request.method, path: event.url.pathname }, () =>
 		handleRequest({ event, resolve })
 	);
@@ -166,6 +170,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 	return response;
 };
+
+/** Sentry wraps each request first, so everything after it runs inside its trace. */
+export const handle = sequence(Sentry.sentryHandle(), withRequestId);
+
+/** Unexpected errors in loads, actions and endpoints go to Sentry (instrumentation.server.ts). */
+export const handleError = Sentry.handleErrorWithSentry();
 
 const handleRequest: Handle = async ({ event, resolve }) => {
 	if (isForbiddenCrossSite(event.request, event.url, ALLOWED_ORIGINS)) {
@@ -183,6 +193,8 @@ const handleRequest: Handle = async ({ event, resolve }) => {
 	event.locals.user = session?.user ?? null;
 	const ctx = requestContext();
 	if (ctx) ctx.userId = event.locals.user?.id ?? null;
+	// The id only: no email, name or IP goes to Sentry.
+	Sentry.setUser(event.locals.user ? { id: event.locals.user.id } : null);
 	event.locals.session = session?.session ?? null;
 
 	const tooBig = refuseLargeBodies(event);

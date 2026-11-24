@@ -6,6 +6,8 @@ struct AppConfig: Sendable {
     let associatedDomainHost: String
     let googleClientID: String
     let googleRedirectScheme: String
+    /// Sentry DSN (`SENTRY_DSN`); nil keeps crash reporting off.
+    let sentryDSN: String?
 
     static let fallbackBaseURL = URL(string: "https://availabliss.com")!
 
@@ -19,7 +21,8 @@ struct AppConfig: Sendable {
             apiBaseURL: base,
             associatedDomainHost: host.isEmpty ? (base.host() ?? "availabliss.com") : host,
             googleClientID: value("AVGoogleClientID"),
-            googleRedirectScheme: value("AVGoogleRedirectScheme")
+            googleRedirectScheme: value("AVGoogleRedirectScheme"),
+            sentryDSN: value("AVSentryDSN").isEmpty ? nil : value("AVSentryDSN")
         )
     }
 

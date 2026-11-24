@@ -36,6 +36,9 @@
         android:theme="@style/Theme.Availabliss"
         tools:targetApi="37">
 
+        <!-- Sentry starts in AvailablissApp.onCreate (CrashReporting), with the DSN from the build. -->
+        <meta-data android:name="io.sentry.auto-init" android:value="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

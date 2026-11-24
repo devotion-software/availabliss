@@ -15,7 +15,10 @@ final class SessionStore {
     private(set) var state: State
     /// Cached on the device, so a later launch can open straight away (see `restore`).
     private(set) var user: User? {
-        didSet { Self.cache(user) }
+        didSet {
+            Self.cache(user)
+            if user?.id != oldValue?.id { CrashReporting.setUser(id: user?.id) }
+        }
     }
 
     private let api: APIClient

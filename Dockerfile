@@ -12,7 +12,13 @@ COPY web/ .
 # db and auth modules refuse to load unconfigured. These placeholders are scoped to
 # this one command (not ENV), so no layer keeps them; Coolify injects the real values
 # into the runtime image.
-RUN DATABASE_URL=mysql://build:build@localhost:3306/build \
+# Sentry source maps: uploaded only when the SENTRY_AUTH_TOKEN build secret is given
+# (docker build --secret id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN, or Coolify's build
+# secrets). It's mounted for this command alone, so no layer keeps it. Org and project aren't secret.
+ARG SENTRY_ORG
+ARG SENTRY_PROJECT
+RUN --mount=type=secret,id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN \
+    DATABASE_URL=mysql://build:build@localhost:3306/build \
     BETTER_AUTH_SECRET=build-time-placeholder-not-used-at-runtime \
     bun run build
 
