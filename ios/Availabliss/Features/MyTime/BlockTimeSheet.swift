@@ -7,6 +7,8 @@ struct BlockTimeSheet: View {
 
     let editing: ManualBlock?
     let save: (NewManualBlock) async -> Bool
+    /// Removes the block being edited (every occurrence of a repeat).
+    let remove: (() async -> Void)?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
     @State private var start: Date
@@ -17,6 +19,7 @@ struct BlockTimeSheet: View {
     @State private var until: Date?
     @State private var note: String
     @State private var isSaving = false
+    @State private var confirmingRemove = false
     private let opensOnDate: Bool
 
     /// - Parameters:
@@ -25,12 +28,15 @@ struct BlockTimeSheet: View {
     ///   - when: Start on exact times, all day, or several days (from `initialDay` to `lastDay`).
     ///   - pickDate: Open with the start date's calendar showing (for presets that still need a day).
     ///   - editing: Edit this block instead of creating one; its times, repeat and note win.
+    ///   - remove: When editing, offers to remove the block.
     init(
         initialDay: CalendarDay, range: (from: Int, to: Int)? = nil, when: When = .times, lastDay: CalendarDay? = nil,
-        pickDate: Bool = false, editing: ManualBlock? = nil, save: @escaping (NewManualBlock) async -> Bool
+        pickDate: Bool = false, editing: ManualBlock? = nil, save: @escaping (NewManualBlock) async -> Bool,
+        remove: (() async -> Void)? = nil
     ) {
         self.editing = editing
         self.save = save
+        self.remove = remove
         opensOnDate = pickDate
         if let block = editing {
             _start = State(initialValue: block.start)
@@ -78,6 +84,27 @@ struct BlockTimeSheet: View {
             }
             .buttonStyle(.filled(.accent, height: 52))
             .disabled(isSaving)
+            if let editing, remove != nil {
+                Button(editing.repeat == .none ? "Remove block" : "Remove every occurrence") { confirmingRemove = true }
+                    .buttonStyle(.destructiveTextAction)
+                    .frame(maxWidth: .infinity)
+                    .disabled(isSaving)
+            }
+        }
+        .confirmSheet(
+            "Remove this block?",
+            isPresented: $confirmingRemove,
+            message: editing?.repeat == ManualBlock.Repeat.none ? "This time will count as free again." : "Every repeat of it will be removed."
+        ) {
+            [
+                ConfirmOption(
+                    editing?.repeat == ManualBlock.Repeat.none ? "Remove block" : "Remove every occurrence",
+                    systemImage: "trash", kind: .destructive
+                ) {
+                    dismiss()
+                    if let remove { Task { await remove() } }
+                }
+            ]
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: repeatMode)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: until)

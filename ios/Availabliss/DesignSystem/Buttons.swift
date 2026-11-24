@@ -80,12 +80,14 @@ struct GlassPillButtonStyle: ButtonStyle {
 /// Plain text action in `accent-ink` ("Use a different email", "Change").
 struct TextActionButtonStyle: ButtonStyle {
     var fontSize: CGFloat = 14
+    /// Warning ink, for an action that removes something.
+    var destructive = false
     @Environment(\.theme) private var theme
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .bodyFont(fontSize, .semibold, relativeTo: .subheadline)
-            .foregroundStyle(theme.accentInk)
+            .foregroundStyle(destructive ? theme.warnInk : theme.accentInk)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.6 : 1)
@@ -120,6 +122,7 @@ extension ButtonStyle where Self == GlassPillButtonStyle {
 
 extension ButtonStyle where Self == TextActionButtonStyle {
     static var textAction: TextActionButtonStyle { TextActionButtonStyle() }
+    static var destructiveTextAction: TextActionButtonStyle { TextActionButtonStyle(destructive: true) }
 }
 
 extension ButtonStyle where Self == PressableButtonStyle {

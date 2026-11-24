@@ -396,6 +396,10 @@
 	defaultAllDay={sheetAllDay}
 	defaultLastDay={sheetLastDay}
 	onsaved={() => refresh().catch(toasts.error)}
+	ondelete={(block) => {
+		sheetOpen = false;
+		askDelete(block);
+	}}
 />
 <CalendarBusySheet bind:open={calendarOpen} interval={calendarInterval} onchanged={() => refresh().catch(toasts.error)} />
 <ConfirmSheet

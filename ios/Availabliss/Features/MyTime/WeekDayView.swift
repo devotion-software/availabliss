@@ -13,6 +13,8 @@ struct BlockDraft: Identifiable {
     @MainActor func sheet(model: MyTimeViewModel) -> some View {
         BlockTimeSheet(initialDay: day, range: range, when: when, pickDate: pickDate, editing: editing) { block in
             if let editing { await model.update(editing.id, block) } else { await model.create(block) }
+        } remove: {
+            if let editing { await model.remove(editing) }
         }
     }
 }

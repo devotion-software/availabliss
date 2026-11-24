@@ -28,6 +28,8 @@
 		/** Prefill the last day of an all-day block that runs over several days. */
 		defaultLastDay?: string | null;
 		onsaved: (block: ManualBlock) => void;
+		/** When editing: remove the block (every occurrence of a repeat). */
+		ondelete?: (block: ManualBlock) => void;
 	}
 	let {
 		open = $bindable(),
@@ -37,7 +39,8 @@
 		defaultRange = null,
 		defaultAllDay = false,
 		defaultLastDay = null,
-		onsaved
+		onsaved,
+		ondelete
 	}: Props = $props();
 
 	const uid = $props.id();
@@ -214,10 +217,27 @@
 
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
 		<Button type="submit" variant="accent" size="md" block loading={busy}>{block ? 'Save changes' : 'Block this time'}</Button>
+		{#if block && ondelete}
+			{@const editing = block}
+			<button type="button" class="delete" disabled={busy} onclick={() => ondelete(editing)}>
+				{editing.repeat === 'none' ? 'Delete block' : 'Delete every occurrence'}
+			</button>
+		{/if}
 	</form>
 </Sheet>
 
 <style>
+	.delete {
+		align-self: center;
+		min-height: 44px;
+		padding: 0 12px;
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--warn-ink);
+	}
+	.delete:hover:not(:disabled) {
+		text-decoration: underline;
+	}
 	.form {
 		display: flex;
 		flex-direction: column;
